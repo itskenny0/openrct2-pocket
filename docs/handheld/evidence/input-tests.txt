@@ -1,0 +1,8 @@
+Internal ctest changing into directory: /workspace/scratch/ac3d1684fdc2/build-input-tests
+Test project /workspace/scratch/ac3d1684fdc2/build-input-tests
+    Start 1: handheld-input
+1/1 Test #1: handheld-input ...................   Passed    0.04 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Total Test time (real) =   0.13 sec

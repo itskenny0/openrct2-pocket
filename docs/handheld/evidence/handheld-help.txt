@@ -1,0 +1,39 @@
+usage: openrct2                        <uri>           [options]
+                edit                   <uri>           [options]
+                intro                                  [options]
+                host                   <uri>           [options]
+                join                   <hostname>      [options]
+                set-rct2               <path>          [options]
+                scan-objects           <path>          [options]
+                handle-uri             openrct2://.../ [options]
+                trigger-steam-download                 [options]
+                convert                ...
+                screenshot             ...
+                sprite                 ...
+                simulate               ...
+                parkinfo               ...
+
+    -h, --help                    show this help message and exit
+    -v, --version                 show version information and exit
+    -n, --no-install              do not install scenario if passed
+    -a, --all                     show help for all commands
+    --about                       show information about OpenRCT2
+    --verbose                     log verbose messages
+    --headless                    run OpenRCT2 headless
+    --silent-replays              use unobtrusive replays
+    --port=<int>                  port to use for hosting or joining a server
+    --address=<str>               address to listen on when hosting a server
+    --password=<str>              password needed to join the server
+    --user-data-path=<str>        path to the user data directory (containing config.ini)
+    --openrct2-data-path=<str>    path to the OpenRCT2 data directory (containing languages)
+    --rct1-data-path=<str>        path to the RollerCoaster Tycoon 1 data directory (containing data/csg1.dat)
+    --rct2-data-path=<str>        path to the RollerCoaster Tycoon 2 data directory (containing data/g1.dat)
+
+examples:
+  openrct2 ./my_park.sv6                                 open a saved park
+  openrct2 ./SnowyPark.sc6                               install and open a scenario
+  openrct2 ./ShuttleLoop.td6                             install a track
+  openrct2 https://example.org/files/ExamplePark.sv6     download and open a saved park
+  openrct2 host ./my_park.sv6 --port 11753 --headless    run a headless server for a saved park
+
+openrct2 -ha shows help for all commands. openrct2 <command> -h will show help and details for a given command.

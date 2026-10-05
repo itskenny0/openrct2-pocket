@@ -1,0 +1,2 @@
+eb49e62a3a110ef77bb186510cbbb24e36c3f6af488e854883dc043ec0b45def  ../build-baseline/openrct2
+54ee876a6e496596a15df5b86ebe12597451c45ade5fd1acd33fc892ece2e9e3  ../artifacts/openrct2-upstream-x86_64

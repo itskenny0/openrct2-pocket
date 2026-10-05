@@ -356,6 +356,8 @@ public:
         SDL_Event e;
         while (SDL_PollEvent(&e))
         {
+            if (_inputManager.handleHandheldEvent(e))
+                continue;
             switch (e.type)
             {
                 case SDL_QUIT:
@@ -829,7 +831,10 @@ private:
 
         ApplyScreenSaverLockSetting();
 
-        SDL_SetWindowMinimumSize(_window, 720, 480);
+        if (Handheld::IsEnabled())
+            SDL_SetWindowMinimumSize(_window, 512, 384);
+        else
+            SDL_SetWindowMinimumSize(_window, 720, 480);
         SetCursorTrap(Config::Get().general.trapCursor);
         _platformUiContext->SetWindowIcon(_window);
 

@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include "../handheld/ControllerInput.h"
+
 #include <openrct2/interface/ScreenCoords.hpp>
 #include <queue>
 #include <string_view>
@@ -57,6 +59,7 @@ namespace OpenRCT2::Ui
     class InputManager
     {
     private:
+        Handheld::ControllerInput _handheld;
         uint32_t _lastJoystickCheck{};
         std::vector<SDL_GameController*> _gameControllers;
         std::queue<InputEvent> _events;
@@ -88,6 +91,8 @@ namespace OpenRCT2::Ui
 
     public:
         InputManager();
+
+        bool handleHandheldEvent(const SDL_Event& e);
 
         bool isModifierKeyPressed(ModifierKey modifier) const;
         void queueInputEvent(const SDL_Event& e);

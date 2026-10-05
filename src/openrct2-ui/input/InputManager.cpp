@@ -10,6 +10,7 @@
 #include "InputManager.h"
 
 #include "ShortcutIds.h"
+#include "../handheld/Explorer.h"
 
 #include <SDL_events.h>
 #include <SDL_timer.h>
@@ -34,6 +35,11 @@ using namespace OpenRCT2::Ui;
 InputManager::InputManager()
 {
     _modifierKeyState = EnumValue(ModifierKey::none);
+}
+
+bool InputManager::handleHandheldEvent(const SDL_Event& e)
+{
+    return Handheld::IsEnabled() && _handheld.handleEvent(e);
 }
 
 void InputManager::queueInputEvent(const SDL_Event& e)
@@ -201,11 +207,16 @@ void InputManager::updateAnalogueScroll()
 
 void InputManager::process()
 {
-    checkJoysticks();
-    processAnalogueInput();
+    if (!Handheld::IsEnabled())
+    {
+        checkJoysticks();
+        processAnalogueInput();
+    }
     handleModifiers();
     processEvents();
     processHoldEvents();
+    if (Handheld::IsEnabled())
+        Handheld::UpdateExplorer(_handheld);
     handleViewScrolling();
 }
 
@@ -265,7 +276,7 @@ void InputManager::handleViewScrolling()
     }
 
     // Mouse edge scrolling
-    if (Config::Get().general.edgeScrolling)
+    if (Config::Get().general.edgeScrolling && !Handheld::IsEnabled())
     {
         if (InputGetState() != InputState::normal)
             return;
