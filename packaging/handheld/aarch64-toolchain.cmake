@@ -1,0 +1,18 @@
+# Proposed cross-build entry point. Requires an independently provisioned, compatible sysroot.
+# This file is not a toolchain download and has not produced a Brick binary yet.
+set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_SYSTEM_PROCESSOR aarch64)
+if(NOT DEFINED ENV{HANDHELD_SYSROOT} OR NOT DEFINED ENV{HANDHELD_TOOLCHAIN_BIN})
+  message(FATAL_ERROR "Set HANDHELD_SYSROOT and HANDHELD_TOOLCHAIN_BIN to the verified target SDK")
+endif()
+set(CMAKE_SYSROOT "$ENV{HANDHELD_SYSROOT}")
+set(CMAKE_C_COMPILER "$ENV{HANDHELD_TOOLCHAIN_BIN}/aarch64-linux-gnu-gcc")
+set(CMAKE_CXX_COMPILER "$ENV{HANDHELD_TOOLCHAIN_BIN}/aarch64-linux-gnu-g++")
+set(CMAKE_FIND_ROOT_PATH "${CMAKE_SYSROOT}")
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+set(ENV{PKG_CONFIG_SYSROOT_DIR} "${CMAKE_SYSROOT}")
+set(ENV{PKG_CONFIG_LIBDIR} "${CMAKE_SYSROOT}/usr/lib/aarch64-linux-gnu/pkgconfig:${CMAKE_SYSROOT}/usr/lib/pkgconfig:${CMAKE_SYSROOT}/usr/share/pkgconfig")
+set(ENV{PKG_CONFIG_PATH} "")

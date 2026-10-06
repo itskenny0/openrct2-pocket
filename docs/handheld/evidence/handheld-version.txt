@@ -1,0 +1,7 @@
+OpenRCT2, v0.5.5 (21afdbc on HEAD)
+Linux (x86-64)
+Network version: 0.5.5-2
+Plugin API version: 124
+Current park file version: 63
+Minimum park file version: 57
+Breakpad support disabled
