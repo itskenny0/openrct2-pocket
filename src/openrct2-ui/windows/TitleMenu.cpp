@@ -7,6 +7,7 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
+#include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/interface/Window.h>
@@ -19,7 +20,10 @@
 #include <openrct2/SpriteIds.h>
 #include <openrct2/actions/GameActionRunner.h>
 #include <openrct2/actions/general/LoadOrQuitAction.h>
+#include <openrct2/drawing/Line.h>
+#include <openrct2/drawing/PaletteIndex.h>
 #include <openrct2/drawing/Rectangle.h>
+#include <openrct2/drawing/Text.h>
 #include <openrct2/interface/ColourWithFlags.h>
 #include <openrct2/scenes/SceneManager.h>
 #include <openrct2/scenes/editor/EditorScene.h>
@@ -94,8 +98,26 @@ namespace OpenRCT2::Ui::Windows
     {
     private:
         ScreenRect _filterRect;
+        WidgetIndex _handheldSelection = WIDX_START_NEW_GAME;
 
     public:
+        void handheldMove(int32_t direction)
+        {
+            do
+            {
+                _handheldSelection = (_handheldSelection + direction + 4) % 4;
+            } while (!widgets[_handheldSelection].isVisible());
+            invalidate();
+        }
+
+        void handheldConfirm()
+        {
+            if (_handheldSelection == WIDX_GAME_TOOLS)
+                onMouseDown(_handheldSelection);
+            else
+                onMouseUp(_handheldSelection);
+        }
+
         void onOpen() override
         {
             setWidgets(_titleMenuWidgets);
@@ -269,6 +291,25 @@ namespace OpenRCT2::Ui::Windows
         {
             Rectangle::filter(rt, _filterRect, FilterPaletteID::palette51);
             drawWidgets(rt);
+            if (Handheld::IsEnabled())
+            {
+                const auto& widget = widgets[_handheldSelection];
+                const auto left = windowPos.x + widget.left;
+                const auto right = windowPos.x + widget.right;
+                const auto top = windowPos.y + widget.top;
+                const auto bottom = windowPos.y + widget.bottom;
+                GfxDrawLine(rt, { { left, top }, { right, top } }, PaletteIndex::pi21);
+                GfxDrawLine(rt, { { left, bottom }, { right, bottom } }, PaletteIndex::pi21);
+                GfxDrawLine(rt, { { left, top }, { left, bottom } }, PaletteIndex::pi21);
+                GfxDrawLine(rt, { { right, top }, { right, bottom } }, PaletteIndex::pi21);
+                static constexpr const char* labels[] = { "New Park", "Load Park", "Multiplayer", "Game Tools" };
+                drawText(
+                    rt, { ContextGetWidth() / 2, bottom + 8 }, labels[_handheldSelection],
+                    { Colour::white, TextAlignment::centre });
+                drawText(
+                    rt, { ContextGetWidth() / 2, bottom + 24 }, "D-pad: Choose   A: Select   B: Exit",
+                    { Colour::white, TextAlignment::centre });
+            }
         }
     };
 
@@ -283,5 +324,17 @@ namespace OpenRCT2::Ui::Windows
         return windowMgr->Create<TitleMenuWindow>(
             WindowClass::titleMenu, ScreenCoordsXY(0, ContextGetHeight() - 182), { 0, windowHeight },
             { WindowFlag::stickToBack, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
+    }
+
+    void TitleMenuHandheldMove(int32_t direction)
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::titleMenu))
+            static_cast<TitleMenuWindow*>(window)->handheldMove(direction);
+    }
+
+    void TitleMenuHandheldConfirm()
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::titleMenu))
+            static_cast<TitleMenuWindow*>(window)->handheldConfirm();
     }
 } // namespace OpenRCT2::Ui::Windows

@@ -50,6 +50,14 @@ namespace OpenRCT2::Drawing
 
 namespace OpenRCT2::Ui::Windows
 {
+    void TitleMenuHandheldMove(int32_t direction);
+    void TitleMenuHandheldConfirm();
+    void ScenarioSelectHandheldMove(int32_t direction);
+    void ScenarioSelectHandheldTab(int32_t direction);
+    void ScenarioSelectHandheldConfirm();
+    void HandheldMenuOpen();
+    void HandheldMenuMove(int32_t direction);
+    void HandheldMenuConfirm();
     constexpr int32_t kTabBarHeight = 43;
 
     extern bool gWindowSceneryScatterEnabled;

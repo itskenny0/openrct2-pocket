@@ -43,6 +43,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="audio\AudioContext.h" />
+    <ClInclude Include="handheld\ControllerInput.h" />
+    <ClInclude Include="handheld\Explorer.h" />
+    <ClInclude Include="handheld\ListFocus.h" />
     <ClInclude Include="audio\AudioFormat.h" />
     <ClInclude Include="audio\AudioMixer.h" />
     <ClInclude Include="audio\SDLAudioSource.h" />
@@ -160,6 +163,9 @@
     <ClCompile Include="scripting\ScWindow.cpp" />
     <ClCompile Include="scripting\UiExtensions.cpp" />
     <ClCompile Include="ProvisionalElements.cpp" />
+    <ClCompile Include="handheld\ControllerInput.cpp" />
+    <ClCompile Include="handheld\Explorer.cpp" />
+    <ClCompile Include="handheld\Menu.cpp" />
     <ClCompile Include="SDLException.cpp" />
     <ClCompile Include="TextComposition.cpp" />
     <ClCompile Include="title\TitleSequencePlayer.cpp" />

@@ -17,18 +17,23 @@ namespace OpenRCT2::Ui::Handheld
 
     enum class Action
     {
-        inspect,
+        confirm,
         back,
-        rotate,
-        zoomOut,
-        zoomIn,
-        pause,
+        contextPrimary,
+        contextSecondary,
+        previousOption,
+        nextOption,
+        openMenu,
+        openBuild,
+        quit,
     };
 
     struct Frame
     {
         int32_t panX{};
         int32_t panY{};
+        int32_t navigateX{};
+        int32_t navigateY{};
         std::vector<Action> actions;
     };
 
@@ -51,9 +56,13 @@ namespace OpenRCT2::Ui::Handheld
         bool _initialised{};
         bool _scan{ true };
         bool _armed{};
+        bool _quitHeld{};
         uint32_t _lastTick{};
         float _panX{};
         float _panY{};
+        int32_t _navigationX{};
+        int32_t _navigationY{};
+        uint32_t _repeatAt{};
         std::vector<Action> _actions;
 
         void refresh();

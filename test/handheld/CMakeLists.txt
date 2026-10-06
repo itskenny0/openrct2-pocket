@@ -8,3 +8,6 @@ add_executable(handheld-input-tests ControllerInputTests.cpp ../../src/openrct2-
 target_link_libraries(handheld-input-tests PRIVATE PkgConfig::SDL2)
 enable_testing()
 add_test(NAME handheld-input COMMAND handheld-input-tests)
+if(UNIX)
+    add_test(NAME handheld-launcher COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/LauncherTests.sh)
+endif()

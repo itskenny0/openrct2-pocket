@@ -9,6 +9,7 @@
 
 #include "../interface/Theme.h"
 
+#include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/interface/Objective.h>
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/interface/Window.h>
@@ -148,6 +149,16 @@ namespace OpenRCT2::Ui::Windows
         void onOpen() override
         {
             setWidgets(_scenarioSelectWidgets);
+            if (Handheld::IsEnabled())
+            {
+                widgets[WIDX_BACKGROUND].right = width - 1;
+                widgets[WIDX_BACKGROUND].bottom = height - 1;
+                widgets[WIDX_TITLEBAR].right = width - 2;
+                widgets[WIDX_CLOSE].left = width - 13;
+                widgets[WIDX_CLOSE].right = width - 3;
+                widgets[WIDX_TABCONTENT].right = width - 1;
+                widgets[WIDX_TABCONTENT].bottom = height - 1;
+            }
 
             // Load scenario list
             ScenarioRepositoryScan();
@@ -157,6 +168,69 @@ namespace OpenRCT2::Ui::Windows
             updatePressedTab();
             initialiseListItems();
             initScrollWidgets();
+            if (Handheld::IsEnabled())
+                handheldMove(1);
+        }
+
+        void handheldMove(int32_t direction)
+        {
+            std::vector<const ScenarioIndexEntry*> selectable;
+            for (const auto& item : _listItems)
+                if (item.type == ListItemType::scenario && !item.scenario.is_locked)
+                    selectable.push_back(item.scenario.scenario);
+            if (selectable.empty())
+                return;
+            auto found = std::find(selectable.begin(), selectable.end(), _highlightedScenario);
+            int32_t index = found == selectable.end() ? (direction > 0 ? -1 : 0)
+                                                      : static_cast<int32_t>(found - selectable.begin());
+            index = (index + direction + static_cast<int32_t>(selectable.size())) % static_cast<int32_t>(selectable.size());
+            _highlightedScenario = selectable[index];
+            _showLockedInformation = false;
+            int32_t y = 0;
+            for (const auto& item : _listItems)
+            {
+                if (item.type == ListItemType::scenario && item.scenario.scenario == _highlightedScenario)
+                    break;
+                y += item.type == ListItemType::heading ? 18 : GetScenarioListItemSize();
+            }
+            const auto visibleHeight = height - kWidgetsStart - 20;
+            if (y < scrolls[0].contentOffsetY)
+                scrolls[0].contentOffsetY = y;
+            else if (y + GetScenarioListItemSize() > scrolls[0].contentOffsetY + visibleHeight)
+                scrolls[0].contentOffsetY = std::max(0, y + GetScenarioListItemSize() - visibleHeight);
+            invalidate();
+        }
+
+        void handheldTab(int32_t direction)
+        {
+            auto tab = static_cast<int32_t>(selectedTab);
+            for (int32_t i = 0; i < kNumTabs; ++i)
+            {
+                tab = (tab + direction + kNumTabs) % kNumTabs;
+                if (widgets[WIDX_TAB1 + tab].isVisible())
+                {
+                    onMouseDown(WIDX_TAB1 + tab);
+                    handheldMove(1);
+                    break;
+                }
+            }
+        }
+
+        void handheldConfirm()
+        {
+            if (_highlightedScenario != nullptr)
+            {
+                for (const auto& item : _listItems)
+                {
+                    if (item.type == ListItemType::scenario && item.scenario.scenario == _highlightedScenario
+                        && !item.scenario.is_locked)
+                    {
+                        const auto path = _highlightedScenario->Path;
+                        _callback(path);
+                        return;
+                    }
+                }
+            }
         }
 
         void onLanguageChange() override
@@ -197,6 +271,8 @@ namespace OpenRCT2::Ui::Windows
 
         int32_t GetPreviewPaneWidth() const
         {
+            if (Handheld::IsEnabled())
+                return 148;
             if (Config::Get().interface.scenarioPreviewScreenshots)
                 return kPreviewPaneWidthScreenshots;
             else
@@ -883,7 +959,26 @@ namespace OpenRCT2::Ui::Windows
         }
 
         window = windowMgr->Create<ScenarioSelectWindow>(
-            WindowClass::scenarioSelect, {}, kWindowSize, { WindowFlag::autoPosition, WindowFlag::centreScreen }, callback);
+            WindowClass::scenarioSelect, {}, Handheld::IsEnabled() ? ScreenSize{ 504, 360 } : kWindowSize,
+            { WindowFlag::autoPosition, WindowFlag::centreScreen }, callback);
         return window;
+    }
+
+    void ScenarioSelectHandheldMove(int32_t direction)
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::scenarioSelect))
+            static_cast<ScenarioSelectWindow*>(window)->handheldMove(direction);
+    }
+
+    void ScenarioSelectHandheldTab(int32_t direction)
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::scenarioSelect))
+            static_cast<ScenarioSelectWindow*>(window)->handheldTab(direction);
+    }
+
+    void ScenarioSelectHandheldConfirm()
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::scenarioSelect))
+            static_cast<ScenarioSelectWindow*>(window)->handheldConfirm();
     }
 } // namespace OpenRCT2::Ui::Windows

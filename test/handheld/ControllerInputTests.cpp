@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Integration checks against SDL virtual controllers; no original game assets required.
 #include "../../src/openrct2-ui/handheld/ControllerInput.h"
+#include "../../src/openrct2-ui/handheld/ListFocus.h"
 
 #include <SDL.h>
 #include <cstdlib>
@@ -26,6 +27,13 @@ static void Pump(ControllerInput& input)
 
 int main()
 {
+    ListFocus focus;
+    focus.move(-1, 5);
+    Check(focus.index() == 4, "list focus wraps backwards");
+    focus.move(1, 5);
+    Check(focus.index() == 0, "list focus wraps forwards");
+    focus.move(1, 0);
+    Check(focus.index() == 0, "empty lists are safe");
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
     Check(SDL_Init(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) == 0, "SDL initialises");
     {
@@ -49,7 +57,7 @@ int main()
 
         press(SDL_CONTROLLER_BUTTON_A, true);
         auto frame = input.update(true, 120);
-        Check(frame.actions.size() == 1 && frame.actions[0] == Action::inspect, "A emits exactly one mapped action");
+        Check(frame.actions.size() == 1 && frame.actions[0] == Action::confirm, "A emits exactly one mapped action");
         Check(input.update(true, 130).actions.empty(), "held A does not repeat");
         press(SDL_CONTROLLER_BUTTON_A, false);
         input.update(true, 140);
@@ -57,6 +65,8 @@ int main()
         press(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, true);
         frame = input.update(true, 190);
         Check(frame.panX == 6 && frame.panY == 0, "D-pad pans at time-based speed");
+        Check(frame.navigateX == 1, "D-pad emits immediate menu step");
+        Check(input.update(true, 200).navigateX == 0, "menu repetition waits for initial delay");
         frame = input.update(true, 1190);
         Check(frame.panX == 6, "long stalls are clamped");
         press(SDL_CONTROLLER_BUTTON_DPAD_LEFT, true);
@@ -95,6 +105,31 @@ int main()
         Check(!input.handleEvent(raw), "mouse input preserved");
         raw.type = SDL_KEYDOWN;
         Check(!input.handleEvent(raw), "keyboard input preserved");
+
+        SDL_setenv("OPENRCT2_HANDHELD_SWAP_AB", "1", 1);
+        press(SDL_CONTROLLER_BUTTON_B, true);
+        frame = input.update(true, 1430);
+        Check(frame.actions.size() == 1 && frame.actions[0] == Action::confirm, "Brick A/B swap emits confirm");
+        press(SDL_CONTROLLER_BUTTON_B, false);
+        SDL_setenv("OPENRCT2_HANDHELD_SWAP_AB", "0", 1);
+        press(SDL_CONTROLLER_BUTTON_START, true);
+        press(SDL_CONTROLLER_BUTTON_BACK, true);
+        frame = input.update(true, 1440);
+        Check(frame.actions.size() == 1 && frame.actions[0] == Action::quit, "quit chord suppresses menu/build");
+        Check(input.update(true, 1450).actions.empty(), "quit chord cannot repeat");
+        press(SDL_CONTROLLER_BUTTON_START, false);
+        press(SDL_CONTROLLER_BUTTON_BACK, false);
+        input.update(true, 1460);
+        press(SDL_CONTROLLER_BUTTON_START, true);
+        frame = input.update(true, 1470);
+        Check(frame.actions.size() == 1 && frame.actions[0] == Action::openMenu, "Start opens menu");
+        input.suspend();
+        press(SDL_CONTROLLER_BUTTON_BACK, true);
+        frame = input.update(true, 1480);
+        Check(frame.actions.size() == 1 && frame.actions[0] == Action::quit, "staggered quit works after menu suspension");
+        press(SDL_CONTROLLER_BUTTON_START, false);
+        press(SDL_CONTROLLER_BUTTON_BACK, false);
+        input.update(true, 1490);
 
         press(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, true);
         SDL_JoystickDetachVirtual(index);

@@ -103,16 +103,87 @@ namespace OpenRCT2::Ui::Handheld
     {
         SyncFocusWindow();
         auto frame = input.update(ContextHasFocus(), SDL_GetTicks());
+        auto* wm = GetWindowManager();
+        for (const auto action : frame.actions)
+        {
+            if (action == Action::quit)
+            {
+                ContextQuit();
+                input.suspend();
+                return;
+            }
+        }
+        if (wm->FindByClass(WindowClass::handheldMenu) != nullptr)
+        {
+            if (frame.navigateY != 0)
+                Windows::HandheldMenuMove(frame.navigateY);
+            for (const auto action : frame.actions)
+            {
+                if (action == Action::confirm)
+                    Windows::HandheldMenuConfirm();
+                else if (action == Action::back || action == Action::openMenu)
+                    wm->CloseByClass(WindowClass::handheldMenu);
+                input.suspend();
+                break;
+            }
+            return;
+        }
+        if (gLegacyScene == LegacyScene::titleSequence)
+        {
+            const bool scenarios = wm->FindByClass(WindowClass::scenarioSelect) != nullptr;
+            bool modal = HasTextOrModalInput() || wm->FindByClass(WindowClass::dropdown) != nullptr
+                || wm->FindByClass(WindowClass::changelog) != nullptr;
+            for (const auto& window : gWindowList)
+            {
+                if (window->classification != WindowClass::scenarioSelect
+                    && !window->flags.hasAny(WindowFlag::dead, WindowFlag::stickToBack, WindowFlag::stickToFront))
+                    modal = true;
+            }
+            if (!modal)
+            {
+                if (scenarios && frame.navigateY != 0)
+                    Windows::ScenarioSelectHandheldMove(frame.navigateY);
+                else if (!scenarios && (frame.navigateX != 0 || frame.navigateY != 0))
+                    Windows::TitleMenuHandheldMove(frame.navigateX != 0 ? frame.navigateX : frame.navigateY);
+            }
+            for (const auto action : frame.actions)
+            {
+                if (action == Action::back)
+                {
+                    if (wm->FindByClass(WindowClass::dropdown) != nullptr)
+                        wm->CloseByClass(WindowClass::dropdown);
+                    else if (modal || scenarios)
+                        wm->CloseTop();
+                    else
+                        ContextQuit();
+                }
+                else if (!modal && scenarios)
+                {
+                    if (action == Action::confirm)
+                        Windows::ScenarioSelectHandheldConfirm();
+                    else if (action == Action::previousOption || action == Action::nextOption)
+                        Windows::ScenarioSelectHandheldTab(action == Action::previousOption ? -1 : 1);
+                }
+                else if (!modal && action == Action::confirm)
+                    Windows::TitleMenuHandheldConfirm();
+                input.suspend();
+                break;
+            }
+            return;
+        }
         if (gLegacyScene != LegacyScene::playing || HasTextOrModalInput())
         {
-            input.suspend();
+            for (const auto action : frame.actions)
+                if (action == Action::back)
+                    wm->CloseTop();
+            if (!frame.actions.empty() || gLegacyScene != LegacyScene::playing)
+                input.suspend();
             return;
         }
         for (const auto action : frame.actions)
         {
             if (action == Action::back)
             {
-                auto* wm = GetWindowManager();
                 if (wm->FindByClass(WindowClass::error) != nullptr || gInputFlags.has(InputFlag::toolActive))
                     Invoke(ShortcutId::kInterfaceCancelConstruction);
                 else if (wm->FindByClass(WindowClass::dropdown) != nullptr)
@@ -120,26 +191,31 @@ namespace OpenRCT2::Ui::Handheld
                 else
                     wm->CloseTop();
             }
+            else if (action == Action::openMenu && !gInputFlags.has(InputFlag::toolActive))
+            {
+                Windows::HandheldMenuOpen();
+            }
             else if (CanExplore())
             {
                 switch (action)
                 {
-                    case Action::inspect:
+                    case Action::confirm:
                         ViewportInteractionLeftClick(Centre());
                         break;
-                    case Action::rotate:
+                    case Action::contextPrimary:
                         Invoke(ShortcutId::kViewGeneralRotateClockwise);
                         break;
-                    case Action::zoomOut:
+                    case Action::previousOption:
                         Windows::MainWindowZoom(false, false);
                         break;
-                    case Action::zoomIn:
+                    case Action::nextOption:
                         Windows::MainWindowZoom(true, false);
                         break;
-                    case Action::pause:
-                        Invoke(ShortcutId::kInterfacePause);
-                        break;
                     case Action::back:
+                    case Action::contextSecondary:
+                    case Action::openMenu:
+                    case Action::openBuild:
+                    case Action::quit:
                         break;
                 }
             }

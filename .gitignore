@@ -10,6 +10,12 @@ distribution/windows/*.exe
 distribution/android/*/external/
 
 # Build artifacts
+/build*/
+/stage*/
+/RCT1/
+/RCT2/
+/save-handheld/
+/test.park
 artifacts
 bin.*/
 .cache

@@ -37,6 +37,8 @@ namespace OpenRCT2::Ui::Handheld
         _actions.clear();
         _panX = _panY = 0;
         _lastTick = 0;
+        _navigationX = _navigationY = 0;
+        _repeatAt = 0;
     }
 
     void ControllerInput::refresh()
@@ -96,22 +98,36 @@ namespace OpenRCT2::Ui::Handheld
                     switch (event.cbutton.button)
                     {
                         case SDL_CONTROLLER_BUTTON_A:
-                            _actions.push_back(Action::inspect);
+                            _actions.push_back(
+                                std::getenv("OPENRCT2_HANDHELD_SWAP_AB") != nullptr
+                                        && std::string_view(std::getenv("OPENRCT2_HANDHELD_SWAP_AB")) == "1"
+                                    ? Action::back
+                                    : Action::confirm);
                             break;
                         case SDL_CONTROLLER_BUTTON_B:
-                            _actions.push_back(Action::back);
+                            _actions.push_back(
+                                std::getenv("OPENRCT2_HANDHELD_SWAP_AB") != nullptr
+                                        && std::string_view(std::getenv("OPENRCT2_HANDHELD_SWAP_AB")) == "1"
+                                    ? Action::confirm
+                                    : Action::back);
                             break;
                         case SDL_CONTROLLER_BUTTON_X:
-                            _actions.push_back(Action::rotate);
+                            _actions.push_back(Action::contextPrimary);
+                            break;
+                        case SDL_CONTROLLER_BUTTON_Y:
+                            _actions.push_back(Action::contextSecondary);
                             break;
                         case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
-                            _actions.push_back(Action::zoomOut);
+                            _actions.push_back(Action::previousOption);
                             break;
                         case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:
-                            _actions.push_back(Action::zoomIn);
+                            _actions.push_back(Action::nextOption);
                             break;
                         case SDL_CONTROLLER_BUTTON_START:
-                            _actions.push_back(Action::pause);
+                            _actions.push_back(Action::openMenu);
+                            break;
+                        case SDL_CONTROLLER_BUTTON_BACK:
+                            _actions.push_back(Action::openBuild);
                             break;
                         default:
                             break;
@@ -142,6 +158,17 @@ namespace OpenRCT2::Ui::Handheld
             return result;
         }
         auto held = [this](SDL_GameControllerButton button) { return SDL_GameControllerGetButton(_controller, button) != 0; };
+        // Emergency quit must work even if Start already opened and suspended a menu.
+        const bool quitChord = held(SDL_CONTROLLER_BUTTON_START) && held(SDL_CONTROLLER_BUTTON_BACK);
+        if (quitChord && !_quitHeld)
+        {
+            _quitHeld = true;
+            suspend();
+            result.actions = { Action::quit };
+            return result;
+        }
+        if (!quitChord)
+            _quitHeld = false;
         if (!_armed)
         {
             bool any = false;
@@ -156,6 +183,20 @@ namespace OpenRCT2::Ui::Handheld
         result.actions = std::exchange(_actions, {});
         const int x = held(SDL_CONTROLLER_BUTTON_DPAD_RIGHT) - held(SDL_CONTROLLER_BUTTON_DPAD_LEFT);
         const int y = held(SDL_CONTROLLER_BUTTON_DPAD_DOWN) - held(SDL_CONTROLLER_BUTTON_DPAD_UP);
+        if (x != _navigationX || y != _navigationY)
+        {
+            result.navigateX = x;
+            result.navigateY = y;
+            _navigationX = x;
+            _navigationY = y;
+            _repeatAt = now + 320;
+        }
+        else if ((x != 0 || y != 0) && static_cast<int32_t>(now - _repeatAt) >= 0)
+        {
+            result.navigateX = x;
+            result.navigateY = y;
+            _repeatAt = now + 95;
+        }
         const float speed = 120.0f * (x != 0 && y != 0 ? 0.70710678f : 1.0f);
         _panX = x == 0 ? 0 : _panX + x * speed * elapsed / 1000.0f;
         _panY = y == 0 ? 0 : _panY + y * speed * elapsed / 1000.0f;
