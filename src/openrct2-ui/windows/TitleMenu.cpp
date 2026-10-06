@@ -112,7 +112,9 @@ namespace OpenRCT2::Ui::Windows
 
         void handheldConfirm()
         {
-            if (_handheldSelection == WIDX_GAME_TOOLS)
+            if (_handheldSelection == WIDX_CONTINUE_SAVED_GAME)
+                HandheldLoadOpen();
+            else if (_handheldSelection == WIDX_GAME_TOOLS)
                 onMouseDown(_handheldSelection);
             else
                 onMouseUp(_handheldSelection);

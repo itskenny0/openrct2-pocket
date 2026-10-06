@@ -14,5 +14,7 @@ namespace OpenRCT2::Ui::Handheld
 {
     class ControllerInput;
     void UpdateExplorer(ControllerInput& input);
+    void EndTerrain();
+    void BeginTerrain(bool raise);
     void DrawExplorer(Drawing::RenderTarget& rt);
 } // namespace OpenRCT2::Ui::Handheld

@@ -23,6 +23,10 @@ See [current validation and continuation notes](docs/handheld/CHECKPOINT-2026-10
 
 These A/B labels assume `OPENRCT2_HANDHELD_SWAP_AB=1`, as set by the NextUI launcher to correct the observed SDL inversion. Without that override, SDL A confirms and SDL B backs. Physical mappings remain replaceable; L2/R2 and additional distinct buttons are not assigned in this slice.
 
-Save/load/options and toolbox screens are still desktop workflows. Select has a semantic OpenBuild event but no build menu yet. No native path construction, dashboard or finance screen is claimed.
+Options and toolbox screens remain desktop workflows. The terrain/save slice adds a native Build panel and three save/load slots; other save files still use the legacy browser. Native path construction, dashboard and finance screens are not implemented.
 
 Do not replace the currently working Brick executable or launcher with a native x86-64 binary or this menu-source launcher alone. A matching ARM build must be produced and audited first. Keep original assets, saved parks and `save-handheld/` when updating.
+
+## Terrain/save slice
+
+The next source slice adds a blue/yellow shared controller panel, Select → Build → raise/lower terrain, a selected-tile outline and contextual command strip, and three native save/load slots with Save and exit. See [terrain/save controls and validation scope](docs/handheld/TERRAIN-SAVE-SLICE.md). A matching ARM build and physical tests are still required; this is not yet a Brick release.

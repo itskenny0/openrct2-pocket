@@ -46,6 +46,8 @@
     <ClInclude Include="handheld\ControllerInput.h" />
     <ClInclude Include="handheld\Explorer.h" />
     <ClInclude Include="handheld\ListFocus.h" />
+    <ClInclude Include="handheld\Panel.h" />
+    <ClInclude Include="handheld\SaveSlots.h" />
     <ClInclude Include="audio\AudioFormat.h" />
     <ClInclude Include="audio\AudioMixer.h" />
     <ClInclude Include="audio\SDLAudioSource.h" />

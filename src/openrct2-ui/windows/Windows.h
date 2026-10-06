@@ -56,6 +56,9 @@ namespace OpenRCT2::Ui::Windows
     void ScenarioSelectHandheldTab(int32_t direction);
     void ScenarioSelectHandheldConfirm();
     void HandheldMenuOpen();
+    void HandheldBuildOpen();
+    void HandheldLoadOpen();
+    void HandheldMenuBack();
     void HandheldMenuMove(int32_t direction);
     void HandheldMenuConfirm();
     constexpr int32_t kTabBarHeight = 43;

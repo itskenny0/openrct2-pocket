@@ -8,6 +8,7 @@
 #include "ControllerInput.h"
 
 #include <SDL_timer.h>
+#include <iomanip>
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/input/MouseInput.h>
 #include <openrct2-ui/input/ShortcutIds.h>
@@ -18,15 +19,69 @@
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
+#include <openrct2/GameState.h>
 #include <openrct2/Input.h>
 #include <openrct2/OpenRCT2.h>
+#include <openrct2/actions/GameActionRunner.h>
+#include <openrct2/actions/terraform/LandLowerAction.h>
+#include <openrct2/actions/terraform/LandRaiseAction.h>
 #include <openrct2/drawing/Line.h>
 #include <openrct2/drawing/PaletteIndex.h>
+#include <openrct2/drawing/Rectangle.h>
+#include <openrct2/drawing/Text.h>
 #include <openrct2/interface/Viewport.h>
 #include <openrct2/ui/WindowManager.h>
+#include <openrct2/world/MapSelection.h>
+#include <sstream>
 
 namespace OpenRCT2::Ui::Handheld
 {
+    static bool _terrainActive{};
+    static bool _raiseLand = true;
+    static bool _selectionOwned{};
+    static std::optional<CoordsXY> _terrainTile;
+    static std::string _terrainStatus;
+
+    void BeginTerrain(bool raise)
+    {
+        _terrainActive = true;
+        _raiseLand = raise;
+        _terrainStatus.clear();
+    }
+
+    static void ClearTerrainSelection()
+    {
+        if (_selectionOwned)
+        {
+            MapSelection::invalidate();
+            gMapSelectFlags.unset(MapSelectFlag::enable);
+            MapSelection::invalidate();
+            _selectionOwned = false;
+        }
+        _terrainTile.reset();
+    }
+
+    void EndTerrain()
+    {
+        _terrainActive = false;
+        _terrainStatus.clear();
+        ClearTerrainSelection();
+    }
+
+    static GameActions::Result TerrainAction(bool execute)
+    {
+        const auto tile = *_terrainTile;
+        const MapRange range{ tile.x, tile.y, tile.x, tile.y };
+        const CoordsXY centre{ tile.x + 16, tile.y + 16 };
+        if (_raiseLand)
+        {
+            auto action = GameActions::LandRaiseAction(centre, range, MapSelectType::full);
+            return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+        }
+        auto action = GameActions::LandLowerAction(centre, range, MapSelectType::full);
+        return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+    }
+
     static bool HasTextOrModalInput()
     {
         auto* wm = GetWindowManager();
@@ -80,6 +135,7 @@ namespace OpenRCT2::Ui::Handheld
         {
             if (focus != nullptr)
                 wm->Close(*focus);
+            wm->CloseByClass(WindowClass::handheldHud);
             return;
         }
         const auto position = Centre() - ScreenCoordsXY{ 9, 9 };
@@ -97,10 +153,40 @@ namespace OpenRCT2::Ui::Handheld
             focus->windowPos = position;
             focus->invalidate();
         }
+        auto* hud = wm->FindByClass(WindowClass::handheldHud);
+        if (hud == nullptr)
+        {
+            hud = wm->Create<FocusWindow>(
+                WindowClass::handheldHud, { 0, ContextGetHeight() - 34 }, { ContextGetWidth(), 34 },
+                { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
+        }
+        if (hud != nullptr)
+        {
+            hud->invalidate();
+            hud->windowPos = { 0, ContextGetHeight() - 34 };
+            hud->width = ContextGetWidth();
+            hud->invalidate();
+        }
     }
 
     void UpdateExplorer(ControllerInput& input)
     {
+        if (gLegacyScene != LegacyScene::playing)
+            _terrainActive = false;
+        ClearTerrainSelection();
+        if (_terrainActive && CanExplore())
+        {
+            auto coords = ScreenGetMapXY(Centre(), nullptr);
+            if (coords)
+            {
+                _terrainTile = CoordsXY{ coords->x & ~31, coords->y & ~31 };
+                gMapSelectPositionA = gMapSelectPositionB = *_terrainTile;
+                gMapSelectType = MapSelectType::full;
+                gMapSelectFlags.set(MapSelectFlag::enable);
+                _selectionOwned = true;
+                MapSelection::invalidate();
+            }
+        }
         SyncFocusWindow();
         auto frame = input.update(ContextHasFocus(), SDL_GetTicks());
         auto* wm = GetWindowManager();
@@ -122,7 +208,7 @@ namespace OpenRCT2::Ui::Handheld
                 if (action == Action::confirm)
                     Windows::HandheldMenuConfirm();
                 else if (action == Action::back || action == Action::openMenu)
-                    wm->CloseByClass(WindowClass::handheldMenu);
+                    Windows::HandheldMenuBack();
                 input.suspend();
                 break;
             }
@@ -188,6 +274,11 @@ namespace OpenRCT2::Ui::Handheld
                     Invoke(ShortcutId::kInterfaceCancelConstruction);
                 else if (wm->FindByClass(WindowClass::dropdown) != nullptr)
                     wm->CloseByClass(WindowClass::dropdown);
+                else if (_terrainActive && CanExplore())
+                {
+                    _terrainActive = false;
+                    ClearTerrainSelection();
+                }
                 else
                     wm->CloseTop();
             }
@@ -195,12 +286,28 @@ namespace OpenRCT2::Ui::Handheld
             {
                 Windows::HandheldMenuOpen();
             }
+            else if (action == Action::openBuild && CanExplore())
+            {
+                _terrainActive = false;
+                ClearTerrainSelection();
+                Windows::HandheldBuildOpen();
+            }
             else if (CanExplore())
             {
                 switch (action)
                 {
                     case Action::confirm:
-                        ViewportInteractionLeftClick(Centre());
+                        if (_terrainActive)
+                        {
+                            if (_terrainTile)
+                            {
+                                const auto result = TerrainAction(true);
+                                _terrainStatus = result.error == GameActions::Status::ok ? "Land changed."
+                                                                                         : result.getErrorMessage();
+                            }
+                        }
+                        else
+                            ViewportInteractionLeftClick(Centre());
                         break;
                     case Action::contextPrimary:
                         Invoke(ShortcutId::kViewGeneralRotateClockwise);
@@ -211,8 +318,14 @@ namespace OpenRCT2::Ui::Handheld
                     case Action::nextOption:
                         Windows::MainWindowZoom(true, false);
                         break;
-                    case Action::back:
                     case Action::contextSecondary:
+                        if (_terrainActive)
+                        {
+                            _raiseLand = !_raiseLand;
+                            _terrainStatus.clear();
+                        }
+                        break;
+                    case Action::back:
                     case Action::openMenu:
                     case Action::openBuild:
                     case Action::quit:
@@ -226,6 +339,7 @@ namespace OpenRCT2::Ui::Handheld
         if (CanExplore() && (frame.panX != 0 || frame.panY != 0))
         {
             auto* main = WindowGetMain();
+            _terrainStatus.clear();
             WindowUnfollowSprite(*main);
             InputScrollViewportSmooth({ frame.panX, frame.panY }, main);
         }
@@ -237,6 +351,33 @@ namespace OpenRCT2::Ui::Handheld
             return;
         using namespace Drawing;
         const auto c = Centre();
+        const auto height = ContextGetHeight();
+        Rectangle::fill(rt, { 0, height - 34, ContextGetWidth() - 1, height - 1 }, PaletteIndex::pi10);
+        const char* hints = _terrainActive ? "D-pad: Move   A: Edit   Y: Raise/Lower   B: Done"
+                                           : "A: Inspect   B: Back   Select: Build   Start: Park";
+        drawText(rt, { 8, height - 17 }, hints, { Colour::white });
+        std::string status = "L/R: Zoom   X: Rotate";
+        if (_terrainActive)
+        {
+            status = _raiseLand ? "RAISE LAND" : "LOWER LAND";
+            if (_terrainTile)
+            {
+                const auto result = TerrainAction(false);
+                if (result.error == GameActions::Status::ok)
+                {
+                    std::ostringstream cost;
+                    cost << "  Cost: $" << std::fixed << std::setprecision(2) << result.cost / 100.0;
+                    status += cost.str();
+                }
+                else
+                    status += "  " + result.getErrorMessage();
+            }
+            else
+                status += "  Move onto land";
+            if (!_terrainStatus.empty())
+                status = _terrainStatus;
+        }
+        drawText(rt, { 8, height - 31 }, status, { Colour::yellow });
         // High contrast, fixed map focus; this does not move the desktop pointer.
         GfxDrawLine(rt, { c + ScreenCoordsXY{ -7, -1 }, c + ScreenCoordsXY{ 7, -1 } }, PaletteIndex::pi10);
         GfxDrawLine(rt, { c + ScreenCoordsXY{ -7, 1 }, c + ScreenCoordsXY{ 7, 1 } }, PaletteIndex::pi10);
