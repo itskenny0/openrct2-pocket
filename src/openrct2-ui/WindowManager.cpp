@@ -1067,6 +1067,8 @@ public:
     // TODO: Refactor this to use variant once the new window class is done.
     void CloseByNumber(WindowClass cls, EntityId number) override
     {
+        if (cls == WindowClass::peep)
+            HandheldStaffRemoved(number);
         CloseByNumber(cls, static_cast<WindowNumber>(number.ToUnderlying()));
     }
 

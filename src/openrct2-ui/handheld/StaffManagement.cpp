@@ -1,0 +1,235 @@
+// SPDX-License-Identifier: GPL-3.0-only
+#include "StaffManagement.h"
+
+#include <openrct2/Context.h>
+#include <openrct2/GameState.h>
+#include <openrct2/actions/peep/StaffFireAction.h>
+#include <openrct2/actions/peep/StaffHireNewAction.h>
+#include <openrct2/actions/peep/StaffSetOrdersAction.h>
+#include <openrct2/config/Config.h>
+#include <openrct2/entity/EntityList.h>
+#include <openrct2/interface/Window.h>
+#include <openrct2/localisation/Formatter.h>
+#include <openrct2/object/ObjectManager.h>
+#include <openrct2/object/PeepAnimationsObject.h>
+#include <openrct2/peep/PeepActionFormat.h>
+#include <openrct2/peep/PeepAnimations.h>
+#include <openrct2/ui/WindowManager.h>
+#include <openrct2/world/Map.h>
+#include <unordered_map>
+
+namespace OpenRCT2::Ui::Handheld::StaffManagement
+{
+    static std::unordered_map<uint16_t, uint64_t> gRemovedStaff;
+    void Invalidate(EntityId id)
+    {
+        if (auto found = gRemovedStaff.find(id.ToUnderlying()); found != gRemovedStaff.end())
+            ++found->second;
+    }
+    static GameActions::Result Invalid(const char* message)
+    {
+        GameActions::Result result;
+        result.error = GameActions::Status::disallowed;
+        result.errorMessage = message;
+        return result;
+    }
+    bool Supported(StaffType type)
+    {
+        return type == StaffType::handyman || type == StaffType::mechanic;
+    }
+    std::optional<Target> Identify(EntityId id)
+    {
+        auto* staff = getGameState().entities.tryGetEntity<Staff>(id);
+        if (!staff || !Supported(staff->assignedStaffType))
+            return {};
+        return Target{ staff->id, staff->assignedStaffType, staff->peepId, staff->hireDate, gRemovedStaff[id.ToUnderlying()] };
+    }
+    Staff* Resolve(const Target& target)
+    {
+        const auto current = Identify(target.id);
+        return current && *current == target ? getGameState().entities.tryGetEntity<Staff>(target.id) : nullptr;
+    }
+    std::vector<Target> Roster()
+    {
+        std::vector<Target> result;
+        for (auto* staff : EntityList<Staff>())
+            if (auto target = Identify(staff->id))
+                result.push_back(*target);
+        std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
+            return a.type != b.type ? a.type < b.type : a.peepId < b.peepId;
+        });
+        return result;
+    }
+    std::vector<std::pair<uint8_t, std::string>> Orders(StaffType type)
+    {
+        if (type == StaffType::handyman)
+            return { { STAFF_ORDERS_SWEEPING, "Sweep paths" },
+                     { STAFF_ORDERS_WATER_FLOWERS, "Water gardens" },
+                     { STAFF_ORDERS_EMPTY_BINS, "Empty bins" },
+                     { STAFF_ORDERS_MOWING, "Mow grass" } };
+        if (type == StaffType::mechanic)
+            return { { STAFF_ORDERS_INSPECT_RIDES, "Inspect rides" }, { STAFF_ORDERS_FIX_RIDES, "Fix rides" } };
+        return {};
+    }
+    GameActions::Result Hire(StaffType type, bool execute, GameActions::GameAction::Callback_t callback)
+    {
+        if (!Supported(type))
+            return Invalid("Unsupported staff role");
+        const auto animation = findPeepAnimationsIndexForType(AnimationPeepType(EnumValue(type) + 1));
+        if (animation == kObjectEntryIndexNull
+            || !GetContext()->GetObjectManager().GetLoadedObject<PeepAnimationsObject>(animation))
+            return Invalid("Staff animation unavailable");
+        // Native auto-placement can fall back to picked-up staff if no entry or walking guest exists.
+        // This workflow has no manual pickup tool, so avoid creating an unplaced employee.
+        bool canPosition = !getGameState().park.entrances.empty();
+        for (auto* guest : EntityList<Guest>())
+            if (guest->state == PeepState::walking && MapGetPathElementAt(TileCoordsXYZ{ guest->nextLoc }))
+                canPosition = true;
+        if (!canPosition)
+            return Invalid("No automatic placement location");
+        uint8_t orders = type == StaffType::mechanic
+            ? STAFF_ORDERS_INSPECT_RIDES | STAFF_ORDERS_FIX_RIDES
+            : STAFF_ORDERS_SWEEPING | STAFF_ORDERS_WATER_FLOWERS | STAFF_ORDERS_EMPTY_BINS;
+        if (type == StaffType::handyman && Config::Get().general.handymenMowByDefault)
+            orders |= STAFF_ORDERS_MOWING;
+        GameActions::StaffHireNewAction action(true, type, animation, orders);
+        action.SetCallback(std::move(callback));
+        return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+    }
+    GameActions::Result SetOrders(const Target& target, uint8_t baseline, uint8_t value, bool execute)
+    {
+        const auto* staff = Resolve(target);
+        if (!staff)
+            return Invalid("Employee unavailable");
+        if (staff->staffOrders != baseline)
+            return Invalid("Orders changed; reopen editor");
+        uint8_t mask = 0;
+        for (const auto& order : Orders(target.type))
+            mask |= order.first;
+        if ((value & ~mask) != (baseline & ~mask))
+            return Invalid("Unsupported orders");
+        GameActions::StaffSetOrdersAction action(target.id, value);
+        return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+    }
+    GameActions::Result Dismiss(const Target& target, bool execute)
+    {
+        if (!Resolve(target))
+            return Invalid("Employee unavailable");
+        GameActions::StaffFireAction action(target.id);
+        action.SetCallback([id = target.id](const GameActions::GameAction*, const GameActions::Result* result) {
+            if (result->error == GameActions::Status::ok)
+                Invalidate(id);
+        });
+        return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+    }
+    bool Locate(const Target& target)
+    {
+        const auto* staff = Resolve(target);
+        if (!staff || staff->getLocation().isNull())
+            return false;
+        auto* main = WindowGetMain();
+        if (!main)
+            return false;
+        WindowScrollToLocation(*main, staff->getLocation());
+        return true;
+    }
+    ManagementPresentation Presentation(
+        View view, size_t selected, const std::vector<Target>& roster, const std::optional<Target>& target, StaffType hireType,
+        std::optional<uint8_t> orders, const std::string& status)
+    {
+        ManagementPresentation model;
+        model.breadcrumb = "Park dashboard / Staff";
+        model.title = "Staff";
+        model.selected = selected;
+        model.status = status;
+        auto wage = [](StaffType type) {
+            return getGameState().park.flags.has(ParkFlag::noMoney) ? std::string("Not applicable")
+                                                                    : FormatMoney(GetStaffWage(type));
+        };
+        if (view == View::roster)
+        {
+            model.rows = { "Hire handyman...", "Hire mechanic..." };
+            for (const auto& entry : roster)
+            {
+                const auto* staff = Resolve(entry);
+                model.rows.push_back(staff ? staff->getName() : "Employee unavailable");
+            }
+            model.rows.push_back("Back to dashboard");
+            if (roster.empty())
+                model.status = "No handymen or mechanics";
+            return model;
+        }
+        if (view == View::hire)
+        {
+            model.title = hireType == StaffType::handyman ? "Hire handyman" : "Hire mechanic";
+            model.stats = { { "Monthly wage", wage(hireType) },
+                            { "Upfront charge",
+                              getGameState().park.flags.has(ParkFlag::noMoney) ? "Not applicable" : FormatMoney(0) },
+                            { "Placement", "Automatic" } };
+            model.rows = { "Hire", "Cancel" };
+            model.confirmation = true;
+            auto result = Hire(hireType, false);
+            if (result.error != GameActions::Status::ok && model.status.empty())
+                model.status = result.getErrorMessage().empty() ? result.getErrorTitle() : result.getErrorMessage();
+            return model;
+        }
+        const auto* staff = target ? Resolve(*target) : nullptr;
+        if (!staff)
+        {
+            model.status = "Employee unavailable";
+            model.rows = { "Back to roster" };
+            return model;
+        }
+        model.title = staff->getName();
+        if (view == View::inspection)
+        {
+            Formatter ft;
+            formatPeepActionTo(*staff, ft);
+            model.stats = { { "Role", target->type == StaffType::handyman ? "Handyman" : "Mechanic" },
+                            { "Monthly wage", wage(target->type) },
+                            { "Status", FormatStringIDLegacy(STR_STRINGID, ft.Data()) } };
+            model.rows = { "Locate", "Orders...", "Statistics...", "Dismiss...", "Back to roster" };
+        }
+        else if (view == View::statistics)
+        {
+            model.breadcrumb = "Staff / Statistics";
+            model.stats = { { "Employed months",
+                              std::to_string(
+                                  std::max(0, static_cast<int32_t>(GetDate().GetMonthsElapsed()) - staff->getHireDate())) } };
+            if (target->type == StaffType::handyman)
+                for (const auto& value :
+                     std::vector<std::pair<std::string, uint32_t>>{ { "Lawns mown", staff->staffLawnsMown },
+                                                                    { "Gardens watered", staff->staffGardensWatered },
+                                                                    { "Litter swept", staff->staffLitterSwept },
+                                                                    { "Bins emptied", staff->staffBinsEmptied } })
+                    model.stats.push_back({ value.first, std::to_string(value.second) });
+            else
+                model.stats.insert(
+                    model.stats.end(),
+                    { { "Rides inspected", std::to_string(staff->staffRidesInspected) },
+                      { "Rides fixed", std::to_string(staff->staffRidesFixed) } });
+            model.rows = { "Back to employee" };
+        }
+        else if (view == View::orders)
+        {
+            model.breadcrumb = "Staff / Orders draft";
+            for (const auto& item : Orders(target->type))
+                model.rows.push_back(item.second + ((orders.value_or(staff->staffOrders) & item.first) ? "  On" : "  Off"));
+            model.rows.push_back("Apply orders");
+            model.rows.push_back("Cancel");
+        }
+        else
+        {
+            model.breadcrumb = "Staff / Confirm dismissal";
+            model.stats = { { "Monthly wage", wage(target->type) },
+                            { "Refund",
+                              getGameState().park.flags.has(ParkFlag::noMoney) ? "Not applicable" : FormatMoney(0) } };
+            model.rows = { "Dismiss employee", "Cancel" };
+            model.confirmation = true;
+            const auto result = Dismiss(*target, false);
+            if (result.error != GameActions::Status::ok && model.status.empty())
+                model.status = result.getErrorMessage().empty() ? result.getErrorTitle() : result.getErrorMessage();
+        }
+        return model;
+    }
+} // namespace OpenRCT2::Ui::Handheld::StaffManagement

@@ -12,6 +12,7 @@
 #include <openrct2-ui/handheld/SceneryRemoval.h>
 #include <openrct2-ui/handheld/ShopManagement.h>
 #include <openrct2-ui/handheld/Shops.h>
+#include <openrct2-ui/handheld/StaffManagement.h>
 #include <openrct2-ui/handheld/Surface.h>
 #include <openrct2-ui/handheld/TreePicker.h>
 #include <openrct2-ui/handheld/Trees.h>
@@ -27,10 +28,14 @@
 #include <openrct2/actions/park/ParkSetEntranceFeeAction.h>
 #include <openrct2/actions/park/ParkSetLoanAction.h>
 #include <openrct2/actions/park/ParkSetResearchFundingAction.h>
+#include <openrct2/actions/peep/StaffFireAction.h>
+#include <openrct2/actions/peep/StaffHireNewAction.h>
 #include <openrct2/audio/AudioContext.h>
 #include <openrct2/config/Config.h>
+#include <openrct2/entity/EntityList.h>
 #include <openrct2/interface/Viewport.h>
 #include <openrct2/localisation/CurrencyTypes.h>
+#include <openrct2/management/Finance.h>
 #include <openrct2/management/Research.h>
 #include <openrct2/object/ObjectManager.h>
 #include <openrct2/scenario/Scenario.h>
@@ -1777,6 +1782,307 @@ static void TestFinances(IContext& context, const std::string& profile, bool rea
                  "cancel-input-pause-no-money / save-reload passed\n";
 }
 
+static void TestStaff(IContext& context, const std::string& profile, bool realUi)
+{
+    namespace S = Ui::Handheld::StaffManagement;
+    namespace W = Ui::Windows;
+    namespace H = Ui::Handheld;
+    auto& state = getGameState();
+    auto& park = state.park;
+    gGamePaused = 0;
+    park.flags.unset(ParkFlag::noMoney);
+    Require(context.GetObjectManager().LoadObject("rct2.peep_animations.handyman"), "Handyman animation missing");
+    Require(context.GetObjectManager().LoadObject("rct2.peep_animations.mechanic"), "Mechanic animation missing");
+    const auto entrances = park.entrances;
+    park.entrances.clear();
+    Require(S::Hire(StaffType::handyman, false).error != GameActions::Status::ok, "Unplaceable hire accepted");
+    park.entrances.push_back({ 64, 64, 16, 0 });
+    const auto cash = park.cash;
+    const auto ledger = park.expenditureTable;
+    const auto count = S::Roster().size();
+    Require(S::Hire(StaffType::security, true).error != GameActions::Status::ok, "Unsupported staff hired");
+    Require(
+        S::Hire(StaffType::handyman, false).error == GameActions::Status::ok && S::Roster().size() == count
+            && park.cash == cash,
+        "Hire query changed employee/cash");
+    std::optional<S::Target> hired;
+    Require(
+        S::Hire(
+            StaffType::handyman, true,
+            [&](const GameActions::GameAction*, const GameActions::Result* result) {
+                Require(result->error == GameActions::Status::ok, "Queued hire failed");
+                hired = S::Identify(result->getData<GameActions::StaffHireNewActionResult>().StaffEntityId);
+            }).error
+                == GameActions::Status::ok
+            && !hired && S::Roster().size() == count,
+        "Hire bypassed queue");
+    GameActions::ProcessQueue(state);
+    Require(
+        hired && S::Roster().size() == count + 1 && park.cash == cash && park.expenditureTable == ledger,
+        "Hire upfront cash/count incorrect");
+    auto handyman = *hired;
+    Require(
+        S::Resolve(handyman)->state != PeepState::picked && !S::Resolve(handyman)->getLocation().isNull(),
+        "Native automatic placement failed");
+    const auto originalOrders = S::Resolve(handyman)->staffOrders;
+    const auto changedOrders = originalOrders ^ STAFF_ORDERS_MOWING;
+    Require(
+        S::SetOrders(handyman, originalOrders, changedOrders, false).error == GameActions::Status::ok
+            && S::Resolve(handyman)->staffOrders == originalOrders,
+        "Order draft changed park");
+    gGamePaused = 1;
+    Require(
+        S::SetOrders(handyman, originalOrders, changedOrders, true).error == GameActions::Status::ok,
+        "Paused order action failed");
+    GameActions::ProcessQueue(state);
+    Require(S::Resolve(handyman)->staffOrders == changedOrders && park.cash == cash, "Orders action/cash incorrect");
+    Require(
+        S::SetOrders(handyman, originalOrders, originalOrders, true).error != GameActions::Status::ok,
+        "Stale orders submitted");
+    auto stale = handyman;
+    stale.peepId++;
+    Require(
+        !S::Resolve(stale) && S::Dismiss(stale, true).error != GameActions::Status::ok && !S::Locate(stale),
+        "Stale staff target accepted");
+    Require(S::Hire(StaffType::mechanic, true).error == GameActions::Status::ok, "Paused mechanic hire failed");
+    GameActions::ProcessQueue(state);
+    auto roster = S::Roster();
+    auto mechanic = *std::find_if(
+        roster.begin(), roster.end(), [](const auto& entry) { return entry.type == StaffType::mechanic; });
+    S::Resolve(mechanic)->state = PeepState::fixing;
+    Require(S::Dismiss(mechanic, false).error != GameActions::Status::ok, "Fixing mechanic dismissible");
+    S::Resolve(mechanic)->state = PeepState::inspecting;
+    Require(S::Dismiss(mechanic, true).error != GameActions::Status::ok, "Inspecting mechanic dismissed");
+    S::Resolve(mechanic)->state = PeepState::falling;
+    // Native wages are paid weekly as one quarter of the displayed monthly wage.
+    money64 wages = 0;
+    for (auto* staff : EntityList<Staff>())
+        wages += GetStaffWage(staff->assignedStaffType) / 4;
+    FinancePayWages();
+    Require(park.cash == cash - wages, "Native wages cash incorrect");
+    const auto paidCash = park.cash;
+    park.flags.set(ParkFlag::noMoney);
+    FinancePayWages();
+    Require(
+        park.cash == paidCash && S::Presentation(S::View::inspection, 0, {}, handyman).stats[1].second == "Not applicable",
+        "No-money wages displayed/charged");
+    Require(S::Hire(StaffType::mechanic, true).error == GameActions::Status::ok, "Native no-money hire rejected");
+    GameActions::ProcessQueue(state);
+    Require(park.cash == paidCash, "No-money hire charged");
+    park.flags.unset(ParkFlag::noMoney);
+    for (int i = 0; i < 8; ++i)
+    {
+        Require(S::Hire(StaffType::handyman, true).error == GameActions::Status::ok, "Roster population failed");
+        GameActions::ProcessQueue(state);
+    }
+    roster = S::Roster();
+    Require(
+        roster.size() >= 11 && S::Presentation(S::View::roster, roster.size() + 1, roster).rows.size() == roster.size() + 3,
+        "Full staff roster truncated");
+    const auto stableRoster = roster;
+    const auto afterHireCash = park.cash;
+    if (realUi)
+    {
+        auto open = [&] {
+            W::HandheldMenuOpen();
+            W::HandheldMenuMove(2);
+            W::HandheldMenuConfirm();
+            W::HandheldMenuMove(2);
+            W::HandheldMenuConfirm();
+            Require(W::HandheldStaffIsOpen() && gGamePaused, "Dashboard Staff route failed");
+        };
+        open();
+        W::HandheldMenuConfirm();
+        W::HandheldMenuConfirm(); // safe hire Cancel
+        GameActions::ProcessQueue(state);
+        Require(S::Roster() == stableRoster, "Default hire confirmation hired");
+        W::HandheldMenuConfirm();
+        W::HandheldMenuBack();
+        Require(S::Roster() == stableRoster, "B hired employee");
+        W::HandheldMenuMove(2); // first employee
+        H::ControllerInput input;
+        H::Frame frame;
+        frame.actions = { H::Action::confirm, H::Action::confirm };
+        H::HandleMenuInput(input, frame); // one transition into inspection
+        W::HandheldMenuMove(1);
+        W::HandheldMenuConfirm(); // orders
+        W::HandheldMenuConfirm(); // toggle sweeping draft
+        W::HandheldMenuBack();
+        Require(S::Resolve(handyman)->staffOrders == changedOrders, "Orders cancellation applied draft");
+        W::HandheldMenuMove(1);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuConfirm();
+        W::HandheldMenuMove(4);
+        W::HandheldMenuConfirm();
+        GameActions::ProcessQueue(state);
+        Require(S::Resolve(handyman)->staffOrders == (changedOrders ^ STAFF_ORDERS_SWEEPING), "Controller orders not applied");
+        W::HandheldMenuMove(3);
+        W::HandheldMenuConfirm();
+        H::HandleMenuInput(input, frame); // Cancel selected: no dismissal
+        Require(S::Resolve(handyman), "Default dismissal Cancel removed employee");
+        W::HandheldMenuMove(3);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuBack();
+        Require(S::Resolve(handyman), "B dismissed employee");
+        W::HandheldMenuBack();                                        // roster, retain employee focus
+        W::HandheldMenuMove(static_cast<int32_t>(roster.size() - 1)); // final employee on later page
+        H::HandleMenuInput(input, frame);
+        W::HandheldMenuMove(1);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuConfirm();
+        W::HandheldMenuMove(2);
+        W::HandheldMenuConfirm();
+        GameActions::ProcessQueue(state);
+        Require(
+            S::Resolve(roster.back())->staffOrders
+                == (STAFF_ORDERS_INSPECT_RIDES | STAFF_ORDERS_FIX_RIDES) - STAFF_ORDERS_INSPECT_RIDES,
+            "Later-page mechanic selection/orders failed");
+        frame.actions = { H::Action::openMenu };
+        H::HandleMenuInput(input, frame);
+        Require(!W::HandheldStaffIsOpen(), "Start failed staff pause transition");
+        W::HandheldMenuBack();
+        Require(gGamePaused == 1, "Externally paused park unpaused");
+        gGamePaused = 0;
+        open();
+        W::HandheldMenuConfirm();
+        W::HandheldMenuMove(-1);
+        frame.actions = { H::Action::confirm, H::Action::confirm };
+        H::HandleMenuInput(input, frame);
+        GameActions::ProcessQueue(state);
+        Require(
+            S::Roster().size() == stableRoster.size() + 1 && park.cash == afterHireCash, "Controller hire duplicated/charged");
+        W::HandheldMenuMove(3);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuMove(-1);
+        H::HandleMenuInput(input, frame);
+        GameActions::ProcessQueue(state);
+        Require(
+            S::Roster().size() == stableRoster.size() && park.cash == afterHireCash,
+            "Controller dismissal duplicated/refunded");
+        W::HandheldMenuBack();
+        W::HandheldMenuBack();
+        W::HandheldMenuBack();
+        Require(!gGamePaused, "Staff menu pause ownership leaked");
+        // A selecting a role cannot confirm hiring, nor locate the new employee while held.
+        SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+        Require(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) == 0, "Staff SDL init failed");
+        {
+            H::ControllerInput controller;
+            controller.update(true, 4000);
+            const auto device = SDL_JoystickAttachVirtual(
+                SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);
+            auto* joystick = SDL_JoystickOpen(device);
+            Require(joystick, "Staff virtual controller missing");
+            auto pump = [&] {
+                SDL_Event e;
+                while (SDL_PollEvent(&e))
+                    controller.handleEvent(e);
+            };
+            pump();
+            controller.update(true, 4010);
+            pump();
+            controller.update(true, 4020);
+            auto press = [&](bool down) {
+                SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, down);
+                SDL_JoystickUpdate();
+                pump();
+            };
+            open();
+            const auto before = S::Roster();
+            press(true);
+            auto f = controller.update(true, 4030);
+            Require(f.actions.size() == 1 && H::HandleMenuInput(controller, f), "Staff role selection lost");
+            Require(controller.update(true, 4040).actions.empty() && S::Roster() == before, "Held role A hired");
+            press(false);
+            Require(controller.update(true, 4050).actions.empty(), "Role release hired");
+            W::HandheldMenuMove(-1);
+            press(true);
+            f = controller.update(true, 4060);
+            Require(f.actions.size() == 1 && H::HandleMenuInput(controller, f), "Fresh hire confirmation lost");
+            GameActions::ProcessQueue(state);
+            Require(S::Roster().size() == before.size() + 1 && park.cash == afterHireCash, "SDL hire count/cash wrong");
+            Require(
+                controller.update(true, 4070).actions.empty() && W::HandheldStaffIsOpen(), "Held hire A spilled into Locate");
+            press(false);
+            controller.update(true, 4080);
+            const auto current = S::Roster();
+            const auto newest = *std::find_if(current.begin(), current.end(), [&](const auto& item) {
+                return std::find(before.begin(), before.end(), item) == before.end();
+            });
+            W::HandheldMenuMove(3);
+            W::HandheldMenuConfirm();
+            W::HandheldMenuMove(-1);
+            // External native dismissal invalidates a confirmation even if the native entity slot is reused.
+            GameActions::StaffFireAction fire(newest.id);
+            Require(GameActions::Execute(&fire, state).error == GameActions::Status::ok, "External staff fire failed");
+            GameActions::ProcessQueue(state);
+            Require(!S::Resolve(newest), "Removed native employee still resolved");
+            Require(S::Hire(StaffType::handyman, true).error == GameActions::Status::ok, "Replacement hire failed");
+            GameActions::ProcessQueue(state);
+            const auto replacementRoster = S::Roster();
+            Require(!S::Resolve(newest), "Reused native slot revived stale identity");
+            W::HandheldMenuConfirm();
+            GameActions::ProcessQueue(state);
+            Require(S::Roster() == replacementRoster, "Stale dismissal removed replacement employee");
+            W::HandheldStaffPause();
+            W::HandheldMenuBack();
+            SDL_JoystickClose(joystick);
+            SDL_JoystickDetachVirtual(device);
+        }
+        // Locate uses the native main viewport and returns to the unobstructed park.
+        Require(W::MainOpen(), "Staff locate main viewport missing");
+        open();
+        W::HandheldMenuMove(2);
+        W::HandheldMenuConfirm();
+        Require(S::Locate(handyman), "Native staff locate failed");
+        W::HandheldMenuConfirm();
+        Require(!W::HandheldStaffIsOpen() && !gGamePaused, "Locate did not return to park");
+        // A pending authorized hire may finish after menu exit, but must not reopen it.
+        open();
+        W::HandheldMenuConfirm();
+        W::HandheldMenuMove(-1);
+        W::HandheldMenuConfirm();
+        W::HandheldStaffPause();
+        W::HandheldMenuBack();
+        GameActions::ProcessQueue(state);
+        Require(!W::HandheldStaffIsOpen() && !gGamePaused, "Queued hire callback resurrected exited menu");
+    }
+    gGamePaused = 0;
+    const auto beforeDismissCash = park.cash;
+    Require(
+        S::Dismiss(handyman, false).error == GameActions::Status::ok && S::Resolve(handyman), "Dismiss query removed employee");
+    Require(S::Dismiss(handyman, true).error == GameActions::Status::ok, "Dismiss failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        !S::Resolve(handyman) && park.cash == beforeDismissCash && S::Dismiss(handyman, true).error != GameActions::Status::ok,
+        "Dismiss identity/refund incorrect");
+    const auto persisted = S::Roster();
+    std::vector<uint8_t> persistedOrders;
+    for (const auto& entry : persisted)
+        persistedOrders.push_back(S::Resolve(entry)->staffOrders);
+    const auto save = profile + "/staff-roundtrip.park";
+    SaveFlags flags{};
+    flags.set(SaveFlag::exportObjects);
+    Require(ScenarioSave(state, save, flags) != 0, "Staff save failed");
+    if (realUi)
+    {
+        W::HandheldMenuOpen();
+        W::HandheldMenuMove(2);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuMove(2);
+        W::HandheldMenuConfirm();
+    }
+    Require(context.LoadParkFromFile(save), "Staff reload failed");
+    Require(S::Roster() == persisted && park.cash == beforeDismissCash, "Staff/cash save persistence failed");
+    for (size_t i = 0; i < persisted.size(); ++i)
+        Require(S::Resolve(persisted[i])->staffOrders == persistedOrders[i], "Orders persistence failed");
+    if (realUi)
+        Require(!W::HandheldStaffIsOpen(), "Load retained staff menu");
+    park.entrances = entrances;
+    std::cout << "Native staff / auto-hire-roster-orders / exact native wages-no-money / cancel-input-stale-dismiss / "
+                 "save-reload passed\n";
+}
+
 int main(int argc, char** argv)
 {
     try
@@ -2086,6 +2392,7 @@ int main(int argc, char** argv)
         TestShops(*context, argv[2], argc == 4);
         TestShopManagement(*context, argv[2], argc == 4);
         TestFinances(*context, argv[2], argc == 4);
+        TestStaff(*context, argv[2], argc == 4);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;

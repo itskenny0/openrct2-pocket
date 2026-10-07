@@ -8,6 +8,7 @@
 #include "SaveSlots.h"
 #include "ShopManagement.h"
 #include "Shops.h"
+#include "StaffManagement.h"
 #include "TreePicker.h"
 #include "Trees.h"
 
@@ -22,6 +23,7 @@
 #include <openrct2/PlatformEnvironment.h>
 #include <openrct2/actions/GameActionRunner.h>
 #include <openrct2/actions/park/ParkSetResearchFundingAction.h>
+#include <openrct2/actions/peep/StaffHireNewAction.h>
 #include <openrct2/actions/ride/RideSetStatusAction.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/localisation/StringIds.h>
@@ -49,6 +51,12 @@ namespace OpenRCT2::Ui::Windows
         finances,
         financeEditor,
         financeConfirm,
+        staff,
+        staffInspect,
+        staffStats,
+        staffOrders,
+        staffHire,
+        staffDismiss,
         guests,
         research,
         ride,
@@ -69,6 +77,7 @@ namespace OpenRCT2::Ui::Windows
     };
     static constexpr std::array kManagementSections{ ManagementSection{ Page::overview, "Overview" },
                                                      ManagementSection{ Page::finances, "Finances" },
+                                                     ManagementSection{ Page::staff, "Staff" },
                                                      ManagementSection{ Page::guests, "Guests" },
                                                      ManagementSection{ Page::research, "Research" } };
     Handheld::ManagementPresentation HandheldDashboardPresentation(size_t selected)
@@ -104,13 +113,38 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::ShopManagement::Target> _shop;
         std::optional<money64> _priceDraft;
         std::optional<Handheld::Finances::Draft> _financeDraft;
+        std::vector<Handheld::StaffManagement::Target> _staffRoster;
+        std::optional<Handheld::StaffManagement::Target> _staffTarget;
+        StaffType _hireType = StaffType::handyman;
+        uint8_t _ordersBaseline{}, _ordersDraft{};
+        bool _staffBusy{};
+        size_t _staffRosterFocus{};
+        std::shared_ptr<int> _staffLifetime = std::make_shared<int>(0);
+        uint64_t _staffRequest{};
+        bool staffManagement() const
+        {
+            return _page == Page::staff || _page == Page::staffInspect || _page == Page::staffStats
+                || _page == Page::staffOrders || _page == Page::staffHire || _page == Page::staffDismiss;
+        }
+        Handheld::ManagementPresentation staffPresentation() const
+        {
+            using Handheld::StaffManagement::View;
+            const auto view = _page == Page::staff ? View::roster
+                : _page == Page::staffInspect      ? View::inspection
+                : _page == Page::staffStats        ? View::statistics
+                : _page == Page::staffOrders       ? View::orders
+                : _page == Page::staffHire         ? View::hire
+                                                   : View::dismissal;
+            return Handheld::StaffManagement::Presentation(
+                view, _focus.index(), _staffRoster, _staffTarget, _hireType, _ordersDraft, _status);
+        }
         bool financeManagement() const
         {
             return _page == Page::finances || _page == Page::financeEditor || _page == Page::financeConfirm;
         }
         bool managementShell() const
         {
-            return _page == Page::dashboard || financeManagement();
+            return _page == Page::dashboard || financeManagement() || staffManagement();
         }
         bool shopManagement() const
         {
@@ -158,6 +192,10 @@ namespace OpenRCT2::Ui::Windows
 
         void page(Page next)
         {
+            _staffBusy = false;
+            ++_staffRequest;
+            if (next == Page::staff)
+                _staffRoster = Handheld::StaffManagement::Roster();
             _page = next;
             if (next != Page::financeEditor && next != Page::financeConfirm)
                 _financeDraft.reset();
@@ -165,10 +203,12 @@ namespace OpenRCT2::Ui::Windows
             _status.clear();
             _priceDraft.reset();
             layout();
+            if (next == Page::staff)
+                _focus.move(static_cast<int32_t>(std::min(_staffRosterFocus, rows().size() - 1)), rows().size());
             if (next == Page::dashboard)
                 _focus.move(static_cast<int32_t>(_dashboardFocus), rows().size());
             if (next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish
-                || next == Page::financeConfirm)
+                || next == Page::financeConfirm || next == Page::staffHire || next == Page::staffDismiss)
                 _focus.move(1, 2); // destructive confirmations default to Cancel
             invalidate();
         }
@@ -181,6 +221,13 @@ namespace OpenRCT2::Ui::Windows
                              "Save and exit", "Load park", "Exit without saving" };
                 case Page::dashboard:
                     return HandheldDashboardPresentation(0).rows;
+                case Page::staff:
+                case Page::staffInspect:
+                case Page::staffStats:
+                case Page::staffOrders:
+                case Page::staffHire:
+                case Page::staffDismiss:
+                    return staffPresentation().rows;
                 case Page::finances:
                     return Handheld::Finances::Presentation(Handheld::Finances::View::overview, 0).rows;
                 case Page::financeEditor:
@@ -345,6 +392,27 @@ namespace OpenRCT2::Ui::Windows
         }
         void onUpdate() override
         {
+            if (_page == Page::staff)
+            {
+                const auto updated = Handheld::StaffManagement::Roster();
+                if (updated != _staffRoster)
+                {
+                    std::optional<Handheld::StaffManagement::Target> selected;
+                    if (_focus.index() >= 2 && _focus.index() - 2 < _staffRoster.size())
+                        selected = _staffRoster[_focus.index() - 2];
+                    size_t newFocus = std::min(_focus.index(), updated.size() + 2);
+                    if (selected)
+                    {
+                        const auto found = std::find(updated.begin(), updated.end(), *selected);
+                        if (found != updated.end())
+                            newFocus = 2 + std::distance(updated.begin(), found);
+                    }
+                    _staffRoster = updated;
+                    _focus = {};
+                    _focus.move(static_cast<int32_t>(newFocus), rows().size());
+                    invalidate();
+                }
+            }
             if (shopManagement() && _shop && !Handheld::ShopManagement::Find(*_shop))
             {
                 _shop.reset();
@@ -373,6 +441,41 @@ namespace OpenRCT2::Ui::Windows
         void openLoad()
         {
             page(Page::load);
+        }
+        void staffRemoved(EntityId id)
+        {
+            if (_staffTarget && _staffTarget->id == id)
+                _staffTarget.reset();
+            std::erase_if(_staffRoster, [id](const auto& target) { return target.id == id; });
+            if (staffManagement())
+            {
+                _status = "Employee removed";
+                invalidate();
+            }
+        }
+        bool staffIsOpen() const
+        {
+            return staffManagement();
+        }
+        void staffPause()
+        {
+            if (staffManagement())
+                page(Page::park);
+        }
+        void staffHired(const GameActions::Result& result)
+        {
+            if (!_staffBusy || !staffManagement())
+                return;
+            _staffBusy = false;
+            if (result.error != GameActions::Status::ok)
+                _status = Handheld::Finances::Feedback(result);
+            else
+            {
+                _staffTarget = Handheld::StaffManagement::Identify(
+                    result.getData<GameActions::StaffHireNewActionResult>().StaffEntityId);
+                page(_staffTarget ? Page::staffInspect : Page::staff);
+            }
+            invalidate();
         }
         bool financeIsOpen() const
         {
@@ -447,6 +550,18 @@ namespace OpenRCT2::Ui::Windows
                 case Page::pathOptions:
                 case Page::treePicker:
                     close();
+                    break;
+                case Page::staffHire:
+                case Page::staffInspect:
+                    page(Page::staff);
+                    break;
+                case Page::staffStats:
+                case Page::staffOrders:
+                case Page::staffDismiss:
+                    page(Page::staffInspect);
+                    break;
+                case Page::staff:
+                    page(Page::dashboard);
                     break;
                 case Page::financeConfirm:
                     page(Page::financeEditor);
@@ -599,6 +714,106 @@ namespace OpenRCT2::Ui::Windows
                 case Page::dashboard:
                     _dashboardFocus = choice;
                     page(choice < kManagementSections.size() ? kManagementSections[choice].page : Page::park);
+                    break;
+                case Page::staff:
+                    _staffRosterFocus = choice;
+                    if (choice < 2)
+                    {
+                        _hireType = choice == 0 ? StaffType::handyman : StaffType::mechanic;
+                        page(Page::staffHire);
+                    }
+                    else if (choice - 2 < _staffRoster.size())
+                    {
+                        _staffTarget = _staffRoster[choice - 2];
+                        page(Page::staffInspect);
+                    }
+                    else
+                        page(Page::dashboard);
+                    break;
+                case Page::staffHire:
+                    if (choice == 1)
+                        page(Page::staff);
+                    else if (!_staffBusy)
+                    {
+                        _staffBusy = true;
+                        auto result = Handheld::StaffManagement::Hire(
+                            _hireType, true,
+                            [this, lifetime = std::weak_ptr<int>(_staffLifetime),
+                             request = _staffRequest](const GameActions::GameAction*, const GameActions::Result* response) {
+                                if (lifetime.lock() && request == _staffRequest)
+                                    staffHired(*response);
+                            });
+                        if (result.error != GameActions::Status::ok)
+                        {
+                            _staffBusy = false;
+                            _status = Handheld::Finances::Feedback(result);
+                        }
+                        else
+                            _status = "Hiring...";
+                    }
+                    break;
+                case Page::staffInspect:
+                    if (!_staffTarget || !Handheld::StaffManagement::Resolve(*_staffTarget))
+                    {
+                        page(Page::staff);
+                        break;
+                    }
+                    if (choice == 0)
+                    {
+                        const auto target = *_staffTarget;
+                        if (!Handheld::StaffManagement::Resolve(target)->getLocation().isNull() && WindowGetMain())
+                        {
+                            close();
+                            Handheld::StaffManagement::Locate(target);
+                            return;
+                        }
+                        _status = "Location unavailable";
+                    }
+                    else if (choice == 1)
+                    {
+                        _ordersBaseline = _ordersDraft = Handheld::StaffManagement::Resolve(*_staffTarget)->staffOrders;
+                        page(Page::staffOrders);
+                    }
+                    else
+                        page(choice == 2 ? Page::staffStats : choice == 3 ? Page::staffDismiss : Page::staff);
+                    break;
+                case Page::staffStats:
+                    page(Page::staffInspect);
+                    break;
+                case Page::staffOrders:
+                    if (!_staffTarget || !Handheld::StaffManagement::Resolve(*_staffTarget))
+                    {
+                        page(Page::staff);
+                        break;
+                    }
+                    {
+                        const auto orders = Handheld::StaffManagement::Orders(_staffTarget->type);
+                        if (choice < orders.size())
+                            _ordersDraft ^= orders[choice].first;
+                        else if (choice == orders.size())
+                        {
+                            const auto result = Handheld::StaffManagement::SetOrders(
+                                *_staffTarget, _ordersBaseline, _ordersDraft, true);
+                            if (result.error == GameActions::Status::ok)
+                                page(Page::staffInspect);
+                            else
+                                _status = Handheld::Finances::Feedback(result);
+                        }
+                        else
+                            page(Page::staffInspect);
+                    }
+                    break;
+                case Page::staffDismiss:
+                    if (choice == 1)
+                        page(Page::staffInspect);
+                    else if (_staffTarget)
+                    {
+                        const auto result = Handheld::StaffManagement::Dismiss(*_staffTarget, true);
+                        if (result.error == GameActions::Status::ok)
+                            page(Page::staff);
+                        else
+                            _status = Handheld::Finances::Feedback(result);
+                    }
                     break;
                 case Page::finances:
                     if (choice == 2)
@@ -788,6 +1003,8 @@ namespace OpenRCT2::Ui::Windows
                     model = HandheldDashboardPresentation(_focus.index());
                     model.status = _status;
                 }
+                else if (staffManagement())
+                    model = staffPresentation();
                 else
                 {
                     using Handheld::Finances::View;
@@ -1116,5 +1333,25 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->financePause();
+    }
+} // namespace OpenRCT2::Ui::Windows
+
+namespace OpenRCT2::Ui::Windows
+{
+    void HandheldStaffRemoved(EntityId id)
+    {
+        Handheld::StaffManagement::Invalidate(id);
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            static_cast<HandheldMenuWindow*>(window)->staffRemoved(id);
+    }
+    bool HandheldStaffIsOpen()
+    {
+        const auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window && static_cast<const HandheldMenuWindow*>(window)->staffIsOpen();
+    }
+    void HandheldStaffPause()
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            static_cast<HandheldMenuWindow*>(window)->staffPause();
     }
 } // namespace OpenRCT2::Ui::Windows

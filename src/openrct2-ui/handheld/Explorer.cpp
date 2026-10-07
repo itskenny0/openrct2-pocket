@@ -364,6 +364,8 @@ namespace OpenRCT2::Ui::Handheld
                     Windows::HandheldObjectPickerPause();
                 else if (action == Action::openMenu && Windows::HandheldShopManagementIsOpen())
                     Windows::HandheldShopManagementPause();
+                else if (action == Action::openMenu && Windows::HandheldStaffIsOpen())
+                    Windows::HandheldStaffPause();
                 else if (action == Action::openMenu && Windows::HandheldFinancesIsOpen())
                     Windows::HandheldFinancesPause();
                 else if (action == Action::back || action == Action::openMenu)
