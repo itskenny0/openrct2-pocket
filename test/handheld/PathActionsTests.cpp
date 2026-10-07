@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include <array>
+#include <cstring>
 #include <iostream>
 #include <openrct2-ui/ProvisionalElements.h>
 #include <openrct2-ui/UiContext.h>
@@ -7,6 +8,7 @@
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/SceneryRemoval.h>
 #include <openrct2-ui/handheld/Surface.h>
+#include <openrct2-ui/handheld/Trees.h>
 #include <openrct2-ui/handheld/Water.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
@@ -19,6 +21,7 @@
 #include <openrct2/audio/AudioContext.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/interface/Viewport.h>
+#include <openrct2/management/Research.h>
 #include <openrct2/object/ObjectManager.h>
 #include <openrct2/scenario/Scenario.h>
 #include <openrct2/ui/UiContext.h>
@@ -381,6 +384,127 @@ static void TestSceneryRemoval(IContext& context, const std::string& profile)
     std::cout << "Native scenery removal / exact target-cash / unsupported-stale hits / ghost protection / "
                  "ownership-funds-pause-tree rules / neighbours / save-reload checks passed\n";
 }
+static void TestTrees(IContext& context, const std::string& profile)
+{
+    namespace Trees = Ui::Handheld::Trees;
+    auto& state = getGameState();
+    auto& objects = context.GetObjectManager();
+    // Fixture-only object/research setup. Production never loads objects or unlocks research.
+    auto* object = objects.LoadObject("rct2.scenery_small.tcl");
+    Require(object, "Tree fixture missing");
+    const auto index = objects.GetLoadedObjectEntryIndex(object);
+    const ScenerySelection selection{ SCENERY_TYPE_SMALL, index };
+    ScenerySetInvented(selection);
+    Require(Trees::Eligible(index), "Full-tile researched tree excluded");
+    const auto roofIndex = objects.GetLoadedObjectEntryIndex(objects.LoadObject("rct2.scenery_small.corroof"));
+    Require(!Trees::Eligible(roofIndex) && !Trees::Eligible(kObjectEntryIndexNull), "Non-tree/unloaded tree included");
+    Require(Trees::Next(index) == index, "Single eligible tree cycle failed");
+    auto* secondObject = objects.LoadObject("rct2.scenery_small.tpm");
+    Require(secondObject, "Second tree fixture missing");
+    const auto secondIndex = objects.GetLoadedObjectEntryIndex(secondObject);
+    const ScenerySelection secondSelection{ SCENERY_TYPE_SMALL, secondIndex };
+    ScenerySetInvented(secondSelection);
+    Require(Trees::Next(index) == secondIndex && Trees::Next(secondIndex) == index, "Tree cycle failed to wrap/skip non-trees");
+    ScenerySetNotInvented(secondSelection);
+    const CoordsXY tile{ 448, 96 }, neighbour{ 416, 96 };
+    auto* surface = MapGetSurfaceElementAt(tile);
+    surface->setOwnership({ OwnershipFlag::landOwned });
+    surface->setBaseZ(surface->getBaseZ() + 16);
+    surface->setClearanceZ(surface->getBaseZ());
+    const auto land = surface->getBaseZ();
+    auto snapshot = [](CoordsXY xy) {
+        std::vector<TileElement> result;
+        for (auto* e : TileElementsView(xy))
+            result.push_back(*e);
+        return result;
+    };
+    auto same = [](const std::vector<TileElement>& a, const std::vector<TileElement>& b) {
+        return a.size() == b.size() && std::memcmp(a.data(), b.data(), a.size() * sizeof(TileElement)) == 0;
+    };
+    const auto neighbourBefore = snapshot(neighbour);
+    auto ground = [&]() {
+        const auto* e = MapGetSurfaceElementAt(tile);
+        return std::array<int, 9>{ e->getBaseZ(),
+                                   e->getSlope(),
+                                   e->getWaterHeight(),
+                                   e->getSurfaceObjectIndex(),
+                                   e->getEdgeObjectIndex(),
+                                   static_cast<int>(e->getPrimarySurfaceColour()),
+                                   static_cast<int>(e->getPrimaryEdgeColour()),
+                                   e->getGrassLength(),
+                                   e->getParkFences() };
+    };
+    const auto groundBefore = ground();
+    auto count = [&](CoordsXY xy) {
+        int n = 0;
+        for (auto* e : TileElementsView<SmallSceneryElement>(xy))
+            n += !e->isGhost();
+        return n;
+    };
+    state.park.cash = 100000;
+    const auto originalCash = state.park.cash;
+    auto query = Trees::Action(tile, index, false);
+    Require(query.error == GameActions::Status::ok && query.cost > 0, "Tree query failed");
+    Require(count(tile) == 0 && state.park.cash == originalCash, "Tree query changed park");
+    ScenerySetNotInvented(selection);
+    Require(!Trees::Eligible(index) && Trees::Next(index) == kObjectEntryIndexNull, "Unresearched tree available");
+    Require(Trees::Action(tile, index, true).error != GameActions::Status::ok, "Unresearched tree placed");
+    ScenerySetInvented(selection);
+    SetSceneryItemRestricted(selection, true);
+    Require(
+        !Trees::Eligible(index) && Trees::Action(tile, index, true).error != GameActions::Status::ok, "Restricted tree placed");
+    SetSceneryItemRestricted(selection, false);
+    Require(
+        Trees::Action({}, index, true).error != GameActions::Status::ok
+            && Trees::Action(CoordsXY{ 0, 96 }, index, true).error != GameActions::Status::ok
+            && Trees::Action(CoordsXY{ 449, 96 }, index, true).error != GameActions::Status::ok,
+        "Invalid tree target accepted");
+    surface = MapGetSurfaceElementAt(tile);
+    surface->setOwnership({});
+    Require(
+        Trees::Action(tile, index, false).error != GameActions::Status::ok
+            && Trees::Action(tile, index, true).error != GameActions::Status::ok,
+        "Unowned tree placement accepted");
+    surface->setOwnership({ OwnershipFlag::landOwned });
+    state.park.cash = 0;
+    Require(
+        Trees::Action(tile, index, true).error == GameActions::Status::insufficientFunds, "Unfunded tree placement accepted");
+    state.park.cash = originalCash;
+    gGamePaused = 1;
+    Require(Trees::Action(tile, index, true).error == GameActions::Status::gamePaused, "Paused tree placement accepted");
+    gGamePaused = 0;
+    Require(Trees::Action(tile, index, true).error == GameActions::Status::ok, "Tree placement failed");
+    Require(count(tile) == 0 && state.park.cash == originalCash, "Tree bypassed native queue");
+    GameActions::ProcessQueue(state);
+    Require(count(tile) == 1 && state.park.cash == originalCash - query.cost, "Tree count/cash incorrect");
+    auto* placed = *TileElementsView<SmallSceneryElement>(tile).begin();
+    Require(
+        placed->getEntryIndex() == index && placed->getBaseZ() == land && !placed->isGhost(), "Tree identity/ground incorrect");
+    Require(groundBefore == ground() && same(neighbourBefore, snapshot(neighbour)), "Tree changed ground or neighbours");
+    const auto placedBefore = *placed;
+    const auto placedCash = state.park.cash;
+    Require(
+        Trees::Action(tile, index, false).error != GameActions::Status::ok
+            && Trees::Action(tile, index, true).error != GameActions::Status::ok,
+        "Overlapping tree accepted");
+    GameActions::ProcessQueue(state);
+    Require(count(tile) == 1 && state.park.cash == placedCash, "Invalid placement changed cash/tree count");
+    SaveFlags flags{};
+    flags.set(SaveFlag::exportObjects);
+    const auto save = profile + "/trees.park";
+    Require(ScenarioSave(state, save, flags) != 0 && context.LoadParkFromFile(save), "Tree save/reload failed");
+    placed = *TileElementsView<SmallSceneryElement>(tile).begin();
+    Require(
+        count(tile) == 1 && state.park.cash == placedCash
+            && std::memcmp(&placedBefore, placed, sizeof(SmallSceneryElement)) == 0
+            && same(neighbourBefore, snapshot(neighbour)),
+        "Tree/cash/neighbours not preserved on reload");
+    Require(groundBefore == ground(), "Ground changed on reload");
+    Ui::Handheld::EndTerrain();
+    std::cout << "Native tree placement / availability-research-restrictions / one tree-exact cash / ground-neighbours / "
+                 "invalid-ownership-clearance-funds-pause / save-reload checks passed\n";
+}
+
 int main(int argc, char** argv)
 {
     try
@@ -667,12 +791,24 @@ int main(int argc, char** argv)
             Require(
                 !Paths::IsActive() && !FindPath(TileCoordsXYZ{ previewLocation }),
                 "Scenery removal entry retained path tool/ghost");
+            Ui::Handheld::EndTerrain();
+            Paths::Begin(false);
+            info.Element = reinterpret_cast<TileElement*>(MapGetSurfaceElementAt(previewTile));
+            Paths::UpdateTargetFromInfo(info);
+            Paths::UpdatePreview();
+            Require(FindPath(TileCoordsXYZ{ previewLocation }), "Tree entry ghost fixture missing");
+            Ui::Windows::HandheldBuildOpen();
+            for (int i = 0; i < 6; ++i)
+                Ui::Windows::HandheldMenuMove(1);
+            Ui::Windows::HandheldMenuConfirm();
+            Require(!Paths::IsActive() && !FindPath(TileCoordsXYZ{ previewLocation }), "Tree entry retained path ghost");
             Require(context->LoadParkFromFile(save), "UI reload failed");
             Require(!Paths::IsActive() && !FindPath(TileCoordsXYZ{ previewLocation }), "Park load retained preview/tool");
         }
         TestWater(*context, argv[2]);
         TestSurface(*context, argv[2]);
         TestSceneryRemoval(*context, argv[2]);
+        TestTrees(*context, argv[2]);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;

@@ -71,11 +71,17 @@ namespace OpenRCT2::Ui::Handheld
         raise,
         lower,
         path,
-        remove
+        remove,
+        tree
     };
 
     inline void DrawIcon(Drawing::RenderTarget& rt, ScreenCoordsXY pos, PanelIcon icon, bool selected = false)
     {
+        if (icon == PanelIcon::tree)
+        {
+            Concept::DrawIcon(rt, pos, Concept::Icon::tree, selected);
+            return;
+        }
         if (icon == PanelIcon::remove)
         {
             Concept::DrawIcon(rt, pos, Concept::Icon::remove, selected);
@@ -296,6 +302,17 @@ namespace OpenRCT2::Ui::Handheld
         DrawModernText(rt, pos + ScreenCoordsXY{ 12, 153 }, "{MUTED}1 x 1");
     }
 
+    inline void DrawTreeOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& name, bool available)
+    {
+        using namespace Concept;
+        Box(rt, pos, { kRailWidth, 146 });
+        Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, "Trees");
+        Section(rt, pos + ScreenCoordsXY{ 10, 35 }, "Tree");
+        Row(rt, pos + ScreenCoordsXY{ 8, 54 }, name, Icon::tree, available);
+        Rule(rt, pos + ScreenCoordsXY{ 8, 99 }, 148);
+        DrawModernText(rt, pos + ScreenCoordsXY{ 12, 116 }, "{MUTED}Ground level");
+    }
+
     inline void DrawSceneryRemovalOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& name, bool target)
     {
         using namespace Concept;
@@ -312,6 +329,16 @@ namespace OpenRCT2::Ui::Handheld
         const ScreenCoordsXY p{ 0, screen.height - kActionStripHeight };
         Fill(rt, p, { screen.width, kActionStripHeight }, static_cast<Drawing::PaletteIndex>(PocketPalette::panel));
         Concept::Rule(rt, p, screen.width);
+    }
+
+    inline void DrawTreeFooter(Drawing::RenderTarget& rt, ScreenSize screen)
+    {
+        DrawActionStrip(rt, screen);
+        const auto y = screen.height - 21;
+        DrawCommand(rt, { 12, y }, 38, "D-pad", "Move");
+        DrawCommand(rt, { 140, y }, 17, "A", "Place");
+        DrawCommand(rt, { 268, y }, 17, "Y", "Tree");
+        DrawCommand(rt, { 396, y }, 17, "B", "Back");
     }
 
     inline void DrawSceneryRemovalFooter(Drawing::RenderTarget& rt, ScreenSize screen)

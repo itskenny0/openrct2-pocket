@@ -10,6 +10,7 @@
 #include "Paths.h"
 #include "SceneryRemoval.h"
 #include "Surface.h"
+#include "Trees.h"
 #include "Water.h"
 
 #include <SDL_timer.h>
@@ -45,6 +46,8 @@ namespace OpenRCT2::Ui::Handheld
     static bool _terrainActive{};
     static bool _waterTool{};
     static bool _surfaceTool{};
+    static bool _treeTool{};
+    static ObjectEntryIndex _treeIndex = kObjectEntryIndexNull;
     static bool _sceneryRemovalTool{};
     static std::optional<SceneryRemoval::Target> _sceneryTarget;
     static ObjectEntryIndex _surfaceIndex = kObjectEntryIndexNull;
@@ -59,6 +62,8 @@ namespace OpenRCT2::Ui::Handheld
         _terrainActive = true;
         _waterTool = false;
         _surfaceTool = false;
+        _treeTool = false;
+        _treeIndex = kObjectEntryIndexNull;
         _sceneryRemovalTool = false;
         _sceneryTarget.reset();
         _surfaceIndex = kObjectEntryIndexNull;
@@ -77,6 +82,13 @@ namespace OpenRCT2::Ui::Handheld
         BeginTerrain(true);
         _surfaceTool = true;
         _surfaceIndex = Surface::Next(kObjectEntryIndexNull);
+    }
+
+    void BeginTrees()
+    {
+        BeginTerrain(true);
+        _treeTool = true;
+        _treeIndex = Trees::Next(kObjectEntryIndexNull);
     }
 
     void BeginSceneryRemoval()
@@ -103,6 +115,8 @@ namespace OpenRCT2::Ui::Handheld
         _terrainActive = false;
         _waterTool = false;
         _surfaceTool = false;
+        _treeTool = false;
+        _treeIndex = kObjectEntryIndexNull;
         _sceneryRemovalTool = false;
         _sceneryTarget.reset();
         _surfaceIndex = kObjectEntryIndexNull;
@@ -115,6 +129,8 @@ namespace OpenRCT2::Ui::Handheld
     {
         if (_sceneryRemovalTool)
             return SceneryRemoval::Action(_sceneryTarget, execute);
+        if (_treeTool)
+            return Trees::Action(_terrainTile, _treeIndex, execute);
         if (_surfaceTool)
             return Surface::Action(_terrainTile, _surfaceIndex, execute);
         if (_waterTool)
@@ -422,10 +438,11 @@ namespace OpenRCT2::Ui::Handheld
                             {
                                 const auto result = TerrainAction(true);
                                 _terrainStatus = result.error == GameActions::Status::ok
-                                    ? (_sceneryRemovalTool ? "Removal requested."
-                                           : _surfaceTool  ? "Surface change requested."
-                                           : _waterTool    ? "Water change requested."
-                                                           : "Land changed.")
+                                    ? (_treeTool                 ? "Tree placement requested."
+                                           : _sceneryRemovalTool ? "Removal requested."
+                                           : _surfaceTool        ? "Surface change requested."
+                                           : _waterTool          ? "Water change requested."
+                                                                 : "Land changed.")
                                     : result.getErrorMessage();
                             }
                         }
@@ -462,7 +479,9 @@ namespace OpenRCT2::Ui::Handheld
                         }
                         if (_terrainActive)
                         {
-                            if (_surfaceTool)
+                            if (_treeTool)
+                                _treeIndex = Trees::Next(_treeIndex);
+                            else if (_surfaceTool)
                                 _surfaceIndex = Surface::Next(_surfaceIndex);
                             else if (!_sceneryRemovalTool)
                                 _raiseLand = !_raiseLand;
@@ -500,10 +519,11 @@ namespace OpenRCT2::Ui::Handheld
         std::string costAmount;
         if (_terrainActive)
         {
-            status = _sceneryRemovalTool ? "REMOVE SCENERY"
-                : _surfaceTool           ? "PAINT SURFACE"
-                : _waterTool             ? (_raiseLand ? "RAISE WATER" : "LOWER WATER")
-                                         : (_raiseLand ? "RAISE LAND" : "LOWER LAND");
+            status = _treeTool        ? "PLACE TREE"
+                : _sceneryRemovalTool ? "REMOVE SCENERY"
+                : _surfaceTool        ? "PAINT SURFACE"
+                : _waterTool          ? (_raiseLand ? "RAISE WATER" : "LOWER WATER")
+                                      : (_raiseLand ? "RAISE LAND" : "LOWER LAND");
             if (_terrainTile)
             {
                 const auto result = TerrainAction(false);
@@ -543,7 +563,9 @@ namespace OpenRCT2::Ui::Handheld
         {
             if (_terrainActive)
             {
-                if (_sceneryRemovalTool)
+                if (_treeTool)
+                    DrawTreeOverlay(rt, Concept::kOrigin, Trees::Name(_treeIndex), Trees::Eligible(_treeIndex));
+                else if (_sceneryRemovalTool)
                     DrawSceneryRemovalOverlay(
                         rt, Concept::kOrigin, SceneryRemoval::Name(_sceneryTarget), _sceneryTarget.has_value());
                 else if (_surfaceTool)
@@ -551,7 +573,9 @@ namespace OpenRCT2::Ui::Handheld
                 else
                     DrawTerrainOverlay(rt, Concept::kOrigin, _raiseLand, _waterTool);
             }
-            if (_sceneryRemovalTool)
+            if (_treeTool)
+                DrawTreeFooter(rt, { ContextGetWidth(), height });
+            else if (_sceneryRemovalTool)
                 DrawSceneryRemovalFooter(rt, { ContextGetWidth(), height });
             else
                 DrawGameplayFooter(rt, { ContextGetWidth(), height }, status, _terrainActive, _surfaceTool);

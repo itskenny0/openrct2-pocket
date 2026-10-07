@@ -123,7 +123,9 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ride:
                     return { "Open ride", "Close ride", "Back to park" };
                 case Page::build:
-                    return { "Raise land", "Lower land", "Paths", "Water", "Surface", "Remove scenery", "Back to park" };
+                    return {
+                        "Raise land", "Lower land", "Paths", "Water", "Surface", "Remove scenery", "Trees", "Back to park"
+                    };
                 case Page::paths:
                     return { "Normal path", "Queue path", "Remove path", "Back to build" };
                 case Page::pathOptions:
@@ -309,6 +311,8 @@ namespace OpenRCT2::Ui::Windows
                             Handheld::BeginSurface();
                         else if (choice == 5)
                             Handheld::BeginSceneryRemoval();
+                        else if (choice == 6)
+                            Handheld::BeginTrees();
                     }
                     break;
                 case Page::paths:
@@ -524,7 +528,7 @@ namespace OpenRCT2::Ui::Windows
             {
                 model.icons = { Handheld::PanelIcon::raise,   Handheld::PanelIcon::lower,   Handheld::PanelIcon::path,
                                 Handheld::PanelIcon::terrain, Handheld::PanelIcon::terrain, Handheld::PanelIcon::remove,
-                                Handheld::PanelIcon::back };
+                                Handheld::PanelIcon::tree,    Handheld::PanelIcon::back };
                 if (model.status.empty())
                     model.status = "Choose a tool, then edit in the park.";
             }

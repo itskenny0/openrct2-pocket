@@ -46,7 +46,8 @@ namespace OpenRCT2::Ui::Handheld::Concept
         options,
         remove,
         play,
-        ground
+        ground,
+        tree
     };
     inline void DrawIcon(Drawing::RenderTarget& rt, ScreenCoordsXY p, Icon icon, bool selected = false)
     {
@@ -68,6 +69,15 @@ namespace OpenRCT2::Ui::Handheld::Concept
             line(8, 4, 14, 7, shade);
             if (icon == Icon::queue)
                 line(2, 8, 8, 11, static_cast<PaletteIndex>(selected ? 10 : 120));
+        }
+        else if (icon == Icon::tree)
+        {
+            for (int y = 1; y <= 11; ++y)
+            {
+                const int radius = y / 2;
+                line(8 - radius, y, 8 + radius, y, light);
+            }
+            line(8, 12, 8, 15, shade);
         }
         else if (icon == Icon::rise || icon == Icon::lower || icon == Icon::height)
         {
