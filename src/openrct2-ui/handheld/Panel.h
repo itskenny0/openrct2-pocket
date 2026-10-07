@@ -67,11 +67,17 @@ namespace OpenRCT2::Ui::Handheld
         folder,
         back,
         raise,
-        lower
+        lower,
+        path
     };
 
     inline void DrawIcon(Drawing::RenderTarget& rt, ScreenCoordsXY pos, PanelIcon icon, bool selected = false)
     {
+        if (icon == PanelIcon::path)
+        {
+            GfxDrawSprite(rt, ImageId(SPR_G2_BUTTON_FOOTPATH), pos + ScreenCoordsXY{ -5, -6 });
+            return;
+        }
         // Native 16px pixel glyphs, independent of the user's RCT2 asset installation.
         static constexpr uint16_t glyphs[][16] = {
             { 0, 0, 0x0800, 0x0C00, 0x0E00, 0x0F00, 0x0F80, 0x0FC0, 0x0F80, 0x0F00, 0x0E00, 0x0C00, 0x0800, 0, 0, 0 },
@@ -292,7 +298,7 @@ namespace OpenRCT2::Ui::Handheld
             remove      ? "Remove path"
                 : queue ? "Queue path"
                         : "Normal path",
-            true, remove ? PanelIcon::back : PanelIcon::folder);
+            true, remove ? PanelIcon::back : PanelIcon::path);
         DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 13, 82 }, w.width - 26, surface, { Drawing::Colour::white });
         DrawModernText(rt, pos + ScreenCoordsXY{ 13, 107 }, "Follows terrain slope", { Drawing::Colour::white });
         DrawCommand(rt, pos + ScreenCoordsXY{ 13, 139 }, 17, "Y", "Change surface");

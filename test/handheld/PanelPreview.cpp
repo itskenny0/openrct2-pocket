@@ -65,30 +65,54 @@ int main(int argc, char** argv)
             }
     }
     Ui::Window w;
-    w.windowPos = { 8, 53 };
-    const auto size = Ui::Handheld::OverlaySize(6);
+    w.windowPos = { 8, 37 };
+    const auto size = Ui::Handheld::OverlaySize(7);
     w.width = size.width;
     w.height = size.height;
     Ui::Handheld::MenuPresentation model;
     model.title = "PARK / PAUSE";
-    model.rows = { "Resume park", "Build", "Save park", "Save and exit", "Load park", "Exit without saving" };
+    model.rows = { "Resume park", "Build", "Park dashboard", "Save park", "Save and exit", "Load park", "Exit without saving" };
     model.icons = { Ui::Handheld::PanelIcon::play, Ui::Handheld::PanelIcon::terrain, Ui::Handheld::PanelIcon::save,
                     Ui::Handheld::PanelIcon::exit, Ui::Handheld::PanelIcon::folder,  Ui::Handheld::PanelIcon::exit };
     model.selected = 1;
     if (std::string(argv[3]) == "terrain")
     {
         Ui::Handheld::DrawTerrainOverlay(rt, { 8, 52 }, true);
-        Ui::Handheld::DrawGameplayFooter(rt, { 512, 384 }, "RAISE LAND  Cost: $20.00", true);
+        Ui::Handheld::DrawGameplayFooter(rt, { 512, 384 }, "RAISE LAND", true);
+        Ui::Handheld::DrawCostBadge(rt, { 288, 224 }, "$20.00");
         Ui::Handheld::DrawMapFocus(rt, { 256, 192 });
+    }
+    else if (std::string(argv[3]) == "paths")
+    {
+        Ui::Handheld::DrawPathOverlay(rt, { 8, 52 }, "Tarmac", false, false);
+        Ui::Handheld::DrawPathFooter(rt, { 512, 384 }, "PLACE PATH");
+        Ui::Handheld::DrawCostBadge(rt, { 288, 224 }, "$12.00");
+        Ui::Handheld::DrawMapFocus(rt, { 256, 192 });
+    }
+    else if (std::string(argv[3]) == "finances")
+    {
+        w.width = 330;
+        w.height = 310;
+        w.windowPos = { 8, 37 };
+        model.title = "FINANCES";
+        model.detailTitle = "Evergreen Gardens";
+        model.stats = { { "Cash", "$12,456.00" },
+                        { "Bank loan", "$10,000.00" },
+                        { "Current profit", "$3,210.00" },
+                        { "Expenditure", "$971.30" },
+                        { "Park value", "$98,724.00" } };
+        model.rows = { "Back to dashboard" };
+        model.selected = 0;
+        Ui::Handheld::DrawInformationOverlay(rt, w, model);
     }
     else if (std::string(argv[3]) == "build")
     {
         model.title = "BUILD / TERRAIN";
-        model.rows = { "Raise land", "Lower land", "Back to park" };
+        model.rows = { "Raise land", "Lower land", "Paths", "Back to park" };
         model.icons = { Ui::Handheld::PanelIcon::raise, Ui::Handheld::PanelIcon::lower, Ui::Handheld::PanelIcon::back };
         model.selected = 0;
         model.status = "Choose a tool, then edit in the park.";
-        const auto buildSize = Ui::Handheld::OverlaySize(3);
+        const auto buildSize = Ui::Handheld::OverlaySize(4);
         w.height = buildSize.height;
         w.windowPos.y = (384 - w.height) / 2;
         Ui::Handheld::DrawOverlayShell(rt, w, model);

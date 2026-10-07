@@ -453,7 +453,7 @@ namespace OpenRCT2::Ui::Windows
                                 Handheld::PanelIcon::exit };
             else if (_page == Page::build)
             {
-                model.icons = { Handheld::PanelIcon::raise, Handheld::PanelIcon::lower, Handheld::PanelIcon::folder,
+                model.icons = { Handheld::PanelIcon::raise, Handheld::PanelIcon::lower, Handheld::PanelIcon::path,
                                 Handheld::PanelIcon::back };
                 if (model.status.empty())
                     model.status = "Choose a tool, then edit in the park.";
