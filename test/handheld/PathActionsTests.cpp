@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
+#include <array>
 #include <iostream>
 #include <openrct2-ui/ProvisionalElements.h>
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/Paths.h>
+#include <openrct2-ui/handheld/SceneryRemoval.h>
 #include <openrct2-ui/handheld/Surface.h>
 #include <openrct2-ui/handheld/Water.h>
 #include <openrct2-ui/windows/Windows.h>
@@ -243,6 +245,141 @@ static void TestSurface(IContext& context, const std::string& profile)
     Ui::Handheld::EndTerrain();
     std::cout << "Native surface paint / exact cash / loaded cycle / no-op / invalid target / ownership / funds / pause / "
                  "height-edge-water / save-reload checks passed\n";
+}
+static void TestSceneryRemoval(IContext& context, const std::string& profile)
+{
+    namespace Removal = Ui::Handheld::SceneryRemoval;
+    auto& objects = context.GetObjectManager();
+    auto* object = objects.LoadObject("rct2.scenery_small.tcl");
+    Require(object, "Scenery fixture object missing");
+    const auto index = objects.GetLoadedObjectEntryIndex(object);
+    auto& state = getGameState();
+    const CoordsXY tile{ 384, 64 }, neighbour{ 416, 64 };
+    MapGetSurfaceElementAt(tile)->setOwnership({ OwnershipFlag::landOwned });
+    MapGetSurfaceElementAt(neighbour)->setOwnership({ OwnershipFlag::landOwned });
+    const auto z = MapGetSurfaceElementAt(tile)->getBaseZ();
+    auto insert = [&](CoordsXY xy, int height, uint8_t quadrant, bool ghost = false) {
+        auto* element = TileElementInsert<SmallSceneryElement>({ xy, height }, 15);
+        Require(element, "Scenery fixture insert failed");
+        element->setEntryIndex(index);
+        element->setSceneryQuadrant(quadrant);
+        element->setClearanceZ(height + 8);
+        element->setGhost(ghost);
+    };
+    // Deliberately exercise native identities sharing a tile/type or a quadrant.
+    insert(tile, z, 0);
+    insert(tile, z, 1);
+    insert(tile, z + 8, 0);
+    insert(neighbour, z, 0);
+    Removal::Target target{ { tile, z }, 0, index };
+    Removal::Target sibling{ { tile, z }, 1, index }, upper{ { tile, z + 8 }, 0, index }, next{ { neighbour, z }, 0, index };
+    InteractionInfo info;
+    info.Loc = tile;
+    info.Element = Removal::Find(target)->as<TileElement>();
+    info.interactionType = ViewportInteractionItem::scenery;
+    auto selected = Removal::FromInfo(info);
+    Require(selected && selected->location.z == z && selected->quadrant == 0, "Scenery hit target incorrect");
+    auto metadata = [](SmallSceneryElement* e) {
+        return std::array<int, 7>{ e->getBaseZ(),           e->getClearanceZ(), e->getEntryIndex(),
+                                   e->getSceneryQuadrant(), e->getAge(),        static_cast<int>(e->getPrimaryColour()),
+                                   e->getDirection() };
+    };
+    const auto siblingBefore = metadata(Removal::Find(sibling)), upperBefore = metadata(Removal::Find(upper)),
+               nextBefore = metadata(Removal::Find(next));
+    auto query = Removal::Action(selected, false);
+    const auto initialCash = state.park.cash;
+    Require(query.error == GameActions::Status::ok && query.cost > 0 && Removal::Find(target), "Scenery query failed");
+    Require(state.park.cash == initialCash, "Removal query spent money");
+    Require(
+        Removal::Action(selected, true).error == GameActions::Status::ok && Removal::Find(target), "Removal bypassed queue");
+    GameActions::ProcessQueue(state);
+    Require(!Removal::Find(target) && state.park.cash == initialCash - query.cost, "Exact removal/cash incorrect");
+    Require(Removal::Find(sibling) && Removal::Find(upper) && Removal::Find(next), "Removal changed another element");
+    Require(Removal::Action(selected, true).error != GameActions::Status::ok, "Stale removal target accepted");
+    Require(Removal::Action({}, true).error != GameActions::Status::ok, "Missing removal target accepted");
+    info.Element = MapGetSurfaceElementAt(tile)->as<TileElement>();
+    for (auto type : { ViewportInteractionItem::terrain, ViewportInteractionItem::ride, ViewportInteractionItem::footpath,
+                       ViewportInteractionItem::largeScenery })
+    {
+        info.interactionType = type;
+        Require(!Removal::FromInfo(info), "Unsupported removal hit accepted");
+    }
+    info.interactionType = ViewportInteractionItem::scenery;
+    Require(!Removal::FromInfo(info), "Wrong element type accepted as scenery");
+    info.Element = nullptr;
+    Require(!Removal::FromInfo(info), "Null removal hit accepted");
+    insert(tile, z, 0, true);
+    auto* ghost = Removal::Find(target);
+    info.Element = ghost->as<TileElement>();
+    Require(
+        !Removal::FromInfo(info) && Removal::Action(target, true).error != GameActions::Status::ok, "Removal accepted ghost");
+    // A native non-ghost action can match a preceding ghost: reject ambiguous hits.
+    insert(tile, z, 0);
+    SmallSceneryElement* real = nullptr;
+    for (auto* e : TileElementsView<SmallSceneryElement>(tile))
+        if (!e->isGhost() && e->getBaseZ() == z && e->getSceneryQuadrant() == 0)
+            real = e;
+    info.Element = real->as<TileElement>();
+    Require(!Removal::FromInfo(info), "Ambiguous real hit could remove ghost");
+    Require(Removal::Find(target)->isGhost(), "Ghost changed by rejection");
+    TileElementRemove(Removal::Find(target)->as<TileElement>());
+    Require(Removal::Find(target) && !Removal::Find(target)->isGhost(), "Ambiguity fixture failed");
+    const auto validCash = state.park.cash;
+    MapGetSurfaceElementAt(tile)->setOwnership({});
+    Require(Removal::Action(target, true).error != GameActions::Status::ok, "Unowned removal accepted");
+    MapGetSurfaceElementAt(tile)->setOwnership({ OwnershipFlag::landOwned });
+    state.park.cash = 0;
+    Require(Removal::Action(target, true).error == GameActions::Status::insufficientFunds, "Unaffordable removal accepted");
+    state.park.cash = validCash;
+    gGamePaused = 1;
+    Require(Removal::Action(target, true).error == GameActions::Status::gamePaused, "Paused removal accepted");
+    gGamePaused = 0;
+    state.park.flags.set(ParkFlag::forbidTreeRemoval);
+    Require(Removal::Action(target, true).error != GameActions::Status::ok, "Forbidden tree removal accepted");
+    state.park.flags.unset(ParkFlag::forbidTreeRemoval);
+    GameActions::ProcessQueue(state);
+    Require(Removal::Find(target) && state.park.cash == validCash, "Rejected removal changed park");
+    // Remove the restored fixture target so the save proves permanent deletion.
+    query = Removal::Action(target, false);
+    Require(Removal::Action(target, true).error == GameActions::Status::ok, "Second removal failed");
+    GameActions::ProcessQueue(state);
+    Require(state.park.cash == validCash - query.cost, "Second removal charge incorrect");
+    // A real loaded refund-priced object proves signed native pricing, even at zero cash.
+    auto* refundObject = objects.LoadObject("rct2.scenery_small.corroof");
+    Require(refundObject, "Refund scenery fixture missing");
+    const CoordsXY refundTile{ 384, 96 };
+    auto* refundSurface = MapGetSurfaceElementAt(refundTile);
+    refundSurface->setOwnership({ OwnershipFlag::landOwned });
+    const Removal::Target refund{ { refundTile, refundSurface->getBaseZ() },
+                                  0,
+                                  objects.GetLoadedObjectEntryIndex(refundObject) };
+    auto* roof = TileElementInsert<SmallSceneryElement>(refund.location, 15);
+    Require(roof, "Refund fixture insert failed");
+    roof->setEntryIndex(refund.object);
+    roof->setSceneryQuadrant(0);
+    roof->setClearanceZ(refund.location.z + 8);
+    state.park.cash = 0;
+    query = Removal::Action(refund, false);
+    Require(query.error == GameActions::Status::ok && query.cost < 0, "Native refund query failed");
+    Require(Removal::Action(refund, true).error == GameActions::Status::ok, "Refund removal rejected at zero cash");
+    GameActions::ProcessQueue(state);
+    Require(!Removal::Find(refund) && state.park.cash == -query.cost, "Native refund cash incorrect");
+    const auto savedCash = state.park.cash;
+    SaveFlags flags{};
+    flags.set(SaveFlag::exportObjects);
+    const auto save = profile + "/scenery-removal.park";
+    Require(ScenarioSave(state, save, flags) != 0 && context.LoadParkFromFile(save), "Scenery removal save/reload failed");
+    Require(
+        !Removal::Find(target) && Removal::Find(sibling) && Removal::Find(upper) && Removal::Find(next)
+            && state.park.cash == savedCash,
+        "Removed/surviving scenery or cash not preserved");
+    Require(
+        metadata(Removal::Find(sibling)) == siblingBefore && metadata(Removal::Find(upper)) == upperBefore
+            && metadata(Removal::Find(next)) == nextBefore,
+        "Neighbour metadata changed");
+    Ui::Handheld::EndTerrain();
+    std::cout << "Native scenery removal / exact target-cash / unsupported-stale hits / ghost protection / "
+                 "ownership-funds-pause-tree rules / neighbours / save-reload checks passed\n";
 }
 int main(int argc, char** argv)
 {
@@ -517,11 +654,25 @@ int main(int argc, char** argv)
             Ui::Windows::HandheldMenuConfirm();
             Require(
                 !Paths::IsActive() && !FindPath(TileCoordsXYZ{ previewLocation }), "Surface entry retained path tool/ghost");
+            Ui::Handheld::EndTerrain();
+            Paths::Begin(false);
+            info.Element = reinterpret_cast<TileElement*>(MapGetSurfaceElementAt(previewTile));
+            Paths::UpdateTargetFromInfo(info);
+            Paths::UpdatePreview();
+            Require(Paths::IsActive() && FindPath(TileCoordsXYZ{ previewLocation }), "Scenery entry ghost fixture missing");
+            Ui::Windows::HandheldBuildOpen();
+            for (int i = 0; i < 5; ++i)
+                Ui::Windows::HandheldMenuMove(1);
+            Ui::Windows::HandheldMenuConfirm();
+            Require(
+                !Paths::IsActive() && !FindPath(TileCoordsXYZ{ previewLocation }),
+                "Scenery removal entry retained path tool/ghost");
             Require(context->LoadParkFromFile(save), "UI reload failed");
             Require(!Paths::IsActive() && !FindPath(TileCoordsXYZ{ previewLocation }), "Park load retained preview/tool");
         }
         TestWater(*context, argv[2]);
         TestSurface(*context, argv[2]);
+        TestSceneryRemoval(*context, argv[2]);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;

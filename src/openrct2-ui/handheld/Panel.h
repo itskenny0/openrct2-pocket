@@ -70,11 +70,17 @@ namespace OpenRCT2::Ui::Handheld
         back,
         raise,
         lower,
-        path
+        path,
+        remove
     };
 
     inline void DrawIcon(Drawing::RenderTarget& rt, ScreenCoordsXY pos, PanelIcon icon, bool selected = false)
     {
+        if (icon == PanelIcon::remove)
+        {
+            Concept::DrawIcon(rt, pos, Concept::Icon::remove, selected);
+            return;
+        }
         if (icon == PanelIcon::path)
         {
             GfxDrawSprite(rt, ImageId(SPR_G2_BUTTON_FOOTPATH), pos + ScreenCoordsXY{ -5, -6 });
@@ -290,11 +296,31 @@ namespace OpenRCT2::Ui::Handheld
         DrawModernText(rt, pos + ScreenCoordsXY{ 12, 153 }, "{MUTED}1 x 1");
     }
 
+    inline void DrawSceneryRemovalOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& name, bool target)
+    {
+        using namespace Concept;
+        Box(rt, pos, { kRailWidth, 146 });
+        Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, "Remove scenery");
+        Section(rt, pos + ScreenCoordsXY{ 10, 35 }, "Target");
+        Row(rt, pos + ScreenCoordsXY{ 8, 54 }, name, Icon::remove, target);
+        Rule(rt, pos + ScreenCoordsXY{ 8, 99 }, 148);
+        DrawModernText(rt, pos + ScreenCoordsXY{ 12, 116 }, "{MUTED}One object");
+    }
+
     inline void DrawActionStrip(Drawing::RenderTarget& rt, ScreenSize screen)
     {
         const ScreenCoordsXY p{ 0, screen.height - kActionStripHeight };
         Fill(rt, p, { screen.width, kActionStripHeight }, static_cast<Drawing::PaletteIndex>(PocketPalette::panel));
         Concept::Rule(rt, p, screen.width);
+    }
+
+    inline void DrawSceneryRemovalFooter(Drawing::RenderTarget& rt, ScreenSize screen)
+    {
+        DrawActionStrip(rt, screen);
+        const auto y = screen.height - 21;
+        DrawCommand(rt, { 12, y }, 38, "D-pad", "Move");
+        DrawCommand(rt, { 184, y }, 17, "A", "Remove");
+        DrawCommand(rt, { 396, y }, 17, "B", "Back");
     }
 
     inline void DrawGameplayFooter(

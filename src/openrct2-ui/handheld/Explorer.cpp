@@ -8,6 +8,7 @@
 #include "ControllerInput.h"
 #include "Panel.h"
 #include "Paths.h"
+#include "SceneryRemoval.h"
 #include "Surface.h"
 #include "Water.h"
 
@@ -44,6 +45,8 @@ namespace OpenRCT2::Ui::Handheld
     static bool _terrainActive{};
     static bool _waterTool{};
     static bool _surfaceTool{};
+    static bool _sceneryRemovalTool{};
+    static std::optional<SceneryRemoval::Target> _sceneryTarget;
     static ObjectEntryIndex _surfaceIndex = kObjectEntryIndexNull;
     static bool _raiseLand = true;
     static bool _selectionOwned{};
@@ -56,6 +59,8 @@ namespace OpenRCT2::Ui::Handheld
         _terrainActive = true;
         _waterTool = false;
         _surfaceTool = false;
+        _sceneryRemovalTool = false;
+        _sceneryTarget.reset();
         _surfaceIndex = kObjectEntryIndexNull;
         _raiseLand = raise;
         _terrainStatus.clear();
@@ -74,6 +79,12 @@ namespace OpenRCT2::Ui::Handheld
         _surfaceIndex = Surface::Next(kObjectEntryIndexNull);
     }
 
+    void BeginSceneryRemoval()
+    {
+        BeginTerrain(true);
+        _sceneryRemovalTool = true;
+    }
+
     static void ClearTerrainSelection()
     {
         if (_selectionOwned)
@@ -84,6 +95,7 @@ namespace OpenRCT2::Ui::Handheld
             _selectionOwned = false;
         }
         _terrainTile.reset();
+        _sceneryTarget.reset();
     }
 
     void EndTerrain()
@@ -91,6 +103,8 @@ namespace OpenRCT2::Ui::Handheld
         _terrainActive = false;
         _waterTool = false;
         _surfaceTool = false;
+        _sceneryRemovalTool = false;
+        _sceneryTarget.reset();
         _surfaceIndex = kObjectEntryIndexNull;
         Paths::End();
         _terrainStatus.clear();
@@ -99,6 +113,8 @@ namespace OpenRCT2::Ui::Handheld
 
     static GameActions::Result TerrainAction(bool execute)
     {
+        if (_sceneryRemovalTool)
+            return SceneryRemoval::Action(_sceneryTarget, execute);
         if (_surfaceTool)
             return Surface::Action(_terrainTile, _surfaceIndex, execute);
         if (_waterTool)
@@ -263,6 +279,11 @@ namespace OpenRCT2::Ui::Handheld
                 coords = info.interactionType == ViewportInteractionItem::none ? std::nullopt
                                                                                : std::optional<CoordsXY>{ info.Loc };
             }
+            if (_sceneryRemovalTool)
+            {
+                _sceneryTarget = SceneryRemoval::FromInfo(GetMapCoordinatesFromPos(Centre(), kViewportInteractionItemAll));
+                coords = _sceneryTarget ? std::optional<CoordsXY>{ _sceneryTarget->location } : std::nullopt;
+            }
             if (coords)
             {
                 _terrainTile = CoordsXY{ coords->x & ~31, coords->y & ~31 };
@@ -401,9 +422,10 @@ namespace OpenRCT2::Ui::Handheld
                             {
                                 const auto result = TerrainAction(true);
                                 _terrainStatus = result.error == GameActions::Status::ok
-                                    ? (_surfaceTool     ? "Surface change requested."
-                                           : _waterTool ? "Water change requested."
-                                                        : "Land changed.")
+                                    ? (_sceneryRemovalTool ? "Removal requested."
+                                           : _surfaceTool  ? "Surface change requested."
+                                           : _waterTool    ? "Water change requested."
+                                                           : "Land changed.")
                                     : result.getErrorMessage();
                             }
                         }
@@ -442,7 +464,7 @@ namespace OpenRCT2::Ui::Handheld
                         {
                             if (_surfaceTool)
                                 _surfaceIndex = Surface::Next(_surfaceIndex);
-                            else
+                            else if (!_sceneryRemovalTool)
                                 _raiseLand = !_raiseLand;
                             _terrainStatus.clear();
                         }
@@ -478,9 +500,10 @@ namespace OpenRCT2::Ui::Handheld
         std::string costAmount;
         if (_terrainActive)
         {
-            status = _surfaceTool ? "PAINT SURFACE"
-                : _waterTool      ? (_raiseLand ? "RAISE WATER" : "LOWER WATER")
-                                  : (_raiseLand ? "RAISE LAND" : "LOWER LAND");
+            status = _sceneryRemovalTool ? "REMOVE SCENERY"
+                : _surfaceTool           ? "PAINT SURFACE"
+                : _waterTool             ? (_raiseLand ? "RAISE WATER" : "LOWER WATER")
+                                         : (_raiseLand ? "RAISE LAND" : "LOWER LAND");
             if (_terrainTile)
             {
                 const auto result = TerrainAction(false);
@@ -494,7 +517,7 @@ namespace OpenRCT2::Ui::Handheld
                     status += "  " + result.getErrorMessage();
             }
             else
-                status += "  Move onto land";
+                status += _sceneryRemovalTool ? "  Point at small scenery" : "  Move onto land";
             if (!_terrainStatus.empty())
                 status = _terrainStatus;
         }
@@ -520,12 +543,18 @@ namespace OpenRCT2::Ui::Handheld
         {
             if (_terrainActive)
             {
-                if (_surfaceTool)
+                if (_sceneryRemovalTool)
+                    DrawSceneryRemovalOverlay(
+                        rt, Concept::kOrigin, SceneryRemoval::Name(_sceneryTarget), _sceneryTarget.has_value());
+                else if (_surfaceTool)
                     DrawSurfaceOverlay(rt, Concept::kOrigin, Surface::Name(_surfaceIndex));
                 else
                     DrawTerrainOverlay(rt, Concept::kOrigin, _raiseLand, _waterTool);
             }
-            DrawGameplayFooter(rt, { ContextGetWidth(), height }, status, _terrainActive, _surfaceTool);
+            if (_sceneryRemovalTool)
+                DrawSceneryRemovalFooter(rt, { ContextGetWidth(), height });
+            else
+                DrawGameplayFooter(rt, { ContextGetWidth(), height }, status, _terrainActive, _surfaceTool);
         }
         const bool feedback = !_terrainStatus.empty();
         if ((_terrainActive || Paths::IsActive()) && (feedback || costAmount.empty()))
