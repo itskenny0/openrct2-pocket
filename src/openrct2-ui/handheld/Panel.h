@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
+#include "ConceptStyle.h"
 #include "ModernText.h"
 
 #include <cmath>
@@ -259,45 +260,25 @@ namespace OpenRCT2::Ui::Handheld
         DrawOverlayCommands(rt, w);
     }
 
-    inline constexpr int kActionStripHeight = 28;
-    inline constexpr ScreenSize kTerrainOverlaySize{ 164, 94 };
+    inline constexpr int kActionStripHeight = 30;
+    inline constexpr ScreenSize kTerrainOverlaySize{ 164, 278 };
     inline constexpr ScreenSize kContextSize{ 160, 42 };
-
-    inline void DrawQuietSurface(Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size)
-    {
-        Fill(rt, p + ScreenCoordsXY{ 3, 0 }, { size.width - 6, size.height }, Theme::edge);
-        Fill(rt, p + ScreenCoordsXY{ 0, 3 }, { size.width, size.height - 6 }, Theme::edge);
-        Fill(rt, p + ScreenCoordsXY{ 3, 1 }, { size.width - 6, size.height - 2 }, Theme::ink);
-        Fill(rt, p + ScreenCoordsXY{ 1, 3 }, { size.width - 2, size.height - 6 }, Theme::ink);
-    }
-
-    inline void DrawToolHeading(Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& title)
-    {
-        DrawQuietSurface(rt, p, size);
-        DrawModernText(rt, p + ScreenCoordsXY{ 12, 12 }, "{MUTED}" + title);
-    }
-
-    inline void DrawToolRow(Drawing::RenderTarget& rt, ScreenCoordsXY p, int width, const std::string& text, bool selected)
-    {
-        if (selected)
-        {
-            Fill(rt, p + ScreenCoordsXY{ 2, 0 }, { width - 4, 28 }, Theme::gold);
-            Fill(rt, p + ScreenCoordsXY{ 0, 2 }, { width, 24 }, Theme::gold);
-        }
-        DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, 9 }, width - 20, (selected ? "{BLACK}" : "{WHITE}") + text);
-    }
 
     inline void DrawTerrainOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, bool raise)
     {
-        DrawToolHeading(rt, pos, { 164, 94 }, "TERRAIN");
-        DrawToolRow(rt, pos + ScreenCoordsXY{ 8, 34 }, 148, raise ? "Raise land" : "Lower land", true);
-        DrawModernText(rt, pos + ScreenCoordsXY{ 12, 74 }, "{MUTED}1 tile");
+        using namespace Concept;
+        Box(rt, pos, { 164, 194 });
+        Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, "Terrain");
+        Row(rt, pos + ScreenCoordsXY{ 8, 34 }, "Raise land", Icon::rise, raise);
+        Row(rt, pos + ScreenCoordsXY{ 8, 62 }, "Lower land", Icon::lower, !raise);
+        Heading(rt, pos + ScreenCoordsXY{ 10, 105 }, "Brush");
+        Row(rt, pos + ScreenCoordsXY{ 8, 127 }, "Single tile", Icon::ground, false);
+        DrawModernText(rt, pos + ScreenCoordsXY{ 12, 171 }, "{MUTED}Size: 1 x 1");
     }
 
     inline void DrawActionStrip(Drawing::RenderTarget& rt, ScreenSize screen)
     {
-        Fill(rt, { 0, screen.height - kActionStripHeight }, { screen.width, kActionStripHeight }, Theme::ink);
-        Fill(rt, { 0, screen.height - kActionStripHeight }, { screen.width, 1 }, Theme::edge);
+        Concept::Box(rt, { 0, screen.height - kActionStripHeight }, { screen.width, kActionStripHeight });
     }
 
     inline void DrawGameplayFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::string&, bool terrain)
@@ -306,10 +287,10 @@ namespace OpenRCT2::Ui::Handheld
         const auto y = screen.height - 21;
         if (terrain)
         {
-            DrawCommand(rt, { 12, y }, 17, "A", "Edit");
-            DrawCommand(rt, { 140, y }, 17, "Y", "Switch");
-            DrawCommand(rt, { 268, y }, 17, "B", "Done");
-            DrawCommand(rt, { 396, y }, 38, "D-pad", "Move");
+            DrawCommand(rt, { 12, y }, 38, "D-pad", "Move");
+            DrawCommand(rt, { 140, y }, 17, "A", "Edit");
+            DrawCommand(rt, { 268, y }, 17, "Y", "Tool");
+            DrawCommand(rt, { 396, y }, 17, "B", "Back");
         }
         else
         {
@@ -324,32 +305,55 @@ namespace OpenRCT2::Ui::Handheld
         Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& surface, bool queue, bool remove,
         const std::string& placement = "Ground / auto slope")
     {
-        DrawToolHeading(rt, pos, kTerrainOverlaySize, remove ? "REMOVE PATH" : queue ? "QUEUE PATH" : "PATH");
-        DrawToolRow(rt, pos + ScreenCoordsXY{ 8, 34 }, 148, remove ? "Remove" : surface, true);
-        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 12, 73 }, 140, "{MUTED}" + placement);
+        using namespace Concept;
+        Box(rt, pos, kTerrainOverlaySize);
+        Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, "Path type");
+        Row(rt, pos + ScreenCoordsXY{ 8, 34 }, queue ? "Queue path" : "Normal path", queue ? Icon::queue : Icon::path, !remove);
+        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 12, 69 }, 140, "{MUTED}" + surface);
+        Rule(rt, pos + ScreenCoordsXY{ 8, 91 }, 148);
+        Heading(rt, pos + ScreenCoordsXY{ 10, 103 }, "Slope");
+        const auto slash = placement.find(" / ");
+        const auto slope = slash == std::string::npos ? "Follow ground" : placement.substr(slash + 3);
+        Row(rt, pos + ScreenCoordsXY{ 8, 125 },
+            remove                      ? "Existing path"
+                : slope == "auto slope" ? "Auto slope"
+                                        : slope,
+            slope.starts_with("Rise") ? Icon::slope : Icon::path, !remove);
+        DrawModernEllipsised(
+            rt, pos + ScreenCoordsXY{ 12, 160 }, 140,
+            "{MUTED}"
+                + (remove                           ? std::string("Uses tile height")
+                       : slash == std::string::npos ? placement
+                                                    : placement.substr(0, slash)));
+        Rule(rt, pos + ScreenCoordsXY{ 8, 181 }, 148);
+        Heading(rt, pos + ScreenCoordsXY{ 10, 193 }, "Options");
+        Row(rt, pos + ScreenCoordsXY{ 8, 215 }, "Path options", Icon::options, false);
+        Row(rt, pos + ScreenCoordsXY{ 8, 243 }, "Remove", Icon::remove, remove);
     }
 
     inline void DrawPathFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::string&, bool remove = false)
     {
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;
-        DrawCommand(rt, { 8, y }, 17, "A", remove ? "Remove" : "Place");
-        DrawCommand(rt, { 110, y }, 17, "X", remove ? "Place" : "Remove");
-        DrawCommand(rt, { 212, y }, 28, "SEL", "Options");
-        DrawCommand(rt, { 314, y }, 17, "B", "Done");
-        DrawCommand(rt, { 416, y }, 38, "D-pad", "Move");
+        DrawCommand(rt, { 8, y }, 38, "D-pad", "Move");
+        DrawCommand(rt, { 91, y }, 17, "A", remove ? "Remove" : "Place");
+        DrawCommand(rt, { 180, y }, 17, "X", remove ? "Place" : "Remove");
+        DrawCommand(rt, { 271, y }, 17, "Y", "Surface");
+        DrawCommand(rt, { 358, y }, 28, "SEL", "Options");
+        DrawCommand(rt, { 450, y }, 17, "B", "Back");
     }
 
     inline void DrawCostBadge(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& amount)
     {
-        DrawQuietSurface(rt, pos, { 88, 24 });
-        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 10, 7 }, 68, "{YELLOW}" + amount);
+        Concept::Box(rt, pos, { 114, 28 });
+        DrawStrongText(rt, pos + ScreenCoordsXY{ 8, 9 }, "Cost:");
+        DrawStrongText(rt, pos + ScreenCoordsXY{ 46, 9 }, "{POSITIVE}" + amount, 61);
     }
 
     inline void DrawContextMessage(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& text)
     {
         // Two short lines preserve feedback without reserving a permanent status row.
-        DrawQuietSurface(rt, pos, kContextSize);
+        Concept::Box(rt, pos, kContextSize);
         auto split = text.size();
         while (split > 0 && TextWidth(text.substr(0, split)) > 140)
             --split;
@@ -368,24 +372,18 @@ namespace OpenRCT2::Ui::Handheld
         Drawing::RenderTarget& rt, ScreenSize screen, const std::vector<std::string>& rows, size_t selected,
         const std::string& status)
     {
-        const ScreenCoordsXY p{ 8, 52 };
-        DrawToolHeading(rt, p, { 164, 188 }, "PATH OPTIONS");
-        const size_t visible = std::min<size_t>(4, rows.size());
-        const auto first = std::min(selected > 0 ? selected - 1 : 0, rows.size() - visible);
-        for (size_t i = 0; i < visible; ++i)
-            DrawToolRow(
-                rt, p + ScreenCoordsXY{ 8, 34 + static_cast<int>(i) * 30 }, 148, rows[first + i], first + i == selected);
-        if (first > 0)
-        {
-            GfxDrawLine(rt, { p + ScreenCoordsXY{ 145, 18 }, p + ScreenCoordsXY{ 148, 15 } }, Theme::highlight);
-            GfxDrawLine(rt, { p + ScreenCoordsXY{ 148, 15 }, p + ScreenCoordsXY{ 151, 18 } }, Theme::highlight);
-        }
-        if (first + visible < rows.size())
-        {
-            GfxDrawLine(rt, { p + ScreenCoordsXY{ 145, 169 }, p + ScreenCoordsXY{ 148, 172 } }, Theme::highlight);
-            GfxDrawLine(rt, { p + ScreenCoordsXY{ 148, 172 }, p + ScreenCoordsXY{ 151, 169 } }, Theme::highlight);
-        }
-        DrawModernEllipsised(rt, p + ScreenCoordsXY{ 12, 166 }, 130, "{MUTED}" + status);
+        using namespace Concept;
+        const auto p = kOrigin;
+        Box(rt, p, { 164, 342 });
+        Heading(rt, p + ScreenCoordsXY{ 10, 12 }, "Path options");
+        DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, 32 }, 144, "{MUTED}" + status);
+        const int rowY[] = { 52, 108, 136, 164, 220, 248, 304 };
+        const Icon icons[] = { Icon::play, Icon::ground, Icon::rise, Icon::lower, Icon::slope, Icon::options, Icon::path };
+        Heading(rt, p + ScreenCoordsXY{ 10, 87 }, "Height");
+        Heading(rt, p + ScreenCoordsXY{ 10, 199 }, "Slope");
+        Heading(rt, p + ScreenCoordsXY{ 10, 283 }, "Surface");
+        for (size_t i = 0; i < rows.size() && i < 7; ++i)
+            Row(rt, p + ScreenCoordsXY{ 8, rowY[i] }, rows[i], icons[i], i == selected);
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;
         DrawCommand(rt, { 12, y }, 38, "D-pad", "Choose");

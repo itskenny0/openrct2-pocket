@@ -181,7 +181,7 @@ namespace OpenRCT2::Ui::Handheld
             if (tools == nullptr)
             {
                 tools = wm->Create<FocusWindow>(
-                    WindowClass::handheldHud, { 8, 52 }, kTerrainOverlaySize,
+                    WindowClass::handheldHud, Concept::kOrigin, kTerrainOverlaySize,
                     { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
                 if (tools != nullptr)
                     tools->number = 1;
@@ -464,13 +464,14 @@ namespace OpenRCT2::Ui::Handheld
                 status = result.getErrorMessage();
             if (!_terrainStatus.empty())
                 status = _terrainStatus;
-            DrawPathOverlay(rt, { 8, 52 }, Paths::SurfaceName(), Paths::IsQueue(), Paths::IsRemoving(), Paths::PlacementName());
+            DrawPathOverlay(
+                rt, Concept::kOrigin, Paths::SurfaceName(), Paths::IsQueue(), Paths::IsRemoving(), Paths::PlacementName());
             DrawPathFooter(rt, { ContextGetWidth(), height }, status, Paths::IsRemoving());
         }
         else
         {
             if (_terrainActive)
-                DrawTerrainOverlay(rt, { 8, 52 }, _raiseLand);
+                DrawTerrainOverlay(rt, Concept::kOrigin, _raiseLand);
             DrawGameplayFooter(rt, { ContextGetWidth(), height }, status, _terrainActive);
         }
         const bool feedback = !_terrainStatus.empty();

@@ -75,26 +75,31 @@ int main(int argc, char** argv)
     model.icons = { Ui::Handheld::PanelIcon::play, Ui::Handheld::PanelIcon::terrain, Ui::Handheld::PanelIcon::save,
                     Ui::Handheld::PanelIcon::exit, Ui::Handheld::PanelIcon::folder,  Ui::Handheld::PanelIcon::exit };
     model.selected = 1;
-    if (std::string(argv[3]) == "terrain")
+    if (std::string(argv[3]) == "terrain" || std::string(argv[3]) == "terrain-lower")
     {
-        Ui::Handheld::DrawTerrainOverlay(rt, { 8, 52 }, true);
+        Ui::Handheld::DrawTerrainOverlay(rt, Ui::Handheld::Concept::kOrigin, std::string(argv[3]) != "terrain-lower");
         Ui::Handheld::DrawGameplayFooter(rt, { 512, 384 }, "RAISE LAND", true);
         Ui::Handheld::DrawCostBadge(rt, { 288, 224 }, "$20.00");
         Ui::Handheld::DrawMapFocus(rt, { 256, 192 });
     }
-    else if (std::string(argv[3]) == "paths")
+    else if (std::string(argv[3]).starts_with("paths"))
     {
-        Ui::Handheld::DrawPathOverlay(rt, { 8, 52 }, "Tarmac", false, false, "Height 6 / Rise NE");
-        Ui::Handheld::DrawPathFooter(rt, { 512, 384 }, "PLACE PATH");
+        Ui::Handheld::DrawPathOverlay(
+            rt, Ui::Handheld::Concept::kOrigin, std::string(argv[3]) == "paths-queue" ? "Blue queue" : "Tarmac",
+            std::string(argv[3]) == "paths-queue", std::string(argv[3]) == "paths-remove",
+            std::string(argv[3]) == "paths-ground" ? "Ground / auto slope" : "Height 6 / Rise NE");
+        Ui::Handheld::DrawPathFooter(rt, { 512, 384 }, "PLACE PATH", std::string(argv[3]) == "paths-remove");
         Ui::Handheld::DrawCostBadge(rt, { 288, 224 }, "$12.00");
+        if (std::string(argv[3]) == "paths-error")
+            Ui::Handheld::DrawContextMessage(rt, { 288, 224 }, "Land not owned by park.");
         Ui::Handheld::DrawMapFocus(rt, { 256, 192 });
     }
-    else if (std::string(argv[3]) == "path-options")
+    else if (std::string(argv[3]).starts_with("path-options"))
     {
         Ui::Handheld::DrawPathOptions(
             rt, { 512, 384 },
-            { "Resume", "Follow ground", "Raise height", "Lower height", "Flat / slope", "Rotate slope", "Surface" }, 2,
-            "Height 6 / Rise NE");
+            { "Resume", "Follow ground", "Raise height", "Lower height", "Flat / slope", "Rotate slope", "Change surface" },
+            std::string(argv[3]) == "path-options-last" ? 6 : 2, "Height 6 / Rise NE");
     }
     else if (std::string(argv[3]) == "finances")
     {

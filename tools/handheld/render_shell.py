@@ -16,6 +16,9 @@ parser.add_argument("--output", type=Path, required=True, help="PNG contact shee
 parser.add_argument("--ninja", default="ninja")
 parser.add_argument("--background", type=Path, help="Optional park image for an explicitly labelled layout composite")
 parser.add_argument("--frames-dir", type=Path, help="Also save individual unscaled 512 x 384 PNG captures")
+parser.add_argument("--pages", nargs="+", default=["terrain", "paths", "path-options"],
+                    choices=["terrain", "terrain-lower", "paths", "paths-queue", "paths-remove", "paths-ground", "paths-error", "path-options", "path-options-last"],
+                    help="Native UI states to capture")
 args = parser.parse_args()
 if args.frames_dir:
     args.frames_dir.mkdir(parents=True, exist_ok=True)
@@ -40,7 +43,7 @@ with tempfile.TemporaryDirectory(prefix="pocket-shell-") as directory:
     link.insert(output_index, str(repo / "test/handheld/PanelPreview.cpp"))
     link[1:1] = ["-std=c++20", *definitions, f"-I{repo / 'src'}", f"-I{repo / 'src/thirdparty'}"]
     subprocess.run(link, cwd=build, check=True)
-    sheet = Image.new("RGB", (512, 1218), (15, 19, 55))
+    sheet = Image.new("RGB", (512, 406 * len(args.pages)), (15, 19, 55))
     draw = ImageDraw.Draw(sheet)
     background_args = []
     if args.background:
@@ -48,7 +51,7 @@ with tempfile.TemporaryDirectory(prefix="pocket-shell-") as directory:
         with Image.open(args.background) as image:
             ImageOps.fit(image.convert("RGB"), (512, 384), method=Image.Resampling.NEAREST).save(background_path)
         background_args = [str(background_path)]
-    for index, page in enumerate(("terrain", "paths", "path-options")):
+    for index, page in enumerate(args.pages):
         path = temporary / f"{page}.ppm"
         subprocess.run([str(temporary / "preview"), str(args.data.resolve()), str(path), page, *background_args], check=True)
         top = index * 406

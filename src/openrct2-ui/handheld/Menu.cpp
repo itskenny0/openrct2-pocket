@@ -127,8 +127,8 @@ namespace OpenRCT2::Ui::Windows
                 case Page::paths:
                     return { "Normal path", "Queue path", "Remove path", "Back to build" };
                 case Page::pathOptions:
-                    return { "Resume",       "Follow ground", "Raise height", "Lower height",
-                             "Flat / slope", "Rotate slope",  "Surface" };
+                    return { "Resume",       "Follow ground", "Raise height",  "Lower height",
+                             "Flat / slope", "Rotate slope",  "Change surface" };
                 case Page::save:
                 case Page::load:
                 {

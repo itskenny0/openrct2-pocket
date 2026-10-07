@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "PocketSansData.h"
+#include "PocketSansStrongData.h"
 
 #include <algorithm>
 #include <array>
@@ -19,7 +20,8 @@ namespace OpenRCT2::Ui::Handheld
         light,
         dark,
         gold,
-        muted
+        muted,
+        positive
     };
 
     inline Drawing::PaletteIndex BlendGlyph(Ink ink, Drawing::PaletteIndex background, uint8_t coverage)
@@ -29,7 +31,7 @@ namespace OpenRCT2::Ui::Handheld
             bool ready{};
             std::array<Drawing::PaletteIndex, 16> colours{};
         };
-        static std::array<std::array<Ramp, 256>, 4> ramps;
+        static std::array<std::array<Ramp, 256>, 5> ramps;
         auto& ramp = ramps[static_cast<size_t>(ink)][static_cast<uint8_t>(background)];
         if (!ramp.ready)
         {
@@ -38,10 +40,11 @@ namespace OpenRCT2::Ui::Handheld
                 || static_cast<uint8_t>(background) >= palette->startIndex + palette->numColours)
                 return background;
             const auto bg = palette->palette[static_cast<uint8_t>(background) - palette->startIndex];
-            const std::array<int, 3> fg = ink == Ink::muted ? std::array<int, 3>{ 145, 166, 187 }
-                : ink == Ink::dark                          ? std::array<int, 3>{ 15, 24, 34 }
-                : ink == Ink::gold                          ? std::array<int, 3>{ 255, 231, 95 }
-                                                            : std::array<int, 3>{ 230, 240, 250 };
+            const std::array<int, 3> fg = ink == Ink::positive ? std::array<int, 3>{ 134, 239, 93 }
+                : ink == Ink::muted                            ? std::array<int, 3>{ 145, 166, 187 }
+                : ink == Ink::dark                             ? std::array<int, 3>{ 15, 24, 34 }
+                : ink == Ink::gold                             ? std::array<int, 3>{ 255, 231, 95 }
+                                                               : std::array<int, 3>{ 230, 240, 250 };
             for (int a = 0; a < 16; ++a)
             {
                 const int red = (bg.red * (15 - a) + fg[0] * a) / 15;
@@ -67,27 +70,29 @@ namespace OpenRCT2::Ui::Handheld
         return ramp.colours[coverage];
     }
 
-    inline int TextWidth(const std::string& text)
+    inline int TextWidth(const std::string& text, bool strong = false)
     {
         int width = 0;
         for (const unsigned char c : text)
             if (c >= 32 && c < 127)
-                width += PocketSans::kAdvance[c - 32];
+                width += strong ? PocketSansStrong::kAdvance[c - 32] : PocketSans::kAdvance[c - 32];
         return width;
     }
 
     inline void DrawModernText(
-        Drawing::RenderTarget& rt, ScreenCoordsXY pos, std::string text, TextPaint paint = {}, int maxWidth = 0)
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, std::string text, TextPaint paint = {}, int maxWidth = 0,
+        bool strong = false)
     {
         Ink ink = paint.colour.colour == Drawing::Colour::yellow ? Ink::gold : Ink::light;
-        for (const auto& prefix :
-             { std::string("{BLACK}"), std::string("{WHITE}"), std::string("{YELLOW}"), std::string("{MUTED}") })
+        for (const auto& prefix : { std::string("{BLACK}"), std::string("{WHITE}"), std::string("{YELLOW}"),
+                                    std::string("{MUTED}"), std::string("{POSITIVE}") })
             if (text.starts_with(prefix))
             {
-                ink = prefix == "{BLACK}"  ? Ink::dark
-                    : prefix == "{YELLOW}" ? Ink::gold
-                    : prefix == "{MUTED}"  ? Ink::muted
-                                           : Ink::light;
+                ink = prefix == "{POSITIVE}" ? Ink::positive
+                    : prefix == "{BLACK}"    ? Ink::dark
+                    : prefix == "{YELLOW}"   ? Ink::gold
+                    : prefix == "{MUTED}"    ? Ink::muted
+                                             : Ink::light;
                 text.erase(0, prefix.size());
                 break;
             }
@@ -101,35 +106,41 @@ namespace OpenRCT2::Ui::Handheld
                 drawText(rt, pos, text, paint);
             return;
         }
-        if (maxWidth > 0 && TextWidth(text) > maxWidth)
+        if (maxWidth > 0 && TextWidth(text, strong) > maxWidth)
         {
-            while (!text.empty() && TextWidth(text + "...") > maxWidth)
+            while (!text.empty() && TextWidth(text + "...", strong) > maxWidth)
                 text.pop_back();
             text += "...";
         }
-        const int width = TextWidth(text);
+        const int width = TextWidth(text, strong);
         if (paint.alignment == TextAlignment::centre)
             pos.x -= width / 2;
         else if (paint.alignment == TextAlignment::right)
             pos.x -= width;
         for (const unsigned char c : text)
         {
-            const auto glyph = PocketSans::kCoverage[c - 32];
+            const auto glyph = strong ? PocketSansStrong::kCoverage[c - 32] : PocketSans::kCoverage[c - 32];
+            const auto glyphWidth = strong ? PocketSansStrong::kWidth : PocketSans::kWidth;
             for (int y = 0; y < PocketSans::kHeight; ++y)
-                for (int x = 0; x < PocketSans::kWidth; ++x)
+                for (int x = 0; x < glyphWidth; ++x)
                 {
                     const int px = pos.x + x, py = pos.y + y - 3;
                     if (px < rt.x || py < rt.y || px >= rt.x + rt.width || py >= rt.y + rt.height)
                         continue;
-                    const char value = glyph[y * PocketSans::kWidth + x];
+                    const char value = glyph[y * glyphWidth + x];
                     const uint8_t coverage = value <= '9' ? value - '0' : value - 'a' + 10;
                     if (!coverage)
                         continue;
                     auto& pixel = rt.bits[(py - rt.y) * rt.LineStride() + px - rt.x];
                     pixel = BlendGlyph(ink, pixel, coverage);
                 }
-            pos.x += PocketSans::kAdvance[c - 32];
+            pos.x += strong ? PocketSansStrong::kAdvance[c - 32] : PocketSans::kAdvance[c - 32];
         }
+    }
+
+    inline void DrawStrongText(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& text, int maxWidth = 0)
+    {
+        DrawModernText(rt, pos, text, {}, maxWidth, true);
     }
 
     inline void DrawModernEllipsised(

@@ -53,3 +53,12 @@ remaining work and the validation boundaries.
 
 For individual 512 × 384 captures, add `--frames-dir /absolute/path/to/captures`.
 See `docs/handheld/UI-REFINEMENT.md` for the compact tool layouts and validation.
+
+The authoritative Concept B styling and current validation are documented in
+`docs/handheld/CONCEPT-UI.md`, superseding the sparse tool-layout pass.
+`ConceptStyle.h` owns its shared primitives; generate the bold atlas with:
+
+```sh
+python3 tools/handheld/generate_font.py /path/to/DejaVuSans-Bold.ttf \
+  src/openrct2-ui/handheld/PocketSansStrongData.h --namespace PocketSansStrong --width 16
+```
