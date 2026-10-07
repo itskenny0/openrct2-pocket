@@ -162,13 +162,14 @@ namespace OpenRCT2::Ui::Handheld
         if (hud == nullptr)
         {
             hud = wm->Create<FocusWindow>(
-                WindowClass::handheldHud, { 0, ContextGetHeight() - 34 }, { ContextGetWidth(), 34 },
+                WindowClass::handheldHud, { 0, ContextGetHeight() - kActionStripHeight },
+                { ContextGetWidth(), kActionStripHeight },
                 { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
         }
         if (hud != nullptr)
         {
             hud->invalidate();
-            hud->windowPos = { 0, ContextGetHeight() - 34 };
+            hud->windowPos = { 0, ContextGetHeight() - kActionStripHeight };
             hud->width = ContextGetWidth();
             hud->invalidate();
         }
@@ -196,7 +197,7 @@ namespace OpenRCT2::Ui::Handheld
             if (cost == nullptr)
             {
                 cost = wm->Create<FocusWindow>(
-                    WindowClass::handheldHud, Centre() + ScreenCoordsXY{ 32, 32 }, { 136, 28 },
+                    WindowClass::handheldHud, Centre() + ScreenCoordsXY{ 32, 32 }, kContextSize,
                     { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
                 if (cost != nullptr)
                     cost->number = 2;
@@ -464,7 +465,7 @@ namespace OpenRCT2::Ui::Handheld
             if (!_terrainStatus.empty())
                 status = _terrainStatus;
             DrawPathOverlay(rt, { 8, 52 }, Paths::SurfaceName(), Paths::IsQueue(), Paths::IsRemoving(), Paths::PlacementName());
-            DrawPathFooter(rt, { ContextGetWidth(), height }, status);
+            DrawPathFooter(rt, { ContextGetWidth(), height }, status, Paths::IsRemoving());
         }
         else
         {
@@ -472,7 +473,10 @@ namespace OpenRCT2::Ui::Handheld
                 DrawTerrainOverlay(rt, { 8, 52 }, _raiseLand);
             DrawGameplayFooter(rt, { ContextGetWidth(), height }, status, _terrainActive);
         }
-        if (!costAmount.empty())
+        const bool feedback = !_terrainStatus.empty();
+        if ((_terrainActive || Paths::IsActive()) && (feedback || costAmount.empty()))
+            DrawContextMessage(rt, c + ScreenCoordsXY{ 32, 32 }, status);
+        else if (!costAmount.empty())
             DrawCostBadge(rt, c + ScreenCoordsXY{ 32, 32 }, costAmount);
         // High contrast, fixed map focus; this does not move the desktop pointer.
         DrawMapFocus(rt, c);

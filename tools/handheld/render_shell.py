@@ -15,7 +15,10 @@ parser.add_argument("--data", type=Path, required=True, help="OpenRCT2 graphics 
 parser.add_argument("--output", type=Path, required=True, help="PNG contact sheet destination")
 parser.add_argument("--ninja", default="ninja")
 parser.add_argument("--background", type=Path, help="Optional park image for an explicitly labelled layout composite")
+parser.add_argument("--frames-dir", type=Path, help="Also save individual unscaled 512 x 384 PNG captures")
 args = parser.parse_args()
+if args.frames_dir:
+    args.frames_dir.mkdir(parents=True, exist_ok=True)
 repo = Path(__file__).resolve().parents[2]
 build = args.build.resolve()
 args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -52,5 +55,7 @@ with tempfile.TemporaryDirectory(prefix="pocket-shell-") as directory:
         draw.text((12, top + 5), f"{page.upper()} / native UI" + (" / backdrop composite / sample data" if args.background else " / no park assets"), fill=(255, 243, 95))
         with Image.open(path) as image:
             sheet.paste(image, (0, top + 22))
+            if args.frames_dir:
+                image.save(args.frames_dir / f"{page}.png")
     sheet.save(args.output)
 print(f"Saved native shell preview: {args.output}")

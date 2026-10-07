@@ -50,3 +50,6 @@ include paths are inherited from the real build to preserve context ABI.
 
 See `docs/handheld/MODERN-PATHS.md` for implemented features, device controls,
 remaining work and the validation boundaries.
+
+For individual 512 × 384 captures, add `--frames-dir /absolute/path/to/captures`.
+See `docs/handheld/UI-REFINEMENT.md` for the compact tool layouts and validation.

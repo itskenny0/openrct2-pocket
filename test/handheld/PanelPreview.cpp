@@ -91,15 +91,10 @@ int main(int argc, char** argv)
     }
     else if (std::string(argv[3]) == "path-options")
     {
-        model.title = "PATH OPTIONS";
-        model.rows = { "Resume placing", "Follow ground",       "Raise path height", "Lower path height",
-                       "Flat / sloped",  "Rotate rising slope", "Change surface" };
-        model.icons = { Ui::Handheld::PanelIcon::play,  Ui::Handheld::PanelIcon::terrain, Ui::Handheld::PanelIcon::raise,
-                        Ui::Handheld::PanelIcon::lower, Ui::Handheld::PanelIcon::path,    Ui::Handheld::PanelIcon::path,
-                        Ui::Handheld::PanelIcon::path };
-        model.selected = 2;
-        model.status = "Height 6 / Rise NE";
-        Ui::Handheld::DrawOverlayShell(rt, w, model);
+        Ui::Handheld::DrawPathOptions(
+            rt, { 512, 384 },
+            { "Resume", "Follow ground", "Raise height", "Lower height", "Flat / slope", "Rotate slope", "Surface" }, 2,
+            "Height 6 / Rise NE");
     }
     else if (std::string(argv[3]) == "finances")
     {

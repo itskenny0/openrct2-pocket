@@ -259,77 +259,138 @@ namespace OpenRCT2::Ui::Handheld
         DrawOverlayCommands(rt, w);
     }
 
-    inline constexpr ScreenSize kTerrainOverlaySize{ 184, 164 };
+    inline constexpr int kActionStripHeight = 28;
+    inline constexpr ScreenSize kTerrainOverlaySize{ 164, 94 };
+    inline constexpr ScreenSize kContextSize{ 160, 42 };
+
+    inline void DrawQuietSurface(Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size)
+    {
+        Fill(rt, p + ScreenCoordsXY{ 3, 0 }, { size.width - 6, size.height }, Theme::edge);
+        Fill(rt, p + ScreenCoordsXY{ 0, 3 }, { size.width, size.height - 6 }, Theme::edge);
+        Fill(rt, p + ScreenCoordsXY{ 3, 1 }, { size.width - 6, size.height - 2 }, Theme::ink);
+        Fill(rt, p + ScreenCoordsXY{ 1, 3 }, { size.width - 2, size.height - 6 }, Theme::ink);
+    }
+
+    inline void DrawToolHeading(Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& title)
+    {
+        DrawQuietSurface(rt, p, size);
+        DrawModernText(rt, p + ScreenCoordsXY{ 12, 12 }, "{MUTED}" + title);
+    }
+
+    inline void DrawToolRow(Drawing::RenderTarget& rt, ScreenCoordsXY p, int width, const std::string& text, bool selected)
+    {
+        if (selected)
+        {
+            Fill(rt, p + ScreenCoordsXY{ 2, 0 }, { width - 4, 28 }, Theme::gold);
+            Fill(rt, p + ScreenCoordsXY{ 0, 2 }, { width, 24 }, Theme::gold);
+        }
+        DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, 9 }, width - 20, (selected ? "{BLACK}" : "{WHITE}") + text);
+    }
 
     inline void DrawTerrainOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, bool raise)
     {
-        Window window;
-        window.windowPos = pos;
-        window.width = kTerrainOverlaySize.width;
-        window.height = kTerrainOverlaySize.height;
-        DrawPanelHeading(rt, window, "Terrain");
-        DrawIconRow(rt, pos + ScreenCoordsXY{ 10, 44 }, window.width - 20, "Raise land", raise, PanelIcon::raise);
-        DrawIconRow(rt, pos + ScreenCoordsXY{ 10, 76 }, window.width - 20, "Lower land", !raise, PanelIcon::lower);
-        DrawModernText(rt, pos + ScreenCoordsXY{ 13, 115 }, "Single tile / centre cursor", { Drawing::Colour::white });
-        DrawCommand(rt, pos + ScreenCoordsXY{ 13, 141 }, 17, "Y", "Switch tool");
+        DrawToolHeading(rt, pos, { 164, 94 }, "TERRAIN");
+        DrawToolRow(rt, pos + ScreenCoordsXY{ 8, 34 }, 148, raise ? "Raise land" : "Lower land", true);
+        DrawModernText(rt, pos + ScreenCoordsXY{ 12, 74 }, "{MUTED}1 tile");
     }
 
-    inline void DrawGameplayFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::string& status, bool terrain)
+    inline void DrawActionStrip(Drawing::RenderTarget& rt, ScreenSize screen)
     {
-        DrawSurface(rt, { 0, screen.height - 34 }, { screen.width, 34 });
-        const auto y = screen.height - 19;
+        Fill(rt, { 0, screen.height - kActionStripHeight }, { screen.width, kActionStripHeight }, Theme::ink);
+        Fill(rt, { 0, screen.height - kActionStripHeight }, { screen.width, 1 }, Theme::edge);
+    }
+
+    inline void DrawGameplayFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::string&, bool terrain)
+    {
+        DrawActionStrip(rt, screen);
+        const auto y = screen.height - 21;
         if (terrain)
         {
-            DrawCommand(rt, { 8, y }, 17, "A", "Edit");
-            DrawCommand(rt, { 112, y }, 17, "Y", "Raise/lower");
-            DrawCommand(rt, { 264, y }, 17, "B", "Done");
-            DrawCommand(rt, { 376, y }, 38, "D-pad", "Move");
+            DrawCommand(rt, { 12, y }, 17, "A", "Edit");
+            DrawCommand(rt, { 140, y }, 17, "Y", "Switch");
+            DrawCommand(rt, { 268, y }, 17, "B", "Done");
+            DrawCommand(rt, { 396, y }, 38, "D-pad", "Move");
         }
         else
         {
-            DrawCommand(rt, { 8, y }, 17, "A", "Inspect");
-            DrawCommand(rt, { 126, y }, 17, "B", "Back");
-            DrawCommand(rt, { 244, y }, 28, "SEL", "Build");
-            DrawCommand(rt, { 370, y }, 38, "START", "Park");
+            DrawCommand(rt, { 12, y }, 17, "A", "Inspect");
+            DrawCommand(rt, { 140, y }, 17, "B", "Back");
+            DrawCommand(rt, { 268, y }, 28, "SEL", "Build");
+            DrawCommand(rt, { 396, y }, 38, "START", "Park");
         }
-        DrawModernEllipsised(rt, { 8, screen.height - 31 }, screen.width - 16, "{YELLOW}" + status, { Drawing::Colour::white });
     }
 
     inline void DrawPathOverlay(
         Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& surface, bool queue, bool remove,
         const std::string& placement = "Ground / auto slope")
     {
-        Window w;
-        w.windowPos = pos;
-        w.width = kTerrainOverlaySize.width;
-        w.height = kTerrainOverlaySize.height;
-        DrawPanelHeading(rt, w, "Paths");
-        DrawIconRow(
-            rt, pos + ScreenCoordsXY{ 10, 44 }, w.width - 20,
-            remove      ? "Remove path"
-                : queue ? "Queue path"
-                        : "Normal path",
-            true, remove ? PanelIcon::back : PanelIcon::path);
-        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 13, 82 }, w.width - 26, surface, { Drawing::Colour::white });
-        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 13, 107 }, w.width - 26, placement, { Drawing::Colour::white });
-        DrawCommand(rt, pos + ScreenCoordsXY{ 13, 139 }, 28, "SEL", "Path options");
+        DrawToolHeading(rt, pos, kTerrainOverlaySize, remove ? "REMOVE PATH" : queue ? "QUEUE PATH" : "PATH");
+        DrawToolRow(rt, pos + ScreenCoordsXY{ 8, 34 }, 148, remove ? "Remove" : surface, true);
+        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 12, 73 }, 140, "{MUTED}" + placement);
     }
-    inline void DrawPathFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::string& status)
+
+    inline void DrawPathFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::string&, bool remove = false)
     {
-        DrawSurface(rt, { 0, screen.height - 34 }, { screen.width, 34 });
-        DrawModernEllipsised(rt, { 8, screen.height - 31 }, screen.width - 16, "{YELLOW}" + status, { Drawing::Colour::white });
-        const auto y = screen.height - 19;
-        DrawCommand(rt, { 8, y }, 17, "A", "Apply");
-        DrawCommand(rt, { 104, y }, 17, "X", "Place/remove");
-        DrawCommand(rt, { 258, y }, 17, "B", "Done");
-        DrawCommand(rt, { 369, y }, 38, "D-pad", "Move");
+        DrawActionStrip(rt, screen);
+        const auto y = screen.height - 21;
+        DrawCommand(rt, { 8, y }, 17, "A", remove ? "Remove" : "Place");
+        DrawCommand(rt, { 110, y }, 17, "X", remove ? "Place" : "Remove");
+        DrawCommand(rt, { 212, y }, 28, "SEL", "Options");
+        DrawCommand(rt, { 314, y }, 17, "B", "Done");
+        DrawCommand(rt, { 416, y }, 38, "D-pad", "Move");
     }
 
     inline void DrawCostBadge(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& amount)
     {
-        DrawCard(rt, pos, { 136, 28 });
-        DrawModernText(rt, pos + ScreenCoordsXY{ 10, 9 }, "Cost", { Drawing::Colour::white });
-        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 47, 9 }, 79, "{YELLOW}" + amount, { Drawing::Colour::white });
+        DrawQuietSurface(rt, pos, { 88, 24 });
+        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 10, 7 }, 68, "{YELLOW}" + amount);
+    }
+
+    inline void DrawContextMessage(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& text)
+    {
+        // Two short lines preserve feedback without reserving a permanent status row.
+        DrawQuietSurface(rt, pos, kContextSize);
+        auto split = text.size();
+        while (split > 0 && TextWidth(text.substr(0, split)) > 140)
+            --split;
+        if (split < text.size())
+        {
+            const auto space = text.rfind(' ', split);
+            if (space != std::string::npos && space > 0)
+                split = space;
+        }
+        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 10, 7 }, 140, "{WHITE}" + text.substr(0, split));
+        if (split < text.size())
+            DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 10, 24 }, 140, "{MUTED}" + text.substr(split));
+    }
+
+    inline void DrawPathOptions(
+        Drawing::RenderTarget& rt, ScreenSize screen, const std::vector<std::string>& rows, size_t selected,
+        const std::string& status)
+    {
+        const ScreenCoordsXY p{ 8, 52 };
+        DrawToolHeading(rt, p, { 164, 188 }, "PATH OPTIONS");
+        const size_t visible = std::min<size_t>(4, rows.size());
+        const auto first = std::min(selected > 0 ? selected - 1 : 0, rows.size() - visible);
+        for (size_t i = 0; i < visible; ++i)
+            DrawToolRow(
+                rt, p + ScreenCoordsXY{ 8, 34 + static_cast<int>(i) * 30 }, 148, rows[first + i], first + i == selected);
+        if (first > 0)
+        {
+            GfxDrawLine(rt, { p + ScreenCoordsXY{ 145, 18 }, p + ScreenCoordsXY{ 148, 15 } }, Theme::highlight);
+            GfxDrawLine(rt, { p + ScreenCoordsXY{ 148, 15 }, p + ScreenCoordsXY{ 151, 18 } }, Theme::highlight);
+        }
+        if (first + visible < rows.size())
+        {
+            GfxDrawLine(rt, { p + ScreenCoordsXY{ 145, 169 }, p + ScreenCoordsXY{ 148, 172 } }, Theme::highlight);
+            GfxDrawLine(rt, { p + ScreenCoordsXY{ 148, 172 }, p + ScreenCoordsXY{ 151, 169 } }, Theme::highlight);
+        }
+        DrawModernEllipsised(rt, p + ScreenCoordsXY{ 12, 166 }, 130, "{MUTED}" + status);
+        DrawActionStrip(rt, screen);
+        const auto y = screen.height - 21;
+        DrawCommand(rt, { 12, y }, 38, "D-pad", "Choose");
+        DrawCommand(rt, { 184, y }, 17, "A", "Select");
+        DrawCommand(rt, { 356, y }, 17, "B", "Back");
     }
 
     inline void DrawMapFocus(Drawing::RenderTarget& rt, ScreenCoordsXY centre)

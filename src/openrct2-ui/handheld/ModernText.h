@@ -18,7 +18,8 @@ namespace OpenRCT2::Ui::Handheld
     {
         light,
         dark,
-        gold
+        gold,
+        muted
     };
 
     inline Drawing::PaletteIndex BlendGlyph(Ink ink, Drawing::PaletteIndex background, uint8_t coverage)
@@ -28,7 +29,7 @@ namespace OpenRCT2::Ui::Handheld
             bool ready{};
             std::array<Drawing::PaletteIndex, 16> colours{};
         };
-        static std::array<std::array<Ramp, 256>, 3> ramps;
+        static std::array<std::array<Ramp, 256>, 4> ramps;
         auto& ramp = ramps[static_cast<size_t>(ink)][static_cast<uint8_t>(background)];
         if (!ramp.ready)
         {
@@ -37,9 +38,10 @@ namespace OpenRCT2::Ui::Handheld
                 || static_cast<uint8_t>(background) >= palette->startIndex + palette->numColours)
                 return background;
             const auto bg = palette->palette[static_cast<uint8_t>(background) - palette->startIndex];
-            const std::array<int, 3> fg = ink == Ink::dark ? std::array<int, 3>{ 15, 24, 34 }
-                : ink == Ink::gold                         ? std::array<int, 3>{ 255, 231, 95 }
-                                                           : std::array<int, 3>{ 230, 240, 250 };
+            const std::array<int, 3> fg = ink == Ink::muted ? std::array<int, 3>{ 145, 166, 187 }
+                : ink == Ink::dark                          ? std::array<int, 3>{ 15, 24, 34 }
+                : ink == Ink::gold                          ? std::array<int, 3>{ 255, 231, 95 }
+                                                            : std::array<int, 3>{ 230, 240, 250 };
             for (int a = 0; a < 16; ++a)
             {
                 const int red = (bg.red * (15 - a) + fg[0] * a) / 15;
@@ -78,10 +80,14 @@ namespace OpenRCT2::Ui::Handheld
         Drawing::RenderTarget& rt, ScreenCoordsXY pos, std::string text, TextPaint paint = {}, int maxWidth = 0)
     {
         Ink ink = paint.colour.colour == Drawing::Colour::yellow ? Ink::gold : Ink::light;
-        for (const auto& prefix : { std::string("{BLACK}"), std::string("{WHITE}"), std::string("{YELLOW}") })
+        for (const auto& prefix :
+             { std::string("{BLACK}"), std::string("{WHITE}"), std::string("{YELLOW}"), std::string("{MUTED}") })
             if (text.starts_with(prefix))
             {
-                ink = prefix == "{BLACK}" ? Ink::dark : prefix == "{YELLOW}" ? Ink::gold : Ink::light;
+                ink = prefix == "{BLACK}"  ? Ink::dark
+                    : prefix == "{YELLOW}" ? Ink::gold
+                    : prefix == "{MUTED}"  ? Ink::muted
+                                           : Ink::light;
                 text.erase(0, prefix.size());
                 break;
             }

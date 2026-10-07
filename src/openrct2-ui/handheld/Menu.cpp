@@ -85,9 +85,14 @@ namespace OpenRCT2::Ui::Windows
             const ScreenSize target{ _page == Page::overwrite || _page == Page::discard || _page == Page::exit ? 330
                                                                                                                : size.width,
                                      size.height };
-            const ScreenSize bounds = information() ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 } : target;
+            const ScreenSize bounds = _page == Page::pathOptions ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
+                : information()                                  ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 }
+                                                                 : target;
             WindowSetResize(*this, bounds, bounds);
-            WindowSetPosition(*this, { 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
+            WindowSetPosition(
+                *this,
+                _page == Page::pathOptions ? ScreenCoordsXY{ 0, 0 }
+                                           : ScreenCoordsXY{ 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
         }
 
         void page(Page next)
@@ -122,8 +127,8 @@ namespace OpenRCT2::Ui::Windows
                 case Page::paths:
                     return { "Normal path", "Queue path", "Remove path", "Back to build" };
                 case Page::pathOptions:
-                    return { "Resume placing", "Follow ground",       "Raise path height", "Lower path height",
-                             "Flat / sloped",  "Rotate rising slope", "Change surface" };
+                    return { "Resume",       "Follow ground", "Raise height", "Lower height",
+                             "Flat / slope", "Rotate slope",  "Surface" };
                 case Page::save:
                 case Page::load:
                 {
@@ -436,6 +441,13 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
+            if (_page == Page::pathOptions)
+            {
+                Handheld::DrawPathOptions(
+                    rt, { ContextGetWidth(), ContextGetHeight() }, rows(), _focus.index(),
+                    _status.empty() ? Handheld::Paths::PlacementName() : _status);
+                return;
+            }
             const char* title = "PARK / PAUSE";
             switch (_page)
             {
