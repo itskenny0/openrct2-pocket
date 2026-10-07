@@ -18,6 +18,11 @@ namespace OpenRCT2::Ui::Handheld::Paths
     bool IsQueue();
     void ToggleRemove();
     void CycleSurface();
+    void FollowGround();
+    bool ChangeHeight(int direction);
+    bool CycleSlope();
+    bool RotateSlope();
+    std::string PlacementName();
     void UpdateTarget(ScreenCoordsXY cursor);
     void UpdateTargetFromInfo(const InteractionInfo& info);
     std::optional<CoordsXY> TargetTile();

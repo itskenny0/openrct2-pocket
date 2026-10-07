@@ -131,4 +131,34 @@ namespace OpenRCT2::Ui::Handheld
     {
         DrawModernText(rt, pos, text, paint, width);
     }
+
+    // Button labels centre the visible ink, rather than the font advance/baseline.
+    inline void DrawButtonLabel(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, const std::string& text)
+    {
+        int left = 10000, top = 10000, right = -1, bottom = -1, advance = 0;
+        for (const unsigned char c : text)
+        {
+            if (c < 32 || c >= 127)
+                return;
+            const auto glyph = PocketSans::kCoverage[c - 32];
+            for (int y = 0; y < PocketSans::kHeight; ++y)
+                for (int x = 0; x < PocketSans::kWidth; ++x)
+                    if (glyph[y * PocketSans::kWidth + x] != '0')
+                    {
+                        left = std::min(left, advance + x);
+                        right = std::max(right, advance + x);
+                        top = std::min(top, y);
+                        bottom = std::max(bottom, y);
+                    }
+            advance += PocketSans::kAdvance[c - 32];
+        }
+        if (right < left)
+            return;
+        DrawModernText(
+            rt,
+            pos
+                + ScreenCoordsXY{ (size.width - (right - left + 1)) / 2 - left,
+                                  (size.height - (bottom - top + 1)) / 2 - top + 3 },
+            "{BLACK}" + text);
+    }
 } // namespace OpenRCT2::Ui::Handheld

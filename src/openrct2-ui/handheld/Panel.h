@@ -11,6 +11,7 @@
 #include <openrct2/drawing/PaletteIndex.h>
 #include <openrct2/drawing/Rectangle.h>
 #include <openrct2/drawing/Text.h>
+#include <string_view>
 
 namespace OpenRCT2::Ui::Handheld
 {
@@ -133,9 +134,19 @@ namespace OpenRCT2::Ui::Handheld
 
     inline void DrawCommand(Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t keyWidth, const char* key, const char* label)
     {
-        const auto badgeWidth = keyWidth == 17 ? 22 : keyWidth + 4;
+        const bool dpad = std::string_view(key) == "D-pad";
+        const auto badgeWidth = dpad || keyWidth == 17 ? 22 : keyWidth + 4;
         const auto top = pos.y - 3;
-        if (keyWidth == 17)
+        if (dpad)
+        {
+            // Compact physical D-pad silhouette; no text or rectangular keycap.
+            Fill(rt, { pos.x + 8, top }, { 6, 20 }, Theme::highlight);
+            Fill(rt, { pos.x + 1, top + 7 }, { 20, 6 }, Theme::highlight);
+            Fill(rt, { pos.x + 8, top + 1 }, { 6, 18 }, Theme::text);
+            Fill(rt, { pos.x + 2, top + 7 }, { 18, 6 }, Theme::text);
+            Fill(rt, { pos.x + 9, top + 8 }, { 4, 4 }, Theme::edge);
+        }
+        else if (keyWidth == 17)
         {
             // Circular face-button badges with antialiased edges in the native palette.
             for (int y = 0; y < 20; ++y)
@@ -152,9 +163,8 @@ namespace OpenRCT2::Ui::Handheld
             DrawCard(rt, { pos.x, top }, { badgeWidth, 20 });
             Fill(rt, { pos.x + 3, top + 2 }, { badgeWidth - 6, 16 }, Theme::text);
         }
-        DrawModernText(
-            rt, { pos.x + badgeWidth / 2, pos.y }, "{BLACK}" + std::string(key),
-            { Drawing::Colour::white, TextAlignment::centre });
+        if (!dpad)
+            DrawButtonLabel(rt, { pos.x, top }, { badgeWidth, 20 }, key);
         DrawModernText(rt, { pos.x + badgeWidth + 5, pos.y }, label, { Drawing::Colour::white });
     }
 
@@ -286,7 +296,8 @@ namespace OpenRCT2::Ui::Handheld
     }
 
     inline void DrawPathOverlay(
-        Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& surface, bool queue, bool remove)
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& surface, bool queue, bool remove,
+        const std::string& placement = "Ground / auto slope")
     {
         Window w;
         w.windowPos = pos;
@@ -300,8 +311,8 @@ namespace OpenRCT2::Ui::Handheld
                         : "Normal path",
             true, remove ? PanelIcon::back : PanelIcon::path);
         DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 13, 82 }, w.width - 26, surface, { Drawing::Colour::white });
-        DrawModernText(rt, pos + ScreenCoordsXY{ 13, 107 }, "Follows terrain slope", { Drawing::Colour::white });
-        DrawCommand(rt, pos + ScreenCoordsXY{ 13, 139 }, 17, "Y", "Change surface");
+        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 13, 107 }, w.width - 26, placement, { Drawing::Colour::white });
+        DrawCommand(rt, pos + ScreenCoordsXY{ 13, 139 }, 28, "SEL", "Path options");
     }
     inline void DrawPathFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::string& status)
     {

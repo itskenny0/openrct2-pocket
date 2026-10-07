@@ -76,6 +76,32 @@ int main(int argc, char** argv)
         Require(result.error == GameActions::Status::ok, "Queue conversion failed");
         path = MapGetPathElementAt(TileCoordsXYZ{ location });
         Require(path && path->isQueue(), "Queue flag missing");
+        // Fixed height survives movement to another tile; slope and removal use native actions.
+        const CoordsXY bridgeTile{ 128, 64 };
+        surface = MapGetSurfaceElementAt(bridgeTile);
+        surface->setOwnership({ OwnershipFlag::landOwned });
+        info.Loc = bridgeTile;
+        info.Element = reinterpret_cast<TileElement*>(surface);
+        info.interactionType = ViewportInteractionItem::terrain;
+        Paths::Begin(false);
+        Paths::UpdateTargetFromInfo(info);
+        Require(Paths::ChangeHeight(1) && Paths::ChangeHeight(1), "Height selection failed");
+        const CoordsXYZ bridgeLocation{ bridgeTile, surface->getBaseZ() + 2 * kPathHeightStep };
+        Require(Paths::CycleSlope() && Paths::RotateSlope(), "Slope selection failed");
+        const CoordsXY movedTile{ 160, 64 };
+        surface = MapGetSurfaceElementAt(movedTile);
+        surface->setOwnership({ OwnershipFlag::landOwned });
+        info.Loc = movedTile;
+        info.Element = reinterpret_cast<TileElement*>(surface);
+        Paths::UpdateTargetFromInfo(info);
+        result = Paths::Action(true);
+        GameActions::ProcessQueue(state);
+        const CoordsXYZ movedLocation{ movedTile, bridgeLocation.z };
+        auto* elevated = MapGetPathElementAt(TileCoordsXYZ{ movedLocation });
+        Require(result.error == GameActions::Status::ok && elevated && elevated->isSloped(), "Elevated slope placement failed");
+        Require(elevated->getSlopeDirection() == 1, "Slope rotation failed");
+        Paths::FollowGround();
+        Require(Paths::PlacementName() == "Ground / auto slope", "Ground mode reset failed");
         SaveFlags flags{};
         flags.set(SaveFlag::exportObjects);
         const auto save = std::string(argv[2]) + "/paths.park";
@@ -83,6 +109,23 @@ int main(int argc, char** argv)
         Require(context->LoadParkFromFile(save), "Native reload failed");
         path = MapGetPathElementAt(TileCoordsXYZ{ location });
         Require(path && path->isQueue(), "Queue not preserved in save");
+        elevated = MapGetPathElementAt(TileCoordsXYZ{ movedLocation });
+        Require(elevated && elevated->isSloped() && elevated->getSlopeDirection() == 1, "Elevated slope not preserved in save");
+        // Removal ignores the construction height/slope overrides and targets the selected path.
+        info.Loc = movedTile;
+        info.Element = reinterpret_cast<TileElement*>(elevated);
+        info.interactionType = ViewportInteractionItem::footpath;
+        Paths::Begin(false);
+        Paths::UpdateTargetFromInfo(info);
+        Require(Paths::ChangeHeight(1), "Removal override fixture failed");
+        Paths::ToggleRemove();
+        result = Paths::Action(true);
+        GameActions::ProcessQueue(state);
+        Require(
+            result.error == GameActions::Status::ok && !MapGetPathElementAt(TileCoordsXYZ{ movedLocation }),
+            "Elevated removal failed");
+        path = MapGetPathElementAt(TileCoordsXYZ{ location });
+        info.Loc = tile;
         info.Element = reinterpret_cast<TileElement*>(path);
         Paths::Begin(false, true);
         Paths::UpdateTargetFromInfo(info);
@@ -114,7 +157,7 @@ int main(int argc, char** argv)
         Require(Paths::Action(true).error != GameActions::Status::ok, "Invalid target accepted");
         Paths::End();
         Require(!Paths::IsActive(), "Tool remained active");
-        std::cout << "Native path place / queue / save / reload / remove / ownership / pause and research checks passed\n";
+        std::cout << "Native path place / queue / raised slope / height persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;
     }
     catch (const std::exception& error)

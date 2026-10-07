@@ -35,6 +35,7 @@ namespace OpenRCT2::Ui::Windows
         park,
         build,
         paths,
+        pathOptions,
         dashboard,
         overview,
         finances,
@@ -120,6 +121,9 @@ namespace OpenRCT2::Ui::Windows
                     return { "Raise land", "Lower land", "Paths", "Back to park" };
                 case Page::paths:
                     return { "Normal path", "Queue path", "Remove path", "Back to build" };
+                case Page::pathOptions:
+                    return { "Resume placing", "Follow ground",       "Raise path height", "Lower path height",
+                             "Flat / sloped",  "Rotate rising slope", "Change surface" };
                 case Page::save:
                 case Page::load:
                 {
@@ -196,6 +200,10 @@ namespace OpenRCT2::Ui::Windows
         {
             page(Page::build);
         }
+        void openPathOptions()
+        {
+            page(Page::pathOptions);
+        }
         void openRide(RideId id)
         {
             _rideId = id;
@@ -216,6 +224,7 @@ namespace OpenRCT2::Ui::Windows
             switch (_page)
             {
                 case Page::ride:
+                case Page::pathOptions:
                     close();
                     break;
                 case Page::overview:
@@ -300,6 +309,36 @@ namespace OpenRCT2::Ui::Windows
                         Handheld::Paths::Begin(choice == 1, choice == 2);
                     }
                     break;
+                case Page::pathOptions:
+                {
+                    namespace Paths = Handheld::Paths;
+                    bool changed = true;
+                    switch (choice)
+                    {
+                        case 0:
+                            close();
+                            return;
+                        case 1:
+                            Paths::FollowGround();
+                            break;
+                        case 2:
+                        case 3:
+                            changed = Paths::ChangeHeight(choice == 2 ? 1 : -1);
+                            break;
+                        case 4:
+                            changed = Paths::CycleSlope();
+                            break;
+                        case 5:
+                            changed = Paths::RotateSlope();
+                            break;
+                        case 6:
+                            Paths::CycleSurface();
+                            break;
+                    }
+                    _status = changed ? Paths::PlacementName() : "No target or height limit reached.";
+                    invalidate();
+                    break;
+                }
                 case Page::dashboard:
                     if (choice == 4)
                         page(Page::park);
@@ -421,6 +460,9 @@ namespace OpenRCT2::Ui::Windows
                 case Page::paths:
                     title = "PATHS";
                     break;
+                case Page::pathOptions:
+                    title = "PATH OPTIONS";
+                    break;
                 case Page::build:
                     title = "BUILD";
                     break;
@@ -447,6 +489,14 @@ namespace OpenRCT2::Ui::Windows
             model.rows = rows();
             model.selected = _focus.index();
             model.status = _status;
+            if (_page == Page::pathOptions)
+            {
+                model.icons = { Handheld::PanelIcon::play,  Handheld::PanelIcon::terrain, Handheld::PanelIcon::raise,
+                                Handheld::PanelIcon::lower, Handheld::PanelIcon::path,    Handheld::PanelIcon::path,
+                                Handheld::PanelIcon::path };
+                if (model.status.empty())
+                    model.status = Handheld::Paths::PlacementName();
+            }
             if (_page == Page::park)
                 model.icons = { Handheld::PanelIcon::play, Handheld::PanelIcon::terrain, Handheld::PanelIcon::folder,
                                 Handheld::PanelIcon::save, Handheld::PanelIcon::exit,    Handheld::PanelIcon::folder,
@@ -548,6 +598,11 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = OpenPanel())
             window->openBuild();
+    }
+    void HandheldPathOptionsOpen()
+    {
+        if (auto* window = OpenPanel())
+            window->openPathOptions();
     }
     void HandheldLoadOpen()
     {

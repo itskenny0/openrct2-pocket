@@ -27,7 +27,7 @@ python3 tools/handheld/render_shell.py \
 Use `--ninja /absolute/path/to/ninja` if necessary. The helper derives compile
 settings and the GUI link command from Ninja, replaces the application entry
 point with `test/handheld/PanelPreview.cpp`, and calls the real UI components.
-Three unscaled 512 × 384 frames show terrain, paths and finances with sample data.
+Three unscaled 512 × 384 frames show terrain, paths and path options with sample data.
 
 An optional `--background /absolute/path/to/park-image.png` fits a park image to
 512 × 384 and quantises it before drawing. Output explicitly labels this a
@@ -44,7 +44,8 @@ python3 tools/handheld/run_native_test.py \
 This runner links `test/handheld/PathActionsTests.cpp` against the completed GUI
 build and uses an isolated temporary profile. Real path objects are required in
 the data directory. It verifies native placement, queue conversion, save/reload,
-removal, ownership, pause rules and research funding. Compile definitions and
+removal, ownership, pause rules, elevated sloped paths, fixed height across tiles
+and research funding. Compile definitions and
 include paths are inherited from the real build to preserve context ABI.
 
 See `docs/handheld/MODERN-PATHS.md` for implemented features, device controls,

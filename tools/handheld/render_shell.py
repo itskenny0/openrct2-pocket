@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix="pocket-shell-") as directory:
         with Image.open(args.background) as image:
             ImageOps.fit(image.convert("RGB"), (512, 384), method=Image.Resampling.NEAREST).save(background_path)
         background_args = [str(background_path)]
-    for index, page in enumerate(("terrain", "paths", "finances")):
+    for index, page in enumerate(("terrain", "paths", "path-options")):
         path = temporary / f"{page}.ppm"
         subprocess.run([str(temporary / "preview"), str(args.data.resolve()), str(path), page, *background_args], check=True)
         top = index * 406

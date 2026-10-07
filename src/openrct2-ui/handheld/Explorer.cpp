@@ -335,8 +335,13 @@ namespace OpenRCT2::Ui::Handheld
             }
             else if (action == Action::openBuild && CanExplore())
             {
-                EndTerrain();
-                Windows::HandheldBuildOpen();
+                if (Paths::IsActive())
+                    Windows::HandheldPathOptionsOpen();
+                else
+                {
+                    EndTerrain();
+                    Windows::HandheldBuildOpen();
+                }
             }
             else if (CanExplore())
             {
@@ -458,7 +463,7 @@ namespace OpenRCT2::Ui::Handheld
                 status = result.getErrorMessage();
             if (!_terrainStatus.empty())
                 status = _terrainStatus;
-            DrawPathOverlay(rt, { 8, 52 }, Paths::SurfaceName(), Paths::IsQueue(), Paths::IsRemoving());
+            DrawPathOverlay(rt, { 8, 52 }, Paths::SurfaceName(), Paths::IsQueue(), Paths::IsRemoving(), Paths::PlacementName());
             DrawPathFooter(rt, { ContextGetWidth(), height }, status);
         }
         else

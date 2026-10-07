@@ -23,4 +23,5 @@ namespace OpenRCT2::Ui::Handheld
 namespace OpenRCT2::Ui::Windows
 {
     void HandheldRideOpen(RideId ride);
-}
+    void HandheldPathOptionsOpen();
+} // namespace OpenRCT2::Ui::Windows

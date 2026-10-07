@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "Paths.h"
 
+#include <algorithm>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
@@ -23,6 +24,8 @@ namespace OpenRCT2::Ui::Handheld::Paths
     static std::optional<CoordsXYZ> target;
     static FootpathSlope slope;
     static bool targetIsPath{};
+    static std::optional<int32_t> fixedHeight;
+    static std::optional<FootpathSlope> fixedSlope;
 
     void Begin(bool queue, bool remove)
     {
@@ -31,6 +34,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
         active = true;
         removing = remove;
         target.reset();
+        FollowGround();
     }
     void End()
     {
@@ -52,6 +56,60 @@ namespace OpenRCT2::Ui::Handheld::Paths
     void ToggleRemove()
     {
         removing = !removing;
+    }
+
+    void FollowGround()
+    {
+        fixedHeight.reset();
+        fixedSlope.reset();
+    }
+    bool ChangeHeight(int direction)
+    {
+        if (!target)
+            return false;
+        const auto height = fixedHeight.value_or(target->z);
+        const auto next = std::clamp(height + direction * kPathHeightStep, kFootpathMinHeight, kFootpathMaxHeight);
+        if (next == height)
+            return false;
+        fixedHeight = next;
+        if (!fixedSlope)
+            fixedSlope = slope;
+        return true;
+    }
+    bool CycleSlope()
+    {
+        if (!target)
+            return false;
+        if (!fixedHeight)
+            fixedHeight = target->z;
+        auto next = fixedSlope.value_or(slope);
+        next.type = next.type == FootpathSlopeType::sloped ? FootpathSlopeType::flat : FootpathSlopeType::sloped;
+        fixedSlope = next;
+        return true;
+    }
+    bool RotateSlope()
+    {
+        if (!target)
+            return false;
+        if (!fixedHeight)
+            fixedHeight = target->z;
+        auto next = fixedSlope.value_or(slope);
+        next.type = FootpathSlopeType::sloped;
+        next.direction = (next.direction + 1) & 3;
+        fixedSlope = next;
+        return true;
+    }
+    std::string PlacementName()
+    {
+        if (removing)
+            return "Remove selected path";
+        if (!fixedHeight)
+            return "Ground / auto slope";
+        const auto selectedSlope = fixedSlope.value_or(slope);
+        const char* directions[] = { "NW", "NE", "SE", "SW" };
+        return "Height " + std::to_string(*fixedHeight / kCoordsZStep) + " / "
+            + (selectedSlope.type == FootpathSlopeType::sloped ? std::string("Rise ") + directions[selectedSlope.direction & 3]
+                                                               : "Flat");
     }
 
     void CycleSurface()
@@ -112,7 +170,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
             if (!surface)
                 return;
             const auto placement = FootpathGetOnTerrainPlacement(*surface);
-            if (placement.slope.type == FootpathSlopeType::irregular)
+            if (placement.slope.type == FootpathSlopeType::irregular && !fixedSlope)
                 return;
             target = CoordsXYZ{ tile, placement.baseZ };
             slope = placement.slope;
@@ -152,8 +210,10 @@ namespace OpenRCT2::Ui::Handheld::Paths
             result.errorMessage = "No path surface of this type is loaded.";
             return result;
         }
+        auto placement = *target;
+        placement.z = fixedHeight.value_or(target->z);
         auto action = GameActions::FootpathPlaceAction(
-            *target, slope, type, gFootpathSelection.railings, kInvalidDirection, flags);
+            placement, fixedSlope.value_or(slope), type, gFootpathSelection.railings, kInvalidDirection, flags);
         return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
     }
     std::string SurfaceName()

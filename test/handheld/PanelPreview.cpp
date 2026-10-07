@@ -84,10 +84,22 @@ int main(int argc, char** argv)
     }
     else if (std::string(argv[3]) == "paths")
     {
-        Ui::Handheld::DrawPathOverlay(rt, { 8, 52 }, "Tarmac", false, false);
+        Ui::Handheld::DrawPathOverlay(rt, { 8, 52 }, "Tarmac", false, false, "Height 6 / Rise NE");
         Ui::Handheld::DrawPathFooter(rt, { 512, 384 }, "PLACE PATH");
         Ui::Handheld::DrawCostBadge(rt, { 288, 224 }, "$12.00");
         Ui::Handheld::DrawMapFocus(rt, { 256, 192 });
+    }
+    else if (std::string(argv[3]) == "path-options")
+    {
+        model.title = "PATH OPTIONS";
+        model.rows = { "Resume placing", "Follow ground",       "Raise path height", "Lower path height",
+                       "Flat / sloped",  "Rotate rising slope", "Change surface" };
+        model.icons = { Ui::Handheld::PanelIcon::play,  Ui::Handheld::PanelIcon::terrain, Ui::Handheld::PanelIcon::raise,
+                        Ui::Handheld::PanelIcon::lower, Ui::Handheld::PanelIcon::path,    Ui::Handheld::PanelIcon::path,
+                        Ui::Handheld::PanelIcon::path };
+        model.selected = 2;
+        model.status = "Height 6 / Rise NE";
+        Ui::Handheld::DrawOverlayShell(rt, w, model);
     }
     else if (std::string(argv[3]) == "finances")
     {

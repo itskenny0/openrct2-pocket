@@ -60,7 +60,7 @@ version launches validate dependency resolution, not physical device gameplay.
 
 ## Next work
 
-Explicit bridge/tunnel heights and manual slopes, a placement ghost and improved
+A placement ghost, connected bridge/tunnel construction workflow and improved
 error presentation; ride construction and the remaining ride operations;
 scenery, shops and staff menus; fuller finance/research controls and graphs;
 settings/help. Most desktop dialogs have not yet been replaced. This is a
@@ -75,3 +75,27 @@ objects/music/languages and `save-handheld`; retain those from the working
 installation. The root engine `config.ini` is only a template, copied by the
 launcher if `save-handheld/config.ini` does not exist. Existing user configuration
 and saves remain in `save-handheld`. This is not a standalone first installation.
+
+## Follow-up: badge alignment and manual path options
+
+Face-button and Start/Select labels now centre their visible glyph bounds in the
+badge, including vertical alignment. D-pad hints draw a physical cross rather
+than a labelled rectangle.
+
+While a path tool is active, Select opens Path options instead of leaving the
+tool. A selects Resume placing, Follow ground, Raise/Lower path height,
+Flat/sloped, Rotate rising slope or Change surface. B closes options and returns
+to placement. Height changes use native path-height steps and remain fixed while
+moving the cursor. Native placement still checks clearance, ownership and funds;
+removal always uses the hit path's actual height regardless of placement settings.
+The overlay shows height and world-space rising direction. Y still cycles surfaces,
+X toggles removal, and L/R still zoom. Follow ground clears both height and slope
+overrides. No provisional path ghost is shown yet.
+
+The native GUI build, existing three CTest suites and extended native integration
+tests pass. Tests additionally cover elevated sloped placement after moving to
+another tile, slope rotation, save/reload of that elevated path, returning to
+ground mode and removal despite a different construction-height setting. The
+preview calls actual UI components with a composite park backdrop and sample
+values. This follow-up has not yet been rebuilt for ARM or tested on the Brick;
+the downloadable 0.7 update predates these changes.
