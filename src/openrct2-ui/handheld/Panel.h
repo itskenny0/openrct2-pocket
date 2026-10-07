@@ -260,25 +260,28 @@ namespace OpenRCT2::Ui::Handheld
         DrawOverlayCommands(rt, w);
     }
 
-    inline constexpr int kActionStripHeight = 30;
+    inline constexpr int kActionStripHeight = 28;
     inline constexpr ScreenSize kTerrainOverlaySize{ 164, 278 };
     inline constexpr ScreenSize kContextSize{ 160, 42 };
 
     inline void DrawTerrainOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, bool raise)
     {
         using namespace Concept;
-        Box(rt, pos, { 164, 194 });
+        Box(rt, pos, { kRailWidth, 174 });
         Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, "Terrain");
         Row(rt, pos + ScreenCoordsXY{ 8, 34 }, "Raise land", Icon::rise, raise);
         Row(rt, pos + ScreenCoordsXY{ 8, 62 }, "Lower land", Icon::lower, !raise);
-        Heading(rt, pos + ScreenCoordsXY{ 10, 105 }, "Brush");
-        Row(rt, pos + ScreenCoordsXY{ 8, 127 }, "Single tile", Icon::ground, false);
-        DrawModernText(rt, pos + ScreenCoordsXY{ 12, 171 }, "{MUTED}Size: 1 x 1");
+        Rule(rt, pos + ScreenCoordsXY{ 8, 99 }, 148);
+        Section(rt, pos + ScreenCoordsXY{ 10, 109 }, "Brush");
+        DrawModernText(rt, pos + ScreenCoordsXY{ 12, 132 }, "Single tile");
+        DrawModernText(rt, pos + ScreenCoordsXY{ 12, 153 }, "{MUTED}1 x 1");
     }
 
     inline void DrawActionStrip(Drawing::RenderTarget& rt, ScreenSize screen)
     {
-        Concept::Box(rt, { 0, screen.height - kActionStripHeight }, { screen.width, kActionStripHeight });
+        const ScreenCoordsXY p{ 0, screen.height - kActionStripHeight };
+        Fill(rt, p, { screen.width, kActionStripHeight }, static_cast<Drawing::PaletteIndex>(PocketPalette::panel));
+        Concept::Rule(rt, p, screen.width);
     }
 
     inline void DrawGameplayFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::string&, bool terrain)
@@ -311,7 +314,7 @@ namespace OpenRCT2::Ui::Handheld
         Row(rt, pos + ScreenCoordsXY{ 8, 34 }, queue ? "Queue path" : "Normal path", queue ? Icon::queue : Icon::path, !remove);
         DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 12, 69 }, 140, "{MUTED}" + surface);
         Rule(rt, pos + ScreenCoordsXY{ 8, 91 }, 148);
-        Heading(rt, pos + ScreenCoordsXY{ 10, 103 }, "Slope");
+        Section(rt, pos + ScreenCoordsXY{ 10, 103 }, "Slope");
         const auto slash = placement.find(" / ");
         const auto slope = slash == std::string::npos ? "Follow ground" : placement.substr(slash + 3);
         Row(rt, pos + ScreenCoordsXY{ 8, 125 },
@@ -326,7 +329,7 @@ namespace OpenRCT2::Ui::Handheld
                        : slash == std::string::npos ? placement
                                                     : placement.substr(0, slash)));
         Rule(rt, pos + ScreenCoordsXY{ 8, 181 }, 148);
-        Heading(rt, pos + ScreenCoordsXY{ 10, 193 }, "Options");
+        Section(rt, pos + ScreenCoordsXY{ 10, 193 }, "Options");
         Row(rt, pos + ScreenCoordsXY{ 8, 215 }, "Path options", Icon::options, false);
         Row(rt, pos + ScreenCoordsXY{ 8, 243 }, "Remove", Icon::remove, remove);
     }
@@ -345,9 +348,9 @@ namespace OpenRCT2::Ui::Handheld
 
     inline void DrawCostBadge(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& amount)
     {
-        Concept::Box(rt, pos, { 114, 28 });
-        DrawStrongText(rt, pos + ScreenCoordsXY{ 8, 9 }, "Cost:");
-        DrawStrongText(rt, pos + ScreenCoordsXY{ 46, 9 }, "{POSITIVE}" + amount, 61);
+        Concept::Box(rt, pos, { 110, 26 });
+        DrawModernText(rt, pos + ScreenCoordsXY{ 8, 8 }, "{MUTED}Cost:");
+        DrawStrongText(rt, pos + ScreenCoordsXY{ 43, 8 }, "{POSITIVE}" + amount, 60);
     }
 
     inline void DrawContextMessage(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& text)
@@ -374,14 +377,14 @@ namespace OpenRCT2::Ui::Handheld
     {
         using namespace Concept;
         const auto p = kOrigin;
-        Box(rt, p, { 164, 342 });
+        Box(rt, p, { kRailWidth, 338 });
         Heading(rt, p + ScreenCoordsXY{ 10, 12 }, "Path options");
         DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, 32 }, 144, "{MUTED}" + status);
         const int rowY[] = { 52, 108, 136, 164, 220, 248, 304 };
         const Icon icons[] = { Icon::play, Icon::ground, Icon::rise, Icon::lower, Icon::slope, Icon::options, Icon::path };
-        Heading(rt, p + ScreenCoordsXY{ 10, 87 }, "Height");
-        Heading(rt, p + ScreenCoordsXY{ 10, 199 }, "Slope");
-        Heading(rt, p + ScreenCoordsXY{ 10, 283 }, "Surface");
+        Section(rt, p + ScreenCoordsXY{ 10, 87 }, "Height");
+        Section(rt, p + ScreenCoordsXY{ 10, 199 }, "Slope");
+        Section(rt, p + ScreenCoordsXY{ 10, 283 }, "Surface");
         for (size_t i = 0; i < rows.size() && i < 7; ++i)
             Row(rt, p + ScreenCoordsXY{ 8, rowY[i] }, rows[i], icons[i], i == selected);
         DrawActionStrip(rt, screen);

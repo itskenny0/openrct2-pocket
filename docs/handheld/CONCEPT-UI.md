@@ -21,13 +21,13 @@ same licence as PocketSansData.h. The old unused sparse-tool primitives are remo
 | Reference feature | Native implementation |
 | --- | --- |
 | Left rail about one-third of the screen | 164 pixels out of 512, at (8, 8) |
-| Blue-navy inset panels with quiet blue-grey edges | Rounded surface with stable palette mixtures, two restrained edge tones |
-| Gold active rows with dark, stronger text | 148 × 28 rows, light upper edge, true bold selected labels |
+| Blue-navy inset panels with quiet blue-grey edges | Solid deep-indigo surface, single restrained border |
+| Gold active rows with dark, stronger text | 148 × 28 solid gold rows, true bold dark selected labels |
 | Icon + label alignment | 16-pixel icons, 31-pixel text inset, consistent baseline |
-| White section headings, lighter subordinate detail | Bold headings, regular rows and muted secondary text |
+| White section headings, lighter subordinate detail | Bold titles, muted section headings, regular rows and secondary state |
 | Grouped controls | Terrain/Brush; Path type/Slope/Options; Height/Slope/Surface |
-| Controller strip integrated along the bottom | 30 pixels, centered face-button lettering, D-pad cross, short labels |
-| Compact cost context | Bordered 114 × 28 box, white Cost label and green native queried amount |
+| Controller strip integrated along the bottom | 28 pixels, centered face-button lettering, D-pad cross, short labels |
+| Compact cost context | Bordered 110 × 26 box, muted Cost label and green native queried amount |
 
 Terrain displays both supported tools, with the active one highlighted, followed
 by the existing single-tile brush. Path placement displays the selected path type,
@@ -44,12 +44,32 @@ from the poster. The existing native map-selection highlight and centre cursor r
 
 ## Colour fidelity boundary
 
-OpenRCT2's indexed software palette lacks continuous dark-navy RGB ramps. The
-UI uses a low-contrast ordered mixture of stable blue/charcoal entries, confined
-to its own panels. It does not reserve or modify palette colours used by the park.
-This approximates the hue but leaves a visible fine texture; it is not identical
-to the poster's smooth RGB gradients. Exact smooth colour matching would require
-an RGB UI compositing layer. This checkpoint does not claim that renderer change.
+The indexed software renderer lacks the concept's exact dark navy and smooth RGB
+gradients. This pass uses solid existing entries only: no dithering, stippling,
+checkerboards, or artificial texture. `PocketPalette.h` centralizes the shared
+palette tokens. Panel interiors and selected rows are constant-color fills;
+rounded corners and a one-pixel border provide the only surface treatment.
+
+| Role | Palette index | RGB |
+| --- | --- | --- |
+| Panel / action strip | 118 | 15, 19, 55 |
+| Border / separator | 119 | 39, 43, 87 |
+| Selection | 53 | 243, 203, 27 |
+| Primary text | 21 | 239, 243, 243 |
+| Secondary text | 18 | 159, 175, 175 |
+| Selected text | 10 | 23, 35, 35 |
+| Positive amount | 103 | 139, 223, 115 |
+
+These are the actual default game palette entries, not requested RGB targets.
+Text uses these exact endpoints at full coverage; antialiased glyph edges use
+nearest existing palette entries. This is glyph coverage, not patterned panel
+colour approximation. The hue is deep indigo rather than the reference's teal
+navy. Non-ASCII/localized text still uses the complete native text fallback.
+
+Terrain is 164 × 174; Path placement remains 164 × 278; Path options is 164 × 338.
+Nonselected rows no longer each carry a separator; spacing and quiet section
+headings provide grouping. The bottom strip uses a single top rule and solid
+fill. All actions, focus indices and controller mappings are unchanged.
 
 ## Validation and captures
 

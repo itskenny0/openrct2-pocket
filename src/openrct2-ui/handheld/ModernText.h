@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
+#include "PocketPalette.h"
 #include "PocketSansData.h"
 #include "PocketSansStrongData.h"
 
@@ -40,16 +41,17 @@ namespace OpenRCT2::Ui::Handheld
                 || static_cast<uint8_t>(background) >= palette->startIndex + palette->numColours)
                 return background;
             const auto bg = palette->palette[static_cast<uint8_t>(background) - palette->startIndex];
-            const std::array<int, 3> fg = ink == Ink::positive ? std::array<int, 3>{ 134, 239, 93 }
-                : ink == Ink::muted                            ? std::array<int, 3>{ 145, 166, 187 }
-                : ink == Ink::dark                             ? std::array<int, 3>{ 15, 24, 34 }
-                : ink == Ink::gold                             ? std::array<int, 3>{ 255, 231, 95 }
-                                                               : std::array<int, 3>{ 230, 240, 250 };
+            const auto foreground = ink == Ink::positive ? PocketPalette::positive
+                : ink == Ink::muted                      ? PocketPalette::secondary
+                : ink == Ink::dark                       ? PocketPalette::dark
+                : ink == Ink::gold                       ? PocketPalette::selection
+                                                         : PocketPalette::primary;
+            const auto fg = palette->palette[foreground - palette->startIndex];
             for (int a = 0; a < 16; ++a)
             {
-                const int red = (bg.red * (15 - a) + fg[0] * a) / 15;
-                const int green = (bg.green * (15 - a) + fg[1] * a) / 15;
-                const int blue = (bg.blue * (15 - a) + fg[2] * a) / 15;
+                const int red = (bg.red * (15 - a) + fg.red * a) / 15;
+                const int green = (bg.green * (15 - a) + fg.green * a) / 15;
+                const int blue = (bg.blue * (15 - a) + fg.blue * a) / 15;
                 int distance = 3 * 256 * 256, nearest = static_cast<uint8_t>(background);
                 for (int i = std::max<int>(10, palette->startIndex);
                      i < std::min<int>(230, palette->startIndex + palette->numColours); ++i)
@@ -65,6 +67,8 @@ namespace OpenRCT2::Ui::Handheld
                 }
                 ramp.colours[a] = static_cast<Drawing::PaletteIndex>(nearest);
             }
+            ramp.colours[0] = background;
+            ramp.colours[15] = static_cast<Drawing::PaletteIndex>(foreground);
             ramp.ready = true;
         }
         return ramp.colours[coverage];

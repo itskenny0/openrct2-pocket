@@ -7,12 +7,12 @@
 namespace OpenRCT2::Ui::Handheld::Concept
 {
     using Drawing::PaletteIndex;
-    // The world palette remains untouched. Ordered mixtures of stable entries
-    // approximate the reference's blue-navy surfaces in the indexed renderer.
+    // Solid palette surfaces keep the park and current selection dominant.
     inline constexpr int kRailWidth = 164;
     inline constexpr int kRowHeight = 28;
     inline constexpr ScreenCoordsXY kOrigin{ 8, 8 };
-    inline constexpr uint8_t kBayer[4][4] = { { 0, 8, 2, 10 }, { 12, 4, 14, 6 }, { 3, 11, 1, 9 }, { 15, 7, 13, 5 } };
+    inline constexpr int kInset = 8;
+    inline constexpr int kTextInset = 10;
 
     inline void Box(Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, bool gold = false)
     {
@@ -23,28 +23,16 @@ namespace OpenRCT2::Ui::Handheld::Concept
                 const int dy = std::min(y - p.y, p.y + size.height - 1 - y);
                 if ((dy == 0 && dx < 3) || (dy == 1 && dx < 1))
                     continue;
-                const int d = kBayer[y & 3][x & 3];
-                uint8_t colour;
-                if (gold)
-                    colour = dx == 0 || dy == 0 ? 55 : (y - p.y < 3 ? 54 : 53);
-                else if (dx == 0 || dy == 0)
-                    colour = d < 8 ? 14 : 121;
-                else if (dx == 1 || dy == 1)
-                    colour = d < 8 ? 12 : 119;
-                else
-                {
-                    // Low-contrast blue/charcoal mixture avoids the coarse teal texture
-                    // produced by alternating saturated palette ramps.
-                    const int glow = 2 + (size.height - (y - p.y)) * 3 / size.height;
-                    colour = d < 6 ? 118 : d < 6 + glow ? 11 : 10;
-                }
+                const auto colour = gold ? PocketPalette::selection
+                    : dx == 0 || dy == 0 ? PocketPalette::border
+                                         : PocketPalette::panel;
                 rt.bits[(y - rt.y) * rt.LineStride() + x - rt.x] = static_cast<PaletteIndex>(colour);
             }
     }
 
     inline void Rule(Drawing::RenderTarget& rt, ScreenCoordsXY p, int width)
     {
-        GfxDrawLine(rt, { p, p + ScreenCoordsXY{ width - 1, 0 } }, static_cast<PaletteIndex>(12));
+        GfxDrawLine(rt, { p, p + ScreenCoordsXY{ width - 1, 0 } }, static_cast<PaletteIndex>(PocketPalette::separator));
     }
 
     enum class Icon
@@ -62,8 +50,8 @@ namespace OpenRCT2::Ui::Handheld::Concept
     };
     inline void DrawIcon(Drawing::RenderTarget& rt, ScreenCoordsXY p, Icon icon, bool selected = false)
     {
-        const auto light = static_cast<PaletteIndex>(selected ? 10 : 20);
-        const auto shade = static_cast<PaletteIndex>(selected ? 52 : 14);
+        const auto light = static_cast<PaletteIndex>(selected ? PocketPalette::dark : PocketPalette::primary);
+        const auto shade = static_cast<PaletteIndex>(selected ? 52 : PocketPalette::secondary);
         const auto line = [&](int x1, int y1, int x2, int y2, PaletteIndex c) {
             GfxDrawLine(rt, { p + ScreenCoordsXY{ x1, y1 }, p + ScreenCoordsXY{ x2, y2 } }, c);
         };
@@ -120,12 +108,15 @@ namespace OpenRCT2::Ui::Handheld::Concept
     {
         DrawStrongText(rt, p, "{WHITE}" + title, 144);
     }
+    inline void Section(Drawing::RenderTarget& rt, ScreenCoordsXY p, const std::string& title)
+    {
+        DrawModernText(rt, p, "{MUTED}" + title, {}, kRailWidth - 2 * kTextInset);
+    }
     inline void Row(Drawing::RenderTarget& rt, ScreenCoordsXY p, const std::string& label, Icon icon, bool selected)
     {
         if (selected)
-            Box(rt, p, { 148, kRowHeight }, true);
-        else
-            Rule(rt, p + ScreenCoordsXY{ 2, kRowHeight - 1 }, 144);
+            Box(rt, p, { kRailWidth - 2 * kInset, kRowHeight }, true);
+
         DrawIcon(rt, p + ScreenCoordsXY{ 7, 5 }, icon, selected);
         if (selected)
             DrawStrongText(rt, p + ScreenCoordsXY{ 31, 9 }, "{BLACK}" + label, 110);
