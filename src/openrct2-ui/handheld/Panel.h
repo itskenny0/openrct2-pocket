@@ -337,7 +337,7 @@ namespace OpenRCT2::Ui::Handheld
         const auto y = screen.height - 21;
         DrawCommand(rt, { 12, y }, 38, "D-pad", "Move");
         DrawCommand(rt, { 140, y }, 17, "A", "Place");
-        DrawCommand(rt, { 268, y }, 17, "Y", "Tree");
+        DrawCommand(rt, { 268, y }, 17, "Y", "Trees");
         DrawCommand(rt, { 396, y }, 17, "B", "Back");
     }
 

@@ -92,6 +92,24 @@ namespace OpenRCT2::Ui::Handheld
         _treeIndex = Trees::Next(kObjectEntryIndexNull);
     }
 
+    bool IsTreeToolActive()
+    {
+        return _treeTool;
+    }
+    ObjectEntryIndex TreeSelection()
+    {
+        return _treeIndex;
+    }
+    bool SetTreeSelection(ObjectEntryIndex index)
+    {
+        if (!_treeTool || !Trees::Eligible(index))
+            return false;
+        Trees::ClearPreview();
+        _treeIndex = index;
+        _terrainStatus.clear();
+        return true;
+    }
+
     void BeginSceneryRemoval()
     {
         BeginTerrain(true);
@@ -275,6 +293,30 @@ namespace OpenRCT2::Ui::Handheld
             wm->Close(*cost);
     }
 
+    bool HandleMenuInput(ControllerInput& input, const Frame& frame)
+    {
+        if (GetWindowManager()->FindByClass(WindowClass::handheldMenu) != nullptr)
+        {
+            if (Windows::HandheldTreePickerIsOpen())
+                Windows::HandheldTreePickerMove(frame.navigateX, frame.navigateY);
+            else if (frame.navigateY != 0)
+                Windows::HandheldMenuMove(frame.navigateY);
+            for (const auto action : frame.actions)
+            {
+                if (action == Action::confirm)
+                    Windows::HandheldMenuConfirm();
+                else if (action == Action::openMenu && Windows::HandheldTreePickerIsOpen())
+                    Windows::HandheldTreePickerPause();
+                else if (action == Action::back || action == Action::openMenu)
+                    Windows::HandheldMenuBack();
+                input.suspend();
+                break;
+            }
+            return true;
+        }
+        return false;
+    }
+
     void UpdateExplorer(ControllerInput& input)
     {
         if (gLegacyScene != LegacyScene::playing)
@@ -332,21 +374,8 @@ namespace OpenRCT2::Ui::Handheld
                 return;
             }
         }
-        if (wm->FindByClass(WindowClass::handheldMenu) != nullptr)
-        {
-            if (frame.navigateY != 0)
-                Windows::HandheldMenuMove(frame.navigateY);
-            for (const auto action : frame.actions)
-            {
-                if (action == Action::confirm)
-                    Windows::HandheldMenuConfirm();
-                else if (action == Action::back || action == Action::openMenu)
-                    Windows::HandheldMenuBack();
-                input.suspend();
-                break;
-            }
+        if (HandleMenuInput(input, frame))
             return;
-        }
         if (gLegacyScene == LegacyScene::titleSequence)
         {
             const bool scenarios = wm->FindByClass(WindowClass::scenarioSelect) != nullptr;
@@ -488,8 +517,7 @@ namespace OpenRCT2::Ui::Handheld
                         {
                             if (_treeTool)
                             {
-                                _treeIndex = Trees::Next(_treeIndex);
-                                Trees::UpdatePreview(_terrainTile, _treeIndex);
+                                Windows::HandheldTreePickerOpen();
                             }
                             else if (_surfaceTool)
                                 _surfaceIndex = Surface::Next(_surfaceIndex);

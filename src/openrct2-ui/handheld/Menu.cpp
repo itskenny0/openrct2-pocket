@@ -4,6 +4,7 @@
 #include "Panel.h"
 #include "Paths.h"
 #include "SaveSlots.h"
+#include "TreePicker.h"
 #include "Trees.h"
 
 #include <filesystem>
@@ -37,6 +38,7 @@ namespace OpenRCT2::Ui::Windows
         build,
         paths,
         pathOptions,
+        treePicker,
         dashboard,
         overview,
         finances,
@@ -60,6 +62,7 @@ namespace OpenRCT2::Ui::Windows
     {
         Handheld::ListFocus _focus;
         Page _page = Page::park;
+        Handheld::ObjectPicker _picker;
         bool _pausedHere{};
         bool _exitAfterSave{};
         size_t _slot{};
@@ -86,14 +89,16 @@ namespace OpenRCT2::Ui::Windows
             const ScreenSize target{ _page == Page::overwrite || _page == Page::discard || _page == Page::exit ? 330
                                                                                                                : size.width,
                                      size.height };
-            const ScreenSize bounds = _page == Page::pathOptions ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
-                : information()                                  ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 }
-                                                                 : target;
+            const ScreenSize bounds = (_page == Page::pathOptions || _page == Page::treePicker)
+                ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
+                : information() ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 }
+                                : target;
             WindowSetResize(*this, bounds, bounds);
             WindowSetPosition(
                 *this,
-                _page == Page::pathOptions ? ScreenCoordsXY{ 0, 0 }
-                                           : ScreenCoordsXY{ 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
+                (_page == Page::pathOptions || _page == Page::treePicker)
+                    ? ScreenCoordsXY{ 0, 0 }
+                    : ScreenCoordsXY{ 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
         }
 
         void page(Page next)
@@ -127,6 +132,8 @@ namespace OpenRCT2::Ui::Windows
                     return {
                         "Raise land", "Lower land", "Paths", "Water", "Surface", "Remove scenery", "Trees", "Back to park"
                     };
+                case Page::treePicker:
+                    return {};
                 case Page::paths:
                     return { "Normal path", "Queue path", "Remove path", "Back to build" };
                 case Page::pathOptions:
@@ -214,6 +221,42 @@ namespace OpenRCT2::Ui::Windows
         {
             page(Page::pathOptions);
         }
+        void refreshPicker(std::optional<Handheld::PickerIdentity> preferred = {})
+        {
+            _picker.setEntries(Handheld::TreePickerEntries(), preferred);
+        }
+        void openTreePicker()
+        {
+            refreshPicker(Handheld::PickerIdentity{ ObjectType::smallScenery, Handheld::TreeSelection() });
+            page(Page::treePicker);
+        }
+        bool treePicker() const
+        {
+            return _page == Page::treePicker;
+        }
+        ObjectEntryIndex pickerFocus() const
+        {
+            return _picker.selected() ? _picker.selected()->identity.index : kObjectEntryIndexNull;
+        }
+        void pickerMove(int x, int y)
+        {
+            if (!treePicker() || (x == 0 && y == 0))
+                return;
+            refreshPicker();
+            _picker.move(x, y);
+            _status.clear();
+            invalidate();
+        }
+        void pickerPause()
+        {
+            if (treePicker())
+                page(Page::park); // Discard unconfirmed focus, keep the placement selection.
+        }
+        void onUpdate() override
+        {
+            if (treePicker() && !Handheld::IsTreeToolActive())
+                close();
+        }
         void openRide(RideId id)
         {
             _rideId = id;
@@ -235,6 +278,7 @@ namespace OpenRCT2::Ui::Windows
             {
                 case Page::ride:
                 case Page::pathOptions:
+                case Page::treePicker:
                     close();
                     break;
                 case Page::overview:
@@ -271,6 +315,16 @@ namespace OpenRCT2::Ui::Windows
             const auto choice = _focus.index();
             switch (_page)
             {
+                case Page::treePicker:
+                    if (_picker.selected() && Handheld::SetTreeSelection(_picker.selected()->identity.index))
+                        close();
+                    else
+                    {
+                        refreshPicker();
+                        _status = "Tree unavailable";
+                        invalidate();
+                    }
+                    break;
                 case Page::park:
                     switch (choice)
                     {
@@ -454,6 +508,12 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
+            if (_page == Page::treePicker)
+            {
+                Handheld::DrawObjectPicker(
+                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Choose tree", _status, "No trees available");
+                return;
+            }
             if (_page == Page::pathOptions)
             {
                 Handheld::DrawPathOptions(
@@ -654,5 +714,38 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = OpenPanel())
             window->openRide(ride);
+    }
+} // namespace OpenRCT2::Ui::Windows
+
+namespace OpenRCT2::Ui::Windows
+{
+    void HandheldTreePickerOpen()
+    {
+        if (!Handheld::IsTreeToolActive())
+            return;
+        if (auto* window = OpenPanel())
+            window->openTreePicker();
+    }
+    bool HandheldTreePickerIsOpen()
+    {
+        const auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window && static_cast<const HandheldMenuWindow*>(window)->treePicker();
+    }
+    void HandheldTreePickerMove(int x, int y)
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            static_cast<HandheldMenuWindow*>(window)->pickerMove(x, y);
+    }
+    void HandheldTreePickerPause()
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            static_cast<HandheldMenuWindow*>(window)->pickerPause();
+    }
+    ObjectEntryIndex HandheldTreePickerFocus()
+    {
+        const auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window && static_cast<const HandheldMenuWindow*>(window)->treePicker()
+            ? static_cast<const HandheldMenuWindow*>(window)->pickerFocus()
+            : kObjectEntryIndexNull;
     }
 } // namespace OpenRCT2::Ui::Windows

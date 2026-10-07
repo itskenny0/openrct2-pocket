@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+#include <SDL.h>
 #include <array>
 #include <cstring>
 #include <iostream>
@@ -9,6 +10,7 @@
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/SceneryRemoval.h>
 #include <openrct2-ui/handheld/Surface.h>
+#include <openrct2-ui/handheld/TreePicker.h>
 #include <openrct2-ui/handheld/Trees.h>
 #include <openrct2-ui/handheld/Water.h>
 #include <openrct2-ui/windows/Windows.h>
@@ -508,6 +510,165 @@ static void TestTrees(IContext& context, const std::string& profile)
                  "invalid-ownership-clearance-funds-pause / save-reload checks passed\n";
 }
 
+static void TestTreePicker(bool realUi)
+{
+    namespace H = Ui::Handheld;
+    namespace W = Ui::Windows;
+    auto& state = getGameState();
+    auto& objects = GetContext()->GetObjectManager();
+    for (const auto* id : { "tcl", "tpm", "tct", "tsp", "tcf", "tww", "tco", "tns", "tmp" })
+    {
+        auto* object = objects.LoadObject(std::string("rct2.scenery_small.") + id);
+        Require(object, "Picker fixture object missing");
+        ScenerySetInvented({ SCENERY_TYPE_SMALL, objects.GetLoadedObjectEntryIndex(object) });
+    }
+    const auto entries = H::TreePickerEntries();
+    Require(entries.size() > H::ObjectPicker::pageSize, "Picker fixture needs multiple pages");
+    for (const auto& e : entries)
+        Require(
+            e.identity.type == ObjectType::smallScenery && H::Trees::Eligible(e.identity.index),
+            "Picker included unavailable tree");
+    H::ObjectPicker model;
+    model.setEntries(entries, entries.front().identity);
+    model.move(-1, 0);
+    Require(model.focus() == 0, "Picker wrapped across left edge");
+    model.move(1, 0);
+    Require(model.focus() == 1, "Picker horizontal navigation failed");
+    model.move(0, 1);
+    model.move(0, 1);
+    Require(model.page() == 1 && model.focus() == 7, "Picker page navigation failed");
+    const auto focused = model.selected()->identity;
+    model.setEntries(entries);
+    Require(model.selected()->identity == focused, "Picker refresh lost focus identity");
+    for (int i = 0; i < 10; ++i)
+        model.move(0, 1);
+    Require(model.focus() < entries.size(), "Partial last page navigation exceeded list");
+    model.setEntries({});
+    model.move(1, 1);
+    Require(!model.selected() && model.pages() == 1, "Empty picker unsafe");
+    if (!realUi)
+        return;
+    const CoordsXY tile{ 448, 160 };
+    MapGetSurfaceElementAt(tile)->setOwnership({ OwnershipFlag::landOwned });
+    state.park.cash = 100000;
+    const auto cash = state.park.cash;
+    auto count = [&](bool ghosts) {
+        int n = 0;
+        for (auto* e : TileElementsView<SmallSceneryElement>(tile))
+            n += e->isGhost() == ghosts;
+        return n;
+    };
+    H::BeginTrees();
+    const auto original = H::TreeSelection();
+    H::Trees::UpdatePreview(tile, original);
+    Require(count(true) == 1, "Picker preview fixture missing");
+    W::HandheldTreePickerOpen();
+    Require(
+        W::HandheldTreePickerIsOpen() && W::HandheldTreePickerFocus() == original && count(true) == 0 && gGamePaused,
+        "Picker entry did not focus selection/clear ghost/pause");
+    W::HandheldTreePickerMove(1, 0);
+    const auto choice = W::HandheldTreePickerFocus();
+    Require(choice != original, "Picker did not navigate to next tree");
+    W::HandheldMenuBack();
+    Require(
+        !W::HandheldTreePickerIsOpen() && H::TreeSelection() == original && !gGamePaused,
+        "Picker cancellation changed selection/pause");
+    H::Trees::UpdatePreview(tile, original);
+    Require(count(true) == 1 && state.park.cash == cash, "Cancelled picker failed preview/cash restoration");
+    W::HandheldTreePickerOpen();
+    W::HandheldTreePickerMove(1, 0);
+    SetSceneryItemRestricted({ SCENERY_TYPE_SMALL, choice }, true);
+    W::HandheldMenuConfirm();
+    Require(
+        W::HandheldTreePickerIsOpen() && H::TreeSelection() == original && count(false) == 0,
+        "Picker accepted newly restricted selection");
+    W::HandheldMenuBack();
+    SetSceneryItemRestricted({ SCENERY_TYPE_SMALL, choice }, false);
+    W::HandheldTreePickerOpen();
+    W::HandheldTreePickerMove(1, 0);
+    H::ControllerInput menuInput;
+    H::Frame pauseFrame;
+    pauseFrame.actions = { H::Action::openMenu };
+    Require(
+        H::HandleMenuInput(menuInput, pauseFrame) && !W::HandheldTreePickerIsOpen()
+            && Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu) && gGamePaused && H::TreeSelection() == original,
+        "Picker Start failed to open pause/preserve selection");
+    W::HandheldMenuConfirm(); // Resume the existing pause screen.
+    Require(!gGamePaused, "Picker pause resume did not unpause");
+    for (const auto& e : entries)
+        SetSceneryItemRestricted({ SCENERY_TYPE_SMALL, e.identity.index }, true);
+    W::HandheldTreePickerOpen();
+    Require(W::HandheldTreePickerFocus() == kObjectEntryIndexNull, "Empty tree picker retained a focus");
+    W::HandheldMenuConfirm();
+    Require(
+        W::HandheldTreePickerIsOpen() && H::TreeSelection() == original && count(false) == 0, "Empty picker activated a tree");
+    W::HandheldMenuBack();
+    for (const auto& e : entries)
+        SetSceneryItemRestricted({ SCENERY_TYPE_SMALL, e.identity.index }, false);
+
+    // A native SDL virtual controller exercises the actual menu dispatcher/suspend handoff.
+    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+    Require(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) == 0, "Picker controller init failed");
+    {
+        H::ControllerInput input;
+        input.update(true, 100);
+        const auto device = SDL_JoystickAttachVirtual(
+            SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);
+        Require(device >= 0, "Picker virtual controller attach failed");
+        auto* joystick = SDL_JoystickOpen(device);
+        Require(joystick, "Picker joystick open failed");
+        auto pump = [&]() {
+            SDL_Event e;
+            while (SDL_PollEvent(&e))
+                input.handleEvent(e);
+        };
+        pump();
+        input.update(true, 100);
+        pump();
+        input.update(true, 110);
+        auto press = [&](bool down) {
+            Require(SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, down) == 0, "Picker button failed");
+            SDL_JoystickUpdate();
+            pump();
+        };
+        W::HandheldTreePickerOpen();
+        W::HandheldTreePickerMove(1, 0);
+        const auto selected = W::HandheldTreePickerFocus();
+        press(true);
+        auto frame = input.update(true, 120);
+        Require(frame.actions.size() == 1 && frame.actions[0] == H::Action::confirm, "Picker A mapping wrong");
+        Require(
+            H::HandleMenuInput(input, frame) && !W::HandheldTreePickerIsOpen() && H::TreeSelection() == selected
+                && count(false) == 0 && count(true) == 0 && state.park.cash == cash && !gGamePaused,
+            "Picker A also placed/charged or selected wrong tree");
+        H::Trees::UpdatePreview(tile, selected);
+        Require(count(true) == 1, "Selected tree preview failed");
+        Require(input.update(true, 130).actions.empty(), "Held selecting A leaked into placement");
+        press(false);
+        Require(input.update(true, 140).actions.empty(), "A release emitted placement");
+        press(true);
+        frame = input.update(true, 150);
+        Require(
+            frame.actions.size() == 1 && frame.actions[0] == H::Action::confirm && !H::HandleMenuInput(input, frame),
+            "Fresh A not handed to placement");
+        const auto query = H::Trees::Action(tile, selected, false);
+        Require(
+            H::Trees::Action(tile, selected, true).error == GameActions::Status::ok, "Picker selection real placement failed");
+        GameActions::ProcessQueue(state);
+        Require(
+            count(false) == 1 && count(true) == 0 && state.park.cash == cash - query.cost,
+            "Picker selection real placement/count/cash failed");
+        Require(input.update(true, 160).actions.empty(), "Held placement A repeated");
+        press(false);
+        SDL_JoystickClose(joystick);
+        SDL_JoystickDetachVirtual(device);
+    }
+    H::EndTerrain();
+    std::cout
+        << "Native tree picker / grid-pages-empty-availability / cancel-pause / SDL A selection-release-placement handoff / "
+           "ghost cleanup-exact cash checks passed\n";
+}
+
 static void TestTreeGhost(IContext& context, const std::string& profile, bool realUi)
 {
     namespace Trees = Ui::Handheld::Trees;
@@ -988,6 +1149,7 @@ int main(int argc, char** argv)
         TestSurface(*context, argv[2]);
         TestSceneryRemoval(*context, argv[2]);
         TestTrees(*context, argv[2]);
+        TestTreePicker(argc == 4);
         TestTreeGhost(*context, argv[2], argc == 4);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";

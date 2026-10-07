@@ -5,6 +5,7 @@
 
 #pragma once
 #include <openrct2/Identifiers.h>
+#include <openrct2/object/ObjectTypes.h>
 
 namespace OpenRCT2::Drawing
 {
@@ -14,12 +15,17 @@ namespace OpenRCT2::Drawing
 namespace OpenRCT2::Ui::Handheld
 {
     class ControllerInput;
+    struct Frame;
+    bool HandleMenuInput(ControllerInput& input, const Frame& frame);
     void UpdateExplorer(ControllerInput& input);
     void EndTerrain();
     void BeginTerrain(bool raise);
     void BeginWater(bool raise = true);
     void BeginSurface();
     void BeginTrees();
+    bool IsTreeToolActive();
+    ObjectEntryIndex TreeSelection();
+    bool SetTreeSelection(ObjectEntryIndex index);
     void BeginSceneryRemoval();
     void DrawExplorer(Drawing::RenderTarget& rt);
 } // namespace OpenRCT2::Ui::Handheld
@@ -28,4 +34,9 @@ namespace OpenRCT2::Ui::Windows
 {
     void HandheldRideOpen(RideId ride);
     void HandheldPathOptionsOpen();
+    void HandheldTreePickerOpen();
+    bool HandheldTreePickerIsOpen();
+    void HandheldTreePickerMove(int x, int y);
+    void HandheldTreePickerPause();
+    ObjectEntryIndex HandheldTreePickerFocus();
 } // namespace OpenRCT2::Ui::Windows
