@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "Currency.h"
+#include "Dashboard.h"
 #include "Explorer.h"
 #include "Finances.h"
 #include "ListFocus.h"
@@ -70,25 +71,14 @@ namespace OpenRCT2::Ui::Windows
         exit
     };
 
-    struct ManagementSection
-    {
-        Page page;
-        const char* label;
-    };
-    static constexpr std::array kManagementSections{ ManagementSection{ Page::overview, "Overview" },
-                                                     ManagementSection{ Page::finances, "Finances" },
-                                                     ManagementSection{ Page::staff, "Staff" },
-                                                     ManagementSection{ Page::guests, "Guests" },
-                                                     ManagementSection{ Page::research, "Research" } };
     Handheld::ManagementPresentation HandheldDashboardPresentation(size_t selected)
     {
         Handheld::ManagementPresentation model;
         model.breadcrumb = "Park management";
         model.title = getGameState().park.name;
         model.selected = selected;
-        for (const auto& section : kManagementSections)
-            model.rows.emplace_back(section.label);
-        model.rows.emplace_back("Back to park");
+        for (const auto& section : Handheld::Dashboard::kCategories)
+            model.rows.emplace_back(section.name);
         return model;
     }
 
@@ -107,7 +97,13 @@ namespace OpenRCT2::Ui::Windows
         bool _shopPickerFromBuild{};
         bool _exitAfterSave{};
         size_t _slot{};
-        size_t _dashboardFocus{};
+        Handheld::Dashboard::State _dashboard;
+        struct SectionResume
+        {
+            std::optional<Page> page;
+            size_t row{};
+        };
+        std::array<SectionResume, Handheld::Dashboard::kCategories.size()> _sectionResume;
         std::string _status;
         RideId _rideId = RideId::GetNull();
         std::optional<Handheld::ShopManagement::Target> _shop;
@@ -126,17 +122,21 @@ namespace OpenRCT2::Ui::Windows
             return _page == Page::staff || _page == Page::staffInspect || _page == Page::staffStats
                 || _page == Page::staffOrders || _page == Page::staffHire || _page == Page::staffDismiss;
         }
-        Handheld::ManagementPresentation staffPresentation() const
+        Handheld::ManagementPresentation staffPresentationFor(Page currentPage, size_t selected) const
         {
             using Handheld::StaffManagement::View;
-            const auto view = _page == Page::staff ? View::roster
-                : _page == Page::staffInspect      ? View::inspection
-                : _page == Page::staffStats        ? View::statistics
-                : _page == Page::staffOrders       ? View::orders
-                : _page == Page::staffHire         ? View::hire
-                                                   : View::dismissal;
+            const auto view = currentPage == Page::staff ? View::roster
+                : currentPage == Page::staffInspect      ? View::inspection
+                : currentPage == Page::staffStats        ? View::statistics
+                : currentPage == Page::staffOrders       ? View::orders
+                : currentPage == Page::staffHire         ? View::hire
+                                                         : View::dismissal;
             return Handheld::StaffManagement::Presentation(
-                view, _focus.index(), _staffRoster, _staffTarget, _hireType, _ordersDraft, _status);
+                view, selected, _staffRoster, _staffTarget, _hireType, _ordersDraft, _status);
+        }
+        Handheld::ManagementPresentation staffPresentation() const
+        {
+            return staffPresentationFor(_page, _focus.index());
         }
         bool financeManagement() const
         {
@@ -192,11 +192,19 @@ namespace OpenRCT2::Ui::Windows
 
         void page(Page next)
         {
+            if (next == Page::dashboard && _page != Page::dashboard && managementShell() && dashboardCanSwitch())
+                _sectionResume[_dashboard.index()] = { _page, _focus.index() };
             _staffBusy = false;
             ++_staffRequest;
             if (next == Page::staff)
                 _staffRoster = Handheld::StaffManagement::Roster();
             _page = next;
+            if (next == Page::dashboard)
+                _dashboard.focus = Handheld::Dashboard::Focus::rail;
+            else if (next == Page::staff)
+                _dashboard.section = Handheld::Dashboard::Section::staff;
+            else if (next == Page::finances)
+                _dashboard.section = Handheld::Dashboard::Section::finances;
             if (next != Page::financeEditor && next != Page::financeConfirm)
                 _financeDraft.reset();
             _focus = {};
@@ -205,8 +213,7 @@ namespace OpenRCT2::Ui::Windows
             layout();
             if (next == Page::staff)
                 _focus.move(static_cast<int32_t>(std::min(_staffRosterFocus, rows().size() - 1)), rows().size());
-            if (next == Page::dashboard)
-                _focus.move(static_cast<int32_t>(_dashboardFocus), rows().size());
+
             if (next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish
                 || next == Page::financeConfirm || next == Page::staffHire || next == Page::staffDismiss)
                 _focus.move(1, 2); // destructive confirmations default to Cancel
@@ -453,6 +460,74 @@ namespace OpenRCT2::Ui::Windows
                 invalidate();
             }
         }
+        bool dashboardIsOpen() const
+        {
+            return managementShell();
+        }
+        bool dashboardRailFocused() const
+        {
+            return managementShell() && _dashboard.focus == Handheld::Dashboard::Focus::rail;
+        }
+        bool dashboardCanSwitch() const
+        {
+            return _page == Page::dashboard || _page == Page::finances || _page == Page::staff || _page == Page::staffInspect
+                || _page == Page::staffStats;
+        }
+        void enterDashboardContent()
+        {
+            using Handheld::Dashboard::Section;
+            const auto root = _dashboard.section == Section::staff ? std::optional<Page>{ Page::staff }
+                : _dashboard.section == Section::finances          ? std::optional<Page>{ Page::finances }
+                                                                   : std::nullopt;
+            if (!root || !_dashboard.enter())
+                return;
+            const auto resume = _sectionResume[_dashboard.index()];
+            page(resume.page.value_or(*root));
+            if (resume.page)
+            {
+                _focus = {};
+                _focus.move(static_cast<int32_t>(std::min(resume.row, rows().size() - 1)), rows().size());
+            }
+            invalidate();
+        }
+        void openDashboard()
+        {
+            page(Page::dashboard);
+        }
+        void dashboardPause()
+        {
+            if (managementShell())
+                page(Page::park);
+        }
+        void dashboardSwitchPane()
+        {
+            if (!managementShell() || !dashboardCanSwitch())
+                return;
+            if (dashboardRailFocused())
+                enterDashboardContent();
+            else
+            {
+                if (_page == Page::staff)
+                    _staffRosterFocus = _focus.index();
+                page(Page::dashboard);
+            }
+        }
+        void dashboardMove(int x, int y)
+        {
+            if (dashboardRailFocused())
+            {
+                if (y)
+                {
+                    _dashboard.move(y);
+                    _status.clear();
+                    invalidate();
+                }
+            }
+            else if (financeManagement())
+                financeMove(x, y);
+            else if (y)
+                move(y);
+        }
         bool staffIsOpen() const
         {
             return staffManagement();
@@ -527,6 +602,13 @@ namespace OpenRCT2::Ui::Windows
         }
         void move(int32_t direction)
         {
+            if (dashboardRailFocused())
+            {
+                _dashboard.move(direction);
+                _status.clear();
+                invalidate();
+                return;
+            }
             _focus.move(direction, rows().size());
             _status.clear();
             invalidate();
@@ -535,6 +617,9 @@ namespace OpenRCT2::Ui::Windows
         {
             switch (_page)
             {
+                case Page::dashboard:
+                    close();
+                    break;
                 case Page::shopPicker:
                     if (_shopPickerFromBuild)
                         page(Page::build);
@@ -712,8 +797,13 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 }
                 case Page::dashboard:
-                    _dashboardFocus = choice;
-                    page(choice < kManagementSections.size() ? kManagementSections[choice].page : Page::park);
+                    if (_dashboard.category().available)
+                        enterDashboardContent();
+                    else
+                    {
+                        _status = "Section not implemented";
+                        invalidate();
+                    }
                     break;
                 case Page::staff:
                     _staffRosterFocus = choice;
@@ -1000,8 +1090,21 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::ManagementPresentation model;
                 if (_page == Page::dashboard)
                 {
-                    model = HandheldDashboardPresentation(_focus.index());
-                    model.status = _status;
+                    if (_dashboard.section == Handheld::Dashboard::Section::staff)
+                    {
+                        const auto resume = _sectionResume[_dashboard.index()];
+                        if (resume.page && *resume.page != Page::staff)
+                            model = staffPresentationFor(*resume.page, resume.row);
+                        else
+                            model = Handheld::StaffManagement::Presentation(
+                                Handheld::StaffManagement::View::roster, resume.row, Handheld::StaffManagement::Roster());
+                    }
+                    else if (_dashboard.section == Handheld::Dashboard::Section::finances)
+                        model = Handheld::Finances::Presentation(Handheld::Finances::View::overview, 0);
+                    else
+                        model = Handheld::Dashboard::Unavailable(_dashboard.section);
+                    if (!_status.empty())
+                        model.status = _status;
                 }
                 else if (staffManagement())
                     model = staffPresentation();
@@ -1014,7 +1117,8 @@ namespace OpenRCT2::Ui::Windows
                                                            : View::confirmation,
                         _focus.index(), _financeDraft, _status);
                 }
-                Handheld::DrawManagementPanel(rt, { ContextGetWidth(), ContextGetHeight() }, model);
+                Handheld::Dashboard::Draw(
+                    rt, { ContextGetWidth(), ContextGetHeight() }, _dashboard, model, dashboardCanSwitch());
                 return;
             }
             if (shopManagement())
@@ -1353,5 +1457,39 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->staffPause();
+    }
+} // namespace OpenRCT2::Ui::Windows
+
+namespace OpenRCT2::Ui::Windows
+{
+    void HandheldDashboardPause()
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            static_cast<HandheldMenuWindow*>(window)->dashboardPause();
+    }
+    void HandheldDashboardOpen()
+    {
+        if (auto* window = OpenPanel())
+            window->openDashboard();
+    }
+    bool HandheldDashboardIsOpen()
+    {
+        const auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window && static_cast<const HandheldMenuWindow*>(window)->dashboardIsOpen();
+    }
+    bool HandheldDashboardRailFocused()
+    {
+        const auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window && static_cast<const HandheldMenuWindow*>(window)->dashboardRailFocused();
+    }
+    void HandheldDashboardMove(int x, int y)
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            static_cast<HandheldMenuWindow*>(window)->dashboardMove(x, y);
+    }
+    void HandheldDashboardSwitchPane()
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            static_cast<HandheldMenuWindow*>(window)->dashboardSwitchPane();
     }
 } // namespace OpenRCT2::Ui::Windows

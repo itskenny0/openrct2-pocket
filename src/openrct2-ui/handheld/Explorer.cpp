@@ -348,7 +348,9 @@ namespace OpenRCT2::Ui::Handheld
     {
         if (GetWindowManager()->FindByClass(WindowClass::handheldMenu) != nullptr)
         {
-            if (Windows::HandheldObjectPickerIsOpen())
+            if (Windows::HandheldDashboardIsOpen())
+                Windows::HandheldDashboardMove(frame.navigateX, frame.navigateY);
+            else if (Windows::HandheldObjectPickerIsOpen())
                 Windows::HandheldObjectPickerMove(frame.navigateX, frame.navigateY);
             else if (Windows::HandheldFinancesIsOpen())
                 Windows::HandheldFinancesMove(frame.navigateX, frame.navigateY);
@@ -360,6 +362,17 @@ namespace OpenRCT2::Ui::Handheld
             {
                 if (action == Action::confirm)
                     Windows::HandheldMenuConfirm();
+                else if (action == Action::openBuild && Windows::HandheldDashboardIsOpen())
+                    Windows::HandheldDashboardSwitchPane();
+                else if (action == Action::openMenu && Windows::HandheldDashboardIsOpen())
+                {
+                    if (Windows::HandheldStaffIsOpen())
+                        Windows::HandheldStaffPause();
+                    else if (Windows::HandheldFinancesIsOpen())
+                        Windows::HandheldFinancesPause();
+                    else
+                        Windows::HandheldDashboardPause();
+                }
                 else if (action == Action::openMenu && Windows::HandheldObjectPickerIsOpen())
                     Windows::HandheldObjectPickerPause();
                 else if (action == Action::openMenu && Windows::HandheldShopManagementIsOpen())
@@ -509,7 +522,7 @@ namespace OpenRCT2::Ui::Handheld
             }
             else if (action == Action::openMenu && !gInputFlags.has(InputFlag::toolActive))
             {
-                Windows::HandheldMenuOpen();
+                Windows::HandheldDashboardOpen();
             }
             else if (action == Action::openBuild && CanExplore())
             {

@@ -6,6 +6,7 @@
 #include <openrct2-ui/ProvisionalElements.h>
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/handheld/ControllerInput.h>
+#include <openrct2-ui/handheld/Dashboard.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/Finances.h>
 #include <openrct2-ui/handheld/Paths.h>
@@ -1615,11 +1616,7 @@ static void TestFinances(IContext& context, const std::string& profile, bool rea
         H::ControllerInput input;
         H::Frame frame;
         auto open = [&]() {
-            W::HandheldMenuOpen();
-            W::HandheldMenuMove(1);
-            W::HandheldMenuMove(1);
-            W::HandheldMenuConfirm();
-            W::HandheldMenuMove(1);
+            W::HandheldDashboardOpen();
             W::HandheldMenuConfirm();
             Require(W::HandheldFinancesIsOpen() && gGamePaused, "Dashboard finance navigation failed");
         };
@@ -1723,11 +1720,7 @@ static void TestFinances(IContext& context, const std::string& profile, bool rea
     {
         const auto cash = park.cash, loanValue = park.bankLoan, feeValue = park.entranceFee;
         park.flags.set(ParkFlag::noMoney);
-        W::HandheldMenuOpen();
-        W::HandheldMenuMove(1);
-        W::HandheldMenuMove(1);
-        W::HandheldMenuConfirm();
-        W::HandheldMenuMove(1);
+        W::HandheldDashboardOpen();
         W::HandheldMenuConfirm();
         W::HandheldMenuConfirm();
         W::HandheldFinancesMove(1, 0);
@@ -1743,11 +1736,7 @@ static void TestFinances(IContext& context, const std::string& profile, bool rea
         W::HandheldMenuBack();
         park.flags.unset(ParkFlag::noMoney);
         gGamePaused = 1;
-        W::HandheldMenuOpen();
-        W::HandheldMenuMove(1);
-        W::HandheldMenuMove(1);
-        W::HandheldMenuConfirm();
-        W::HandheldMenuMove(1);
+        W::HandheldDashboardOpen();
         W::HandheldMenuConfirm();
         W::HandheldMenuBack();
         W::HandheldMenuBack();
@@ -1762,11 +1751,7 @@ static void TestFinances(IContext& context, const std::string& profile, bool rea
     Require(ScenarioSave(state, save, flags) != 0, "Finance save failed");
     if (realUi)
     {
-        W::HandheldMenuOpen();
-        W::HandheldMenuMove(1);
-        W::HandheldMenuMove(1);
-        W::HandheldMenuConfirm();
-        W::HandheldMenuMove(1);
+        W::HandheldDashboardOpen();
         W::HandheldMenuConfirm();
         W::HandheldMenuConfirm();
         W::HandheldFinancesMove(1, 0);
@@ -1884,10 +1869,8 @@ static void TestStaff(IContext& context, const std::string& profile, bool realUi
     if (realUi)
     {
         auto open = [&] {
-            W::HandheldMenuOpen();
-            W::HandheldMenuMove(2);
-            W::HandheldMenuConfirm();
-            W::HandheldMenuMove(2);
+            W::HandheldDashboardOpen();
+            W::HandheldMenuMove(-1);
             W::HandheldMenuConfirm();
             Require(W::HandheldStaffIsOpen() && gGamePaused, "Dashboard Staff route failed");
         };
@@ -2066,10 +2049,8 @@ static void TestStaff(IContext& context, const std::string& profile, bool realUi
     Require(ScenarioSave(state, save, flags) != 0, "Staff save failed");
     if (realUi)
     {
-        W::HandheldMenuOpen();
-        W::HandheldMenuMove(2);
-        W::HandheldMenuConfirm();
-        W::HandheldMenuMove(2);
+        W::HandheldDashboardOpen();
+        W::HandheldMenuMove(-1);
         W::HandheldMenuConfirm();
     }
     Require(context.LoadParkFromFile(save), "Staff reload failed");
@@ -2081,6 +2062,226 @@ static void TestStaff(IContext& context, const std::string& profile, bool realUi
     park.entrances = entrances;
     std::cout << "Native staff / auto-hire-roster-orders / exact native wages-no-money / cancel-input-stale-dismiss / "
                  "save-reload passed\n";
+}
+
+static void TestDashboard(IContext& context, const std::string& profile, bool realUi)
+{
+    namespace D = Ui::Handheld::Dashboard;
+    namespace H = Ui::Handheld;
+    namespace W = Ui::Windows;
+    namespace F = H::Finances;
+    namespace S = H::StaffManagement;
+    D::State navigation;
+    Require(
+        navigation.section == D::Section::finances && navigation.focus == D::Focus::rail,
+        "Dashboard default section/focus wrong");
+    navigation.move(1);
+    Require(
+        navigation.section == D::Section::research && !navigation.enter() && navigation.focus == D::Focus::rail,
+        "Unavailable section entered");
+    navigation.move(-2);
+    Require(navigation.section == D::Section::staff && navigation.enter(), "Staff rail route missing");
+    navigation.move(7);
+    Require(navigation.section == D::Section::staff, "Rail wrap failed");
+    if (!realUi)
+        return;
+    auto& state = getGameState();
+    auto& park = state.park;
+    H::EndTerrain();
+    gGamePaused = 0;
+    const auto cash = park.cash, loan = park.bankLoan, fee = park.entranceFee;
+    const auto roster = S::Roster();
+    H::ControllerInput input;
+    H::Frame frame;
+    auto action = [&](H::Action value) {
+        frame = {};
+        frame.actions = { value, value };
+        Require(H::HandleMenuInput(input, frame), "Dashboard semantic input lost");
+    };
+    W::HandheldDashboardOpen();
+    Require(
+        W::HandheldDashboardIsOpen() && W::HandheldDashboardRailFocused() && gGamePaused,
+        "Dashboard open did not own pause/rail");
+    W::HandheldDashboardMove(0, 1); // Research is explicitly unavailable
+    action(H::Action::confirm);
+    action(H::Action::openBuild);
+    Require(
+        W::HandheldDashboardRailFocused() && !W::HandheldFinancesIsOpen() && !W::HandheldStaffIsOpen(),
+        "Unavailable category acquired content focus");
+    Require(park.cash == cash && S::Roster() == roster, "Unavailable category changed native state");
+    W::HandheldDashboardMove(0, -1);
+    action(H::Action::openBuild); // Select enters Finances
+    Require(!W::HandheldDashboardRailFocused() && W::HandheldFinancesIsOpen(), "Rail -> Finances focus failed");
+    action(H::Action::openBuild);
+    Require(W::HandheldDashboardRailFocused(), "Content -> rail focus failed");
+    action(H::Action::confirm);
+    action(H::Action::confirm); // loan editor, no confirmation spill
+    W::HandheldDashboardMove(1, 0);
+    action(H::Action::openBuild);
+    Require(!W::HandheldDashboardRailFocused() && W::HandheldFinancesIsOpen(), "Select escaped modal loan draft");
+    action(H::Action::confirm); // review -> Cancel-first confirmation
+    action(H::Action::openBuild);
+    action(H::Action::back); // confirmation -> draft
+    W::HandheldDashboardMove(-1, 0);
+    action(H::Action::back); // discard -> overview
+    Require(park.cash == cash && park.bankLoan == loan, "Finance focus/back applied a draft");
+    action(H::Action::confirm);
+    action(H::Action::confirm);
+    action(H::Action::confirm); // editor, review, default Cancel
+    GameActions::ProcessQueue(state);
+    Require(park.cash == cash && park.bankLoan == loan, "Cancel-first confirmation applied from duplicated A");
+    action(H::Action::back);
+    Require(W::HandheldDashboardRailFocused(), "Finances overview B did not return to rail");
+    W::HandheldDashboardMove(0, -1);
+    action(H::Action::confirm);
+    Require(W::HandheldStaffIsOpen() && !W::HandheldDashboardRailFocused(), "Staff content focus failed");
+    W::HandheldDashboardMove(0, 2);
+    action(H::Action::confirm); // first employee
+    action(H::Action::openBuild);
+    Require(W::HandheldDashboardRailFocused(), "Employee detail could not switch directly to rail");
+    action(H::Action::openBuild);
+    Require(!W::HandheldDashboardRailFocused() && W::HandheldStaffIsOpen(), "Employee detail focus did not resume");
+    W::HandheldDashboardMove(0, 1);
+    action(H::Action::confirm); // orders draft
+    action(H::Action::confirm); // draft toggle only
+    action(H::Action::openBuild);
+    Require(!W::HandheldDashboardRailFocused(), "Select escaped Staff orders draft");
+    action(H::Action::back); // discard -> employee
+    action(H::Action::back); // -> roster retains focus
+    Require(S::Roster() == roster && W::HandheldStaffIsOpen(), "Staff detail return changed roster or lost section");
+    action(H::Action::confirm); // same employee after retained roster focus
+    W::HandheldDashboardMove(0, 3);
+    action(H::Action::confirm); // dismissal
+    action(H::Action::confirm); // default Cancel
+    Require(S::Roster() == roster && park.cash == cash, "Shell dismissal default removed employee");
+    action(H::Action::back);
+    action(H::Action::back);
+    Require(W::HandheldDashboardRailFocused(), "Staff roster B failed rail return");
+    action(H::Action::back);
+    Require(!W::HandheldDashboardIsOpen() && !gGamePaused, "Rail B did not exit directly to park");
+    // Actual mapped Select/A held-button handoff across rail/content/modal boundaries.
+    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+    Require(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) == 0, "Dashboard SDL init failed");
+    {
+        H::ControllerInput controller;
+        controller.update(true, 5000);
+        const auto device = SDL_JoystickAttachVirtual(
+            SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);
+        auto* joystick = SDL_JoystickOpen(device);
+        Require(joystick, "Dashboard controller missing");
+        auto pump = [&] {
+            SDL_Event e;
+            while (SDL_PollEvent(&e))
+                controller.handleEvent(e);
+        };
+        pump();
+        controller.update(true, 5010);
+        pump();
+        controller.update(true, 5020);
+        auto press = [&](SDL_GameControllerButton button, bool down) {
+            SDL_JoystickSetVirtualButton(joystick, button, down);
+            SDL_JoystickUpdate();
+            pump();
+        };
+        W::HandheldDashboardOpen();
+        press(SDL_CONTROLLER_BUTTON_BACK, true);
+        auto f = controller.update(true, 5030);
+        Require(
+            f.actions.size() == 1 && f.actions[0] == H::Action::openBuild && H::HandleMenuInput(controller, f),
+            "Select pane semantic mapping failed");
+        Require(
+            W::HandheldFinancesIsOpen() && controller.update(true, 5040).actions.empty(), "Held Select toggled back to rail");
+        press(SDL_CONTROLLER_BUTTON_BACK, false);
+        Require(controller.update(true, 5050).actions.empty(), "Select release toggled focus");
+        press(SDL_CONTROLLER_BUTTON_A, true);
+        f = controller.update(true, 5060);
+        Require(f.actions.size() == 1 && H::HandleMenuInput(controller, f), "Fresh content A lost");
+        Require(controller.update(true, 5070).actions.empty(), "Held content A reviewed loan automatically");
+        press(SDL_CONTROLLER_BUTTON_A, false);
+        controller.update(true, 5080);
+        W::HandheldDashboardMove(1, 0);
+        press(SDL_CONTROLLER_BUTTON_A, true);
+        f = controller.update(true, 5090);
+        Require(
+            H::HandleMenuInput(controller, f) && controller.update(true, 5100).actions.empty(), "Held review A confirmed loan");
+        press(SDL_CONTROLLER_BUTTON_A, false);
+        controller.update(true, 5110);
+        press(SDL_CONTROLLER_BUTTON_A, true);
+        f = controller.update(true, 5120);
+        H::HandleMenuInput(controller, f); // fresh default Cancel
+        GameActions::ProcessQueue(state);
+        Require(park.cash == cash && park.bankLoan == loan, "SDL shell cancellation charged");
+        press(SDL_CONTROLLER_BUTTON_A, false);
+        controller.update(true, 5130);
+        W::HandheldMenuBack();
+        W::HandheldMenuBack();
+        SDL_JoystickClose(joystick);
+        SDL_JoystickDetachVirtual(device);
+    }
+    // Native disappearance is still authoritative while a detail/modal lives in the right pane.
+    W::HandheldDashboardOpen();
+    W::HandheldDashboardMove(0, -1);
+    W::HandheldMenuConfirm();
+    W::HandheldMenuMove(2);
+    W::HandheldMenuConfirm();
+    W::HandheldMenuMove(3);
+    W::HandheldMenuConfirm();
+    const auto victim = roster.front();
+    Require(S::Dismiss(victim, true).error == GameActions::Status::ok, "Shell stale fixture dismiss failed");
+    GameActions::ProcessQueue(state);
+    const auto remaining = S::Roster();
+    W::HandheldMenuMove(-1);
+    action(H::Action::confirm);
+    GameActions::ProcessQueue(state);
+    Require(S::Roster() == remaining && park.cash == cash, "Stale shell confirmation affected another staff member");
+    W::HandheldDashboardPause();
+    W::HandheldMenuBack();
+    Require(!W::HandheldDashboardIsOpen() && !gGamePaused, "Dashboard pause/menu ownership leaked");
+    // Dashboard opening still removes native provisional construction previews.
+    const CoordsXY tile{ 320, 320 };
+    MapGetSurfaceElementAt(tile)->setOwnership({ OwnershipFlag::landOwned });
+    InteractionInfo info;
+    info.Loc = tile;
+    info.Element = reinterpret_cast<TileElement*>(MapGetSurfaceElementAt(tile));
+    info.interactionType = ViewportInteractionItem::terrain;
+    Paths::Begin(false);
+    Paths::UpdateTargetFromInfo(info);
+    Paths::UpdatePreview();
+    bool ghost = false;
+    for (auto* path : TileElementsView<PathElement>(tile))
+        ghost |= path->isGhost();
+    Require(ghost, "Dashboard path preview fixture missing");
+    W::HandheldDashboardOpen();
+    for (auto* path : TileElementsView<PathElement>(tile))
+        Require(!path->isGhost(), "Dashboard retained construction ghost");
+    W::HandheldMenuBack();
+    Paths::UpdatePreview();
+    ghost = false;
+    for (auto* path : TileElementsView<PathElement>(tile))
+        ghost |= path->isGhost();
+    Require(ghost && Paths::IsActive(), "Dashboard exit lost native path tool/ghost restoration");
+    Paths::End();
+    H::EndTerrain();
+    SaveFlags flags{};
+    flags.set(SaveFlag::exportObjects);
+    const auto save = profile + "/dashboard-roundtrip.park";
+    Require(ScenarioSave(state, save, flags) != 0, "Dashboard save failed");
+    W::HandheldDashboardOpen();
+    W::HandheldMenuConfirm();
+    W::HandheldMenuConfirm();
+    W::HandheldDashboardMove(1, 0);
+    Require(context.LoadParkFromFile(save), "Dashboard reload failed");
+    Require(
+        !W::HandheldDashboardIsOpen() && park.cash == cash && park.bankLoan == loan && park.entranceFee == fee
+            && S::Roster() == remaining,
+        "Dashboard draft/save/load leaked changes or retained shell");
+    gGamePaused = 1;
+    W::HandheldDashboardOpen();
+    W::HandheldMenuBack();
+    Require(gGamePaused == 1, "Dashboard exit unpaused externally paused park");
+    gGamePaused = 0;
+    std::cout << "Native Dashboard / rail-content-modal-focus / Staff-Finances handoff / unavailable-stale-ghost / save-reload "
+                 "passed\n";
 }
 
 int main(int argc, char** argv)
@@ -2393,6 +2594,7 @@ int main(int argc, char** argv)
         TestShopManagement(*context, argv[2], argc == 4);
         TestFinances(*context, argv[2], argc == 4);
         TestStaff(*context, argv[2], argc == 4);
+        TestDashboard(*context, argv[2], argc == 4);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;

@@ -2,6 +2,7 @@
 // Real private scenario, production management renderer; no fixture finance values.
 #include <filesystem>
 #include <iostream>
+#include <openrct2-ui/handheld/Dashboard.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/Finances.h>
 #include <openrct2/Context.h>
@@ -86,7 +87,7 @@ int main(int argc, char** argv)
         H::ManagementPresentation model;
         if (mode == 0)
         {
-            model = Ui::Windows::HandheldDashboardPresentation(1);
+            model = F::Presentation(F::View::overview, 0);
         }
         else if (mode == 4)
         {
@@ -102,7 +103,9 @@ int main(int argc, char** argv)
                     : mode == 2 ? F::View::editor
                                 : F::View::confirmation,
                 mode == 3 ? 1 : 0, mode > 1 ? std::optional<F::Draft>{ draft } : std::nullopt);
-        H::DrawManagementPanel(rt, { 512, 384 }, model);
+        H::Dashboard::State dashboard;
+        dashboard.focus = mode == 0 ? H::Dashboard::Focus::rail : H::Dashboard::Focus::content;
+        H::Dashboard::Draw(rt, { 512, 384 }, dashboard, model, mode <= 1);
         const char* names[] = { "dashboard.png", "finances.png", "finance-loan.png", "finance-confirmation.png",
                                 "finance-admission.png" };
         Image image;

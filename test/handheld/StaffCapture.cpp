@@ -2,6 +2,7 @@
 // Real private scenario, production staff renderer and native automatic hiring; no fixture employees.
 #include <filesystem>
 #include <iostream>
+#include <openrct2-ui/handheld/Dashboard.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/StaffManagement.h>
 #include <openrct2/Context.h>
@@ -109,7 +110,10 @@ int main(int argc, char** argv)
                 : mode == 6        ? roster.size() + 1
                                    : 0,
             roster, employee, StaffType::mechanic, orders);
-        H::DrawManagementPanel(rt, { 512, 384 }, model);
+        H::Dashboard::State dashboard;
+        dashboard.section = H::Dashboard::Section::staff;
+        dashboard.focus = H::Dashboard::Focus::content;
+        H::Dashboard::Draw(rt, { 512, 384 }, dashboard, model, mode == 0 || mode == 1 || mode == 5 || mode == 6);
         const char* names[] = { "staff-roster.png",    "staff-inspection.png", "staff-orders.png",     "staff-hire.png",
                                 "staff-dismissal.png", "staff-statistics.png", "staff-roster-last.png" };
         Image image;

@@ -41,6 +41,12 @@ namespace OpenRCT2::Ui::Windows
 {
     void HandheldRideOpen(RideId ride);
     Handheld::ManagementPresentation HandheldDashboardPresentation(size_t selected);
+    void HandheldDashboardOpen();
+    void HandheldDashboardPause();
+    bool HandheldDashboardIsOpen();
+    bool HandheldDashboardRailFocused();
+    void HandheldDashboardMove(int x, int y);
+    void HandheldDashboardSwitchPane();
     bool HandheldStaffIsOpen();
     void HandheldStaffPause();
     void HandheldStaffRemoved(EntityId id);

@@ -19,16 +19,17 @@ namespace OpenRCT2::Ui::Handheld
         bool editing{};
         bool confirmation{};
     };
-    inline void DrawManagementPanel(Drawing::RenderTarget& rt, ScreenSize screen, const ManagementPresentation& model)
+    inline void DrawManagementContent(
+        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const ManagementPresentation& model, bool focused = true)
     {
         using namespace Concept;
-        constexpr int width = 244;
-        const auto p = kOrigin;
+        const int width = size.width;
+        const int valueX = 14 + (width - 30) * 45 / 100;
         const int rowStart = 70 + static_cast<int>(model.stats.size()) * 24;
-        const size_t capacity = std::max(1, (338 - rowStart - 30) / 30);
+        const size_t capacity = std::max(1, (size.height - rowStart - 30) / 30);
         const size_t first = model.selected / capacity * capacity;
         const size_t visible = std::min(capacity, model.rows.size() - std::min(first, model.rows.size()));
-        const int height = std::min(338, rowStart + static_cast<int>(visible) * 30 + 30);
+        const int height = std::min(size.height, rowStart + static_cast<int>(visible) * 30 + 30);
         Box(rt, p, { width, height });
         DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, 12 }, width - 20, "{MUTED}" + model.breadcrumb);
         DrawStrongText(rt, p + ScreenCoordsXY{ 10, 32 }, "{WHITE}" + model.title, width - 20);
@@ -36,19 +37,19 @@ namespace OpenRCT2::Ui::Handheld
         for (size_t i = 0; i < model.stats.size(); ++i)
         {
             const int y = 63 + static_cast<int>(i) * 24;
-            const bool highlight = model.highlightedStat == i;
+            const bool highlight = focused && model.highlightedStat == i;
             if (highlight)
                 Box(rt, p + ScreenCoordsXY{ 8, y - 3 }, { width - 16, 23 }, true);
             const auto colour = highlight ? "{BLACK}" : "{MUTED}";
-            DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, y + 4 }, 104, std::string(colour) + model.stats[i].first);
+            DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, y + 4 }, valueX - 20, std::string(colour) + model.stats[i].first);
             DrawModernEllipsised(
-                rt, p + ScreenCoordsXY{ 118, y + 4 }, width - 128,
+                rt, p + ScreenCoordsXY{ valueX, y + 4 }, width - valueX - 10,
                 std::string(highlight ? "{BLACK}" : "{WHITE}") + model.stats[i].second);
         }
         for (size_t i = first; i < first + visible; ++i)
         {
             const int y = rowStart + static_cast<int>(i - first) * 30;
-            const bool selected = i == model.selected;
+            const bool selected = focused && i == model.selected;
             if (selected)
                 Box(rt, p + ScreenCoordsXY{ 8, y }, { width - 16, 28 }, true);
             DrawModernEllipsised(
@@ -59,6 +60,11 @@ namespace OpenRCT2::Ui::Handheld
                                                                                  : model.status;
         if (!status.empty())
             DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, height - 16 }, width - 20, "{MUTED}" + status);
+    }
+    // Compatibility wrapper for construction-era captures; Dashboard uses the content region directly.
+    inline void DrawManagementPanel(Drawing::RenderTarget& rt, ScreenSize screen, const ManagementPresentation& model)
+    {
+        DrawManagementContent(rt, Concept::kOrigin, { 244, 338 }, model);
         DrawActionStrip(rt, screen);
         const int y = screen.height - 21;
         DrawCommand(rt, { 12, y }, 38, "D-pad", model.editing ? "Adjust" : "Choose");
