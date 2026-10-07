@@ -622,8 +622,7 @@ namespace OpenRCT2::Ui::Windows
 
         void onScrollDraw(int32_t scrollIndex, RenderTarget& rt) override
         {
-            auto paletteIndex = Handheld::IsEnabled() ? getColourMap(Colour::darkBlue).darkest
-                                                      : getColourMap(colours[1].colour).midLight;
+            auto paletteIndex = Handheld::IsEnabled() ? Handheld::Theme::ink : getColourMap(colours[1].colour).midLight;
             GfxClear(rt, paletteIndex);
 
             StringId highlighted_format = STR_WINDOW_COLOUR_2_STRINGID;
@@ -691,9 +690,9 @@ namespace OpenRCT2::Ui::Windows
                         const auto scrollCentre = widgets[WIDX_SCENARIOLIST].width() / 2;
 
                         if (Handheld::IsEnabled())
-                            drawTextEllipsised(
-                                rt, { 8, y + 5 }, listWidth - 16, scenario->Name,
-                                { isHighlighted ? Colour::black : Colour::white });
+                            Handheld::DrawModernEllipsised(
+                                rt, { 8, y + 5 }, listWidth - 16, (isHighlighted ? "{BLACK}" : "{WHITE}") + scenario->Name,
+                                { Colour::white });
                         else
                             drawText(
                                 rt, { scrollCentre, y + 1 }, format, ft,

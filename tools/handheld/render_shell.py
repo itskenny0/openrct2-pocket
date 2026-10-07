@@ -24,6 +24,8 @@ subprocess.run([args.ninja, "-C", str(build), "openrct2"], check=True)
 commands = subprocess.check_output(
     [args.ninja, "-C", str(build), "-t", "commands", "openrct2"], text=True
 ).splitlines()
+compile_command = next(line for line in commands if "/handheld/Explorer.cpp" in line and " -c " in line)
+definitions = [value for value in shlex.split(compile_command) if value.startswith("-D")]
 link = shlex.split(commands[-1])
 start = next(i for i, value in enumerate(link) if value.endswith("c++"))
 end = link.index("&&", start) if "&&" in link[start:] else len(link)
@@ -33,7 +35,7 @@ with tempfile.TemporaryDirectory(prefix="pocket-shell-") as directory:
     output_index = link.index("-o")
     link[output_index + 1] = str(temporary / "preview")
     link.insert(output_index, str(repo / "test/handheld/PanelPreview.cpp"))
-    link[1:1] = ["-std=c++20", "-DDISABLE_TTF", f"-I{repo / 'src'}"]
+    link[1:1] = ["-std=c++20", *definitions, f"-I{repo / 'src'}", f"-I{repo / 'src/thirdparty'}"]
     subprocess.run(link, cwd=build, check=True)
     sheet = Image.new("RGB", (512, 812), (15, 19, 55))
     draw = ImageDraw.Draw(sheet)

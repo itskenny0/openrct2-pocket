@@ -6,6 +6,7 @@
 #include "SaveSlots.h"
 
 #include <filesystem>
+#include <iomanip>
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
@@ -13,10 +14,15 @@
 #include <openrct2/GameState.h>
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/PlatformEnvironment.h>
+#include <openrct2/actions/GameActionRunner.h>
+#include <openrct2/actions/park/ParkSetResearchFundingAction.h>
+#include <openrct2/actions/ride/RideSetStatusAction.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/localisation/StringIds.h>
+#include <openrct2/ride/Ride.h>
 #include <openrct2/scenario/Scenario.h>
 #include <openrct2/ui/WindowManager.h>
+#include <sstream>
 
 namespace OpenRCT2::Ui::Windows
 {
@@ -29,6 +35,12 @@ namespace OpenRCT2::Ui::Windows
         park,
         build,
         paths,
+        dashboard,
+        overview,
+        finances,
+        guests,
+        research,
+        ride,
         save,
         load,
         overwrite,
@@ -50,6 +62,20 @@ namespace OpenRCT2::Ui::Windows
         bool _exitAfterSave{};
         size_t _slot{};
         std::string _status;
+        RideId _rideId = RideId::GetNull();
+        bool information() const
+        {
+            return _page == Page::overview || _page == Page::finances || _page == Page::guests || _page == Page::research
+                || _page == Page::ride;
+        }
+        static std::string money(money64 value)
+        {
+            if (value == kMoney64Undefined)
+                return "Not available";
+            std::ostringstream text;
+            text << "$" << std::fixed << std::setprecision(2) << value / 100.0;
+            return text.str();
+        }
 
         void layout()
         {
@@ -58,8 +84,9 @@ namespace OpenRCT2::Ui::Windows
             const ScreenSize target{ _page == Page::overwrite || _page == Page::discard || _page == Page::exit ? 330
                                                                                                                : size.width,
                                      size.height };
-            WindowSetResize(*this, target, target);
-            WindowSetPosition(*this, { 8, std::max(8, (ContextGetHeight() - target.height) / 2) });
+            const ScreenSize bounds = information() ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 } : target;
+            WindowSetResize(*this, bounds, bounds);
+            WindowSetPosition(*this, { 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
         }
 
         void page(Page next)
@@ -77,7 +104,18 @@ namespace OpenRCT2::Ui::Windows
             switch (_page)
             {
                 case Page::park:
-                    return { "Resume park", "Build", "Save park", "Save and exit", "Load park", "Exit without saving" };
+                    return { "Resume park",   "Build",     "Park dashboard",     "Save park",
+                             "Save and exit", "Load park", "Exit without saving" };
+                case Page::dashboard:
+                    return { "Overview", "Finances", "Guests", "Research", "Back to park" };
+                case Page::overview:
+                case Page::finances:
+                case Page::guests:
+                    return { "Back to dashboard" };
+                case Page::research:
+                    return { "Cycle research funding", "Back to dashboard" };
+                case Page::ride:
+                    return { "Open ride", "Close ride", "Back to park" };
                 case Page::build:
                     return { "Raise land", "Lower land", "Paths", "Back to park" };
                 case Page::paths:
@@ -158,6 +196,11 @@ namespace OpenRCT2::Ui::Windows
         {
             page(Page::build);
         }
+        void openRide(RideId id)
+        {
+            _rideId = id;
+            page(Page::ride);
+        }
         void openLoad()
         {
             page(Page::load);
@@ -172,6 +215,15 @@ namespace OpenRCT2::Ui::Windows
         {
             switch (_page)
             {
+                case Page::ride:
+                    close();
+                    break;
+                case Page::overview:
+                case Page::finances:
+                case Page::guests:
+                case Page::research:
+                    page(Page::dashboard);
+                    break;
                 case Page::paths:
                     page(Page::build);
                     break;
@@ -210,17 +262,20 @@ namespace OpenRCT2::Ui::Windows
                             page(Page::build);
                             break;
                         case 2:
+                            page(Page::dashboard);
+                            break;
+                        case 3:
                             _exitAfterSave = false;
                             page(Page::save);
                             break;
-                        case 3:
+                        case 4:
                             _exitAfterSave = true;
                             page(Page::save);
                             break;
-                        case 4:
+                        case 5:
                             page(Page::load);
                             break;
-                        case 5:
+                        case 6:
                             page(Page::exit);
                             break;
                     }
@@ -243,6 +298,48 @@ namespace OpenRCT2::Ui::Windows
                         close();
                         Handheld::EndTerrain();
                         Handheld::Paths::Begin(choice == 1, choice == 2);
+                    }
+                    break;
+                case Page::dashboard:
+                    if (choice == 4)
+                        page(Page::park);
+                    else
+                        page(
+                            choice == 0       ? Page::overview
+                                : choice == 1 ? Page::finances
+                                : choice == 2 ? Page::guests
+                                              : Page::research);
+                    break;
+                case Page::overview:
+                case Page::finances:
+                case Page::guests:
+                    page(Page::dashboard);
+                    break;
+                case Page::research:
+                    if (choice == 1)
+                        page(Page::dashboard);
+                    else
+                    {
+                        const auto& state = getGameState();
+                        auto action = GameActions::ParkSetResearchFundingAction(
+                            state.researchPriorities, (state.researchFundingLevel + 1) % 4);
+                        const auto result = GameActions::Execute(&action, getGameState());
+                        _status = result.error == GameActions::Status::ok ? "Funding change requested."
+                                                                          : result.getErrorMessage();
+                        invalidate();
+                    }
+                    break;
+                case Page::ride:
+                    if (choice == 2)
+                        close();
+                    else
+                    {
+                        auto action = GameActions::RideSetStatusAction(
+                            _rideId, choice == 0 ? RideStatus::open : RideStatus::closed);
+                        const auto result = GameActions::Execute(&action, getGameState());
+                        _status = result.error == GameActions::Status::ok ? "Ride status change requested."
+                                                                          : result.getErrorMessage();
+                        invalidate();
                     }
                     break;
                 case Page::save:
@@ -303,6 +400,24 @@ namespace OpenRCT2::Ui::Windows
             const char* title = "PARK / PAUSE";
             switch (_page)
             {
+                case Page::dashboard:
+                    title = "PARK DASHBOARD";
+                    break;
+                case Page::overview:
+                    title = "PARK OVERVIEW";
+                    break;
+                case Page::finances:
+                    title = "FINANCES";
+                    break;
+                case Page::guests:
+                    title = "GUESTS";
+                    break;
+                case Page::research:
+                    title = "RESEARCH";
+                    break;
+                case Page::ride:
+                    title = "RIDE INSPECTION";
+                    break;
                 case Page::paths:
                     title = "PATHS";
                     break;
@@ -333,8 +448,9 @@ namespace OpenRCT2::Ui::Windows
             model.selected = _focus.index();
             model.status = _status;
             if (_page == Page::park)
-                model.icons = { Handheld::PanelIcon::play, Handheld::PanelIcon::terrain, Handheld::PanelIcon::save,
-                                Handheld::PanelIcon::exit, Handheld::PanelIcon::folder,  Handheld::PanelIcon::exit };
+                model.icons = { Handheld::PanelIcon::play, Handheld::PanelIcon::terrain, Handheld::PanelIcon::folder,
+                                Handheld::PanelIcon::save, Handheld::PanelIcon::exit,    Handheld::PanelIcon::folder,
+                                Handheld::PanelIcon::exit };
             else if (_page == Page::build)
             {
                 model.icons = { Handheld::PanelIcon::raise, Handheld::PanelIcon::lower, Handheld::PanelIcon::folder,
@@ -350,7 +466,68 @@ namespace OpenRCT2::Ui::Windows
                 else if (_page == Page::overwrite)
                     model.status = "This replaces the selected saved park.";
             }
-            Handheld::DrawOverlayShell(rt, *this, model);
+            if (information())
+            {
+                const auto& state = getGameState();
+                const auto& park = state.park;
+                model.detailTitle = park.name;
+                switch (_page)
+                {
+                    case Page::overview:
+                        model.stats = { { "Guests", std::to_string(park.numGuestsInPark) },
+                                        { "Rating", std::to_string(park.rating) },
+                                        { "Park value", money(park.value) },
+                                        { "Company value", money(park.companyValue) },
+                                        { "Cash", money(park.cash) } };
+                        break;
+                    case Page::finances:
+                        model.stats = { { "Cash", money(park.cash) },
+                                        { "Bank loan", money(park.bankLoan) },
+                                        { "Current profit", money(park.currentProfit) },
+                                        { "Expenditure", money(park.currentExpenditure) },
+                                        { "Park value", money(park.value) } };
+                        break;
+                    case Page::guests:
+                        model.stats = { { "In park", std::to_string(park.numGuestsInPark) },
+                                        { "Arriving", std::to_string(park.numGuestsHeadingForPark) },
+                                        { "Total admissions", std::to_string(park.totalAdmissions) },
+                                        { "Park rating", std::to_string(park.rating) } };
+                        break;
+                    case Page::research:
+                    {
+                        static constexpr const char* funding[] = { "None", "Minimum", "Normal", "Maximum" };
+                        model.stats = { { "Funding", funding[std::min<int>(state.researchFundingLevel, 3)] },
+                                        { "Stage progress",
+                                          std::to_string(static_cast<uint32_t>(state.researchProgress) * 100 / 65536) + "%" },
+                                        { "Stage",
+                                          state.researchProgressStage == 0       ? "Initial research"
+                                              : state.researchProgressStage == 1 ? "Designing"
+                                              : state.researchProgressStage == 2 ? "Completing design"
+                                                                                 : "Complete" } };
+                        break;
+                    }
+                    case Page::ride:
+                        if (const auto* ride = GetRide(_rideId))
+                        {
+                            model.detailTitle = ride->getName();
+                            model.stats = { { "Status",
+                                              ride->status == RideStatus::open         ? "Open"
+                                                  : ride->status == RideStatus::closed ? "Closed"
+                                                                                       : "Testing" },
+                                            { "Riders", std::to_string(ride->numRiders) },
+                                            { "Reliability", std::to_string(ride->reliabilityPercentage) + "%" },
+                                            { "Profit", money(ride->profit) } };
+                        }
+                        else
+                            model.status = "This ride is no longer available.";
+                        break;
+                    default:
+                        break;
+                }
+                Handheld::DrawInformationOverlay(rt, *this, model);
+            }
+            else
+                Handheld::DrawOverlayShell(rt, *this, model);
         }
     };
 
@@ -391,5 +568,10 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->back();
+    }
+    void HandheldRideOpen(RideId ride)
+    {
+        if (auto* window = OpenPanel())
+            window->openRide(ride);
     }
 } // namespace OpenRCT2::Ui::Windows

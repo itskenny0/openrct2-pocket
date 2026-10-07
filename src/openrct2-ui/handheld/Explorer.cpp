@@ -34,6 +34,7 @@
 #include <openrct2/interface/Viewport.h>
 #include <openrct2/ui/WindowManager.h>
 #include <openrct2/world/MapSelection.h>
+#include <openrct2/world/tile_element/TileElement.h>
 #include <sstream>
 
 namespace OpenRCT2::Ui::Handheld
@@ -189,6 +190,26 @@ namespace OpenRCT2::Ui::Handheld
         }
         else if (tools != nullptr)
             wm->Close(*tools);
+        auto* cost = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 2 });
+        if (_terrainActive || Paths::IsActive())
+        {
+            if (cost == nullptr)
+            {
+                cost = wm->Create<FocusWindow>(
+                    WindowClass::handheldHud, Centre() + ScreenCoordsXY{ 32, 32 }, { 136, 28 },
+                    { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
+                if (cost != nullptr)
+                    cost->number = 2;
+            }
+            if (cost != nullptr)
+            {
+                cost->invalidate();
+                cost->windowPos = Centre() + ScreenCoordsXY{ 32, 32 };
+                cost->invalidate();
+            }
+        }
+        else if (cost != nullptr)
+            wm->Close(*cost);
     }
 
     void UpdateExplorer(ControllerInput& input)
@@ -325,7 +346,7 @@ namespace OpenRCT2::Ui::Handheld
                         if (Paths::IsActive())
                         {
                             const auto result = Paths::Action(true);
-                            _terrainStatus = result.error == GameActions::Status::ok ? "Path updated."
+                            _terrainStatus = result.error == GameActions::Status::ok ? "Path change requested."
                                                                                      : result.getErrorMessage();
                         }
                         else if (_terrainActive)
@@ -338,7 +359,13 @@ namespace OpenRCT2::Ui::Handheld
                             }
                         }
                         else
-                            ViewportInteractionLeftClick(Centre());
+                        {
+                            const auto info = GetMapCoordinatesFromPos(Centre(), { ViewportInteractionItem::ride });
+                            if (info.Element)
+                                Windows::HandheldRideOpen(info.Element->getRideIndex());
+                            else
+                                ViewportInteractionLeftClick(Centre());
+                        }
                         break;
                     case Action::contextPrimary:
                         if (Paths::IsActive())
@@ -396,6 +423,7 @@ namespace OpenRCT2::Ui::Handheld
         const auto c = Centre();
         const auto height = ContextGetHeight();
         std::string status = "L/R: Zoom   X: Rotate";
+        std::string costAmount;
         if (_terrainActive)
         {
             status = _raiseLand ? "RAISE LAND" : "LOWER LAND";
@@ -405,8 +433,8 @@ namespace OpenRCT2::Ui::Handheld
                 if (result.error == GameActions::Status::ok)
                 {
                     std::ostringstream cost;
-                    cost << "  Cost: $" << std::fixed << std::setprecision(2) << result.cost / 100.0;
-                    status += cost.str();
+                    cost << "$" << std::fixed << std::setprecision(2) << result.cost / 100.0;
+                    costAmount = cost.str();
                 }
                 else
                     status += "  " + result.getErrorMessage();
@@ -423,8 +451,8 @@ namespace OpenRCT2::Ui::Handheld
             if (result.error == GameActions::Status::ok)
             {
                 std::ostringstream cost;
-                cost << "  Cost: $" << std::fixed << std::setprecision(2) << result.cost / 100.0;
-                status += cost.str();
+                cost << "$" << std::fixed << std::setprecision(2) << result.cost / 100.0;
+                costAmount = cost.str();
             }
             else
                 status = result.getErrorMessage();
@@ -439,6 +467,8 @@ namespace OpenRCT2::Ui::Handheld
                 DrawTerrainOverlay(rt, { 8, 52 }, _raiseLand);
             DrawGameplayFooter(rt, { ContextGetWidth(), height }, status, _terrainActive);
         }
+        if (!costAmount.empty())
+            DrawCostBadge(rt, c + ScreenCoordsXY{ 32, 32 }, costAmount);
         // High contrast, fixed map focus; this does not move the desktop pointer.
         DrawMapFocus(rt, c);
     }

@@ -5,6 +5,10 @@
 #include <openrct2/world/Location.hpp>
 #include <optional>
 #include <string>
+namespace OpenRCT2
+{
+    struct InteractionInfo;
+}
 namespace OpenRCT2::Ui::Handheld::Paths
 {
     void Begin(bool queue, bool remove = false);
@@ -15,6 +19,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
     void ToggleRemove();
     void CycleSurface();
     void UpdateTarget(ScreenCoordsXY cursor);
+    void UpdateTargetFromInfo(const InteractionInfo& info);
     std::optional<CoordsXY> TargetTile();
     GameActions::Result Action(bool execute);
     std::string SurfaceName();

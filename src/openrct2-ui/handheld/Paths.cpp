@@ -87,10 +87,13 @@ namespace OpenRCT2::Ui::Handheld::Paths
 
     void UpdateTarget(ScreenCoordsXY cursor)
     {
+        UpdateTargetFromInfo(
+            GetMapCoordinatesFromPos(cursor, { ViewportInteractionItem::terrain, ViewportInteractionItem::footpath }));
+    }
+    void UpdateTargetFromInfo(const InteractionInfo& info)
+    {
         target.reset();
         targetIsPath = false;
-        const auto info = GetMapCoordinatesFromPos(
-            cursor, { ViewportInteractionItem::terrain, ViewportInteractionItem::footpath });
         if (!info.Element)
             return;
         const CoordsXY tile{ info.Loc.x & ~31, info.Loc.y & ~31 };

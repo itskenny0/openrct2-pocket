@@ -4,6 +4,7 @@
  *****************************************************************************/
 
 #pragma once
+#include <openrct2/Identifiers.h>
 
 namespace OpenRCT2::Drawing
 {
@@ -18,3 +19,8 @@ namespace OpenRCT2::Ui::Handheld
     void BeginTerrain(bool raise);
     void DrawExplorer(Drawing::RenderTarget& rt);
 } // namespace OpenRCT2::Ui::Handheld
+
+namespace OpenRCT2::Ui::Windows
+{
+    void HandheldRideOpen(RideId ride);
+}

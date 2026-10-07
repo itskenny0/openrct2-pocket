@@ -221,6 +221,28 @@ namespace OpenRCT2::Ui::Handheld
         DrawOverlayCommands(rt, window);
     }
 
+    inline void DrawInformationOverlay(Drawing::RenderTarget& rt, const Window& w, const MenuPresentation& model)
+    {
+        DrawPanelHeading(rt, w, model.title);
+        const auto p = w.windowPos;
+        DrawModernEllipsised(
+            rt, p + ScreenCoordsXY{ 13, 44 }, w.width - 26, "{YELLOW}" + model.detailTitle, { Drawing::Colour::white });
+        for (size_t i = 0; i < model.stats.size() && i < 6; ++i)
+        {
+            const int y = 69 + static_cast<int>(i) * 22;
+            DrawModernEllipsised(rt, p + ScreenCoordsXY{ 13, y }, 154, model.stats[i].first, { Drawing::Colour::white });
+            DrawModernEllipsised(
+                rt, p + ScreenCoordsXY{ 177, y }, w.width - 190, model.stats[i].second, { Drawing::Colour::white });
+        }
+        for (size_t i = 0; i < model.rows.size(); ++i)
+            DrawIconRow(
+                rt, p + ScreenCoordsXY{ 10, w.height - 62 - static_cast<int>(model.rows.size() - i) * 32 }, w.width - 20,
+                model.rows[i], i == model.selected, PanelIcon::play);
+        DrawModernEllipsised(
+            rt, p + ScreenCoordsXY{ 13, w.height - 45 }, w.width - 26, model.status, { Drawing::Colour::white });
+        DrawOverlayCommands(rt, w);
+    }
+
     inline constexpr ScreenSize kTerrainOverlaySize{ 184, 164 };
 
     inline void DrawTerrainOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, bool raise)
@@ -284,6 +306,13 @@ namespace OpenRCT2::Ui::Handheld
         DrawCommand(rt, { 104, y }, 17, "X", "Place/remove");
         DrawCommand(rt, { 258, y }, 17, "B", "Done");
         DrawCommand(rt, { 369, y }, 38, "D-pad", "Move");
+    }
+
+    inline void DrawCostBadge(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& amount)
+    {
+        DrawCard(rt, pos, { 136, 28 });
+        DrawModernText(rt, pos + ScreenCoordsXY{ 10, 9 }, "Cost", { Drawing::Colour::white });
+        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 47, 9 }, 79, "{YELLOW}" + amount, { Drawing::Colour::white });
     }
 
     inline void DrawMapFocus(Drawing::RenderTarget& rt, ScreenCoordsXY centre)
