@@ -9,6 +9,7 @@
 #include "Panel.h"
 #include "Paths.h"
 #include "SceneryRemoval.h"
+#include "Shops.h"
 #include "Surface.h"
 #include "Trees.h"
 #include "Water.h"
@@ -47,6 +48,9 @@ namespace OpenRCT2::Ui::Handheld
     static bool _waterTool{};
     static bool _surfaceTool{};
     static bool _treeTool{};
+    static bool _shopTool{};
+    static ObjectEntryIndex _shopIndex = kObjectEntryIndexNull;
+    static Direction _shopDirection{};
     static ObjectEntryIndex _treeIndex = kObjectEntryIndexNull;
     static bool _sceneryRemovalTool{};
     static std::optional<SceneryRemoval::Target> _sceneryTarget;
@@ -60,10 +64,13 @@ namespace OpenRCT2::Ui::Handheld
     {
         Paths::End();
         Trees::ClearPreview();
+        Shops::ClearPreview();
         _terrainActive = true;
         _waterTool = false;
         _surfaceTool = false;
         _treeTool = false;
+        _shopTool = false;
+        _shopIndex = kObjectEntryIndexNull;
         _treeIndex = kObjectEntryIndexNull;
         _sceneryRemovalTool = false;
         _sceneryTarget.reset();
@@ -92,6 +99,42 @@ namespace OpenRCT2::Ui::Handheld
         _treeIndex = Trees::Next(kObjectEntryIndexNull);
     }
 
+    bool IsShopToolActive()
+    {
+        return _shopTool;
+    }
+    ObjectEntryIndex ShopSelection()
+    {
+        return _shopIndex;
+    }
+    Direction ShopDirection()
+    {
+        return _shopDirection;
+    }
+    bool SetShopSelection(ObjectEntryIndex index)
+    {
+        if (!Shops::Eligible(index))
+            return false;
+        if (!_shopTool)
+        {
+            BeginTerrain(true);
+            _shopTool = true;
+            _shopDirection = 0;
+        }
+        Shops::ClearPreview();
+        _shopIndex = index;
+        _terrainStatus.clear();
+        return true;
+    }
+    void RotateShop()
+    {
+        if (!_shopTool)
+            return;
+        Shops::ClearPreview();
+        _shopDirection = (_shopDirection + 1) & 3;
+        _terrainStatus.clear();
+    }
+
     bool IsTreeToolActive()
     {
         return _treeTool;
@@ -105,6 +148,7 @@ namespace OpenRCT2::Ui::Handheld
         if (!_treeTool || !Trees::Eligible(index))
             return false;
         Trees::ClearPreview();
+        Shops::ClearPreview();
         _treeIndex = index;
         _terrainStatus.clear();
         return true;
@@ -132,10 +176,13 @@ namespace OpenRCT2::Ui::Handheld
     void EndTerrain()
     {
         Trees::ClearPreview();
+        Shops::ClearPreview();
         _terrainActive = false;
         _waterTool = false;
         _surfaceTool = false;
         _treeTool = false;
+        _shopTool = false;
+        _shopIndex = kObjectEntryIndexNull;
         _treeIndex = kObjectEntryIndexNull;
         _sceneryRemovalTool = false;
         _sceneryTarget.reset();
@@ -149,6 +196,8 @@ namespace OpenRCT2::Ui::Handheld
     {
         if (_sceneryRemovalTool)
             return SceneryRemoval::Action(_sceneryTarget, execute);
+        if (_shopTool)
+            return Shops::Action(_terrainTile, _shopIndex, _shopDirection, execute);
         if (_treeTool)
             return Trees::Action(_terrainTile, _treeIndex, execute);
         if (_surfaceTool)
@@ -297,16 +346,16 @@ namespace OpenRCT2::Ui::Handheld
     {
         if (GetWindowManager()->FindByClass(WindowClass::handheldMenu) != nullptr)
         {
-            if (Windows::HandheldTreePickerIsOpen())
-                Windows::HandheldTreePickerMove(frame.navigateX, frame.navigateY);
+            if (Windows::HandheldObjectPickerIsOpen())
+                Windows::HandheldObjectPickerMove(frame.navigateX, frame.navigateY);
             else if (frame.navigateY != 0)
                 Windows::HandheldMenuMove(frame.navigateY);
             for (const auto action : frame.actions)
             {
                 if (action == Action::confirm)
                     Windows::HandheldMenuConfirm();
-                else if (action == Action::openMenu && Windows::HandheldTreePickerIsOpen())
-                    Windows::HandheldTreePickerPause();
+                else if (action == Action::openMenu && Windows::HandheldObjectPickerIsOpen())
+                    Windows::HandheldObjectPickerPause();
                 else if (action == Action::back || action == Action::openMenu)
                     Windows::HandheldMenuBack();
                 input.suspend();
@@ -354,12 +403,15 @@ namespace OpenRCT2::Ui::Handheld
                 MapSelection::invalidate();
             }
         }
+        if (_shopTool && CanExplore() && ContextHasFocus())
+            Shops::UpdatePreview(_terrainTile, _shopIndex, _shopDirection);
         if (_treeTool && CanExplore() && ContextHasFocus())
             Trees::UpdatePreview(_terrainTile, _treeIndex);
         if (!CanExplore() || !ContextHasFocus())
         {
             Paths::ClearPreview();
             Trees::ClearPreview();
+            Shops::ClearPreview();
         }
         SyncFocusWindow();
         auto frame = input.update(ContextHasFocus(), SDL_GetTicks());
@@ -449,7 +501,9 @@ namespace OpenRCT2::Ui::Handheld
             }
             else if (action == Action::openBuild && CanExplore())
             {
-                if (Paths::IsActive())
+                if (_shopTool)
+                    RotateShop();
+                else if (Paths::IsActive())
                     Windows::HandheldPathOptionsOpen();
                 else
                 {
@@ -474,7 +528,8 @@ namespace OpenRCT2::Ui::Handheld
                             {
                                 const auto result = TerrainAction(true);
                                 _terrainStatus = result.error == GameActions::Status::ok
-                                    ? (_treeTool                 ? "Tree placement requested."
+                                    ? (_shopTool                 ? "Shop placement requested."
+                                           : _treeTool           ? "Tree placement requested."
                                            : _sceneryRemovalTool ? "Removal requested."
                                            : _surfaceTool        ? "Surface change requested."
                                            : _waterTool          ? "Water change requested."
@@ -515,7 +570,9 @@ namespace OpenRCT2::Ui::Handheld
                         }
                         if (_terrainActive)
                         {
-                            if (_treeTool)
+                            if (_shopTool)
+                                Windows::HandheldShopPickerOpen();
+                            else if (_treeTool)
                             {
                                 Windows::HandheldTreePickerOpen();
                             }
@@ -557,7 +614,8 @@ namespace OpenRCT2::Ui::Handheld
         std::string costAmount;
         if (_terrainActive)
         {
-            status = _treeTool        ? "PLACE TREE"
+            status = _shopTool        ? "PLACE SHOP"
+                : _treeTool           ? "PLACE TREE"
                 : _sceneryRemovalTool ? "REMOVE SCENERY"
                 : _surfaceTool        ? "PAINT SURFACE"
                 : _waterTool          ? (_raiseLand ? "RAISE WATER" : "LOWER WATER")
@@ -601,7 +659,9 @@ namespace OpenRCT2::Ui::Handheld
         {
             if (_terrainActive)
             {
-                if (_treeTool)
+                if (_shopTool)
+                    DrawShopOverlay(rt, Concept::kOrigin, Shops::Name(_shopIndex), Shops::Eligible(_shopIndex), _shopDirection);
+                else if (_treeTool)
                     DrawTreeOverlay(rt, Concept::kOrigin, Trees::Name(_treeIndex), Trees::Eligible(_treeIndex));
                 else if (_sceneryRemovalTool)
                     DrawSceneryRemovalOverlay(
@@ -611,7 +671,9 @@ namespace OpenRCT2::Ui::Handheld
                 else
                     DrawTerrainOverlay(rt, Concept::kOrigin, _raiseLand, _waterTool);
             }
-            if (_treeTool)
+            if (_shopTool)
+                DrawShopFooter(rt, { ContextGetWidth(), height });
+            else if (_treeTool)
                 DrawTreeFooter(rt, { ContextGetWidth(), height });
             else if (_sceneryRemovalTool)
                 DrawSceneryRemovalFooter(rt, { ContextGetWidth(), height });

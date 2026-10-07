@@ -41,6 +41,23 @@ namespace OpenRCT2
 {
     static auto _gameState = std::make_unique<GameState_t>();
 
+    // A shop ghost owns a provisional ride record as well as a tile. Exclude
+    // both for the entire tick (finance, ratings, snapshots and queued actions),
+    // not just the pedestrian update. UI-free contexts make these intents no-ops.
+    struct ShopPreviewScope
+    {
+        ShopPreviewScope()
+        {
+            auto intent = Intent(INTENT_ACTION_SUSPEND_SHOP_PREVIEW);
+            ContextBroadcastIntent(&intent);
+        }
+        ~ShopPreviewScope()
+        {
+            auto intent = Intent(INTENT_ACTION_RESUME_SHOP_PREVIEW);
+            ContextBroadcastIntent(&intent);
+        }
+    };
+
     GameState_t& getGameState()
     {
         return *_gameState;
@@ -106,6 +123,9 @@ namespace OpenRCT2
     void gameStateTick()
     {
         PROFILED_FUNCTION();
+        // Cover the paused queue/network/autosave path as well as normal logic.
+        // The inner logic scope nests safely when several updates run this frame.
+        ShopPreviewScope shopPreviewScope;
 
         // Normal game play will update only once every kGameUpdateTimeMS
         uint32_t numUpdates = 1;
@@ -251,6 +271,7 @@ namespace OpenRCT2
     void gameStateUpdateLogic()
     {
         PROFILED_FUNCTION();
+        ShopPreviewScope shopPreviewScope;
 
         gInUpdateCode = true;
 

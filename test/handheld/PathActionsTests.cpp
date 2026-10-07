@@ -9,6 +9,7 @@
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/SceneryRemoval.h>
+#include <openrct2-ui/handheld/Shops.h>
 #include <openrct2-ui/handheld/Surface.h>
 #include <openrct2-ui/handheld/TreePicker.h>
 #include <openrct2-ui/handheld/Trees.h>
@@ -20,6 +21,7 @@
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/PlatformEnvironment.h>
 #include <openrct2/actions/GameActionRunner.h>
+#include <openrct2/actions/footpath/FootpathPlaceAction.h>
 #include <openrct2/actions/park/ParkSetResearchFundingAction.h>
 #include <openrct2/audio/AudioContext.h>
 #include <openrct2/config/Config.h>
@@ -37,6 +39,7 @@
 #include <openrct2/world/tile_element/PathElement.h>
 #include <openrct2/world/tile_element/SurfaceElement.h>
 #include <openrct2/world/tile_element/TileElement.h>
+#include <openrct2/world/tile_element/TrackElement.h>
 #include <stdexcept>
 using namespace OpenRCT2;
 namespace Paths = OpenRCT2::Ui::Handheld::Paths;
@@ -508,6 +511,347 @@ static void TestTrees(IContext& context, const std::string& profile)
     Ui::Handheld::EndTerrain();
     std::cout << "Native tree placement / availability-research-restrictions / one tree-exact cash / ground-neighbours / "
                  "invalid-ownership-clearance-funds-pause / save-reload checks passed\n";
+}
+
+static void TestShops(IContext& context, const std::string& profile, bool realUi)
+{
+    namespace H = Ui::Handheld;
+    namespace S = H::Shops;
+    namespace W = Ui::Windows;
+    auto& state = getGameState();
+    H::EndTerrain();
+    auto& objects = context.GetObjectManager();
+    // Test fixtures only. The production picker neither loads nor invents anything.
+    for (const auto* name : { "burgb", "drnks", "infok", "atm1", "faid1", "coffs", "hatst", "souvs" })
+    {
+        auto* object = objects.LoadObject(std::string("rct2.ride.") + name);
+        Require(object, "Shop fixture missing");
+        const auto index = objects.GetLoadedObjectEntryIndex(object);
+        ResearchInsertRideEntry(index, true);
+        RideEntrySetInvented(index);
+        RideTypeSetInvented(ShopPlacement::Type(index));
+    }
+    auto entries = S::Entries();
+    Require(entries.size() > H::ObjectPicker::pageSize, "Shop paging fixture missing");
+    for (const auto& e : entries)
+        Require(
+            e.identity.type == ObjectType::ride && S::Eligible(e.identity.index)
+                && GetRideTypeDescriptor(ShopPlacement::Type(e.identity.index)).flags.has(RtdFlag::isShopOrFacility),
+            "Shop picker included unsupported/unresearched object");
+    H::ObjectPicker picker;
+    picker.setEntries(entries, entries.front().identity);
+    picker.move(0, 1);
+    picker.move(0, 1);
+    Require(picker.page() == 1 && picker.focus() == 6, "Shared shop grid paging failed");
+    picker.move(0, -1);
+    Require(picker.page() == 0 && picker.focus() == 3, "Shop grid backward paging failed");
+    const auto index = entries.front().identity.index;
+    const CoordsXY tile{ 448, 224 }, next{ 416, 224 }, neighbour{ 448, 256 };
+    for (auto xy : { tile, next, neighbour })
+        MapGetSurfaceElementAt(xy)->setOwnership({ OwnershipFlag::landOwned });
+    auto tracks = [](CoordsXY xy, bool ghost) {
+        int n = 0;
+        for (auto* e : TileElementsView<TrackElement>(xy))
+            n += e->isGhost() == ghost;
+        return n;
+    };
+    auto rides = [&]() {
+        size_t n = 0;
+        for (const auto& ride : state.rides)
+            n += !ride.id.IsNull();
+        return n;
+    };
+    auto pathAction = GameActions::FootpathPlaceAction(
+        { neighbour, MapGetSurfaceElementAt(neighbour)->getBaseZ() }, {},
+        objects.GetLoadedObjectEntryIndex(objects.LoadObject("rct2.footpath_surface.tarmac")),
+        objects.GetLoadedObjectEntryIndex(objects.LoadObject("rct2.footpath_railings.wood")));
+    Require(GameActions::Execute(&pathAction, state).error == GameActions::Status::ok, "Adjacent shop path fixture failed");
+    GameActions::ProcessQueue(state);
+    const auto pathBefore = *MapGetFootpathElement({ neighbour, MapGetSurfaceElementAt(neighbour)->getBaseZ() });
+    const auto baselineRides = rides();
+    const auto baselineRange = state.ridesEndOfUsedRange;
+    const auto baselineCash = state.park.cash = 1000000;
+    const auto neighbourBefore = *MapGetSurfaceElementAt(neighbour);
+    auto query = S::Action(tile, index, 0, false);
+    Require(query.error == GameActions::Status::ok && query.cost > 0, "Shop query failed");
+    Require(
+        rides() == baselineRides && state.ridesEndOfUsedRange == baselineRange && state.park.cash == baselineCash,
+        "Shop query stranded temporary ride/changed cash");
+    S::UpdatePreview(tile, index, 0);
+    Require(
+        tracks(tile, true) == 1 && tracks(tile, false) == 0 && rides() == baselineRides + 1 && state.park.cash == baselineCash,
+        "Native shop ghost/count/cash failed");
+    auto* first = *TileElementsView<TrackElement>(tile).begin();
+    first->setColourScheme(static_cast<RideColourScheme>(1));
+    S::UpdatePreview(tile, index, 0);
+    Require(
+        tracks(tile, true) == 1 && (*TileElementsView<TrackElement>(tile).begin())->getColourScheme() == 1,
+        "Unchanged shop ghost unnecessarily replaced");
+    Require(S::Action(tile, index, 0, false).cost == query.cost, "Shop ghost changed native price");
+    S::UpdatePreview(tile, index, 1);
+    Require(
+        tracks(tile, true) == 1 && (*TileElementsView<TrackElement>(tile).begin())->getDirection() == 1,
+        "Shop rotation failed");
+    S::UpdatePreview(next, index, 2);
+    Require(tracks(tile, true) == 0 && tracks(next, true) == 1, "Shop target change left old ghost");
+    Ui::ProvisionalElementsRemove();
+    Ui::ProvisionalElementsRemove();
+    Require(tracks(next, true) == 0 && rides() == baselineRides, "Shop provisional suspension left ride/ghost");
+    Ui::ProvisionalElementsRestore();
+    Require(tracks(next, true) == 0, "Nested shop suspension restored early");
+    Ui::ProvisionalElementsRestore();
+    Require(tracks(next, true) == 1, "Shop provisional restore failed");
+    S::ClearPreview();
+    Require(rides() == baselineRides, "Shop cleanup left empty native ride");
+    Require(
+        std::memcmp(
+            &pathBefore, MapGetFootpathElement({ neighbour, MapGetSurfaceElementAt(neighbour)->getBaseZ() }),
+            sizeof(pathBefore))
+            == 0,
+        "Shop ghost cleanup changed neighbouring path edges/metadata");
+    S::UpdatePreview({}, index, 0);
+    Require(tracks(next, true) == 0 && rides() == baselineRides, "Invalid target left shop ghost");
+    MapGetSurfaceElementAt(tile)->setOwnership({});
+    Require(S::Action(tile, index, 0, true).error != GameActions::Status::ok, "Unowned shop accepted");
+    S::UpdatePreview(tile, index, 0);
+    Require(tracks(tile, true) == 0, "Unowned shop preview accepted");
+    MapGetSurfaceElementAt(tile)->setOwnership({ OwnershipFlag::landOwned });
+    state.park.cash = 0;
+    Require(S::Action(tile, index, 0, true).error == GameActions::Status::insufficientFunds, "Shop funds bypassed");
+    S::UpdatePreview(tile, index, 0);
+    Require(tracks(tile, true) == 0, "Unaffordable shop ghost");
+    state.park.cash = baselineCash;
+    gGamePaused = 1;
+    S::UpdatePreview(tile, index, 0);
+    Require(tracks(tile, true) == 0, "Paused shop ghost misleading");
+    Require(S::Action(tile, index, 0, true).error != GameActions::Status::ok, "Paused shop placed");
+    gGamePaused = 0;
+    S::UpdatePreview(tile, index, 0);
+    SetEveryRideEntryNotInvented();
+    Require(!S::Eligible(index) && S::Entries().empty(), "Shop research filtering failed");
+    Require(
+        S::Action(tile, index, 0, true).error != GameActions::Status::ok && tracks(tile, true) == 0,
+        "Unresearched shop confirmed/ghost stranded");
+    for (auto& e : entries)
+        RideEntrySetInvented(e.identity.index);
+    SetEveryRideTypeNotInvented();
+    Require(S::Entries().empty(), "Unresearched ride types leaked into picker");
+    for (auto& e : entries)
+        RideTypeSetInvented(ShopPlacement::Type(e.identity.index));
+    Require(!S::Eligible(kObjectEntryIndexNull), "Unloaded shop accepted");
+    if (realUi)
+    {
+        W::HandheldBuildOpen();
+        for (int i = 0; i < 7; ++i)
+            W::HandheldMenuMove(1);
+        W::HandheldMenuConfirm();
+        Require(W::HandheldObjectPickerIsOpen() && !H::IsShopToolActive(), "Build did not open shop picker");
+        W::HandheldMenuBack();
+        Require(!W::HandheldObjectPickerIsOpen() && !H::IsShopToolActive(), "Initial shop cancellation activated placement");
+        W::HandheldMenuBack();
+        W::HandheldMenuBack();
+        Require(H::SetShopSelection(index), "Shop selection failed");
+        S::UpdatePreview(tile, index, 0);
+        W::HandheldShopPickerOpen();
+        Require(tracks(tile, true) == 0 && rides() == baselineRides && gGamePaused, "Shop picker retained ghost/ride");
+        W::HandheldObjectPickerMove(1, 0);
+        W::HandheldMenuBack();
+        Require(H::ShopSelection() == index && !gGamePaused, "Shop cancel changed selection/pause");
+        W::HandheldShopPickerOpen();
+        H::ControllerInput input;
+        H::Frame frame;
+        frame.actions = { H::Action::openMenu };
+        H::HandleMenuInput(input, frame);
+        Require(!W::HandheldObjectPickerIsOpen() && H::ShopSelection() == index && gGamePaused, "Shop picker Start failed");
+        W::HandheldMenuConfirm();
+        W::HandheldShopPickerOpen();
+        W::HandheldObjectPickerMove(1, 0);
+        const auto focused = W::HandheldObjectPickerFocus();
+        SetEveryRideEntryNotInvented();
+        W::HandheldMenuConfirm();
+        Require(W::HandheldObjectPickerIsOpen() && H::ShopSelection() == index, "Stale research selection accepted");
+        W::HandheldMenuBack();
+        for (auto& e : entries)
+            RideEntrySetInvented(e.identity.index);
+        W::HandheldShopPickerOpen();
+        W::HandheldObjectPickerMove(1, 0);
+        frame.actions = { H::Action::confirm, H::Action::confirm };
+        H::HandleMenuInput(input, frame);
+        Require(
+            !W::HandheldObjectPickerIsOpen() && H::ShopSelection() == focused && tracks(tile, false) == 0
+                && state.park.cash == baselineCash,
+            "Shop selection A spilled into placement");
+        H::RotateShop();
+        Require(H::ShopDirection() == 1, "Semantic shop rotation failed");
+        SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+        Require(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) == 0, "Shop controller init failed");
+        {
+            H::ControllerInput controller;
+            controller.update(true, 1000);
+            const auto device = SDL_JoystickAttachVirtual(
+                SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);
+            Require(device >= 0, "Shop controller attach failed");
+            auto* joystick = SDL_JoystickOpen(device);
+            Require(joystick, "Shop controller open failed");
+            auto pump = [&]() {
+                SDL_Event e;
+                while (SDL_PollEvent(&e))
+                    controller.handleEvent(e);
+            };
+            pump();
+            controller.update(true, 1000);
+            pump();
+            controller.update(true, 1010);
+            auto press = [&](bool down) {
+                Require(SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, down) == 0, "Shop A failed");
+                SDL_JoystickUpdate();
+                pump();
+            };
+            W::HandheldShopPickerOpen();
+            press(true);
+            const auto selecting = controller.update(true, 1020);
+            Require(
+                selecting.actions.size() == 1 && H::HandleMenuInput(controller, selecting) && !W::HandheldObjectPickerIsOpen()
+                    && tracks(tile, false) == 0 && state.park.cash == baselineCash,
+                "Shop selecting A planted or spent money");
+            Require(controller.update(true, 1030).actions.empty(), "Shop held selecting A leaked");
+            press(false);
+            Require(controller.update(true, 1040).actions.empty(), "Shop A release planted");
+            press(true);
+            const auto fresh = controller.update(true, 1050);
+            Require(
+                fresh.actions.size() == 1 && fresh.actions[0] == H::Action::confirm && !H::HandleMenuInput(controller, fresh),
+                "Fresh A not handed to shop placement");
+            press(false);
+            SDL_JoystickClose(joystick);
+            SDL_JoystickDetachVirtual(device);
+        }
+        H::SetShopSelection(index);
+        S::UpdatePreview(tile, index, 0);
+        H::UpdateExplorer(input); // Dummy native UI is unfocused: production focus cleanup.
+        Require(tracks(tile, true) == 0 && rides() == baselineRides, "Focus loss retained shop ghost/ride");
+        H::EndTerrain();
+    }
+    // Save/autosave with an active native track ghost must contain neither ghost nor its empty ride record.
+    S::UpdatePreview(tile, index, 3);
+    SaveFlags flags{};
+    flags.set(SaveFlag::exportObjects);
+    const auto save = profile + "/shop-preview.park";
+    flags.set(SaveFlag::automatic);
+    if (!realUi)
+        Ui::ProvisionalElementsRemove();
+    Require(ScenarioSave(state, save, flags) != 0, "Shop ghost save failed");
+    if (!realUi)
+        Ui::ProvisionalElementsRestore();
+    Require(tracks(tile, true) == 1 && state.park.cash == baselineCash, "Shop ghost did not return after save");
+    S::ClearPreview();
+    Require(context.LoadParkFromFile(save), "Shop preview reload failed");
+    Require(
+        tracks(tile, true) == 0 && rides() == baselineRides && state.park.cash == baselineCash,
+        "Save serialized ghost/temporary shop ride");
+    query = S::Action(tile, index, 3, false);
+    Require(query.error == GameActions::Status::ok, "Shop real query failed");
+    Require(
+        S::Action(tile, index, 3, true).error == GameActions::Status::ok && tracks(tile, false) == 0,
+        "Shop action failed/bypassed queue");
+    GameActions::ProcessQueue(state);
+    Require(
+        tracks(tile, false) == 1 && tracks(tile, true) == 0 && rides() == baselineRides + 1
+            && state.park.cash == baselineCash - query.cost,
+        "Shop real placement/count/exact cash failed");
+    const auto* placed = *TileElementsView<TrackElement>(tile).begin();
+    const auto rideId = placed->getRideIndex();
+    Require(
+        placed->getDirection() == 3 && GetRide(rideId)->subtype == index && GetRide(rideId)->status == RideStatus::open,
+        "Placed shop identity/orientation/operating state wrong");
+    Require(S::Action(tile, index, 3, true).error != GameActions::Status::ok, "Occupied shop target accepted");
+    S::UpdatePreview(tile, index, 3);
+    S::ClearPreview();
+    Require(tracks(tile, false) == 1 && tracks(tile, true) == 0 && GetRide(rideId), "Invalid ghost cleanup removed real shop");
+    Require(
+        std::memcmp(&neighbourBefore, MapGetSurfaceElementAt(neighbour), sizeof(neighbourBefore)) == 0,
+        "Shop changed neighbouring terrain");
+    const auto placedCash = state.park.cash;
+    const auto realSave = profile + "/shop-placed.park";
+    flags.unset(SaveFlag::automatic);
+    Require(ScenarioSave(state, realSave, flags) != 0 && context.LoadParkFromFile(realSave), "Placed shop save/reload failed");
+    Require(
+        tracks(tile, false) == 1 && GetRide(rideId)->status == RideStatus::open && state.park.cash == placedCash,
+        "Placed shop did not survive reload");
+    if (realUi)
+    {
+        gameStateUpdateLogic();
+        const auto controlCash = state.park.cash;
+        const auto controlTicks = state.currentTicks;
+        Require(context.LoadParkFromFile(realSave), "Shop tick fixture reload failed");
+        Require(H::SetShopSelection(index), "Shop tick selection failed");
+        S::UpdatePreview(next, index, 0);
+        Require(tracks(next, true) == 1 && rides() == baselineRides + 2, "Shop tick ghost fixture missing");
+        gameStateUpdateLogic();
+        Require(
+            tracks(next, true) == 1 && tracks(next, false) == 0 && rides() == baselineRides + 2
+                && state.park.cash == controlCash && state.currentTicks == controlTicks,
+            "Shop preview changed simulation cash/ride count or failed restoration");
+        state.cheats.buildInPauseMode = true;
+        gGamePaused = 1;
+        const auto pausedCash = state.park.cash;
+        gameStateTick();
+        Require(
+            tracks(next, true) == 1 && rides() == baselineRides + 2 && state.park.cash == pausedCash,
+            "Paused native tick stranded shop record/changed cash");
+        gGamePaused = 0;
+        state.cheats.buildInPauseMode = false;
+        H::EndTerrain();
+        Require(tracks(next, true) == 0 && rides() == baselineRides + 1, "Shop tool exit stranded temporary ride");
+        H::SetShopSelection(index);
+        S::UpdatePreview(next, index, 0);
+        Require(context.LoadParkFromFile(realSave), "Active shop tool park reload failed");
+        Require(
+            !H::IsShopToolActive() && tracks(next, true) == 0 && rides() == baselineRides + 1,
+            "Park change retained shop tool/ghost/ride");
+        H::SetShopSelection(index);
+        S::UpdatePreview(next, index, 0);
+        context.GetUiContext().CloseWindow();
+        Require(
+            !H::IsShopToolActive() && tracks(next, true) == 0 && rides() == baselineRides + 1,
+            "Shutdown retained shop ghost/ride");
+    }
+    H::EndTerrain();
+    const auto facility = std::find_if(entries.begin(), entries.end(), [](const auto& e) {
+        return GetRideTypeDescriptor(ShopPlacement::Type(e.identity.index)).StartTrackPiece == TrackElemType::flatTrack1x1B;
+    });
+    Require(facility != entries.end(), "Information kiosk facility fixture missing");
+    const auto facilityIndex = facility->identity.index;
+    for (Direction direction = 0; direction < 4; ++direction)
+    {
+        S::UpdatePreview(next, facilityIndex, direction);
+        Require(
+            tracks(next, true) == 1 && (*TileElementsView<TrackElement>(next).begin())->getDirection() == direction,
+            "Native facility preview rotation failed");
+    }
+    S::ClearPreview();
+    const auto facilityCash = state.park.cash;
+    const auto facilityRides = rides();
+    query = S::Action(next, facilityIndex, 2, false);
+    Require(
+        query.error == GameActions::Status::ok && S::Action(next, facilityIndex, 2, true).error == GameActions::Status::ok,
+        "Facility placement failed");
+    GameActions::ProcessQueue(state);
+    const auto facilityId = (*TileElementsView<TrackElement>(next).begin())->getRideIndex();
+    Require(
+        tracks(next, false) == 1 && tracks(next, true) == 0 && rides() == facilityRides + 1
+            && state.park.cash == facilityCash - query.cost && GetRide(facilityId)->status == RideStatus::open,
+        "Facility placement/count/open/exact cash failed");
+    const auto facilitySave = profile + "/facility-placed.park";
+    const auto savedFacilityCash = state.park.cash;
+    Require(
+        ScenarioSave(state, facilitySave, flags) != 0 && context.LoadParkFromFile(facilitySave), "Facility save/reload failed");
+    Require(
+        tracks(next, false) == 1 && GetRide(facilityId)->subtype == facilityIndex
+            && GetRide(facilityId)->status == RideStatus::open && state.park.cash == savedFacilityCash,
+        "Facility identity/status/cash not preserved");
+    std::cout << "Native shops / eligibility-grid-selection-cancel-input / ghost-rotation-provisional-save / exact cash-real "
+                 "placement-open-reload passed\n";
 }
 
 static void TestTreePicker(bool realUi)
@@ -1151,6 +1495,7 @@ int main(int argc, char** argv)
         TestTrees(*context, argv[2]);
         TestTreePicker(argc == 4);
         TestTreeGhost(*context, argv[2], argc == 4);
+        TestShops(*context, argv[2], argc == 4);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;

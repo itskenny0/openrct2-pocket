@@ -68,3 +68,11 @@ Native path ghosts and real-scenario captures are documented in
 actual loaded park with locally supplied RCT assets; proprietary asset files
 are not part of the source checkpoint. The optional `run_native_test.py --assets`
 mode also exercises the real UI modal/load lifecycle with SDL dummy drivers.
+
+Shops / Facilities selection, native ground ghosts, rotation, one-command
+placement/opening and save safety are documented in
+`docs/handheld/SHOPS-CHECKPOINT.md`. `render_shops.py` takes the same native
+build/data/assets/scenario/output arguments as `render_tree_picker.py` and
+captures the real picker, ghost and placed building at 512×384. `run_native_test.py`
+now includes shop/facility research, grid/input, native placement/cash, ghost,
+simulation and save/reload coverage. Keep private assets outside the repository.

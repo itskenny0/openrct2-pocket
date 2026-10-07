@@ -3,6 +3,7 @@
 #include "ConceptStyle.h"
 #include "ModernText.h"
 
+#include <array>
 #include <cmath>
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2/SpriteIds.h>
@@ -241,10 +242,11 @@ namespace OpenRCT2::Ui::Handheld
     {
         DrawPanelHeading(rt, window, model.title);
         const auto p = window.windowPos;
-        for (size_t i = 0; i < model.rows.size(); ++i)
+        const size_t first = model.selected >= 8 ? model.selected - 7 : 0;
+        for (size_t i = first; i < model.rows.size() && i < first + 8; ++i)
             DrawIconRow(
-                rt, p + ScreenCoordsXY{ 10, 43 + static_cast<int32_t>(i) * kPanelRowPitch }, window.width - 20, model.rows[i],
-                i == model.selected, i < model.icons.size() ? model.icons[i] : PanelIcon::folder);
+                rt, p + ScreenCoordsXY{ 10, 43 + static_cast<int32_t>(i - first) * kPanelRowPitch }, window.width - 20,
+                model.rows[i], i == model.selected, i < model.icons.size() ? model.icons[i] : PanelIcon::folder);
         DrawModernEllipsised(
             rt, p + ScreenCoordsXY{ 13, window.height - 45 }, window.width - 26, model.status, { Drawing::Colour::white });
         DrawOverlayCommands(rt, window);
@@ -313,6 +315,20 @@ namespace OpenRCT2::Ui::Handheld
         DrawModernText(rt, pos + ScreenCoordsXY{ 12, 116 }, "{MUTED}Ground level");
     }
 
+    inline void DrawShopOverlay(
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& name, bool available, Direction direction)
+    {
+        using namespace Concept;
+        Box(rt, pos, { kRailWidth, 146 });
+        Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, "Shops / Facilities");
+        Section(rt, pos + ScreenCoordsXY{ 10, 35 }, "Building");
+        Row(rt, pos + ScreenCoordsXY{ 8, 54 }, name, Icon::path, available);
+        Rule(rt, pos + ScreenCoordsXY{ 8, 99 }, 148);
+        DrawModernText(
+            rt, pos + ScreenCoordsXY{ 12, 116 },
+            "{MUTED}Rotation " + std::string(std::array{ "NW", "SW", "SE", "NE" }[direction & 3]));
+    }
+
     inline void DrawSceneryRemovalOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& name, bool target)
     {
         using namespace Concept;
@@ -329,6 +345,17 @@ namespace OpenRCT2::Ui::Handheld
         const ScreenCoordsXY p{ 0, screen.height - kActionStripHeight };
         Fill(rt, p, { screen.width, kActionStripHeight }, static_cast<Drawing::PaletteIndex>(PocketPalette::panel));
         Concept::Rule(rt, p, screen.width);
+    }
+
+    inline void DrawShopFooter(Drawing::RenderTarget& rt, ScreenSize screen)
+    {
+        DrawActionStrip(rt, screen);
+        const auto y = screen.height - 21;
+        DrawCommand(rt, { 8, y }, 38, "D-pad", "Move");
+        DrawCommand(rt, { 115, y }, 17, "A", "Place");
+        DrawCommand(rt, { 207, y }, 17, "Y", "Shops");
+        DrawCommand(rt, { 299, y }, 30, "SEL", "Turn");
+        DrawCommand(rt, { 420, y }, 17, "B", "Back");
     }
 
     inline void DrawTreeFooter(Drawing::RenderTarget& rt, ScreenSize screen)
@@ -481,7 +508,8 @@ namespace OpenRCT2::Ui::Handheld
             DrawModernEllipsised(rt, p + ScreenCoordsXY{ 14, 46 }, 204, "{YELLOW}" + model.section, { Drawing::Colour::white });
         else
             DrawTabs(rt, p + ScreenCoordsXY{ 10, 44 }, 221, model.tabs, model.selectedTab);
-        for (size_t i = 0; i < model.rows.size(); ++i)
+        const size_t first = model.selected >= 8 ? model.selected - 7 : 0;
+        for (size_t i = first; i < model.rows.size() && i < first + 8; ++i)
             DrawIconRow(
                 rt, p + ScreenCoordsXY{ 10, (model.tabs.empty() ? 64 : 82) + static_cast<int32_t>(i) * kPanelRowPitch }, 218,
                 model.rows[i], i == model.selected, i < model.icons.size() ? model.icons[i] : PanelIcon::folder);

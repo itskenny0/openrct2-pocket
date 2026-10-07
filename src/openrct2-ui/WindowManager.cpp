@@ -11,6 +11,7 @@
 
 #include "handheld/Explorer.h"
 #include "handheld/Paths.h"
+#include "handheld/Shops.h"
 #include "handheld/Trees.h"
 #include "interface/Chat.h"
 #include "interface/FileBrowser.h"
@@ -573,6 +574,12 @@ public:
                 break;
             }
 
+            case INTENT_ACTION_SUSPEND_SHOP_PREVIEW:
+                Handheld::Shops::RemovePreviewTemporarily();
+                break;
+            case INTENT_ACTION_RESUME_SHOP_PREVIEW:
+                Handheld::Shops::RestorePreview();
+                break;
             case INTENT_ACTION_REMOVE_PROVISIONAL_ELEMENTS:
                 ProvisionalElementsRemove();
                 break;
@@ -1131,6 +1138,7 @@ public:
     {
         Handheld::Paths::ClearPreview();
         Handheld::Trees::ClearPreview();
+        Handheld::Shops::ClearPreview();
         CloseByClass(WindowClass::rideConstruction);
         CloseByClass(WindowClass::footpath);
         CloseByClass(WindowClass::trackDesignList);

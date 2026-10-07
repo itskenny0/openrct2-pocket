@@ -6,6 +6,7 @@
 #pragma once
 #include <openrct2/Identifiers.h>
 #include <openrct2/object/ObjectTypes.h>
+#include <openrct2/world/Location.hpp>
 
 namespace OpenRCT2::Drawing
 {
@@ -23,6 +24,11 @@ namespace OpenRCT2::Ui::Handheld
     void BeginWater(bool raise = true);
     void BeginSurface();
     void BeginTrees();
+    bool IsShopToolActive();
+    ObjectEntryIndex ShopSelection();
+    Direction ShopDirection();
+    bool SetShopSelection(ObjectEntryIndex index);
+    void RotateShop();
     bool IsTreeToolActive();
     ObjectEntryIndex TreeSelection();
     bool SetTreeSelection(ObjectEntryIndex index);
@@ -35,6 +41,11 @@ namespace OpenRCT2::Ui::Windows
     void HandheldRideOpen(RideId ride);
     void HandheldPathOptionsOpen();
     void HandheldTreePickerOpen();
+    void HandheldShopPickerOpen();
+    bool HandheldObjectPickerIsOpen();
+    void HandheldObjectPickerMove(int x, int y);
+    void HandheldObjectPickerPause();
+    ObjectEntryIndex HandheldObjectPickerFocus();
     bool HandheldTreePickerIsOpen();
     void HandheldTreePickerMove(int x, int y);
     void HandheldTreePickerPause();
