@@ -6,6 +6,7 @@
 #include "ListFocus.h"
 #include "Panel.h"
 #include "Paths.h"
+#include "ResearchManagement.h"
 #include "SaveSlots.h"
 #include "ShopManagement.h"
 #include "Shops.h"
@@ -60,6 +61,8 @@ namespace OpenRCT2::Ui::Windows
         staffDismiss,
         guests,
         research,
+        researchEditor,
+        researchConfirm,
         ride,
         shop,
         shopPrices,
@@ -109,6 +112,7 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::ShopManagement::Target> _shop;
         std::optional<money64> _priceDraft;
         std::optional<Handheld::Finances::Draft> _financeDraft;
+        std::optional<Handheld::ResearchManagement::Draft> _researchDraft;
         std::vector<Handheld::StaffManagement::Target> _staffRoster;
         std::optional<Handheld::StaffManagement::Target> _staffTarget;
         StaffType _hireType = StaffType::handyman;
@@ -142,9 +146,22 @@ namespace OpenRCT2::Ui::Windows
         {
             return _page == Page::finances || _page == Page::financeEditor || _page == Page::financeConfirm;
         }
+        bool researchManagement() const
+        {
+            return _page == Page::research || _page == Page::researchEditor || _page == Page::researchConfirm;
+        }
+        Handheld::ManagementPresentation researchPresentation() const
+        {
+            using Handheld::ResearchManagement::View;
+            return Handheld::ResearchManagement::Presentation(
+                _page == Page::research             ? View::overview
+                    : _page == Page::researchEditor ? View::editor
+                                                    : View::confirmation,
+                _focus.index(), _researchDraft, _status);
+        }
         bool managementShell() const
         {
-            return _page == Page::dashboard || financeManagement() || staffManagement();
+            return _page == Page::dashboard || financeManagement() || staffManagement() || researchManagement();
         }
         bool shopManagement() const
         {
@@ -205,6 +222,10 @@ namespace OpenRCT2::Ui::Windows
                 _dashboard.section = Handheld::Dashboard::Section::staff;
             else if (next == Page::finances)
                 _dashboard.section = Handheld::Dashboard::Section::finances;
+            if (next == Page::research)
+                _dashboard.section = Handheld::Dashboard::Section::research;
+            if (next != Page::researchEditor && next != Page::researchConfirm)
+                _researchDraft.reset();
             if (next != Page::financeEditor && next != Page::financeConfirm)
                 _financeDraft.reset();
             _focus = {};
@@ -217,6 +238,8 @@ namespace OpenRCT2::Ui::Windows
             if (next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish
                 || next == Page::financeConfirm || next == Page::staffHire || next == Page::staffDismiss)
                 _focus.move(1, 2); // destructive confirmations default to Cancel
+            if (next == Page::researchConfirm)
+                _focus.move(static_cast<int32_t>(rows().size() - 1), rows().size());
             invalidate();
         }
         std::vector<std::string> rows() const
@@ -245,7 +268,9 @@ namespace OpenRCT2::Ui::Windows
                 case Page::guests:
                     return { "Back to dashboard" };
                 case Page::research:
-                    return { "Cycle research funding", "Back to dashboard" };
+                case Page::researchEditor:
+                case Page::researchConfirm:
+                    return researchPresentation().rows;
                 case Page::shop:
                     return { "Status", "Prices", "Demolish" };
                 case Page::shopPrices:
@@ -471,13 +496,14 @@ namespace OpenRCT2::Ui::Windows
         bool dashboardCanSwitch() const
         {
             return _page == Page::dashboard || _page == Page::finances || _page == Page::staff || _page == Page::staffInspect
-                || _page == Page::staffStats;
+                || _page == Page::staffStats || _page == Page::research;
         }
         void enterDashboardContent()
         {
             using Handheld::Dashboard::Section;
             const auto root = _dashboard.section == Section::staff ? std::optional<Page>{ Page::staff }
                 : _dashboard.section == Section::finances          ? std::optional<Page>{ Page::finances }
+                : _dashboard.section == Section::research          ? std::optional<Page>{ Page::research }
                                                                    : std::nullopt;
             if (!root || !_dashboard.enter())
                 return;
@@ -519,6 +545,17 @@ namespace OpenRCT2::Ui::Windows
                 if (y)
                 {
                     _dashboard.move(y);
+                    _status.clear();
+                    invalidate();
+                }
+            }
+            else if (researchManagement())
+            {
+                if (y)
+                    move(y);
+                if (x && _page == Page::researchEditor && _focus.index() == 0 && _researchDraft)
+                {
+                    Handheld::ResearchManagement::AdjustFunding(*_researchDraft, x);
                     _status.clear();
                     invalidate();
                 }
@@ -647,6 +684,12 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::staff:
                     page(Page::dashboard);
+                    break;
+                case Page::researchConfirm:
+                    page(Page::researchEditor);
+                    break;
+                case Page::researchEditor:
+                    page(Page::research);
                     break;
                 case Page::financeConfirm:
                     page(Page::financeEditor);
@@ -956,14 +999,52 @@ namespace OpenRCT2::Ui::Windows
                 case Page::research:
                     if (choice == 1)
                         page(Page::dashboard);
-                    else
+                    else if (
+                        Handheld::ResearchManagement::FundingAvailable() || Handheld::ResearchManagement::AvailableCategories())
                     {
-                        const auto& state = getGameState();
-                        auto action = GameActions::ParkSetResearchFundingAction(
-                            state.researchPriorities, (state.researchFundingLevel + 1) % 4);
-                        const auto result = GameActions::Execute(&action, getGameState());
-                        _status = result.error == GameActions::Status::ok ? "Funding change requested."
-                                                                          : result.getErrorMessage();
+                        _researchDraft = Handheld::ResearchManagement::Begin();
+                        page(Page::researchEditor);
+                    }
+                    break;
+                case Page::researchEditor:
+                    if (choice == 9)
+                        page(Page::research);
+                    else if (_researchDraft)
+                    {
+                        if (choice == 0)
+                        {
+                            Handheld::ResearchManagement::AdjustFunding(*_researchDraft, _researchDraft->funding == 3 ? -3 : 1);
+                            _status.clear();
+                        }
+                        else if (choice < 8)
+                        {
+                            Handheld::ResearchManagement::ToggleCategory(*_researchDraft, choice - 1);
+                            _status.clear();
+                        }
+                        else
+                        {
+                            const auto result = Handheld::ResearchManagement::Action(*_researchDraft, false);
+                            if (result.error == GameActions::Status::ok)
+                                page(Page::researchConfirm);
+                            else
+                                _status = Handheld::Finances::Feedback(result);
+                        }
+                        invalidate();
+                    }
+                    break;
+                case Page::researchConfirm:
+                    if (choice == 8)
+                        page(Page::research);
+                    else if (choice == 7 && _researchDraft)
+                    {
+                        const auto result = Handheld::ResearchManagement::Action(*_researchDraft, true);
+                        if (result.error == GameActions::Status::ok)
+                        {
+                            page(Page::research);
+                            _status = "Research settings requested";
+                        }
+                        else
+                            _status = Handheld::Finances::Feedback(result);
                         invalidate();
                     }
                     break;
@@ -1101,6 +1182,8 @@ namespace OpenRCT2::Ui::Windows
                     }
                     else if (_dashboard.section == Handheld::Dashboard::Section::finances)
                         model = Handheld::Finances::Presentation(Handheld::Finances::View::overview, 0);
+                    else if (_dashboard.section == Handheld::Dashboard::Section::research)
+                        model = Handheld::ResearchManagement::Presentation(Handheld::ResearchManagement::View::overview, 0);
                     else
                         model = Handheld::Dashboard::Unavailable(_dashboard.section);
                     if (!_status.empty())
@@ -1108,6 +1191,8 @@ namespace OpenRCT2::Ui::Windows
                 }
                 else if (staffManagement())
                     model = staffPresentation();
+                else if (researchManagement())
+                    model = researchPresentation();
                 else
                 {
                     using Handheld::Finances::View;

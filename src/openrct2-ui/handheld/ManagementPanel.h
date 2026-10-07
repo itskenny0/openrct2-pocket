@@ -16,6 +16,7 @@ namespace OpenRCT2::Ui::Handheld
         size_t selected{};
         std::optional<size_t> highlightedStat;
         std::string status;
+        std::string primaryAction;
         bool editing{};
         bool confirmation{};
     };

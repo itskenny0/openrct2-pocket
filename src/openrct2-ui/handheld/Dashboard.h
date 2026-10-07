@@ -25,7 +25,7 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
     inline constexpr std::array kCategories{
         Category{ Section::overview, "Overview", false },  Category{ Section::rides, "Rides", false },
         Category{ Section::guests, "Guests", false },      Category{ Section::staff, "Staff", true },
-        Category{ Section::finances, "Finances", true },   Category{ Section::research, "Research", false },
+        Category{ Section::finances, "Finances", true },   Category{ Section::research, "Research", true },
         Category{ Section::marketing, "Marketing", false }
     };
     enum class Focus
@@ -65,7 +65,7 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         model.breadcrumb = "Park management";
         model.title = kCategories[static_cast<size_t>(section)].name;
         model.stats = { { "Availability", "Not implemented" } };
-        model.status = "Choose Staff or Finances";
+        model.status = "Choose an available section";
         return model;
     }
     inline void Draw(
@@ -111,10 +111,11 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         DrawCommand(rt, { 10, y }, 38, "D-pad", model.editing && state.focus == Focus::content ? "Adjust" : "Choose");
         DrawCommand(
             rt, { 154, y }, 17, "A",
-            state.focus == Focus::rail ? "Enter"
-                : model.editing        ? "Review"
-                : model.confirmation   ? "Confirm"
-                                       : "Select");
+            state.focus == Focus::rail         ? "Enter"
+                : !model.primaryAction.empty() ? model.primaryAction.c_str()
+                : model.editing                ? "Review"
+                : model.confirmation           ? "Confirm"
+                                               : "Select");
         DrawCommand(rt, { 272, y }, 17, "B", state.focus == Focus::rail ? "Park" : "Back");
         DrawCommand(rt, { 386, y }, sectionRoot ? 28 : 44, sectionRoot ? "SEL" : "START", sectionRoot ? "Pane" : "Menu");
     }

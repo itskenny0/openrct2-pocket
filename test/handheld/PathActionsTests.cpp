@@ -10,6 +10,7 @@
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/Finances.h>
 #include <openrct2-ui/handheld/Paths.h>
+#include <openrct2-ui/handheld/ResearchManagement.h>
 #include <openrct2-ui/handheld/SceneryRemoval.h>
 #include <openrct2-ui/handheld/ShopManagement.h>
 #include <openrct2-ui/handheld/Shops.h>
@@ -2064,6 +2065,233 @@ static void TestStaff(IContext& context, const std::string& profile, bool realUi
                  "save-reload passed\n";
 }
 
+static void TestResearchManagement(IContext& context, const std::string& profile, bool realUi)
+{
+    namespace R = Ui::Handheld::ResearchManagement;
+    namespace H = Ui::Handheld;
+    namespace W = Ui::Windows;
+    auto& state = getGameState();
+    auto& park = state.park;
+    const auto original = profile + "/research-original.park";
+    SaveFlags flags{};
+    flags.set(SaveFlag::exportObjects);
+    Require(ScenarioSave(state, original, flags) != 0, "Research original save failed");
+    // Integration fixture only: loaded shop becomes the sole native research item.
+    // Production never inserts research items or changes invention flags directly.
+    const auto entries = H::Shops::Entries();
+    Require(!entries.empty(), "Research loaded shop fixture missing");
+    const auto index = entries.front().identity.index;
+    const auto type = ShopPlacement::Type(index);
+    state.researchItemsUninvented = { ResearchItem(
+        OpenRCT2::Research::EntryType::ride, index, type, ResearchCategory::shop, RESEARCH_ENTRY_FLAG_FIRST_OF_TYPE) };
+    state.researchItemsInvented.clear();
+    state.researchNextItem.reset();
+    state.researchLastItem.reset();
+    state.researchProgressStage = RESEARCH_STAGE_INITIAL_RESEARCH;
+    state.researchProgress = 0;
+    state.researchExpectedDay = 255;
+    state.researchFundingLevel = 1;
+    state.researchPriorities = 0xA0; // Preserve unsupported bit 7 through the draft.
+    park.flags.unset(ParkFlag::noMoney);
+    // Keep the fixture a complete native research list: load repairs omitted loaded
+    // objects. Mark only missing entries researched, preserving the pending shop.
+    state.researchProgressStage = RESEARCH_STAGE_FINISHED_ALL;
+    ResearchFix();
+    state.researchProgressStage = RESEARCH_STAGE_INITIAL_RESEARCH;
+    Require(!H::Shops::Eligible(index), "Unresearched shop leaked into picker");
+    const auto cash = park.cash;
+    std::array<std::array<money64, static_cast<size_t>(ExpenditureType::count)>, kExpenditureTableMonthCount> ledger{};
+    for (size_t month = 0; month < ledger.size(); ++month)
+        std::copy(std::begin(park.expenditureTable[month]), std::end(park.expenditureTable[month]), ledger[month].begin());
+    auto ledgerUnchanged = [&] {
+        for (size_t month = 0; month < ledger.size(); ++month)
+            if (!std::equal(ledger[month].begin(), ledger[month].end(), std::begin(park.expenditureTable[month])))
+                return false;
+        return true;
+    };
+    auto draft = R::Begin();
+    R::AdjustFunding(draft, 100);
+    Require(draft.funding == 3, "Research upper bound failed");
+    R::AdjustFunding(draft, -100);
+    Require(draft.funding == 0, "Research lower bound failed");
+    R::AdjustFunding(draft, 3);
+    R::ToggleCategory(draft, 5);
+    R::ToggleCategory(draft, 0);
+    Require(
+        draft.priorities == 0x80 && R::AvailableCategories() == 0x20, "Category availability/unknown bit preservation failed");
+    Require(
+        R::Action(draft, false).error == GameActions::Status::ok && park.cash == cash && state.researchFundingLevel == 1,
+        "Research query mutated state");
+    auto invalid = draft;
+    invalid.funding = 4;
+    Require(R::Action(invalid, true).error != GameActions::Status::ok, "Invalid funding accepted");
+    const auto pendingItems = state.researchItemsUninvented;
+    state.researchItemsUninvented.clear();
+    Require(R::Action(draft, true).error != GameActions::Status::ok, "Stale completed priority category accepted");
+    state.researchItemsUninvented = pendingItems;
+    invalid = draft;
+    invalid.priorities ^= 1;
+    Require(R::Action(invalid, true).error != GameActions::Status::ok, "Completed category draft accepted");
+    state.researchPriorities ^= 0x20;
+    Require(R::Action(draft, true).error != GameActions::Status::ok, "Stale priorities accepted");
+    state.researchPriorities ^= 0x20;
+    state.researchFundingLevel = 2;
+    Require(R::Action(draft, true).error != GameActions::Status::ok, "Stale funding accepted");
+    state.researchFundingLevel = 1;
+    park.flags.set(ParkFlag::noMoney);
+    Require(
+        !R::FundingAvailable() && R::Action(draft, true).error != GameActions::Status::ok, "No-money funding edit accepted");
+    auto prioritiesOnly = R::Begin();
+    R::ToggleCategory(prioritiesOnly, 5);
+    Require(R::Action(prioritiesOnly, false).error == GameActions::Status::ok, "No-money priority query rejected");
+    Require(R::Action(prioritiesOnly, true).error == GameActions::Status::ok, "No-money priority submit rejected");
+    GameActions::ProcessQueue(state);
+    Require(state.researchPriorities == 0x80 && park.cash == cash, "No-money priority action changed cash/failed");
+    prioritiesOnly = R::Begin();
+    R::ToggleCategory(prioritiesOnly, 5);
+    Require(R::Action(prioritiesOnly, true).error == GameActions::Status::ok, "No-money priority restore rejected");
+    GameActions::ProcessQueue(state);
+    const auto beforeNoMoney = park.cash;
+    FinancePayResearch();
+    Require(park.cash == beforeNoMoney, "No-money research charged cash");
+    state.researchFundingLevel = 0;
+    state.currentTicks += (32 - state.currentTicks % 32) % 32;
+    ResearchUpdate();
+    Require(state.researchProgress > 0, "Native no-money automatic research stopped");
+    state.researchProgress = 0;
+    state.researchFundingLevel = 1;
+    park.flags.unset(ParkFlag::noMoney);
+    if (realUi)
+    {
+        H::ControllerInput input;
+        auto press = [&](H::Action value) {
+            H::Frame frame;
+            frame.actions = { value, value }; // One semantic action only, never spill into new page.
+            Require(H::HandleMenuInput(input, frame), "Research input unhandled");
+        };
+        W::HandheldDashboardOpen();
+        W::HandheldDashboardMove(0, 1);
+        press(H::Action::confirm);
+        Require(!W::HandheldDashboardRailFocused(), "Research rail did not enter content");
+        press(H::Action::openBuild);
+        Require(W::HandheldDashboardRailFocused(), "Research content did not switch to rail");
+        press(H::Action::confirm);
+        press(H::Action::confirm); // Editor only; duplicated action cannot change funding.
+        Require(state.researchFundingLevel == 1, "Research selecting A spilled into editor");
+        W::HandheldDashboardMove(1, 0);
+        press(H::Action::openBuild);
+        Require(!W::HandheldDashboardRailFocused(), "Select escaped research draft");
+        W::HandheldDashboardMove(0, 6);
+        press(H::Action::confirm); // Toggle shop priority in draft only.
+        W::HandheldDashboardMove(0, 2);
+        press(H::Action::confirm); // Review, defaults to Cancel.
+        press(H::Action::openBuild);
+        Require(!W::HandheldDashboardRailFocused(), "Select escaped research confirmation");
+        press(H::Action::back); // Keep draft, return editor.
+        W::HandheldDashboardMove(0, 8);
+        press(H::Action::confirm);
+        press(H::Action::confirm); // Safe Cancel discards draft.
+        Require(
+            state.researchFundingLevel == 1 && state.researchPriorities == 0xA0 && park.cash == cash,
+            "Research cancellation applied draft");
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(1, 0);
+        W::HandheldDashboardMove(0, 6);
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(0, 2);
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(0, -1);
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Require(
+            state.researchFundingLevel == 2 && state.researchPriorities == 0x80 && park.cash == cash,
+            "Confirmed research settings did not apply exactly once");
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(1, 0);
+        state.researchFundingLevel = 1; // Native/external change makes draft stale.
+        W::HandheldDashboardMove(0, 8);
+        press(H::Action::confirm);
+        press(H::Action::openBuild);
+        Require(
+            !W::HandheldDashboardRailFocused() && state.researchFundingLevel == 1, "Stale UI research draft escaped/applied");
+        press(H::Action::openMenu); // Start drops draft into existing pause/save menu.
+        Require(!W::HandheldDashboardIsOpen(), "Research Start did not leave shell");
+        press(H::Action::back);
+        Require(!gGamePaused && park.cash == cash, "Research pause ownership leaked");
+    }
+    draft = R::Begin();
+    R::AdjustFunding(draft, 2);
+    if (draft.priorities & 0x20)
+        R::ToggleCategory(draft, 5); // All supported priorities off: native fallback still selects the pending shop.
+    Require(R::Action(draft, true).error == GameActions::Status::ok, "Research commit failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        state.researchFundingLevel == 3 && state.researchPriorities == 0x80 && park.cash == cash && ledgerUnchanged(),
+        "Funding action invented upfront charge/ledger entry");
+    FinancePayResearch();
+    Require(
+        park.cash == cash - kResearchCosts[3] / 4
+            && park.expenditureTable[0][static_cast<size_t>(ExpenditureType::research)]
+                == ledger[0][static_cast<size_t>(ExpenditureType::research)] - kResearchCosts[3] / 4,
+        "Native recurring research payment incorrect");
+    const auto activeSave = profile + "/research-active.park";
+    Require(ScenarioSave(state, activeSave, flags) != 0, "Active research save failed");
+    if (realUi)
+    {
+        W::HandheldDashboardOpen();
+        W::HandheldDashboardMove(0, 1);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuConfirm();
+        W::HandheldDashboardMove(-1, 0); // Draft only, actual funding remains maximum.
+    }
+    Require(context.LoadParkFromFile(activeSave), "Active research reload failed");
+    Require(
+        state.researchFundingLevel == 3 && state.researchPriorities == 0x80 && park.cash == cash - kResearchCosts[3] / 4
+            && (!realUi || !W::HandheldDashboardIsOpen()),
+        "Active draft leaked through save/load");
+    state.currentTicks += (32 - state.currentTicks % 32) % 32;
+    // Run native progression, not ResearchFinishItem/manual invention shortcuts.
+    for (int updates = 0; updates < 1000 && !RideEntryIsInvented(index); ++updates)
+    {
+        state.currentTicks += 32;
+        ResearchUpdate();
+    }
+    Require(RideEntryIsInvented(index) && H::Shops::Eligible(index), "Native research unlock absent from shop picker");
+    for (int updates = 0; updates < 500 && state.researchProgressStage != RESEARCH_STAGE_FINISHED_ALL; ++updates)
+    {
+        state.currentTicks += 32;
+        ResearchUpdate();
+        GameActions::ProcessQueue(state);
+    }
+    Require(
+        state.researchProgressStage == RESEARCH_STAGE_FINISHED_ALL && !R::FundingAvailable(),
+        "Native research completion not respected");
+    Require(
+        R::Presentation(R::View::overview, 0).stats[0].second == "All research completed",
+        "Completed research presentation fabricated project");
+    const auto savedCash = park.cash;
+    const auto savedFunding = state.researchFundingLevel;
+    const auto savedPriorities = state.researchPriorities;
+    const auto roundtrip = profile + "/research-roundtrip.park";
+    Require(ScenarioSave(state, roundtrip, flags) != 0, "Research save failed");
+    if (realUi)
+    {
+        W::HandheldDashboardOpen();
+        W::HandheldDashboardMove(0, 1);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuConfirm(); // Completed research cannot open an unavailable editor.
+    }
+    Require(context.LoadParkFromFile(roundtrip), "Research reload failed");
+    Require(
+        state.researchFundingLevel == savedFunding && state.researchPriorities == savedPriorities && park.cash == savedCash
+            && H::Shops::Eligible(index) && (!realUi || !W::HandheldDashboardIsOpen()),
+        "Research save/reload state changed");
+    Require(context.LoadParkFromFile(original), "Research test restoration failed");
+    gGamePaused = 0;
+    std::cout << "Native Research / bounded-stale-drafts / cancel-focus-input / no-money-exact-recurring-cost / "
+                 "progression-picker-unlock / save-reload passed\n";
+}
+
 static void TestDashboard(IContext& context, const std::string& profile, bool realUi)
 {
     namespace D = Ui::Handheld::Dashboard;
@@ -2075,11 +2303,11 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
     Require(
         navigation.section == D::Section::finances && navigation.focus == D::Focus::rail,
         "Dashboard default section/focus wrong");
-    navigation.move(1);
+    navigation.move(2);
     Require(
-        navigation.section == D::Section::research && !navigation.enter() && navigation.focus == D::Focus::rail,
+        navigation.section == D::Section::marketing && !navigation.enter() && navigation.focus == D::Focus::rail,
         "Unavailable section entered");
-    navigation.move(-2);
+    navigation.move(-3);
     Require(navigation.section == D::Section::staff && navigation.enter(), "Staff rail route missing");
     navigation.move(7);
     Require(navigation.section == D::Section::staff, "Rail wrap failed");
@@ -2102,14 +2330,14 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
     Require(
         W::HandheldDashboardIsOpen() && W::HandheldDashboardRailFocused() && gGamePaused,
         "Dashboard open did not own pause/rail");
-    W::HandheldDashboardMove(0, 1); // Research is explicitly unavailable
+    W::HandheldDashboardMove(0, 2); // Marketing is explicitly unavailable
     action(H::Action::confirm);
     action(H::Action::openBuild);
     Require(
         W::HandheldDashboardRailFocused() && !W::HandheldFinancesIsOpen() && !W::HandheldStaffIsOpen(),
         "Unavailable category acquired content focus");
     Require(park.cash == cash && S::Roster() == roster, "Unavailable category changed native state");
-    W::HandheldDashboardMove(0, -1);
+    W::HandheldDashboardMove(0, -2);
     action(H::Action::openBuild); // Select enters Finances
     Require(!W::HandheldDashboardRailFocused() && W::HandheldFinancesIsOpen(), "Rail -> Finances focus failed");
     action(H::Action::openBuild);
@@ -2595,6 +2823,7 @@ int main(int argc, char** argv)
         TestFinances(*context, argv[2], argc == 4);
         TestStaff(*context, argv[2], argc == 4);
         TestDashboard(*context, argv[2], argc == 4);
+        TestResearchManagement(*context, argv[2], argc == 4);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;
