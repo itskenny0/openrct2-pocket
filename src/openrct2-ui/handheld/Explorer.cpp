@@ -7,6 +7,7 @@
 
 #include "ControllerInput.h"
 #include "Panel.h"
+#include "Paths.h"
 
 #include <SDL_timer.h>
 #include <iomanip>
@@ -45,6 +46,7 @@ namespace OpenRCT2::Ui::Handheld
 
     void BeginTerrain(bool raise)
     {
+        Paths::End();
         _terrainActive = true;
         _raiseLand = raise;
         _terrainStatus.clear();
@@ -65,6 +67,7 @@ namespace OpenRCT2::Ui::Handheld
     void EndTerrain()
     {
         _terrainActive = false;
+        Paths::End();
         _terrainStatus.clear();
         ClearTerrainSelection();
     }
@@ -171,7 +174,7 @@ namespace OpenRCT2::Ui::Handheld
         // A separate small input-transparent window redraws only the tool panel,
         // rather than placing a full-screen overlay over the scrolling viewport.
         auto* tools = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 1 });
-        if (_terrainActive)
+        if (_terrainActive || Paths::IsActive())
         {
             if (tools == nullptr)
             {
@@ -191,11 +194,16 @@ namespace OpenRCT2::Ui::Handheld
     void UpdateExplorer(ControllerInput& input)
     {
         if (gLegacyScene != LegacyScene::playing)
-            _terrainActive = false;
-        ClearTerrainSelection();
-        if (_terrainActive && CanExplore())
         {
-            auto coords = ScreenGetMapXY(Centre(), nullptr);
+            _terrainActive = false;
+            Paths::End();
+        }
+        ClearTerrainSelection();
+        if ((_terrainActive || Paths::IsActive()) && CanExplore())
+        {
+            if (Paths::IsActive())
+                Paths::UpdateTarget(Centre());
+            auto coords = Paths::IsActive() ? Paths::TargetTile() : ScreenGetMapXY(Centre(), nullptr);
             if (coords)
             {
                 _terrainTile = CoordsXY{ coords->x & ~31, coords->y & ~31 };
@@ -293,10 +301,9 @@ namespace OpenRCT2::Ui::Handheld
                     Invoke(ShortcutId::kInterfaceCancelConstruction);
                 else if (wm->FindByClass(WindowClass::dropdown) != nullptr)
                     wm->CloseByClass(WindowClass::dropdown);
-                else if (_terrainActive && CanExplore())
+                else if ((_terrainActive || Paths::IsActive()) && CanExplore())
                 {
-                    _terrainActive = false;
-                    ClearTerrainSelection();
+                    EndTerrain();
                 }
                 else
                     wm->CloseTop();
@@ -307,8 +314,7 @@ namespace OpenRCT2::Ui::Handheld
             }
             else if (action == Action::openBuild && CanExplore())
             {
-                _terrainActive = false;
-                ClearTerrainSelection();
+                EndTerrain();
                 Windows::HandheldBuildOpen();
             }
             else if (CanExplore())
@@ -316,7 +322,13 @@ namespace OpenRCT2::Ui::Handheld
                 switch (action)
                 {
                     case Action::confirm:
-                        if (_terrainActive)
+                        if (Paths::IsActive())
+                        {
+                            const auto result = Paths::Action(true);
+                            _terrainStatus = result.error == GameActions::Status::ok ? "Path updated."
+                                                                                     : result.getErrorMessage();
+                        }
+                        else if (_terrainActive)
                         {
                             if (_terrainTile)
                             {
@@ -329,6 +341,12 @@ namespace OpenRCT2::Ui::Handheld
                             ViewportInteractionLeftClick(Centre());
                         break;
                     case Action::contextPrimary:
+                        if (Paths::IsActive())
+                        {
+                            Paths::ToggleRemove();
+                            _terrainStatus.clear();
+                            break;
+                        }
                         Invoke(ShortcutId::kViewGeneralRotateClockwise);
                         break;
                     case Action::previousOption:
@@ -338,6 +356,12 @@ namespace OpenRCT2::Ui::Handheld
                         Windows::MainWindowZoom(true, false);
                         break;
                     case Action::contextSecondary:
+                        if (Paths::IsActive())
+                        {
+                            Paths::CycleSurface();
+                            _terrainStatus.clear();
+                            break;
+                        }
                         if (_terrainActive)
                         {
                             _raiseLand = !_raiseLand;
@@ -392,9 +416,29 @@ namespace OpenRCT2::Ui::Handheld
             if (!_terrainStatus.empty())
                 status = _terrainStatus;
         }
-        if (_terrainActive)
-            DrawTerrainOverlay(rt, { 8, 52 }, _raiseLand);
-        DrawGameplayFooter(rt, { ContextGetWidth(), height }, status, _terrainActive);
+        if (Paths::IsActive())
+        {
+            const auto result = Paths::Action(false);
+            status = Paths::IsRemoving() ? "REMOVE PATH" : "PLACE PATH";
+            if (result.error == GameActions::Status::ok)
+            {
+                std::ostringstream cost;
+                cost << "  Cost: $" << std::fixed << std::setprecision(2) << result.cost / 100.0;
+                status += cost.str();
+            }
+            else
+                status = result.getErrorMessage();
+            if (!_terrainStatus.empty())
+                status = _terrainStatus;
+            DrawPathOverlay(rt, { 8, 52 }, Paths::SurfaceName(), Paths::IsQueue(), Paths::IsRemoving());
+            DrawPathFooter(rt, { ContextGetWidth(), height }, status);
+        }
+        else
+        {
+            if (_terrainActive)
+                DrawTerrainOverlay(rt, { 8, 52 }, _raiseLand);
+            DrawGameplayFooter(rt, { ContextGetWidth(), height }, status, _terrainActive);
+        }
         // High contrast, fixed map focus; this does not move the desktop pointer.
         DrawMapFocus(rt, c);
     }

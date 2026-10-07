@@ -257,6 +257,35 @@ namespace OpenRCT2::Ui::Handheld
         DrawModernEllipsised(rt, { 8, screen.height - 31 }, screen.width - 16, "{YELLOW}" + status, { Drawing::Colour::white });
     }
 
+    inline void DrawPathOverlay(
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& surface, bool queue, bool remove)
+    {
+        Window w;
+        w.windowPos = pos;
+        w.width = kTerrainOverlaySize.width;
+        w.height = kTerrainOverlaySize.height;
+        DrawPanelHeading(rt, w, "Paths");
+        DrawIconRow(
+            rt, pos + ScreenCoordsXY{ 10, 44 }, w.width - 20,
+            remove      ? "Remove path"
+                : queue ? "Queue path"
+                        : "Normal path",
+            true, remove ? PanelIcon::back : PanelIcon::folder);
+        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 13, 82 }, w.width - 26, surface, { Drawing::Colour::white });
+        DrawModernText(rt, pos + ScreenCoordsXY{ 13, 107 }, "Follows terrain slope", { Drawing::Colour::white });
+        DrawCommand(rt, pos + ScreenCoordsXY{ 13, 139 }, 17, "Y", "Change surface");
+    }
+    inline void DrawPathFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::string& status)
+    {
+        DrawSurface(rt, { 0, screen.height - 34 }, { screen.width, 34 });
+        DrawModernEllipsised(rt, { 8, screen.height - 31 }, screen.width - 16, "{YELLOW}" + status, { Drawing::Colour::white });
+        const auto y = screen.height - 19;
+        DrawCommand(rt, { 8, y }, 17, "A", "Apply");
+        DrawCommand(rt, { 104, y }, 17, "X", "Place/remove");
+        DrawCommand(rt, { 258, y }, 17, "B", "Done");
+        DrawCommand(rt, { 369, y }, 38, "D-pad", "Move");
+    }
+
     inline void DrawMapFocus(Drawing::RenderTarget& rt, ScreenCoordsXY centre)
     {
         GfxDrawLine(rt, { centre + ScreenCoordsXY{ -7, -1 }, centre + ScreenCoordsXY{ 7, -1 } }, Drawing::PaletteIndex::pi10);

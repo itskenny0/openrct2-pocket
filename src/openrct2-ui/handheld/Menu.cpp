@@ -2,6 +2,7 @@
 #include "Explorer.h"
 #include "ListFocus.h"
 #include "Panel.h"
+#include "Paths.h"
 #include "SaveSlots.h"
 
 #include <filesystem>
@@ -27,6 +28,7 @@ namespace OpenRCT2::Ui::Windows
     {
         park,
         build,
+        paths,
         save,
         load,
         overwrite,
@@ -77,7 +79,9 @@ namespace OpenRCT2::Ui::Windows
                 case Page::park:
                     return { "Resume park", "Build", "Save park", "Save and exit", "Load park", "Exit without saving" };
                 case Page::build:
-                    return { "Raise land", "Lower land", "Back to park" };
+                    return { "Raise land", "Lower land", "Paths", "Back to park" };
+                case Page::paths:
+                    return { "Normal path", "Queue path", "Remove path", "Back to build" };
                 case Page::save:
                 case Page::load:
                 {
@@ -168,6 +172,9 @@ namespace OpenRCT2::Ui::Windows
         {
             switch (_page)
             {
+                case Page::paths:
+                    page(Page::build);
+                    break;
                 case Page::overwrite:
                     page(Page::save);
                     break;
@@ -219,9 +226,24 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::build:
-                    close();
-                    if (choice < 2)
-                        Handheld::BeginTerrain(choice == 0);
+                    if (choice == 2)
+                        page(Page::paths);
+                    else
+                    {
+                        close();
+                        if (choice < 2)
+                            Handheld::BeginTerrain(choice == 0);
+                    }
+                    break;
+                case Page::paths:
+                    if (choice == 3)
+                        page(Page::build);
+                    else
+                    {
+                        close();
+                        Handheld::EndTerrain();
+                        Handheld::Paths::Begin(choice == 1, choice == 2);
+                    }
                     break;
                 case Page::save:
                 {
@@ -281,8 +303,11 @@ namespace OpenRCT2::Ui::Windows
             const char* title = "PARK / PAUSE";
             switch (_page)
             {
+                case Page::paths:
+                    title = "PATHS";
+                    break;
                 case Page::build:
-                    title = "BUILD / TERRAIN";
+                    title = "BUILD";
                     break;
                 case Page::save:
                     title = _exitAfterSave ? "SAVE AND EXIT" : "SAVE PARK";
@@ -312,7 +337,8 @@ namespace OpenRCT2::Ui::Windows
                                 Handheld::PanelIcon::exit, Handheld::PanelIcon::folder,  Handheld::PanelIcon::exit };
             else if (_page == Page::build)
             {
-                model.icons = { Handheld::PanelIcon::raise, Handheld::PanelIcon::lower, Handheld::PanelIcon::back };
+                model.icons = { Handheld::PanelIcon::raise, Handheld::PanelIcon::lower, Handheld::PanelIcon::folder,
+                                Handheld::PanelIcon::back };
                 if (model.status.empty())
                     model.status = "Choose a tool, then edit in the park.";
             }
