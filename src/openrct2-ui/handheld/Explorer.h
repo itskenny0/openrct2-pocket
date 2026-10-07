@@ -39,6 +39,9 @@ namespace OpenRCT2::Ui::Handheld
 namespace OpenRCT2::Ui::Windows
 {
     void HandheldRideOpen(RideId ride);
+    bool HandheldShopManagementIsOpen();
+    void HandheldShopManagementMove(int x, int y);
+    void HandheldShopManagementPause();
     void HandheldPathOptionsOpen();
     void HandheldTreePickerOpen();
     void HandheldShopPickerOpen();

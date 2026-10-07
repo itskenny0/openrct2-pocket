@@ -9,6 +9,7 @@
 #include "Panel.h"
 #include "Paths.h"
 #include "SceneryRemoval.h"
+#include "ShopManagement.h"
 #include "Shops.h"
 #include "Surface.h"
 #include "Trees.h"
@@ -348,6 +349,8 @@ namespace OpenRCT2::Ui::Handheld
         {
             if (Windows::HandheldObjectPickerIsOpen())
                 Windows::HandheldObjectPickerMove(frame.navigateX, frame.navigateY);
+            else if (Windows::HandheldShopManagementIsOpen())
+                Windows::HandheldShopManagementMove(frame.navigateX, frame.navigateY);
             else if (frame.navigateY != 0)
                 Windows::HandheldMenuMove(frame.navigateY);
             for (const auto action : frame.actions)
@@ -356,6 +359,8 @@ namespace OpenRCT2::Ui::Handheld
                     Windows::HandheldMenuConfirm();
                 else if (action == Action::openMenu && Windows::HandheldObjectPickerIsOpen())
                     Windows::HandheldObjectPickerPause();
+                else if (action == Action::openMenu && Windows::HandheldShopManagementIsOpen())
+                    Windows::HandheldShopManagementPause();
                 else if (action == Action::back || action == Action::openMenu)
                     Windows::HandheldMenuBack();
                 input.suspend();
@@ -540,9 +545,15 @@ namespace OpenRCT2::Ui::Handheld
                         else
                         {
                             const auto info = GetMapCoordinatesFromPos(Centre(), { ViewportInteractionItem::ride });
-                            if (info.Element)
-                                Windows::HandheldRideOpen(info.Element->getRideIndex());
-                            else
+                            if (const auto shop = ShopManagement::FromInfo(info))
+                                Windows::HandheldRideOpen(shop->id);
+                            else if (info.Element && !info.Element->isGhost())
+                            {
+                                const auto* ride = GetRide(info.Element->getRideIndex());
+                                if (ride && !ride->getRideTypeDescriptor().flags.has(RtdFlag::isShopOrFacility))
+                                    Windows::HandheldRideOpen(ride->id);
+                            }
+                            else if (!info.Element || !info.Element->isGhost())
                                 ViewportInteractionLeftClick(Centre());
                         }
                         break;

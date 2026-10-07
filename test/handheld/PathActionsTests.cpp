@@ -9,6 +9,7 @@
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/SceneryRemoval.h>
+#include <openrct2-ui/handheld/ShopManagement.h>
 #include <openrct2-ui/handheld/Shops.h>
 #include <openrct2-ui/handheld/Surface.h>
 #include <openrct2-ui/handheld/TreePicker.h>
@@ -1189,6 +1190,279 @@ static void TestTreeGhost(IContext& context, const std::string& profile, bool re
            "menu-tool exit / exact real placement-cash / autosave-manual-save-reload checks passed\n";
 }
 
+static void TestShopManagement(IContext& context, const std::string& profile, bool realUi)
+{
+    namespace H = Ui::Handheld;
+    namespace M = H::ShopManagement;
+    namespace W = Ui::Windows;
+    auto& state = getGameState();
+    H::EndTerrain();
+    gGamePaused = 0;
+    auto& objects = context.GetObjectManager();
+    auto objectIndex = [&](const char* name) {
+        auto* object = objects.LoadObject(std::string("rct2.ride.") + name);
+        Require(object, "Management fixture object missing");
+        const auto index = objects.GetLoadedObjectEntryIndex(object);
+        ResearchInsertRideEntry(index, true);
+        RideEntrySetInvented(index);
+        RideTypeSetInvented(ShopPlacement::Type(index));
+        return index;
+    };
+    const auto burger = objectIndex("burgb"), kiosk = objectIndex("infok"), atm = objectIndex("atm1"),
+               toilet = objectIndex("tlt1");
+    auto place = [&](CoordsXY tile, ObjectEntryIndex object) {
+        MapGetSurfaceElementAt(tile)->setOwnership({ OwnershipFlag::landOwned });
+        Require(
+            H::Shops::Action(tile, object, 0, true).error == GameActions::Status::ok, "Management fixture placement failed");
+        GameActions::ProcessQueue(state);
+        const auto id = (*TileElementsView<TrackElement>(tile).begin())->getRideIndex();
+        const auto target = M::Capture(id);
+        Require(target.has_value() && M::Find(*target), "Real shop inspection target missing");
+        return *target;
+    };
+    const auto first = place({ 64, 352 }, burger), second = place({ 96, 352 }, burger);
+    const auto infoKiosk = place({ 128, 352 }, kiosk), otherKiosk = place({ 160, 352 }, kiosk);
+    const auto cashMachine = place({ 192, 352 }, atm);
+    const auto restroom = place({ 224, 352 }, toilet), otherRestroom = place({ 256, 352 }, toilet);
+    const auto cash = state.park.cash;
+    InteractionInfo hit;
+    hit.interactionType = ViewportInteractionItem::ride;
+    hit.Loc = first.location;
+    hit.Element = reinterpret_cast<TileElement*>(*TileElementsView<TrackElement>(first.location).begin());
+    Require(M::FromInfo(hit).has_value(), "Native shop hit rejected");
+    hit.Element->setGhost(true);
+    Require(!M::FromInfo(hit) && !M::Find(first), "Ghost accepted for inspection");
+    hit.Element->setGhost(false);
+    hit.interactionType = ViewportInteractionItem::terrain;
+    Require(!M::FromInfo(hit), "Non-ride target inspected");
+    Require(!M::Capture(RideId::GetNull()), "Invalid ride inspected");
+    auto stale = first;
+    stale.object = kiosk;
+    Require(
+        !M::Find(stale) && M::SetStatus(stale, false).error != GameActions::Status::ok
+            && M::SetPrice(stale, true, 100).error != GameActions::Status::ok
+            && M::Demolish(stale, true).error != GameActions::Status::ok,
+        "Stale identity accepted");
+    Require(M::Money(kMoney64Undefined) == "Unavailable", "Unavailable statistics disguised as zero");
+    Require(M::Prices(cashMachine).empty(), "Cash machine exposed phantom admission/product");
+    auto prices = M::Prices(first);
+    Require(prices.size() == 1 && prices[0].primary, "Burger price slots incorrect");
+    Require(M::Prices(infoKiosk).size() == 2, "Kiosk secondary price missing");
+    Require(
+        M::Prices(restroom).size() == 1 && M::Prices(restroom)[0].item == ShopItem::admission,
+        "Toilet native admission price missing");
+    state.park.samePriceThroughoutPark |= uint64_t{ 1 } << static_cast<int>(ShopItem::admission);
+    Require(M::SetPrice(restroom, true, 10).error == GameActions::Status::ok, "Toilet admission adjustment failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        GetRide(restroom.id)->price[0] == 10 && GetRide(otherRestroom.id)->price[0] == 10,
+        "Native toilet common admission rule bypassed");
+    Require(M::SetStatus(first, false).error == GameActions::Status::ok, "Native close failed");
+    GameActions::ProcessQueue(state);
+    Require(GetRide(first.id)->status == RideStatus::closed && state.park.cash == cash, "Closing charged money");
+    Require(M::SetStatus(first, true).error == GameActions::Status::ok, "Native open failed");
+    GameActions::ProcessQueue(state);
+    Require(GetRide(first.id)->status == RideStatus::open, "Opening did not persist");
+    state.park.samePriceThroughoutPark &= ~(uint64_t{ 1 } << static_cast<int>(prices[0].item));
+    const auto secondPrice = GetRide(second.id)->price[0];
+    Require(M::SetPrice(first, true, 170).error == GameActions::Status::ok, "Local price change failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        GetRide(first.id)->price[0] == 170 && GetRide(second.id)->price[0] == secondPrice, "Local price affected neighbour");
+    state.park.samePriceThroughoutPark |= uint64_t{ 1 } << static_cast<int>(prices[0].item);
+    Require(M::Prices(first)[0].shared, "Common price status not exposed");
+    Require(M::SetPrice(first, true, 190).error == GameActions::Status::ok, "Shared price change failed");
+    GameActions::ProcessQueue(state);
+    Require(GetRide(first.id)->price[0] == 190 && GetRide(second.id)->price[0] == 190, "Native common price not preserved");
+    const auto secondary = M::Prices(infoKiosk)[1];
+    state.park.samePriceThroughoutPark |= uint64_t{ 1 } << static_cast<int>(secondary.item);
+    Require(M::SetPrice(infoKiosk, false, 25).error == GameActions::Status::ok, "Secondary common price failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        GetRide(infoKiosk.id)->price[1] == 25 && GetRide(otherKiosk.id)->price[1] == 25,
+        "Secondary shared price not propagated");
+    Require(
+        M::SetPrice(first, true, kRideMaxPrice + 1).error != GameActions::Status::ok
+            && M::SetPrice(first, true, -1).error != GameActions::Status::ok
+            && M::SetPrice(first, false, 100).error != GameActions::Status::ok,
+        "Invalid/phantom price accepted");
+    Require(state.park.cash == cash, "Pricing spent or refunded money");
+    if (realUi)
+    {
+        H::ControllerInput input;
+        H::Frame frame;
+        SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+        Require(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) == 0, "Management controller init failed");
+        {
+            H::ControllerInput controller;
+            controller.update(true, 2000);
+            const auto device = SDL_JoystickAttachVirtual(
+                SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);
+            Require(device >= 0, "Management controller attach failed");
+            auto* joystick = SDL_JoystickOpen(device);
+            Require(joystick, "Management joystick missing");
+            auto pump = [&]() {
+                SDL_Event e;
+                while (SDL_PollEvent(&e))
+                    controller.handleEvent(e);
+            };
+            pump();
+            controller.update(true, 2010);
+            pump();
+            controller.update(true, 2020);
+            auto press = [&](bool down) {
+                Require(SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, down) == 0, "Management A failed");
+                SDL_JoystickUpdate();
+                pump();
+            };
+            W::HandheldRideOpen(first.id);
+            press(true);
+            auto actions = controller.update(true, 2030);
+            Require(actions.actions.size() == 1 && H::HandleMenuInput(controller, actions), "Management A not consumed");
+            GameActions::ProcessQueue(state);
+            Require(GetRide(first.id)->status == RideStatus::closed, "Management A did not close");
+            Require(controller.update(true, 2040).actions.empty(), "Held inspection A leaked");
+            press(false);
+            Require(controller.update(true, 2050).actions.empty(), "Inspection release triggered action");
+            press(true);
+            actions = controller.update(true, 2060);
+            Require(actions.actions.size() == 1 && H::HandleMenuInput(controller, actions), "Fresh A did not reopen");
+            GameActions::ProcessQueue(state);
+            Require(GetRide(first.id)->status == RideStatus::open, "Fresh status press failed");
+            press(false);
+            controller.update(true, 2070);
+            W::HandheldMenuMove(1);
+            W::HandheldMenuMove(1);
+            press(true);
+            actions = controller.update(true, 2080);
+            Require(H::HandleMenuInput(controller, actions), "Confirmation entry A failed");
+            Require(controller.update(true, 2090).actions.empty(), "Held confirmation-entry A leaked");
+            GameActions::ProcessQueue(state);
+            Require(M::Find(first) && state.park.cash == cash, "Confirmation entry demolished shop");
+            press(false);
+            Require(controller.update(true, 2100).actions.empty(), "Confirmation release demolished shop");
+            W::HandheldMenuBack();
+            W::HandheldMenuBack();
+            SDL_JoystickClose(joystick);
+            SDL_JoystickDetachVirtual(device);
+        }
+        W::HandheldRideOpen(first.id);
+        Require(W::HandheldShopManagementIsOpen() && !gGamePaused, "Inspection incorrectly paused native demolition");
+        frame.actions = { H::Action::confirm, H::Action::confirm };
+        Require(H::HandleMenuInput(input, frame), "Inspection did not consume A");
+        GameActions::ProcessQueue(state);
+        Require(GetRide(first.id)->status == RideStatus::closed, "Duplicate confirm toggled status twice");
+        W::HandheldShopManagementMove(0, 1);
+        W::HandheldMenuConfirm();
+        W::HandheldShopManagementMove(1, 0);
+        W::HandheldMenuBack();
+        Require(GetRide(first.id)->price[0] == 190, "Cancelled price draft applied");
+        W::HandheldMenuMove(1);
+        W::HandheldMenuConfirm();
+        for (int i = 0; i < 300; ++i)
+            W::HandheldShopManagementMove(1, 0);
+        W::HandheldMenuConfirm();
+        GameActions::ProcessQueue(state);
+        Require(
+            GetRide(first.id)->price[0] == kRideMaxPrice && GetRide(second.id)->price[0] == kRideMaxPrice,
+            "Controller price upper bound/common price failed");
+        for (int i = 0; i < 300; ++i)
+            W::HandheldShopManagementMove(-1, 0);
+        W::HandheldMenuConfirm();
+        GameActions::ProcessQueue(state);
+        Require(GetRide(first.id)->price[0] == kRideMinPrice, "Controller price lower bound failed");
+        W::HandheldMenuBack();
+        W::HandheldMenuMove(1);
+        W::HandheldMenuMove(1);
+        frame.actions = { H::Action::confirm, H::Action::confirm };
+        H::HandleMenuInput(input, frame);
+        GameActions::ProcessQueue(state);
+        Require(M::Find(first) && state.park.cash == cash, "Entering confirmation demolished shop");
+        W::HandheldMenuConfirm(); // Cancel is initially focused.
+        Require(M::Find(first) && state.park.cash == cash, "Default confirmation did not cancel");
+        W::HandheldMenuMove(1);
+        W::HandheldMenuMove(1);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuBack();
+        Require(M::Find(first), "B cancellation demolished shop");
+        frame.actions = { H::Action::openMenu };
+        H::HandleMenuInput(input, frame);
+        Require(!W::HandheldShopManagementIsOpen() && gGamePaused, "Management Start did not open pause");
+        W::HandheldMenuBack();
+        Require(!gGamePaused, "Management pause return lost prior pause state");
+        gGamePaused = 1;
+        W::HandheldRideOpen(first.id);
+        W::HandheldMenuBack();
+        Require(gGamePaused == 1, "Inspection unpaused an externally paused park");
+        gGamePaused = 0;
+        state.park.flags.set(ParkFlag::noMoney);
+        W::HandheldRideOpen(first.id);
+        W::HandheldMenuMove(1);
+        W::HandheldMenuConfirm();
+        W::HandheldShopManagementMove(1, 0);
+        W::HandheldMenuConfirm();
+        GameActions::ProcessQueue(state);
+        Require(GetRide(first.id)->price[0] == kRideMinPrice, "No-money park exposed editable prices");
+        W::HandheldMenuBack();
+        state.park.flags.unset(ParkFlag::noMoney);
+    }
+    GetRide(first.id)->flags.set(RideFlag::indestructible);
+    Require(M::Demolish(first, false).error != GameActions::Status::ok, "Protected shop demolition allowed");
+    GetRide(first.id)->flags.unset(RideFlag::indestructible);
+    gGamePaused = 1;
+    Require(M::Demolish(first, false).error == GameActions::Status::gamePaused, "Native demolition pause rule bypassed");
+    gGamePaused = 0;
+    SaveFlags flags{};
+    flags.set(SaveFlag::exportObjects);
+    const auto saved = profile + "/shop-management.park";
+    const auto storedPrice = GetRide(first.id)->price[0];
+    const auto storedStatus = GetRide(first.id)->status;
+    const auto common = state.park.samePriceThroughoutPark;
+    Require(ScenarioSave(state, saved, flags) != 0, "Management save failed");
+    if (realUi)
+        W::HandheldRideOpen(first.id);
+    Require(context.LoadParkFromFile(saved), "Management reload failed");
+    if (realUi)
+        Require(!W::HandheldShopManagementIsOpen(), "Park load retained stale inspection");
+    Require(
+        M::Find(first) && GetRide(first.id)->price[0] == storedPrice && GetRide(first.id)->status == storedStatus
+            && state.park.samePriceThroughoutPark == common && state.park.cash == cash,
+        "Management state not persisted");
+    gGamePaused = 0;
+    const auto refund = M::Demolish(first, false);
+    Require(
+        refund.error == GameActions::Status::ok && refund.cost < 0 && state.park.cash == cash,
+        "Native refund query missing or mutated cash");
+    if (realUi)
+    {
+        W::HandheldRideOpen(first.id);
+        W::HandheldMenuMove(1);
+        W::HandheldMenuMove(1);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuMove(-1);
+        H::ControllerInput input;
+        H::Frame frame;
+        frame.actions = { H::Action::confirm, H::Action::confirm };
+        H::HandleMenuInput(input, frame);
+        Require(!W::HandheldShopManagementIsOpen(), "Demolition kept active confirmation");
+    }
+    else
+        Require(M::Demolish(first, true).error == GameActions::Status::ok, "Native demolition failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        !M::Find(first) && !GetRide(first.id) && M::Find(second) && state.park.cash == cash - refund.cost,
+        "Demolition exact refund/target/neighbour safety failed");
+    Require(
+        M::SetStatus(first, true).error != GameActions::Status::ok
+            && M::SetPrice(first, true, 100).error != GameActions::Status::ok
+            && M::Demolish(first, true).error != GameActions::Status::ok,
+        "Removed target still actionable");
+    Require(ScenarioSave(state, saved, flags) != 0 && context.LoadParkFromFile(saved), "Demolition save/reload failed");
+    Require(!GetRide(first.id) && M::Find(second) && state.park.cash == cash - refund.cost, "Demolition/refund not persisted");
+    std::cout << "Native shop management / targeting-status-price-common-price-bounds / cancellation-input / exact refund / "
+                 "stale-pause / save-reload passed\n";
+}
+
 int main(int argc, char** argv)
 {
     try
@@ -1496,6 +1770,7 @@ int main(int argc, char** argv)
         TestTreePicker(argc == 4);
         TestTreeGhost(*context, argv[2], argc == 4);
         TestShops(*context, argv[2], argc == 4);
+        TestShopManagement(*context, argv[2], argc == 4);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;

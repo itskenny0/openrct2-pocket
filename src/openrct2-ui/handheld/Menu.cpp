@@ -4,6 +4,7 @@
 #include "Panel.h"
 #include "Paths.h"
 #include "SaveSlots.h"
+#include "ShopManagement.h"
 #include "Shops.h"
 #include "TreePicker.h"
 #include "Trees.h"
@@ -47,6 +48,9 @@ namespace OpenRCT2::Ui::Windows
         guests,
         research,
         ride,
+        shop,
+        shopPrices,
+        shopDemolish,
         save,
         load,
         overwrite,
@@ -71,6 +75,23 @@ namespace OpenRCT2::Ui::Windows
         size_t _slot{};
         std::string _status;
         RideId _rideId = RideId::GetNull();
+        std::optional<Handheld::ShopManagement::Target> _shop;
+        std::optional<money64> _priceDraft;
+        bool shopManagement() const
+        {
+            return _page == Page::shop || _page == Page::shopPrices || _page == Page::shopDemolish;
+        }
+        void pauseManagement()
+        {
+            if (!shopManagement())
+                return;
+            if (GameIsNotPaused())
+            {
+                PauseToggle();
+                _pausedHere = true;
+            }
+            page(Page::park);
+        }
         bool information() const
         {
             return _page == Page::overview || _page == Page::finances || _page == Page::guests || _page == Page::research
@@ -92,14 +113,14 @@ namespace OpenRCT2::Ui::Windows
             const ScreenSize target{ _page == Page::overwrite || _page == Page::discard || _page == Page::exit ? 330
                                                                                                                : size.width,
                                      size.height };
-            const ScreenSize bounds = (_page == Page::pathOptions || picker())
+            const ScreenSize bounds = (_page == Page::pathOptions || picker() || shopManagement())
                 ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
                 : information() ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 }
                                 : target;
             WindowSetResize(*this, bounds, bounds);
             WindowSetPosition(
                 *this,
-                (_page == Page::pathOptions || picker())
+                (_page == Page::pathOptions || picker() || shopManagement())
                     ? ScreenCoordsXY{ 0, 0 }
                     : ScreenCoordsXY{ 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
         }
@@ -109,8 +130,9 @@ namespace OpenRCT2::Ui::Windows
             _page = next;
             _focus = {};
             _status.clear();
+            _priceDraft.reset();
             layout();
-            if (next == Page::overwrite || next == Page::discard || next == Page::exit)
+            if (next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish)
                 _focus.move(1, 2); // destructive confirmations default to Cancel
             invalidate();
         }
@@ -129,6 +151,18 @@ namespace OpenRCT2::Ui::Windows
                     return { "Back to dashboard" };
                 case Page::research:
                     return { "Cycle research funding", "Back to dashboard" };
+                case Page::shop:
+                    return { "Status", "Prices", "Demolish" };
+                case Page::shopPrices:
+                {
+                    std::vector<std::string> result;
+                    if (_shop)
+                        for (const auto& price : Handheld::ShopManagement::Prices(*_shop))
+                            result.push_back(price.name);
+                    return result;
+                }
+                case Page::shopDemolish:
+                    return { "Demolish", "Cancel" };
                 case Page::ride:
                     return { "Open ride", "Close ride", "Back to park" };
                 case Page::build:
@@ -270,6 +304,13 @@ namespace OpenRCT2::Ui::Windows
         }
         void onUpdate() override
         {
+            if (shopManagement() && _shop && !Handheld::ShopManagement::Find(*_shop))
+            {
+                _shop.reset();
+                _priceDraft.reset();
+                _status = "Shop no longer available";
+                invalidate();
+            }
             if ((treePicker() && !Handheld::IsTreeToolActive())
                 || (_page == Page::shopPicker && !_shopPickerFromBuild && !Handheld::IsShopToolActive()))
                 close();
@@ -277,11 +318,46 @@ namespace OpenRCT2::Ui::Windows
         void openRide(RideId id)
         {
             _rideId = id;
-            page(Page::ride);
+            _shop = Handheld::ShopManagement::Capture(id);
+            const auto* ride = GetRide(id);
+            const bool isShop = ride && ride->getRideTypeDescriptor().flags.has(RtdFlag::isShopOrFacility);
+            if (isShop && _pausedHere && GameIsPaused())
+            {
+                // Keep a shop live; native demolition must obey actual pause rules.
+                PauseToggle();
+                _pausedHere = false;
+            }
+            page(isShop ? Page::shop : Page::ride);
         }
         void openLoad()
         {
             page(Page::load);
+        }
+        bool shopIsOpen() const
+        {
+            return shopManagement();
+        }
+        void shopMove(int x, int y)
+        {
+            if (!shopManagement())
+                return;
+            if (y != 0)
+            {
+                move(y);
+                _priceDraft.reset();
+            }
+            if (_page == Page::shopPrices && _shop && x != 0)
+            {
+                const auto prices = Handheld::ShopManagement::Prices(*_shop);
+                if (_focus.index() < prices.size())
+                    _priceDraft = std::clamp(
+                        _priceDraft.value_or(prices[_focus.index()].value) + x, kRideMinPrice, kRideMaxPrice);
+                invalidate();
+            }
+        }
+        void shopPause()
+        {
+            pauseManagement();
         }
         void move(int32_t direction)
         {
@@ -299,6 +375,11 @@ namespace OpenRCT2::Ui::Windows
                     else
                         close();
                     break;
+                case Page::shopPrices:
+                case Page::shopDemolish:
+                    page(Page::shop);
+                    break;
+                case Page::shop:
                 case Page::ride:
                 case Page::pathOptions:
                 case Page::treePicker:
@@ -475,6 +556,56 @@ namespace OpenRCT2::Ui::Windows
                         invalidate();
                     }
                     break;
+                case Page::shop:
+                    if (!_shop || !Handheld::ShopManagement::Find(*_shop))
+                        _status = "Shop no longer available";
+                    else if (choice == 1)
+                    {
+                        if (!getGameState().park.flags.has(ParkFlag::noMoney)
+                            && !Handheld::ShopManagement::Prices(*_shop).empty())
+                            page(Page::shopPrices);
+                    }
+                    else if (choice == 2)
+                        page(Page::shopDemolish);
+                    else
+                    {
+                        const auto result = Handheld::ShopManagement::SetStatus(
+                            *_shop, Handheld::ShopManagement::Find(*_shop)->status != RideStatus::open);
+                        _status = result.error == GameActions::Status::ok ? "Status change requested"
+                                                                          : result.getErrorMessage();
+                    }
+                    invalidate();
+                    break;
+                case Page::shopPrices:
+                    if (_shop)
+                    {
+                        const auto prices = Handheld::ShopManagement::Prices(*_shop);
+                        if (choice < prices.size() && _priceDraft)
+                        {
+                            const auto result = Handheld::ShopManagement::SetPrice(
+                                *_shop, prices[choice].primary, *_priceDraft);
+                            _status = result.error == GameActions::Status::ok ? "Price change requested"
+                                                                              : result.getErrorMessage();
+                            _priceDraft.reset();
+                        }
+                    }
+                    invalidate();
+                    break;
+                case Page::shopDemolish:
+                    if (choice == 1)
+                        page(Page::shop);
+                    else if (_shop)
+                    {
+                        const auto result = Handheld::ShopManagement::Demolish(*_shop, true);
+                        if (result.error == GameActions::Status::ok)
+                            close();
+                        else
+                        {
+                            _status = result.getErrorMessage();
+                            invalidate();
+                        }
+                    }
+                    break;
                 case Page::ride:
                     if (choice == 2)
                         close();
@@ -543,6 +674,17 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
+            if (shopManagement())
+            {
+                using Handheld::ShopManagement::View;
+                Handheld::ShopManagement::Draw(
+                    rt, { ContextGetWidth(), ContextGetHeight() }, _shop,
+                    _page == Page::shop             ? View::inspection
+                        : _page == Page::shopPrices ? View::prices
+                                                    : View::demolition,
+                    _focus.index(), _priceDraft, _status);
+                return;
+            }
             if (_page == Page::shopPicker)
             {
                 Handheld::DrawObjectPicker(
@@ -761,6 +903,21 @@ namespace OpenRCT2::Ui::Windows
 
 namespace OpenRCT2::Ui::Windows
 {
+    bool HandheldShopManagementIsOpen()
+    {
+        const auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window && static_cast<const HandheldMenuWindow*>(window)->shopIsOpen();
+    }
+    void HandheldShopManagementMove(int x, int y)
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            static_cast<HandheldMenuWindow*>(window)->shopMove(x, y);
+    }
+    void HandheldShopManagementPause()
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            static_cast<HandheldMenuWindow*>(window)->shopPause();
+    }
     void HandheldShopPickerOpen()
     {
         if (auto* window = OpenPanel())
