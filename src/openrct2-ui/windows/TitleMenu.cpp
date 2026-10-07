@@ -8,6 +8,7 @@
  *****************************************************************************/
 
 #include <openrct2-ui/handheld/ControllerInput.h>
+#include <openrct2-ui/handheld/Panel.h>
 #include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/interface/Window.h>
@@ -144,6 +145,25 @@ namespace OpenRCT2::Ui::Windows
             windowPos.x = (ContextGetWidth() - width) / 2;
             colours[1] = ColourWithFlags{ Drawing::Colour::lightOrange }.withFlag(ColourFlag::translucent, true);
 
+            if (Handheld::IsEnabled())
+            {
+                width = 328;
+                height = 210;
+                windowPos = { (ContextGetWidth() - width) / 2, ContextGetHeight() - height - 8 };
+                int32_t row = 0;
+                for (auto index : { WIDX_START_NEW_GAME, WIDX_CONTINUE_SAVED_GAME, WIDX_MULTIPLAYER, WIDX_GAME_TOOLS })
+                {
+                    if (widgets[index].isVisible())
+                    {
+                        auto& item = widgets[index];
+                        item.left = 10;
+                        item.right = width - 11;
+                        item.top = 46 + row * Handheld::kPanelRowPitch;
+                        item.bottom = item.top + 27;
+                        ++row;
+                    }
+                }
+            }
             initScrollWidgets();
         }
 
@@ -291,27 +311,26 @@ namespace OpenRCT2::Ui::Windows
 
         void onDraw(RenderTarget& rt) override
         {
-            Rectangle::filter(rt, _filterRect, FilterPaletteID::palette51);
-            drawWidgets(rt);
             if (Handheld::IsEnabled())
             {
-                const auto& widget = widgets[_handheldSelection];
-                const auto left = windowPos.x + widget.left;
-                const auto right = windowPos.x + widget.right;
-                const auto top = windowPos.y + widget.top;
-                const auto bottom = windowPos.y + widget.bottom;
-                GfxDrawLine(rt, { { left, top }, { right, top } }, PaletteIndex::pi21);
-                GfxDrawLine(rt, { { left, bottom }, { right, bottom } }, PaletteIndex::pi21);
-                GfxDrawLine(rt, { { left, top }, { left, bottom } }, PaletteIndex::pi21);
-                GfxDrawLine(rt, { { right, top }, { right, bottom } }, PaletteIndex::pi21);
-                static constexpr const char* labels[] = { "New Park", "Load Park", "Multiplayer", "Game Tools" };
-                drawText(
-                    rt, { ContextGetWidth() / 2, bottom + 8 }, labels[_handheldSelection],
-                    { Colour::white, TextAlignment::centre });
-                drawText(
-                    rt, { ContextGetWidth() / 2, bottom + 24 }, "D-pad: Choose   A: Select   B: Exit",
-                    { Colour::white, TextAlignment::centre });
+                Handheld::DrawPanelHeading(rt, *this, "OPENRCT2 POCKET");
+                static constexpr const char* labels[] = { "New park", "Load saved park", "Multiplayer", "Game tools" };
+                int32_t row = 0;
+                for (auto index : { WIDX_START_NEW_GAME, WIDX_CONTINUE_SAVED_GAME, WIDX_MULTIPLAYER, WIDX_GAME_TOOLS })
+                {
+                    if (widgets[index].isVisible())
+                    {
+                        Handheld::DrawPanelRow(
+                            rt, *this, windowPos.y + 54 + row * Handheld::kPanelRowPitch, labels[index],
+                            _handheldSelection == index);
+                        ++row;
+                    }
+                }
+                Handheld::DrawPanelCommands(rt, *this, "Exit");
+                return;
             }
+            Rectangle::filter(rt, _filterRect, FilterPaletteID::palette51);
+            drawWidgets(rt);
         }
     };
 

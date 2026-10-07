@@ -10,6 +10,7 @@
 #include "../interface/Theme.h"
 
 #include <openrct2-ui/handheld/ControllerInput.h>
+#include <openrct2-ui/handheld/Panel.h>
 #include <openrct2-ui/interface/Objective.h>
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/interface/Window.h>
@@ -151,6 +152,8 @@ namespace OpenRCT2::Ui::Windows
             setWidgets(_scenarioSelectWidgets);
             if (Handheld::IsEnabled())
             {
+                colours[0] = ColourWithFlags{ Colour::darkBlue };
+                colours[1] = ColourWithFlags{ Colour::darkBlue };
                 widgets[WIDX_BACKGROUND].right = width - 1;
                 widgets[WIDX_BACKGROUND].bottom = height - 1;
                 widgets[WIDX_TITLEBAR].right = width - 2;
@@ -619,7 +622,8 @@ namespace OpenRCT2::Ui::Windows
 
         void onScrollDraw(int32_t scrollIndex, RenderTarget& rt) override
         {
-            auto paletteIndex = getColourMap(colours[1].colour).midLight;
+            auto paletteIndex = Handheld::IsEnabled() ? getColourMap(Colour::darkBlue).darkest
+                                                      : getColourMap(colours[1].colour).midLight;
             GfxClear(rt, paletteIndex);
 
             StringId highlighted_format = STR_WINDOW_COLOUR_2_STRINGID;
@@ -663,7 +667,13 @@ namespace OpenRCT2::Ui::Windows
                         bool isHighlighted = _highlightedScenario == scenario;
                         if (isHighlighted)
                         {
-                            Rectangle::filter(rt, { 0, y, width, y + scenarioItemHeight - 1 }, FilterPaletteID::paletteDarken1);
+                            if (Handheld::IsEnabled())
+                                Rectangle::fill(
+                                    rt, { 1, y, listWidth - 1, y + scenarioItemHeight - 2 },
+                                    getColourMap(Colour::yellow).light);
+                            else
+                                Rectangle::filter(
+                                    rt, { 0, y, width, y + scenarioItemHeight - 1 }, FilterPaletteID::paletteDarken1);
                         }
 
                         bool isCompleted = scenario->Highscore != nullptr;
@@ -680,9 +690,14 @@ namespace OpenRCT2::Ui::Windows
                         auto darkness = isDisabled ? TextDarkness::dark : TextDarkness::regular;
                         const auto scrollCentre = widgets[WIDX_SCENARIOLIST].width() / 2;
 
-                        drawText(
-                            rt, { scrollCentre, y + 1 }, format, ft,
-                            { colour, FontStyle::medium, TextAlignment::centre, darkness });
+                        if (Handheld::IsEnabled())
+                            drawTextEllipsised(
+                                rt, { 8, y + 5 }, listWidth - 16, scenario->Name,
+                                { isHighlighted ? Colour::black : Colour::white });
+                        else
+                            drawText(
+                                rt, { scrollCentre, y + 1 }, format, ft,
+                                { colour, FontStyle::medium, TextAlignment::centre, darkness });
 
                         // Check if scenario is completed
                         if (isCompleted)
@@ -931,6 +946,8 @@ namespace OpenRCT2::Ui::Windows
 
         static int32_t GetScenarioListItemSize()
         {
+            if (Handheld::IsEnabled())
+                return Handheld::kPanelRowPitch;
             if (!LocalisationService_UseTrueTypeFont())
                 return kTrueFontSize;
 

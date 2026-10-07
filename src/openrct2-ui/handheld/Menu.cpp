@@ -265,7 +265,6 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
-            drawWidgets(rt);
             const char* title = "PARK";
             switch (_page)
             {
@@ -290,13 +289,14 @@ namespace OpenRCT2::Ui::Windows
                 default:
                     break;
             }
-            drawText(rt, windowPos + ScreenCoordsXY{ 20, 27 }, title, { Colour::white });
+            Handheld::DrawPanelHeading(rt, *this, title);
             const auto labels = rows();
             for (size_t i = 0; i < labels.size(); ++i)
                 Handheld::DrawPanelRow(
-                    rt, *this, windowPos.y + 58 + static_cast<int32_t>(i) * 31, labels[i], i == _focus.index());
-            drawText(rt, windowPos + ScreenCoordsXY{ 16, 251 }, _status, { Colour::white });
-            drawText(rt, windowPos + ScreenCoordsXY{ 16, 280 }, "D-pad: Choose   A: Select   B: Back", { Colour::white });
+                    rt, *this, windowPos.y + 54 + static_cast<int32_t>(i) * Handheld::kPanelRowPitch, labels[i],
+                    i == _focus.index());
+            drawTextEllipsised(rt, windowPos + ScreenCoordsXY{ 16, 251 }, width - 32, _status, { Colour::white });
+            Handheld::DrawPanelCommands(rt, *this);
         }
     };
 

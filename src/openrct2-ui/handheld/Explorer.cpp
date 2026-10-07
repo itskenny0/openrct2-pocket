@@ -6,6 +6,7 @@
 #include "Explorer.h"
 
 #include "ControllerInput.h"
+#include "Panel.h"
 
 #include <SDL_timer.h>
 #include <iomanip>
@@ -352,10 +353,22 @@ namespace OpenRCT2::Ui::Handheld
         using namespace Drawing;
         const auto c = Centre();
         const auto height = ContextGetHeight();
-        Rectangle::fill(rt, { 0, height - 34, ContextGetWidth() - 1, height - 1 }, PaletteIndex::pi10);
-        const char* hints = _terrainActive ? "D-pad: Move   A: Edit   Y: Raise/Lower   B: Done"
-                                           : "A: Inspect   B: Back   Select: Build   Start: Park";
-        drawText(rt, { 8, height - 17 }, hints, { Colour::white });
+        DrawSurface(rt, { 0, height - 34 }, { ContextGetWidth(), 34 });
+        const auto hintY = height - 15;
+        if (_terrainActive)
+        {
+            DrawCommand(rt, { 8, hintY }, 17, "A", "Edit");
+            DrawCommand(rt, { 112, hintY }, 17, "Y", "Raise/lower");
+            DrawCommand(rt, { 264, hintY }, 17, "B", "Done");
+            DrawCommand(rt, { 376, hintY }, 38, "D-pad", "Move");
+        }
+        else
+        {
+            DrawCommand(rt, { 8, hintY }, 17, "A", "Inspect");
+            DrawCommand(rt, { 126, hintY }, 17, "B", "Back");
+            DrawCommand(rt, { 244, hintY }, 28, "SEL", "Build");
+            DrawCommand(rt, { 370, hintY }, 38, "START", "Park");
+        }
         std::string status = "L/R: Zoom   X: Rotate";
         if (_terrainActive)
         {
@@ -377,7 +390,7 @@ namespace OpenRCT2::Ui::Handheld
             if (!_terrainStatus.empty())
                 status = _terrainStatus;
         }
-        drawText(rt, { 8, height - 31 }, status, { Colour::yellow });
+        drawTextEllipsised(rt, { 8, height - 31 }, ContextGetWidth() - 16, status, { Colour::yellow });
         // High contrast, fixed map focus; this does not move the desktop pointer.
         GfxDrawLine(rt, { c + ScreenCoordsXY{ -7, -1 }, c + ScreenCoordsXY{ 7, -1 } }, PaletteIndex::pi10);
         GfxDrawLine(rt, { c + ScreenCoordsXY{ -7, 1 }, c + ScreenCoordsXY{ 7, 1 } }, PaletteIndex::pi10);
