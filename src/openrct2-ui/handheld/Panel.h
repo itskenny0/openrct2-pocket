@@ -277,6 +277,19 @@ namespace OpenRCT2::Ui::Handheld
         DrawModernText(rt, pos + ScreenCoordsXY{ 12, 153 }, "{MUTED}1 x 1");
     }
 
+    inline void DrawSurfaceOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& name)
+    {
+        using namespace Concept;
+        Box(rt, pos, { kRailWidth, 174 });
+        Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, "Land surface");
+        Section(rt, pos + ScreenCoordsXY{ 10, 35 }, "Surface");
+        Row(rt, pos + ScreenCoordsXY{ 8, 54 }, name, Icon::ground, true);
+        Rule(rt, pos + ScreenCoordsXY{ 8, 99 }, 148);
+        Section(rt, pos + ScreenCoordsXY{ 10, 109 }, "Brush");
+        DrawModernText(rt, pos + ScreenCoordsXY{ 12, 132 }, "Single tile");
+        DrawModernText(rt, pos + ScreenCoordsXY{ 12, 153 }, "{MUTED}1 x 1");
+    }
+
     inline void DrawActionStrip(Drawing::RenderTarget& rt, ScreenSize screen)
     {
         const ScreenCoordsXY p{ 0, screen.height - kActionStripHeight };
@@ -284,15 +297,16 @@ namespace OpenRCT2::Ui::Handheld
         Concept::Rule(rt, p, screen.width);
     }
 
-    inline void DrawGameplayFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::string&, bool terrain)
+    inline void DrawGameplayFooter(
+        Drawing::RenderTarget& rt, ScreenSize screen, const std::string&, bool terrain, bool surface = false)
     {
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;
         if (terrain)
         {
             DrawCommand(rt, { 12, y }, 38, "D-pad", "Move");
-            DrawCommand(rt, { 140, y }, 17, "A", "Edit");
-            DrawCommand(rt, { 268, y }, 17, "Y", "Tool");
+            DrawCommand(rt, { 140, y }, 17, "A", surface ? "Paint" : "Edit");
+            DrawCommand(rt, { 268, y }, 17, "Y", surface ? "Surface" : "Tool");
             DrawCommand(rt, { 396, y }, 17, "B", "Back");
         }
         else

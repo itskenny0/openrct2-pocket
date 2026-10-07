@@ -123,7 +123,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ride:
                     return { "Open ride", "Close ride", "Back to park" };
                 case Page::build:
-                    return { "Raise land", "Lower land", "Paths", "Water", "Back to park" };
+                    return { "Raise land", "Lower land", "Paths", "Water", "Surface", "Back to park" };
                 case Page::paths:
                     return { "Normal path", "Queue path", "Remove path", "Back to build" };
                 case Page::pathOptions:
@@ -305,6 +305,8 @@ namespace OpenRCT2::Ui::Windows
                             Handheld::BeginTerrain(choice == 0);
                         else if (choice == 3)
                             Handheld::BeginWater();
+                        else if (choice == 4)
+                            Handheld::BeginSurface();
                     }
                     break;
                 case Page::paths:
@@ -518,8 +520,8 @@ namespace OpenRCT2::Ui::Windows
                                 Handheld::PanelIcon::exit };
             else if (_page == Page::build)
             {
-                model.icons = { Handheld::PanelIcon::raise, Handheld::PanelIcon::lower, Handheld::PanelIcon::path,
-                                Handheld::PanelIcon::terrain, Handheld::PanelIcon::back };
+                model.icons = { Handheld::PanelIcon::raise,   Handheld::PanelIcon::lower,   Handheld::PanelIcon::path,
+                                Handheld::PanelIcon::terrain, Handheld::PanelIcon::terrain, Handheld::PanelIcon::back };
                 if (model.status.empty())
                     model.status = "Choose a tool, then edit in the park.";
             }

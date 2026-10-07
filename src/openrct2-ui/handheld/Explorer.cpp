@@ -8,6 +8,7 @@
 #include "ControllerInput.h"
 #include "Panel.h"
 #include "Paths.h"
+#include "Surface.h"
 #include "Water.h"
 
 #include <SDL_timer.h>
@@ -42,6 +43,8 @@ namespace OpenRCT2::Ui::Handheld
 {
     static bool _terrainActive{};
     static bool _waterTool{};
+    static bool _surfaceTool{};
+    static ObjectEntryIndex _surfaceIndex = kObjectEntryIndexNull;
     static bool _raiseLand = true;
     static bool _selectionOwned{};
     static std::optional<CoordsXY> _terrainTile;
@@ -52,6 +55,8 @@ namespace OpenRCT2::Ui::Handheld
         Paths::End();
         _terrainActive = true;
         _waterTool = false;
+        _surfaceTool = false;
+        _surfaceIndex = kObjectEntryIndexNull;
         _raiseLand = raise;
         _terrainStatus.clear();
     }
@@ -60,6 +65,13 @@ namespace OpenRCT2::Ui::Handheld
     {
         BeginTerrain(raise);
         _waterTool = true;
+    }
+
+    void BeginSurface()
+    {
+        BeginTerrain(true);
+        _surfaceTool = true;
+        _surfaceIndex = Surface::Next(kObjectEntryIndexNull);
     }
 
     static void ClearTerrainSelection()
@@ -78,6 +90,8 @@ namespace OpenRCT2::Ui::Handheld
     {
         _terrainActive = false;
         _waterTool = false;
+        _surfaceTool = false;
+        _surfaceIndex = kObjectEntryIndexNull;
         Paths::End();
         _terrainStatus.clear();
         ClearTerrainSelection();
@@ -85,6 +99,8 @@ namespace OpenRCT2::Ui::Handheld
 
     static GameActions::Result TerrainAction(bool execute)
     {
+        if (_surfaceTool)
+            return Surface::Action(_terrainTile, _surfaceIndex, execute);
         if (_waterTool)
             return Water::Action(_terrainTile, _raiseLand, execute);
         const auto tile = *_terrainTile;
@@ -385,7 +401,9 @@ namespace OpenRCT2::Ui::Handheld
                             {
                                 const auto result = TerrainAction(true);
                                 _terrainStatus = result.error == GameActions::Status::ok
-                                    ? (_waterTool ? "Water change requested." : "Land changed.")
+                                    ? (_surfaceTool     ? "Surface change requested."
+                                           : _waterTool ? "Water change requested."
+                                                        : "Land changed.")
                                     : result.getErrorMessage();
                             }
                         }
@@ -422,7 +440,10 @@ namespace OpenRCT2::Ui::Handheld
                         }
                         if (_terrainActive)
                         {
-                            _raiseLand = !_raiseLand;
+                            if (_surfaceTool)
+                                _surfaceIndex = Surface::Next(_surfaceIndex);
+                            else
+                                _raiseLand = !_raiseLand;
                             _terrainStatus.clear();
                         }
                         break;
@@ -457,7 +478,9 @@ namespace OpenRCT2::Ui::Handheld
         std::string costAmount;
         if (_terrainActive)
         {
-            status = _waterTool ? (_raiseLand ? "RAISE WATER" : "LOWER WATER") : (_raiseLand ? "RAISE LAND" : "LOWER LAND");
+            status = _surfaceTool ? "PAINT SURFACE"
+                : _waterTool      ? (_raiseLand ? "RAISE WATER" : "LOWER WATER")
+                                  : (_raiseLand ? "RAISE LAND" : "LOWER LAND");
             if (_terrainTile)
             {
                 const auto result = TerrainAction(false);
@@ -496,8 +519,13 @@ namespace OpenRCT2::Ui::Handheld
         else
         {
             if (_terrainActive)
-                DrawTerrainOverlay(rt, Concept::kOrigin, _raiseLand, _waterTool);
-            DrawGameplayFooter(rt, { ContextGetWidth(), height }, status, _terrainActive);
+            {
+                if (_surfaceTool)
+                    DrawSurfaceOverlay(rt, Concept::kOrigin, Surface::Name(_surfaceIndex));
+                else
+                    DrawTerrainOverlay(rt, Concept::kOrigin, _raiseLand, _waterTool);
+            }
+            DrawGameplayFooter(rt, { ContextGetWidth(), height }, status, _terrainActive, _surfaceTool);
         }
         const bool feedback = !_terrainStatus.empty();
         if ((_terrainActive || Paths::IsActive()) && (feedback || costAmount.empty()))

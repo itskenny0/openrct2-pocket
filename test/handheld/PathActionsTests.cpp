@@ -4,6 +4,7 @@
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/Paths.h>
+#include <openrct2-ui/handheld/Surface.h>
 #include <openrct2-ui/handheld/Water.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
@@ -130,6 +131,118 @@ static void TestWater(IContext& context, const std::string& profile)
     Ui::Handheld::EndTerrain();
     std::cout << "Native water raise/lower / exact cash / single tile / clearance / ownership / funds / pause / save/reload "
                  "checks passed\n";
+}
+static void TestSurface(IContext& context, const std::string& profile)
+{
+    namespace Surface = Ui::Handheld::Surface;
+    auto& objects = context.GetObjectManager();
+    Require(objects.LoadObject("rct2.terrain_surface.grass"), "Grass surface missing");
+    Require(objects.LoadObject("rct2.terrain_surface.sand"), "Sand surface missing");
+    auto& state = getGameState();
+    const CoordsXY tile{ 320, 64 }, neighbour{ 352, 64 };
+    auto* surface = MapGetSurfaceElementAt(tile);
+    surface->setOwnership({ OwnershipFlag::landOwned });
+    surface->setSlope(1);
+    surface->setWaterHeight(surface->getBaseZ() + 16);
+    surface->setPrimarySurfaceColour(Drawing::Colour::brightRed);
+    surface->setPrimaryEdgeColour(Drawing::Colour::brightPurple);
+    const auto originalStyle = surface->getSurfaceObjectIndex();
+    const auto height = surface->getBaseZ(), water = surface->getWaterHeight();
+    const auto slope = surface->getSlope();
+    const auto edge = surface->getEdgeObjectIndex();
+    const auto edgeColour = surface->getPrimaryEdgeColour(), colour = surface->getPrimarySurfaceColour();
+    const auto neighbourStyle = MapGetSurfaceElementAt(neighbour)->getSurfaceObjectIndex();
+    auto selected = Surface::Next(kObjectEntryIndexNull);
+    const auto first = selected;
+    int count = 0;
+    do
+    {
+        Require(objects.GetLoadedObject<TerrainSurfaceObject>(selected), "Cycle selected unloaded surface");
+        ++count;
+        selected = Surface::Next(selected);
+        Require(count <= kMaxTerrainSurfaceObjects, "Surface cycle failed to wrap");
+    } while (selected != first);
+    Require(count >= 2, "Surface cycle fixture incomplete");
+    selected = first;
+    while (selected == originalStyle
+           || objects.GetLoadedObject<TerrainSurfaceObject>(selected)->Flags.has(TerrainSurfaceFlag::hasPrimaryColour))
+        selected = Surface::Next(selected);
+    const auto initialCash = state.park.cash;
+    auto query = Surface::Action(tile, selected, false);
+    Require(query.error == GameActions::Status::ok && query.cost > 0, "Paint query failed");
+    Require(surface->getSurfaceObjectIndex() == originalStyle && state.park.cash == initialCash, "Paint query changed park");
+    Require(Surface::Action(tile, selected, true).error == GameActions::Status::ok, "Paint execution failed");
+    Require(surface->getSurfaceObjectIndex() == originalStyle && state.park.cash == initialCash, "Paint bypassed queue");
+    GameActions::ProcessQueue(state);
+    auto preserved = [&]() {
+        return surface->getBaseZ() == height && surface->getSlope() == slope && surface->getWaterHeight() == water
+            && surface->getEdgeObjectIndex() == edge && surface->getPrimaryEdgeColour() == edgeColour
+            && surface->getPrimarySurfaceColour() == colour;
+    };
+    Require(
+        surface->getSurfaceObjectIndex() == selected && state.park.cash == initialCash - query.cost && preserved(),
+        "Paint/cash/metadata incorrect");
+    Require(MapGetSurfaceElementAt(neighbour)->getSurfaceObjectIndex() == neighbourStyle, "Paint changed neighbour");
+    const auto paintedCash = state.park.cash;
+    Require(
+        Surface::Action(tile, selected, false).cost == 0
+            && Surface::Action(tile, selected, true).error == GameActions::Status::ok,
+        "Same-style paint rejected");
+    GameActions::ProcessQueue(state);
+    Require(state.park.cash == paintedCash && preserved(), "Repeated paint charged or changed metadata");
+    Require(Surface::Action({}, first, true).error == GameActions::Status::invalidParameters, "Missing paint target accepted");
+    Require(
+        Surface::Action(CoordsXY{ -32, 64 }, first, true).error == GameActions::Status::invalidParameters,
+        "Off-map paint target accepted");
+    Require(
+        Surface::Action(CoordsXY{ 0, 64 }, first, true).error == GameActions::Status::invalidParameters,
+        "Border paint target accepted");
+    Require(
+        Surface::Action(tile, kObjectEntryIndexNull, true).error == GameActions::Status::invalidParameters,
+        "Missing paint surface accepted");
+    ObjectEntryIndex unloaded = 0;
+    while (objects.GetLoadedObject<TerrainSurfaceObject>(unloaded))
+        ++unloaded;
+    Require(
+        Surface::Action(tile, unloaded, true).error == GameActions::Status::invalidParameters,
+        "Unloaded paint surface accepted");
+    surface->setOwnership({});
+    Require(
+        Surface::Action(tile, originalStyle, false).cost == 0
+            && Surface::Action(tile, originalStyle, true).error == GameActions::Status::ok,
+        "Native unowned no-op changed");
+    GameActions::ProcessQueue(state);
+    Require(
+        surface->getSurfaceObjectIndex() == selected && state.park.cash == paintedCash && preserved(),
+        "Unowned paint changed park");
+    surface->setOwnership({ OwnershipFlag::landOwned });
+    state.park.cash = 0;
+    Require(
+        Surface::Action(tile, originalStyle, true).error == GameActions::Status::insufficientFunds,
+        "Unaffordable paint accepted");
+    state.park.cash = paintedCash;
+    gGamePaused = 1;
+    Require(Surface::Action(tile, originalStyle, true).error == GameActions::Status::gamePaused, "Paused paint accepted");
+    gGamePaused = 0;
+    state.park.flags.set(ParkFlag::forbidLandscapeChanges);
+    Require(
+        Surface::Action(tile, originalStyle, true).error == GameActions::Status::disallowed, "Forbidden landscaping accepted");
+    state.park.flags.unset(ParkFlag::forbidLandscapeChanges);
+    GameActions::ProcessQueue(state);
+    Require(
+        surface->getSurfaceObjectIndex() == selected && state.park.cash == paintedCash && preserved(),
+        "Rejected paint changed park");
+    SaveFlags flags{};
+    flags.set(SaveFlag::exportObjects);
+    const auto save = profile + "/surface.park";
+    Require(ScenarioSave(state, save, flags) != 0 && context.LoadParkFromFile(save), "Paint save/reload failed");
+    surface = MapGetSurfaceElementAt(tile);
+    Require(
+        surface->getSurfaceObjectIndex() == selected && state.park.cash == paintedCash && preserved(),
+        "Paint metadata/cash not preserved after reload");
+    Ui::Handheld::EndTerrain();
+    std::cout << "Native surface paint / exact cash / loaded cycle / no-op / invalid target / ownership / funds / pause / "
+                 "height-edge-water / save-reload checks passed\n";
 }
 int main(int argc, char** argv)
 {
@@ -388,13 +501,27 @@ int main(int argc, char** argv)
             Paths::UpdatePreview();
             Require(FindPath(TileCoordsXYZ{ previewLocation }), "Pause return did not restore preview");
             Ui::Windows::HandheldBuildOpen();
-            Ui::Windows::HandheldMenuMove(3);
+            for (int i = 0; i < 3; ++i)
+                Ui::Windows::HandheldMenuMove(1);
             Ui::Windows::HandheldMenuConfirm();
             Require(!Paths::IsActive() && !FindPath(TileCoordsXYZ{ previewLocation }), "Water entry retained path tool/ghost");
+            Ui::Handheld::EndTerrain();
+            Paths::Begin(false);
+            info.Element = reinterpret_cast<TileElement*>(MapGetSurfaceElementAt(previewTile));
+            Paths::UpdateTargetFromInfo(info);
+            Paths::UpdatePreview();
+            Require(Paths::IsActive() && FindPath(TileCoordsXYZ{ previewLocation }), "Surface entry ghost fixture missing");
+            Ui::Windows::HandheldBuildOpen();
+            for (int i = 0; i < 4; ++i)
+                Ui::Windows::HandheldMenuMove(1);
+            Ui::Windows::HandheldMenuConfirm();
+            Require(
+                !Paths::IsActive() && !FindPath(TileCoordsXYZ{ previewLocation }), "Surface entry retained path tool/ghost");
             Require(context->LoadParkFromFile(save), "UI reload failed");
             Require(!Paths::IsActive() && !FindPath(TileCoordsXYZ{ previewLocation }), "Park load retained preview/tool");
         }
         TestWater(*context, argv[2]);
+        TestSurface(*context, argv[2]);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;
