@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
+#include "ModernText.h"
+
+#include <cmath>
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2/SpriteIds.h>
 #include <openrct2/drawing/ColourMap.h>
@@ -94,7 +97,7 @@ namespace OpenRCT2::Ui::Handheld
         Fill(rt, window.windowPos + ScreenCoordsXY{ 5, 3 }, { window.width - 10, 29 }, Theme::ink);
         Fill(rt, window.windowPos + ScreenCoordsXY{ 13, 11 }, { 3, 14 }, Theme::gold);
         Fill(rt, window.windowPos + ScreenCoordsXY{ 10, 35 }, { window.width - 20, 1 }, Theme::edge);
-        drawTextEllipsised(
+        DrawModernEllipsised(
             rt, window.windowPos + ScreenCoordsXY{ 24, 13 }, window.width - 40, title, { Drawing::Colour::white });
     }
 
@@ -109,11 +112,11 @@ namespace OpenRCT2::Ui::Handheld
             GfxDrawSprite(rt, ImageId(SPR_G2_TAB_LAND), pos + ScreenCoordsXY{ 3, 0 });
         else
             DrawIcon(rt, pos + ScreenCoordsXY{ 8, 6 }, icon, selected);
-        drawTextEllipsised(
+        DrawModernEllipsised(
             rt, pos + ScreenCoordsXY{ 39, 9 }, width - 53, (selected ? "{BLACK}" : "{WHITE}") + label,
             { Drawing::Colour::white });
         if (selected)
-            drawText(rt, pos + ScreenCoordsXY{ width - 11, 9 }, "{BLACK}>", { Drawing::Colour::white });
+            DrawModernText(rt, pos + ScreenCoordsXY{ width - 11, 9 }, "{BLACK}>", { Drawing::Colour::white });
     }
 
     inline void DrawPanelRow(
@@ -124,14 +127,29 @@ namespace OpenRCT2::Ui::Handheld
 
     inline void DrawCommand(Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t keyWidth, const char* key, const char* label)
     {
-        // Light button badges keep the controller legend distinct from menu cards.
-        Fill(rt, pos + ScreenCoordsXY{ 2, -3 }, { keyWidth - 4, 17 }, Theme::highlight);
-        Fill(rt, pos + ScreenCoordsXY{ 0, -1 }, { keyWidth, 13 }, Theme::highlight);
-        Fill(rt, pos + ScreenCoordsXY{ 2, -2 }, { keyWidth - 4, 14 }, Theme::text);
-        drawText(
-            rt, { pos.x + keyWidth / 2, pos.y }, "{BLACK}" + std::string(key),
+        const auto badgeWidth = keyWidth == 17 ? 22 : keyWidth + 4;
+        const auto top = pos.y - 3;
+        if (keyWidth == 17)
+        {
+            // Circular face-button badges with antialiased edges in the native palette.
+            for (int y = 0; y < 20; ++y)
+                for (int x = 0; x < 22; ++x)
+                {
+                    const float dx = x - 10.5f, dy = y - 9.5f;
+                    const float distance = std::sqrt(dx * dx + dy * dy);
+                    if (distance < 9.8f)
+                        Fill(rt, { pos.x + x, top + y }, { 1, 1 }, distance > 8.8f ? Theme::highlight : Theme::text);
+                }
+        }
+        else
+        {
+            DrawCard(rt, { pos.x, top }, { badgeWidth, 20 });
+            Fill(rt, { pos.x + 3, top + 2 }, { badgeWidth - 6, 16 }, Theme::text);
+        }
+        DrawModernText(
+            rt, { pos.x + badgeWidth / 2, pos.y }, "{BLACK}" + std::string(key),
             { Drawing::Colour::white, TextAlignment::centre });
-        drawText(rt, { pos.x + keyWidth + 5, pos.y }, label, { Drawing::Colour::white });
+        DrawModernText(rt, { pos.x + badgeWidth + 5, pos.y }, label, { Drawing::Colour::white });
     }
 
     inline void DrawPanelCommands(Drawing::RenderTarget& rt, const Window& window, const char* backLabel = "Back")
@@ -155,7 +173,7 @@ namespace OpenRCT2::Ui::Handheld
         {
             const auto tabPos = pos + ScreenCoordsXY{ static_cast<int32_t>(i) * tabWidth, 0 };
             DrawCard(rt, tabPos, { tabWidth - 3, 28 }, i == selected);
-            drawTextEllipsised(
+            DrawModernEllipsised(
                 rt, tabPos + ScreenCoordsXY{ 9, 9 }, tabWidth - 21, (i == selected ? "{BLACK}" : "{WHITE}") + labels[i],
                 { Drawing::Colour::white });
         }
@@ -184,7 +202,7 @@ namespace OpenRCT2::Ui::Handheld
 
     inline void DrawOverlayCommands(Drawing::RenderTarget& rt, const Window& window)
     {
-        const auto p = window.windowPos + ScreenCoordsXY{ 12, window.height - 20 };
+        const auto p = window.windowPos + ScreenCoordsXY{ 12, window.height - 23 };
         Fill(rt, window.windowPos + ScreenCoordsXY{ 10, window.height - 29 }, { window.width - 20, 1 }, Theme::edge);
         DrawCommand(rt, p, 17, "A", "Select");
         DrawCommand(rt, p + ScreenCoordsXY{ 92, 0 }, 17, "B", "Back");
@@ -198,7 +216,7 @@ namespace OpenRCT2::Ui::Handheld
             DrawIconRow(
                 rt, p + ScreenCoordsXY{ 10, 43 + static_cast<int32_t>(i) * kPanelRowPitch }, window.width - 20, model.rows[i],
                 i == model.selected, i < model.icons.size() ? model.icons[i] : PanelIcon::folder);
-        drawTextEllipsised(
+        DrawModernEllipsised(
             rt, p + ScreenCoordsXY{ 13, window.height - 45 }, window.width - 26, model.status, { Drawing::Colour::white });
         DrawOverlayCommands(rt, window);
     }
@@ -214,14 +232,14 @@ namespace OpenRCT2::Ui::Handheld
         DrawPanelHeading(rt, window, "Terrain");
         DrawIconRow(rt, pos + ScreenCoordsXY{ 10, 44 }, window.width - 20, "Raise land", raise, PanelIcon::raise);
         DrawIconRow(rt, pos + ScreenCoordsXY{ 10, 76 }, window.width - 20, "Lower land", !raise, PanelIcon::lower);
-        drawText(rt, pos + ScreenCoordsXY{ 13, 115 }, "Single tile / centre cursor", { Drawing::Colour::white });
+        DrawModernText(rt, pos + ScreenCoordsXY{ 13, 115 }, "Single tile / centre cursor", { Drawing::Colour::white });
         DrawCommand(rt, pos + ScreenCoordsXY{ 13, 141 }, 17, "Y", "Switch tool");
     }
 
     inline void DrawGameplayFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::string& status, bool terrain)
     {
         DrawSurface(rt, { 0, screen.height - 34 }, { screen.width, 34 });
-        const auto y = screen.height - 15;
+        const auto y = screen.height - 19;
         if (terrain)
         {
             DrawCommand(rt, { 8, y }, 17, "A", "Edit");
@@ -236,7 +254,7 @@ namespace OpenRCT2::Ui::Handheld
             DrawCommand(rt, { 244, y }, 28, "SEL", "Build");
             DrawCommand(rt, { 370, y }, 38, "START", "Park");
         }
-        drawTextEllipsised(rt, { 8, screen.height - 31 }, screen.width - 16, "{YELLOW}" + status, { Drawing::Colour::white });
+        DrawModernEllipsised(rt, { 8, screen.height - 31 }, screen.width - 16, "{YELLOW}" + status, { Drawing::Colour::white });
     }
 
     inline void DrawMapFocus(Drawing::RenderTarget& rt, ScreenCoordsXY centre)
@@ -256,7 +274,7 @@ namespace OpenRCT2::Ui::Handheld
         DrawPanelHeading(rt, window, model.title);
         const auto p = window.windowPos;
         if (model.tabs.empty())
-            drawTextEllipsised(rt, p + ScreenCoordsXY{ 14, 46 }, 204, "{YELLOW}" + model.section, { Drawing::Colour::white });
+            DrawModernEllipsised(rt, p + ScreenCoordsXY{ 14, 46 }, 204, "{YELLOW}" + model.section, { Drawing::Colour::white });
         else
             DrawTabs(rt, p + ScreenCoordsXY{ 10, 44 }, 221, model.tabs, model.selectedTab);
         for (size_t i = 0; i < model.rows.size(); ++i)
@@ -265,26 +283,26 @@ namespace OpenRCT2::Ui::Handheld
                 model.rows[i], i == model.selected, i < model.icons.size() ? model.icons[i] : PanelIcon::folder);
         DrawCard(rt, p + ScreenCoordsXY{ 238, 44 }, { window.width - 248, 150 });
         GfxDrawSprite(rt, ImageId(SPR_G2_TAB_TREE), p + ScreenCoordsXY{ 250, 50 });
-        drawTextEllipsised(
+        DrawModernEllipsised(
             rt, p + ScreenCoordsXY{ 289, 59 }, window.width - 305, model.detailTitle, { Drawing::Colour::white });
-        drawTextEllipsised(
+        DrawModernEllipsised(
             rt, p + ScreenCoordsXY{ 250, 84 }, window.width - 272, model.detailSubtitle, { Drawing::Colour::white });
         Fill(rt, p + ScreenCoordsXY{ 250, 105 }, { window.width - 272, 1 }, Theme::edge);
         for (size_t i = 0; i < model.stats.size() && i < 3; ++i)
         {
             const auto y = 116 + static_cast<int32_t>(i) * 23;
-            drawTextEllipsised(rt, p + ScreenCoordsXY{ 250, y }, 100, model.stats[i].first, { Drawing::Colour::white });
-            drawTextEllipsised(
+            DrawModernEllipsised(rt, p + ScreenCoordsXY{ 250, y }, 100, model.stats[i].first, { Drawing::Colour::white });
+            DrawModernEllipsised(
                 rt, p + ScreenCoordsXY{ 357, y }, window.width - 371, "{YELLOW}" + model.stats[i].second,
                 { Drawing::Colour::white });
         }
         DrawCard(rt, p + ScreenCoordsXY{ 238, 202 }, { window.width - 248, 87 });
-        drawText(rt, p + ScreenCoordsXY{ 250, 214 }, "{YELLOW}CONTROLS", { Drawing::Colour::white });
+        DrawModernText(rt, p + ScreenCoordsXY{ 250, 214 }, "{YELLOW}CONTROLS", { Drawing::Colour::white });
         for (size_t i = 0; i < model.help.size() && i < 3; ++i)
-            drawTextEllipsised(
+            DrawModernEllipsised(
                 rt, p + ScreenCoordsXY{ 250, 237 + static_cast<int32_t>(i) * 16 }, window.width - 272, model.help[i],
                 { Drawing::Colour::white });
-        drawTextEllipsised(
+        DrawModernEllipsised(
             rt, p + ScreenCoordsXY{ 14, window.height - 47 }, window.width - 28, model.status, { Drawing::Colour::white });
         DrawPanelCommands(rt, window);
     }
