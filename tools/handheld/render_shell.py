@@ -2,19 +2,19 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Render actual native handheld components using an existing Ninja GUI build."""
 import argparse
-import os
 from pathlib import Path
 import shlex
 import subprocess
 import tempfile
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--build", type=Path, required=True, help="Existing native Ninja GUI build")
 parser.add_argument("--data", type=Path, required=True, help="OpenRCT2 graphics directory")
 parser.add_argument("--output", type=Path, required=True, help="PNG contact sheet destination")
 parser.add_argument("--ninja", default="ninja")
+parser.add_argument("--background", type=Path, help="Optional park image for an explicitly labelled layout composite")
 args = parser.parse_args()
 repo = Path(__file__).resolve().parents[2]
 build = args.build.resolve()
@@ -37,11 +37,17 @@ with tempfile.TemporaryDirectory(prefix="pocket-shell-") as directory:
     subprocess.run(link, cwd=build, check=True)
     sheet = Image.new("RGB", (512, 812), (15, 19, 55))
     draw = ImageDraw.Draw(sheet)
+    background_args = []
+    if args.background:
+        background_path = temporary / "background.ppm"
+        with Image.open(args.background) as image:
+            ImageOps.fit(image.convert("RGB"), (512, 384), method=Image.Resampling.NEAREST).save(background_path)
+        background_args = [str(background_path)]
     for index, page in enumerate(("park", "terrain")):
         path = temporary / f"{page}.ppm"
-        subprocess.run([str(temporary / "preview"), str(args.data.resolve()), str(path), page], check=True)
+        subprocess.run([str(temporary / "preview"), str(args.data.resolve()), str(path), page, *background_args], check=True)
         top = index * 406
-        draw.text((12, top + 5), f"{page.upper()} / native 512 x 384 / sample park data", fill=(255, 243, 95))
+        draw.text((12, top + 5), f"{page.upper()} / native UI" + (" / supplied backdrop composite" if args.background else " / no park assets"), fill=(255, 243, 95))
         with Image.open(path) as image:
             sheet.paste(image, (0, top + 22))
     sheet.save(args.output)

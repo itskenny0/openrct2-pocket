@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Native 512x384 shell capture. Park information is a fixture, not a loaded save.
+// Native 512x384 overlay capture; optional backdrop is an explicitly labelled layout composite.
 #include <fstream>
 #include <openrct2-ui/handheld/Panel.h>
 #include <openrct2/Context.h>
@@ -17,7 +17,7 @@ using namespace OpenRCT2;
 using namespace OpenRCT2::Drawing;
 int main(int argc, char** argv)
 {
-    if (argc != 4)
+    if (argc != 4 && argc != 5)
         return 2;
     gCustomOpenRCT2DataPath = argv[1];
     auto context = CreateContext();
@@ -30,38 +30,71 @@ int main(int argc, char** argv)
     engine.BeginDraw();
     auto& rt = *engine.getRT();
     GfxClear(rt, PaletteIndex::pi10);
-    Ui::Window w;
-    w.windowPos = { 9, 21 };
-    w.width = 494;
-    w.height = 342;
-    Ui::Handheld::MenuPresentation model;
-    model.title = "PARK / PAUSE";
-    model.section = "PARK ACTIONS";
-    model.detailTitle = "Evergreen Gardens";
-    model.detailSubtitle = "Park paused";
-    model.stats = { { "Guests", "812" }, { "Park rating", "728" }, { "Save slots", "3" } };
-    model.rows = { "Resume park", "Build", "Save park", "Save and exit", "Load park", "Exit without saving" };
-    model.icons = { Ui::Handheld::PanelIcon::play, Ui::Handheld::PanelIcon::terrain, Ui::Handheld::PanelIcon::save,
-                    Ui::Handheld::PanelIcon::exit, Ui::Handheld::PanelIcon::folder,  Ui::Handheld::PanelIcon::exit };
-    model.help = { "A  Open selected action", "B  Return to your park", "D-pad  Move through menu" };
-    model.selected = 1;
-    if (std::string(argv[3]) == "terrain")
-    {
-        model.title = "BUILD / TERRAIN";
-        model.section = "LAND TOOLS";
-        model.tabs = { "Terrain" };
-        model.detailSubtitle = "Terrain / single tile";
-        model.rows = { "Terrain: raise land", "Terrain: lower land", "Back to park" };
-        model.icons = { Ui::Handheld::PanelIcon::raise, Ui::Handheld::PanelIcon::lower, Ui::Handheld::PanelIcon::back };
-        model.help = { "A  Edit tile under cursor", "Y  Switch raise / lower", "B  Finish editing" };
-        model.selected = 0;
-        model.status = "Select a tool, then move the cursor in your park.";
-    }
-    Ui::Handheld::DrawMenuShell(rt, w, model);
     GamePalette palette{};
     const auto* pal = GfxGetG1Palette(SPR_GAME_DEFAULT_PALETTE);
     for (int i = 0; i < pal->numColours; i++)
         palette[pal->startIndex + i] = { pal->palette[i].blue, pal->palette[i].green, pal->palette[i].red, 255 };
+    if (argc == 5)
+    {
+        std::ifstream background(argv[4], std::ios::binary);
+        std::string magic;
+        int width{}, height{}, maxValue{};
+        background >> magic >> width >> height >> maxValue;
+        background.get();
+        if (magic != "P6" || width != 512 || height != 384 || maxValue != 255)
+            return 3;
+        for (int y = 0; y < 384; ++y)
+            for (int x = 0; x < 512; ++x)
+            {
+                unsigned char rgb[3];
+                if (!background.read(reinterpret_cast<char*>(rgb), 3))
+                    return 3;
+                int nearest = 10, distance = 3 * 256 * 256;
+                for (int index = 10; index < 230; ++index)
+                {
+                    const auto& colour = palette[index];
+                    const auto r = rgb[0] - colour.red, g = rgb[1] - colour.green, b = rgb[2] - colour.blue;
+                    const auto candidate = r * r + g * g + b * b;
+                    if (candidate < distance)
+                    {
+                        distance = candidate;
+                        nearest = index;
+                    }
+                }
+                rt.bits[y * rt.LineStride() + x] = static_cast<PaletteIndex>(nearest);
+            }
+    }
+    Ui::Window w;
+    w.windowPos = { 8, 53 };
+    const auto size = Ui::Handheld::OverlaySize(6);
+    w.width = size.width;
+    w.height = size.height;
+    Ui::Handheld::MenuPresentation model;
+    model.title = "PARK / PAUSE";
+    model.rows = { "Resume park", "Build", "Save park", "Save and exit", "Load park", "Exit without saving" };
+    model.icons = { Ui::Handheld::PanelIcon::play, Ui::Handheld::PanelIcon::terrain, Ui::Handheld::PanelIcon::save,
+                    Ui::Handheld::PanelIcon::exit, Ui::Handheld::PanelIcon::folder,  Ui::Handheld::PanelIcon::exit };
+    model.selected = 1;
+    if (std::string(argv[3]) == "terrain")
+    {
+        Ui::Handheld::DrawTerrainOverlay(rt, { 8, 52 }, true);
+        Ui::Handheld::DrawGameplayFooter(rt, { 512, 384 }, "RAISE LAND  Cost: $20.00", true);
+        Ui::Handheld::DrawMapFocus(rt, { 256, 192 });
+    }
+    else if (std::string(argv[3]) == "build")
+    {
+        model.title = "BUILD / TERRAIN";
+        model.rows = { "Raise land", "Lower land", "Back to park" };
+        model.icons = { Ui::Handheld::PanelIcon::raise, Ui::Handheld::PanelIcon::lower, Ui::Handheld::PanelIcon::back };
+        model.selected = 0;
+        model.status = "Choose a tool, then edit in the park.";
+        const auto buildSize = Ui::Handheld::OverlaySize(3);
+        w.height = buildSize.height;
+        w.windowPos.y = (384 - w.height) / 2;
+        Ui::Handheld::DrawOverlayShell(rt, w, model);
+    }
+    else
+        Ui::Handheld::DrawOverlayShell(rt, w, model);
     std::ofstream out(argv[2], std::ios::binary);
     out << "P6\n512 384\n255\n";
     for (int y = 0; y < 384; y++)

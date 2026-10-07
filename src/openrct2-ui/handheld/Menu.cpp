@@ -21,7 +21,7 @@ namespace OpenRCT2::Ui::Windows
 {
     using namespace Drawing;
     namespace fs = std::filesystem;
-    static constexpr ScreenSize kSize{ 494, 342 };
+    static constexpr ScreenSize kSize{ 244, 278 };
     static constexpr auto kWidgets = makeWidgets(makeWindowShim(STR_SHORTCUT_PAUSE, kSize));
     enum class Page
     {
@@ -49,11 +49,23 @@ namespace OpenRCT2::Ui::Windows
         size_t _slot{};
         std::string _status;
 
+        void layout()
+        {
+            const auto size = Handheld::OverlaySize(rows().size());
+            // Confirmation text needs room; normal tools leave the centre cursor exposed.
+            const ScreenSize target{ _page == Page::overwrite || _page == Page::discard || _page == Page::exit ? 330
+                                                                                                               : size.width,
+                                     size.height };
+            WindowSetResize(*this, target, target);
+            WindowSetPosition(*this, { 8, std::max(8, (ContextGetHeight() - target.height) / 2) });
+        }
+
         void page(Page next)
         {
             _page = next;
             _focus = {};
             _status.clear();
+            layout();
             if (next == Page::overwrite || next == Page::discard || next == Page::exit)
                 _focus.move(1, 2); // destructive confirmations default to Cancel
             invalidate();
@@ -65,7 +77,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::park:
                     return { "Resume park", "Build", "Save park", "Save and exit", "Load park", "Exit without saving" };
                 case Page::build:
-                    return { "Terrain: raise land", "Terrain: lower land", "Back to park" };
+                    return { "Raise land", "Lower land", "Back to park" };
                 case Page::save:
                 case Page::load:
                 {
@@ -126,6 +138,7 @@ namespace OpenRCT2::Ui::Windows
         void onOpen() override
         {
             setWidgets(kWidgets);
+            layout();
             colours[0] = ColourWithFlags{ Colour::darkBlue };
             colours[1] = ColourWithFlags{ Colour::darkBlue };
             _pausedHere = gLegacyScene == LegacyScene::playing && GameIsNotPaused();
@@ -291,42 +304,27 @@ namespace OpenRCT2::Ui::Windows
             }
             Handheld::MenuPresentation model;
             model.title = title;
-            model.section = _page == Page::build ? "LAND TOOLS" : "PARK ACTIONS";
             model.rows = rows();
             model.selected = _focus.index();
             model.status = _status;
-            const bool playing = gLegacyScene == LegacyScene::playing;
-            const auto& park = getGameState().park;
-            model.detailTitle = playing ? park.name : "OpenRCT2 Pocket";
-            model.detailSubtitle = playing ? "Park paused" : "Choose a saved park";
-            if (playing)
-                model.stats = { { "Guests", std::to_string(park.numGuestsInPark) },
-                                { "Park rating", std::to_string(park.rating) },
-                                { "Save slots", "3" } };
-            model.help = { "A  Open selected action", "B  Return to your park", "D-pad  Move through menu" };
             if (_page == Page::park)
                 model.icons = { Handheld::PanelIcon::play, Handheld::PanelIcon::terrain, Handheld::PanelIcon::save,
                                 Handheld::PanelIcon::exit, Handheld::PanelIcon::folder,  Handheld::PanelIcon::exit };
             else if (_page == Page::build)
             {
                 model.icons = { Handheld::PanelIcon::raise, Handheld::PanelIcon::lower, Handheld::PanelIcon::back };
-                model.detailSubtitle = "Terrain / single tile";
-                model.tabs = { "Terrain" };
-                model.help = { "A  Edit tile under cursor", "Y  Switch raise / lower", "B  Finish editing" };
-                model.status = "Select a tool, then move the cursor in your park.";
+                if (model.status.empty())
+                    model.status = "Choose a tool, then edit in the park.";
             }
-            else if (_page == Page::save || _page == Page::load)
+            // Never replace a save failure with the confirmation's normal hint.
+            if (model.status.empty())
             {
-                model.section = "POCKET SAVE SLOTS";
-                model.help = { _page == Page::save ? "A  Save to selected slot" : "A  Load selected slot",
-                               "B  Return to previous menu", "D-pad  Choose a slot" };
+                if (_page == Page::discard || _page == Page::exit)
+                    model.status = "Unsaved changes will be lost.";
+                else if (_page == Page::overwrite)
+                    model.status = "This replaces the selected saved park.";
             }
-            else
-            {
-                model.section = "CONFIRM ACTION";
-                model.help = { "A  Confirm selected action", "B  Return without changes" };
-            }
-            Handheld::DrawMenuShell(rt, *this, model);
+            Handheld::DrawOverlayShell(rt, *this, model);
         }
     };
 
@@ -335,7 +333,8 @@ namespace OpenRCT2::Ui::Windows
         auto* wm = GetWindowManager();
         auto* window = wm->BringToFrontByClass(WindowClass::handheldMenu);
         if (window == nullptr)
-            window = wm->Create<HandheldMenuWindow>(WindowClass::handheldMenu, {}, kSize, { WindowFlag::centreScreen });
+            window = wm->Create<HandheldMenuWindow>(
+                WindowClass::handheldMenu, {}, kSize, { WindowFlag::transparent, WindowFlag::noBackground });
         return static_cast<HandheldMenuWindow*>(window);
     }
     void HandheldMenuOpen()

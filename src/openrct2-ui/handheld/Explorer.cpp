@@ -154,7 +154,7 @@ namespace OpenRCT2::Ui::Handheld
             focus->windowPos = position;
             focus->invalidate();
         }
-        auto* hud = wm->FindByClass(WindowClass::handheldHud);
+        auto* hud = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 0 });
         if (hud == nullptr)
         {
             hud = wm->Create<FocusWindow>(
@@ -168,6 +168,24 @@ namespace OpenRCT2::Ui::Handheld
             hud->width = ContextGetWidth();
             hud->invalidate();
         }
+        // A separate small input-transparent window redraws only the tool panel,
+        // rather than placing a full-screen overlay over the scrolling viewport.
+        auto* tools = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 1 });
+        if (_terrainActive)
+        {
+            if (tools == nullptr)
+            {
+                tools = wm->Create<FocusWindow>(
+                    WindowClass::handheldHud, { 8, 52 }, kTerrainOverlaySize,
+                    { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
+                if (tools != nullptr)
+                    tools->number = 1;
+            }
+            if (tools != nullptr)
+                tools->invalidate();
+        }
+        else if (tools != nullptr)
+            wm->Close(*tools);
     }
 
     void UpdateExplorer(ControllerInput& input)
@@ -353,22 +371,6 @@ namespace OpenRCT2::Ui::Handheld
         using namespace Drawing;
         const auto c = Centre();
         const auto height = ContextGetHeight();
-        DrawSurface(rt, { 0, height - 34 }, { ContextGetWidth(), 34 });
-        const auto hintY = height - 15;
-        if (_terrainActive)
-        {
-            DrawCommand(rt, { 8, hintY }, 17, "A", "Edit");
-            DrawCommand(rt, { 112, hintY }, 17, "Y", "Raise/lower");
-            DrawCommand(rt, { 264, hintY }, 17, "B", "Done");
-            DrawCommand(rt, { 376, hintY }, 38, "D-pad", "Move");
-        }
-        else
-        {
-            DrawCommand(rt, { 8, hintY }, 17, "A", "Inspect");
-            DrawCommand(rt, { 126, hintY }, 17, "B", "Back");
-            DrawCommand(rt, { 244, hintY }, 28, "SEL", "Build");
-            DrawCommand(rt, { 370, hintY }, 38, "START", "Park");
-        }
         std::string status = "L/R: Zoom   X: Rotate";
         if (_terrainActive)
         {
@@ -390,13 +392,10 @@ namespace OpenRCT2::Ui::Handheld
             if (!_terrainStatus.empty())
                 status = _terrainStatus;
         }
-        drawTextEllipsised(rt, { 8, height - 31 }, ContextGetWidth() - 16, status, { Colour::yellow });
+        if (_terrainActive)
+            DrawTerrainOverlay(rt, { 8, 52 }, _raiseLand);
+        DrawGameplayFooter(rt, { ContextGetWidth(), height }, status, _terrainActive);
         // High contrast, fixed map focus; this does not move the desktop pointer.
-        GfxDrawLine(rt, { c + ScreenCoordsXY{ -7, -1 }, c + ScreenCoordsXY{ 7, -1 } }, PaletteIndex::pi10);
-        GfxDrawLine(rt, { c + ScreenCoordsXY{ -7, 1 }, c + ScreenCoordsXY{ 7, 1 } }, PaletteIndex::pi10);
-        GfxDrawLine(rt, { c + ScreenCoordsXY{ -1, -7 }, c + ScreenCoordsXY{ -1, 7 } }, PaletteIndex::pi10);
-        GfxDrawLine(rt, { c + ScreenCoordsXY{ 1, -7 }, c + ScreenCoordsXY{ 1, 7 } }, PaletteIndex::pi10);
-        GfxDrawLine(rt, { c + ScreenCoordsXY{ -6, 0 }, c + ScreenCoordsXY{ 6, 0 } }, PaletteIndex::pi21);
-        GfxDrawLine(rt, { c + ScreenCoordsXY{ 0, -6 }, c + ScreenCoordsXY{ 0, 6 } }, PaletteIndex::pi21);
+        DrawMapFocus(rt, c);
     }
 } // namespace OpenRCT2::Ui::Handheld

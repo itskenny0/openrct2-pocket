@@ -4,6 +4,7 @@
 #include <openrct2/SpriteIds.h>
 #include <openrct2/drawing/ColourMap.h>
 #include <openrct2/drawing/Drawing.h>
+#include <openrct2/drawing/Line.h>
 #include <openrct2/drawing/PaletteIndex.h>
 #include <openrct2/drawing/Rectangle.h>
 #include <openrct2/drawing/Text.h>
@@ -33,22 +34,25 @@ namespace OpenRCT2::Ui::Handheld
             Drawing::Rectangle::fill(rt, { pos, pos + ScreenCoordsXY{ size.width - 1, size.height - 1 } }, colour);
     }
 
-    // Two-pixel cut corners survive the software renderer and match the pixel artwork.
+    // Five-pixel rounded corners and quiet single-line edges, at native resolution.
     inline void DrawCard(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, bool selected = false)
     {
         const auto edge = selected ? Theme::goldShadow : Theme::edge;
-        Fill(rt, pos + ScreenCoordsXY{ 2, 0 }, { size.width - 4, size.height }, edge);
-        Fill(rt, pos + ScreenCoordsXY{ 0, 2 }, { size.width, size.height - 4 }, edge);
-        Fill(rt, pos + ScreenCoordsXY{ 1, 2 }, { size.width - 2, size.height - 4 }, selected ? Theme::gold : Theme::raised);
-        Fill(rt, pos + ScreenCoordsXY{ 2, 1 }, { size.width - 4, 1 }, selected ? Theme::goldLight : Theme::highlight);
-        if (!selected)
-            Fill(rt, pos + ScreenCoordsXY{ 2, 3 }, { size.width - 4, size.height - 5 }, Theme::body);
+        const auto face = selected ? Theme::gold : Theme::ink;
+        Fill(rt, pos + ScreenCoordsXY{ 5, 0 }, { size.width - 10, size.height }, edge);
+        Fill(rt, pos + ScreenCoordsXY{ 2, 2 }, { size.width - 4, size.height - 4 }, edge);
+        Fill(rt, pos + ScreenCoordsXY{ 0, 5 }, { size.width, size.height - 10 }, edge);
+        Fill(rt, pos + ScreenCoordsXY{ 5, 1 }, { size.width - 10, size.height - 2 }, face);
+        Fill(rt, pos + ScreenCoordsXY{ 3, 3 }, { size.width - 6, size.height - 6 }, face);
+        Fill(rt, pos + ScreenCoordsXY{ 1, 5 }, { size.width - 2, size.height - 10 }, face);
+        Fill(rt, pos + ScreenCoordsXY{ 5, 1 }, { size.width - 10, 1 }, selected ? Theme::goldLight : Theme::highlight);
+        if (selected)
+            Fill(rt, pos + ScreenCoordsXY{ 3, 3 }, { size.width - 6, 4 }, static_cast<Drawing::PaletteIndex>(54));
     }
 
     inline void DrawSurface(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size)
     {
         DrawCard(rt, pos, size);
-        Fill(rt, pos + ScreenCoordsXY{ 3, 3 }, { size.width - 6, size.height - 6 }, Theme::ink);
     }
 
     enum class PanelIcon : uint8_t
@@ -87,7 +91,7 @@ namespace OpenRCT2::Ui::Handheld
     inline void DrawPanelHeading(Drawing::RenderTarget& rt, const Window& window, const std::string& title)
     {
         DrawSurface(rt, window.windowPos, { window.width, window.height });
-        Fill(rt, window.windowPos + ScreenCoordsXY{ 3, 3 }, { window.width - 6, 32 }, Theme::raised);
+        Fill(rt, window.windowPos + ScreenCoordsXY{ 5, 3 }, { window.width - 10, 29 }, Theme::ink);
         Fill(rt, window.windowPos + ScreenCoordsXY{ 13, 11 }, { 3, 14 }, Theme::gold);
         Fill(rt, window.windowPos + ScreenCoordsXY{ 10, 35 }, { window.width - 20, 1 }, Theme::edge);
         drawTextEllipsised(
@@ -97,7 +101,10 @@ namespace OpenRCT2::Ui::Handheld
     inline void DrawIconRow(
         Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t width, const std::string& label, bool selected, PanelIcon icon)
     {
-        DrawCard(rt, pos, { width, 28 }, selected);
+        if (selected)
+            DrawCard(rt, pos, { width, 28 }, true);
+        else
+            Fill(rt, pos + ScreenCoordsXY{ 5, 27 }, { width - 10, 1 }, Theme::raised);
         if (icon == PanelIcon::terrain)
             GfxDrawSprite(rt, ImageId(SPR_G2_TAB_LAND), pos + ScreenCoordsXY{ 3, 0 });
         else
@@ -169,6 +176,78 @@ namespace OpenRCT2::Ui::Handheld
         std::string status;
         size_t selected{};
     };
+
+    inline ScreenSize OverlaySize(size_t rows)
+    {
+        return { 244, 86 + static_cast<int32_t>(rows) * kPanelRowPitch };
+    }
+
+    inline void DrawOverlayCommands(Drawing::RenderTarget& rt, const Window& window)
+    {
+        const auto p = window.windowPos + ScreenCoordsXY{ 12, window.height - 20 };
+        Fill(rt, window.windowPos + ScreenCoordsXY{ 10, window.height - 29 }, { window.width - 20, 1 }, Theme::edge);
+        DrawCommand(rt, p, 17, "A", "Select");
+        DrawCommand(rt, p + ScreenCoordsXY{ 92, 0 }, 17, "B", "Back");
+    }
+
+    inline void DrawOverlayShell(Drawing::RenderTarget& rt, const Window& window, const MenuPresentation& model)
+    {
+        DrawPanelHeading(rt, window, model.title);
+        const auto p = window.windowPos;
+        for (size_t i = 0; i < model.rows.size(); ++i)
+            DrawIconRow(
+                rt, p + ScreenCoordsXY{ 10, 43 + static_cast<int32_t>(i) * kPanelRowPitch }, window.width - 20, model.rows[i],
+                i == model.selected, i < model.icons.size() ? model.icons[i] : PanelIcon::folder);
+        drawTextEllipsised(
+            rt, p + ScreenCoordsXY{ 13, window.height - 45 }, window.width - 26, model.status, { Drawing::Colour::white });
+        DrawOverlayCommands(rt, window);
+    }
+
+    inline constexpr ScreenSize kTerrainOverlaySize{ 184, 164 };
+
+    inline void DrawTerrainOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, bool raise)
+    {
+        Window window;
+        window.windowPos = pos;
+        window.width = kTerrainOverlaySize.width;
+        window.height = kTerrainOverlaySize.height;
+        DrawPanelHeading(rt, window, "Terrain");
+        DrawIconRow(rt, pos + ScreenCoordsXY{ 10, 44 }, window.width - 20, "Raise land", raise, PanelIcon::raise);
+        DrawIconRow(rt, pos + ScreenCoordsXY{ 10, 76 }, window.width - 20, "Lower land", !raise, PanelIcon::lower);
+        drawText(rt, pos + ScreenCoordsXY{ 13, 115 }, "Single tile / centre cursor", { Drawing::Colour::white });
+        DrawCommand(rt, pos + ScreenCoordsXY{ 13, 141 }, 17, "Y", "Switch tool");
+    }
+
+    inline void DrawGameplayFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::string& status, bool terrain)
+    {
+        DrawSurface(rt, { 0, screen.height - 34 }, { screen.width, 34 });
+        const auto y = screen.height - 15;
+        if (terrain)
+        {
+            DrawCommand(rt, { 8, y }, 17, "A", "Edit");
+            DrawCommand(rt, { 112, y }, 17, "Y", "Raise/lower");
+            DrawCommand(rt, { 264, y }, 17, "B", "Done");
+            DrawCommand(rt, { 376, y }, 38, "D-pad", "Move");
+        }
+        else
+        {
+            DrawCommand(rt, { 8, y }, 17, "A", "Inspect");
+            DrawCommand(rt, { 126, y }, 17, "B", "Back");
+            DrawCommand(rt, { 244, y }, 28, "SEL", "Build");
+            DrawCommand(rt, { 370, y }, 38, "START", "Park");
+        }
+        drawTextEllipsised(rt, { 8, screen.height - 31 }, screen.width - 16, "{YELLOW}" + status, { Drawing::Colour::white });
+    }
+
+    inline void DrawMapFocus(Drawing::RenderTarget& rt, ScreenCoordsXY centre)
+    {
+        GfxDrawLine(rt, { centre + ScreenCoordsXY{ -7, -1 }, centre + ScreenCoordsXY{ 7, -1 } }, Drawing::PaletteIndex::pi10);
+        GfxDrawLine(rt, { centre + ScreenCoordsXY{ -7, 1 }, centre + ScreenCoordsXY{ 7, 1 } }, Drawing::PaletteIndex::pi10);
+        GfxDrawLine(rt, { centre + ScreenCoordsXY{ -1, -7 }, centre + ScreenCoordsXY{ -1, 7 } }, Drawing::PaletteIndex::pi10);
+        GfxDrawLine(rt, { centre + ScreenCoordsXY{ 1, -7 }, centre + ScreenCoordsXY{ 1, 7 } }, Drawing::PaletteIndex::pi10);
+        GfxDrawLine(rt, { centre + ScreenCoordsXY{ -6, 0 }, centre + ScreenCoordsXY{ 6, 0 } }, Drawing::PaletteIndex::pi21);
+        GfxDrawLine(rt, { centre + ScreenCoordsXY{ 0, -6 }, centre + ScreenCoordsXY{ 0, 6 } }, Drawing::PaletteIndex::pi21);
+    }
 
     // One layout for pause, tool selection, save/load and confirmation pages.
     // The renderer is also called directly by the preview tool: no separate mockup UI.
