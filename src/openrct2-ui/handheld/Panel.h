@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include <openrct2-ui/interface/Window.h>
+#include <openrct2/SpriteIds.h>
 #include <openrct2/drawing/ColourMap.h>
+#include <openrct2/drawing/Drawing.h>
 #include <openrct2/drawing/PaletteIndex.h>
 #include <openrct2/drawing/Rectangle.h>
 #include <openrct2/drawing/Text.h>
@@ -10,57 +12,201 @@ namespace OpenRCT2::Ui::Handheld
 {
     inline constexpr int32_t kPanelRowPitch = 32;
 
+    // Stable entries in OpenRCT2's default palette; never use cycling water colours.
+    // The palette has no continuous RGB navy ramp, so combine ink blue with slate edges.
+    namespace Theme
+    {
+        inline constexpr Drawing::PaletteIndex ink = static_cast<Drawing::PaletteIndex>(118);
+        inline constexpr Drawing::PaletteIndex body = static_cast<Drawing::PaletteIndex>(10);
+        inline constexpr Drawing::PaletteIndex raised = static_cast<Drawing::PaletteIndex>(119);
+        inline constexpr Drawing::PaletteIndex edge = static_cast<Drawing::PaletteIndex>(14);
+        inline constexpr Drawing::PaletteIndex highlight = static_cast<Drawing::PaletteIndex>(17);
+        inline constexpr Drawing::PaletteIndex gold = static_cast<Drawing::PaletteIndex>(53);
+        inline constexpr Drawing::PaletteIndex goldLight = static_cast<Drawing::PaletteIndex>(55);
+        inline constexpr Drawing::PaletteIndex goldShadow = static_cast<Drawing::PaletteIndex>(51);
+        inline constexpr Drawing::PaletteIndex text = static_cast<Drawing::PaletteIndex>(20);
+    } // namespace Theme
+
+    inline void Fill(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, Drawing::PaletteIndex colour)
+    {
+        if (size.width > 0 && size.height > 0)
+            Drawing::Rectangle::fill(rt, { pos, pos + ScreenCoordsXY{ size.width - 1, size.height - 1 } }, colour);
+    }
+
+    // Two-pixel cut corners survive the software renderer and match the pixel artwork.
+    inline void DrawCard(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, bool selected = false)
+    {
+        const auto edge = selected ? Theme::goldShadow : Theme::edge;
+        Fill(rt, pos + ScreenCoordsXY{ 2, 0 }, { size.width - 4, size.height }, edge);
+        Fill(rt, pos + ScreenCoordsXY{ 0, 2 }, { size.width, size.height - 4 }, edge);
+        Fill(rt, pos + ScreenCoordsXY{ 1, 2 }, { size.width - 2, size.height - 4 }, selected ? Theme::gold : Theme::raised);
+        Fill(rt, pos + ScreenCoordsXY{ 2, 1 }, { size.width - 4, 1 }, selected ? Theme::goldLight : Theme::highlight);
+        if (!selected)
+            Fill(rt, pos + ScreenCoordsXY{ 2, 3 }, { size.width - 4, size.height - 5 }, Theme::body);
+    }
+
     inline void DrawSurface(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size)
     {
-        const auto blue = Drawing::getColourMap(Drawing::Colour::grey);
-        Drawing::Rectangle::fill(rt, { pos, pos + ScreenCoordsXY{ size.width - 1, size.height - 1 } }, blue.midDark);
-        Drawing::Rectangle::fill(
-            rt, { pos + ScreenCoordsXY{ 1, 1 }, pos + ScreenCoordsXY{ size.width - 2, size.height - 2 } },
-            Drawing::getColourMap(Drawing::Colour::grey).darkest);
+        DrawCard(rt, pos, size);
+        Fill(rt, pos + ScreenCoordsXY{ 3, 3 }, { size.width - 6, size.height - 6 }, Theme::ink);
+    }
+
+    enum class PanelIcon : uint8_t
+    {
+        play,
+        terrain,
+        save,
+        exit,
+        folder,
+        back,
+        raise,
+        lower
+    };
+
+    inline void DrawIcon(Drawing::RenderTarget& rt, ScreenCoordsXY pos, PanelIcon icon, bool selected = false)
+    {
+        // Native 16px pixel glyphs, independent of the user's RCT2 asset installation.
+        static constexpr uint16_t glyphs[][16] = {
+            { 0, 0, 0x0800, 0x0C00, 0x0E00, 0x0F00, 0x0F80, 0x0FC0, 0x0F80, 0x0F00, 0x0E00, 0x0C00, 0x0800, 0, 0, 0 },
+            { 0, 0, 0, 0x0080, 0x01C0, 0x03E0, 0x07F0, 0x0FF8, 0x1FFC, 0x3FFE, 0x7FFF, 0x3FFE, 0x1FFC, 0, 0, 0 },
+            { 0, 0, 0x3FFC, 0x2424, 0x2424, 0x2424, 0x27E4, 0x2004, 0x2004, 0x27E4, 0x2424, 0x2424, 0x3FFC, 0, 0, 0 },
+            { 0, 0, 0x3F00, 0x2100, 0x2100, 0x2120, 0x2130, 0x27F8, 0x2130, 0x2120, 0x2100, 0x2100, 0x3F00, 0, 0, 0 },
+            { 0, 0, 0, 0x3C00, 0x7FF8, 0x4008, 0x4008, 0x4008, 0x4008, 0x4008, 0x4008, 0x7FF8, 0, 0, 0, 0 },
+            { 0, 0, 0, 0x0200, 0x0600, 0x0C00, 0x1FF8, 0x3FF8, 0x1FF8, 0x0C00, 0x0600, 0x0200, 0, 0, 0, 0 },
+            { 0, 0, 0, 0x0180, 0x03C0, 0x07E0, 0x0DB0, 0x1998, 0x0180, 0x0180, 0x0180, 0x0180, 0x0180, 0, 0, 0 },
+            { 0, 0, 0, 0x0180, 0x0180, 0x0180, 0x0180, 0x0180, 0x1998, 0x0DB0, 0x07E0, 0x03C0, 0x0180, 0, 0, 0 }
+        };
+        for (int y = 0; y < 16; ++y)
+            for (int x = 0; x < 16; ++x)
+                if (glyphs[static_cast<size_t>(icon)][y] & (0x8000 >> x))
+                    Fill(
+                        rt, pos + ScreenCoordsXY{ x, y }, { 1, 1 },
+                        selected ? Theme::ink : (icon == PanelIcon::save ? Theme::highlight : Theme::goldLight));
     }
 
     inline void DrawPanelHeading(Drawing::RenderTarget& rt, const Window& window, const std::string& title)
     {
         DrawSurface(rt, window.windowPos, { window.width, window.height });
-        const auto blue = Drawing::getColourMap(Drawing::Colour::grey);
-        Drawing::Rectangle::fill(
-            rt, { window.windowPos + ScreenCoordsXY{ 1, 1 }, window.windowPos + ScreenCoordsXY{ window.width - 2, 35 } },
-            blue.darker);
+        Fill(rt, window.windowPos + ScreenCoordsXY{ 3, 3 }, { window.width - 6, 32 }, Theme::raised);
+        Fill(rt, window.windowPos + ScreenCoordsXY{ 13, 11 }, { 3, 14 }, Theme::gold);
+        Fill(rt, window.windowPos + ScreenCoordsXY{ 10, 35 }, { window.width - 20, 1 }, Theme::edge);
         drawTextEllipsised(
-            rt, window.windowPos + ScreenCoordsXY{ 16, 13 }, window.width - 32, title, { Drawing::Colour::white });
+            rt, window.windowPos + ScreenCoordsXY{ 24, 13 }, window.width - 40, title, { Drawing::Colour::white });
     }
 
-    // Filled focus, inset rows and consistent clipping at the physical UI size.
+    inline void DrawIconRow(
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t width, const std::string& label, bool selected, PanelIcon icon)
+    {
+        DrawCard(rt, pos, { width, 28 }, selected);
+        if (icon == PanelIcon::terrain)
+            GfxDrawSprite(rt, ImageId(SPR_G2_TAB_LAND), pos + ScreenCoordsXY{ 3, 0 });
+        else
+            DrawIcon(rt, pos + ScreenCoordsXY{ 8, 6 }, icon, selected);
+        drawTextEllipsised(
+            rt, pos + ScreenCoordsXY{ 39, 9 }, width - 53, (selected ? "{BLACK}" : "{WHITE}") + label,
+            { Drawing::Colour::white });
+        if (selected)
+            drawText(rt, pos + ScreenCoordsXY{ width - 11, 9 }, "{BLACK}>", { Drawing::Colour::white });
+    }
+
     inline void DrawPanelRow(
         Drawing::RenderTarget& rt, const Window& window, int32_t y, const std::string& label, bool selected)
     {
-        Drawing::Rectangle::fill(
-            rt, { window.windowPos.x + 10, y - 8, window.windowPos.x + window.width - 11, y + 19 },
-            selected ? Drawing::getColourMap(Drawing::Colour::yellow).light
-                     : Drawing::getColourMap(Drawing::Colour::grey).darker);
-        if (selected)
-            drawText(rt, { window.windowPos.x + 17, y }, "{BLACK}>", { Drawing::Colour::black });
-        drawTextEllipsised(
-            rt, { window.windowPos.x + 30, y }, window.width - 46, (selected ? "{BLACK}" : "{WHITE}") + label,
-            { selected ? Drawing::Colour::black : Drawing::Colour::white, FontStyle::medium, TextAlignment::left,
-              selected ? TextDarkness::extraDark : TextDarkness::regular });
+        DrawIconRow(rt, { window.windowPos.x + 10, y - 8 }, window.width - 20, label, selected, PanelIcon::play);
     }
 
     inline void DrawCommand(Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t keyWidth, const char* key, const char* label)
     {
-        const auto blue = Drawing::getColourMap(Drawing::Colour::grey);
-        Drawing::Rectangle::fill(rt, { pos.x, pos.y - 3, pos.x + keyWidth - 1, pos.y + 12 }, blue.midDark);
-        drawText(rt, { pos.x + keyWidth / 2, pos.y }, key, { Drawing::Colour::white, TextAlignment::centre });
+        // Light button badges keep the controller legend distinct from menu cards.
+        Fill(rt, pos + ScreenCoordsXY{ 2, -3 }, { keyWidth - 4, 17 }, Theme::highlight);
+        Fill(rt, pos + ScreenCoordsXY{ 0, -1 }, { keyWidth, 13 }, Theme::highlight);
+        Fill(rt, pos + ScreenCoordsXY{ 2, -2 }, { keyWidth - 4, 14 }, Theme::text);
+        drawText(
+            rt, { pos.x + keyWidth / 2, pos.y }, "{BLACK}" + std::string(key),
+            { Drawing::Colour::white, TextAlignment::centre });
         drawText(rt, { pos.x + keyWidth + 5, pos.y }, label, { Drawing::Colour::white });
     }
 
     inline void DrawPanelCommands(Drawing::RenderTarget& rt, const Window& window, const char* backLabel = "Back")
     {
         const auto pos = window.windowPos + ScreenCoordsXY{ 1, window.height - 29 };
-        DrawSurface(rt, pos, { window.width - 2, 28 });
+        Fill(rt, pos, { window.width - 2, 28 }, Theme::raised);
+        Fill(rt, pos, { window.width - 2, 1 }, Theme::edge);
         const auto y = pos.y + 8;
         DrawCommand(rt, { pos.x + 12, y }, 38, "D-pad", "Choose");
         DrawCommand(rt, { pos.x + 139, y }, 17, "A", "Select");
         DrawCommand(rt, { pos.x + 238, y }, 17, "B", backLabel);
+    }
+
+    inline void DrawTabs(
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t width, const std::vector<std::string>& labels, size_t selected)
+    {
+        if (labels.empty())
+            return;
+        const auto tabWidth = width / static_cast<int32_t>(labels.size());
+        for (size_t i = 0; i < labels.size(); ++i)
+        {
+            const auto tabPos = pos + ScreenCoordsXY{ static_cast<int32_t>(i) * tabWidth, 0 };
+            DrawCard(rt, tabPos, { tabWidth - 3, 28 }, i == selected);
+            drawTextEllipsised(
+                rt, tabPos + ScreenCoordsXY{ 9, 9 }, tabWidth - 21, (i == selected ? "{BLACK}" : "{WHITE}") + labels[i],
+                { Drawing::Colour::white });
+        }
+    }
+
+    struct MenuPresentation
+    {
+        std::string title;
+        std::string section;
+        std::vector<std::string> tabs;
+        size_t selectedTab{};
+        std::string detailTitle;
+        std::string detailSubtitle;
+        std::vector<std::pair<std::string, std::string>> stats;
+        std::vector<std::string> help;
+        std::vector<std::string> rows;
+        std::vector<PanelIcon> icons;
+        std::string status;
+        size_t selected{};
+    };
+
+    // One layout for pause, tool selection, save/load and confirmation pages.
+    // The renderer is also called directly by the preview tool: no separate mockup UI.
+    inline void DrawMenuShell(Drawing::RenderTarget& rt, const Window& window, const MenuPresentation& model)
+    {
+        DrawPanelHeading(rt, window, model.title);
+        const auto p = window.windowPos;
+        if (model.tabs.empty())
+            drawTextEllipsised(rt, p + ScreenCoordsXY{ 14, 46 }, 204, "{YELLOW}" + model.section, { Drawing::Colour::white });
+        else
+            DrawTabs(rt, p + ScreenCoordsXY{ 10, 44 }, 221, model.tabs, model.selectedTab);
+        for (size_t i = 0; i < model.rows.size(); ++i)
+            DrawIconRow(
+                rt, p + ScreenCoordsXY{ 10, (model.tabs.empty() ? 64 : 82) + static_cast<int32_t>(i) * kPanelRowPitch }, 218,
+                model.rows[i], i == model.selected, i < model.icons.size() ? model.icons[i] : PanelIcon::folder);
+        DrawCard(rt, p + ScreenCoordsXY{ 238, 44 }, { window.width - 248, 150 });
+        GfxDrawSprite(rt, ImageId(SPR_G2_TAB_TREE), p + ScreenCoordsXY{ 250, 50 });
+        drawTextEllipsised(
+            rt, p + ScreenCoordsXY{ 289, 59 }, window.width - 305, model.detailTitle, { Drawing::Colour::white });
+        drawTextEllipsised(
+            rt, p + ScreenCoordsXY{ 250, 84 }, window.width - 272, model.detailSubtitle, { Drawing::Colour::white });
+        Fill(rt, p + ScreenCoordsXY{ 250, 105 }, { window.width - 272, 1 }, Theme::edge);
+        for (size_t i = 0; i < model.stats.size() && i < 3; ++i)
+        {
+            const auto y = 116 + static_cast<int32_t>(i) * 23;
+            drawTextEllipsised(rt, p + ScreenCoordsXY{ 250, y }, 100, model.stats[i].first, { Drawing::Colour::white });
+            drawTextEllipsised(
+                rt, p + ScreenCoordsXY{ 357, y }, window.width - 371, "{YELLOW}" + model.stats[i].second,
+                { Drawing::Colour::white });
+        }
+        DrawCard(rt, p + ScreenCoordsXY{ 238, 202 }, { window.width - 248, 87 });
+        drawText(rt, p + ScreenCoordsXY{ 250, 214 }, "{YELLOW}CONTROLS", { Drawing::Colour::white });
+        for (size_t i = 0; i < model.help.size() && i < 3; ++i)
+            drawTextEllipsised(
+                rt, p + ScreenCoordsXY{ 250, 237 + static_cast<int32_t>(i) * 16 }, window.width - 272, model.help[i],
+                { Drawing::Colour::white });
+        drawTextEllipsised(
+            rt, p + ScreenCoordsXY{ 14, window.height - 47 }, window.width - 28, model.status, { Drawing::Colour::white });
+        DrawPanelCommands(rt, window);
     }
 } // namespace OpenRCT2::Ui::Handheld

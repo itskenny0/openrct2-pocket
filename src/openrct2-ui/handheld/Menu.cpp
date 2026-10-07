@@ -21,7 +21,7 @@ namespace OpenRCT2::Ui::Windows
 {
     using namespace Drawing;
     namespace fs = std::filesystem;
-    static constexpr ScreenSize kSize{ 380, 302 };
+    static constexpr ScreenSize kSize{ 494, 342 };
     static constexpr auto kWidgets = makeWidgets(makeWindowShim(STR_SHORTCUT_PAUSE, kSize));
     enum class Page
     {
@@ -265,7 +265,7 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
-            const char* title = "PARK";
+            const char* title = "PARK / PAUSE";
             switch (_page)
             {
                 case Page::build:
@@ -289,14 +289,44 @@ namespace OpenRCT2::Ui::Windows
                 default:
                     break;
             }
-            Handheld::DrawPanelHeading(rt, *this, title);
-            const auto labels = rows();
-            for (size_t i = 0; i < labels.size(); ++i)
-                Handheld::DrawPanelRow(
-                    rt, *this, windowPos.y + 54 + static_cast<int32_t>(i) * Handheld::kPanelRowPitch, labels[i],
-                    i == _focus.index());
-            drawTextEllipsised(rt, windowPos + ScreenCoordsXY{ 16, 251 }, width - 32, _status, { Colour::white });
-            Handheld::DrawPanelCommands(rt, *this);
+            Handheld::MenuPresentation model;
+            model.title = title;
+            model.section = _page == Page::build ? "LAND TOOLS" : "PARK ACTIONS";
+            model.rows = rows();
+            model.selected = _focus.index();
+            model.status = _status;
+            const bool playing = gLegacyScene == LegacyScene::playing;
+            const auto& park = getGameState().park;
+            model.detailTitle = playing ? park.name : "OpenRCT2 Pocket";
+            model.detailSubtitle = playing ? "Park paused" : "Choose a saved park";
+            if (playing)
+                model.stats = { { "Guests", std::to_string(park.numGuestsInPark) },
+                                { "Park rating", std::to_string(park.rating) },
+                                { "Save slots", "3" } };
+            model.help = { "A  Open selected action", "B  Return to your park", "D-pad  Move through menu" };
+            if (_page == Page::park)
+                model.icons = { Handheld::PanelIcon::play, Handheld::PanelIcon::terrain, Handheld::PanelIcon::save,
+                                Handheld::PanelIcon::exit, Handheld::PanelIcon::folder,  Handheld::PanelIcon::exit };
+            else if (_page == Page::build)
+            {
+                model.icons = { Handheld::PanelIcon::raise, Handheld::PanelIcon::lower, Handheld::PanelIcon::back };
+                model.detailSubtitle = "Terrain / single tile";
+                model.tabs = { "Terrain" };
+                model.help = { "A  Edit tile under cursor", "Y  Switch raise / lower", "B  Finish editing" };
+                model.status = "Select a tool, then move the cursor in your park.";
+            }
+            else if (_page == Page::save || _page == Page::load)
+            {
+                model.section = "POCKET SAVE SLOTS";
+                model.help = { _page == Page::save ? "A  Save to selected slot" : "A  Load selected slot",
+                               "B  Return to previous menu", "D-pad  Choose a slot" };
+            }
+            else
+            {
+                model.section = "CONFIRM ACTION";
+                model.help = { "A  Confirm selected action", "B  Return without changes" };
+            }
+            Handheld::DrawMenuShell(rt, *this, model);
         }
     };
 
