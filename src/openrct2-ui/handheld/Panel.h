@@ -264,13 +264,13 @@ namespace OpenRCT2::Ui::Handheld
     inline constexpr ScreenSize kTerrainOverlaySize{ 164, 278 };
     inline constexpr ScreenSize kContextSize{ 160, 42 };
 
-    inline void DrawTerrainOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, bool raise)
+    inline void DrawTerrainOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, bool raise, bool water = false)
     {
         using namespace Concept;
         Box(rt, pos, { kRailWidth, 174 });
-        Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, "Terrain");
-        Row(rt, pos + ScreenCoordsXY{ 8, 34 }, "Raise land", Icon::rise, raise);
-        Row(rt, pos + ScreenCoordsXY{ 8, 62 }, "Lower land", Icon::lower, !raise);
+        Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, water ? "Water" : "Terrain");
+        Row(rt, pos + ScreenCoordsXY{ 8, 34 }, water ? "Raise water" : "Raise land", Icon::rise, raise);
+        Row(rt, pos + ScreenCoordsXY{ 8, 62 }, water ? "Lower water" : "Lower land", Icon::lower, !raise);
         Rule(rt, pos + ScreenCoordsXY{ 8, 99 }, 148);
         Section(rt, pos + ScreenCoordsXY{ 10, 109 }, "Brush");
         DrawModernText(rt, pos + ScreenCoordsXY{ 12, 132 }, "Single tile");

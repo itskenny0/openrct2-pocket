@@ -9,6 +9,7 @@
 
 #include "WindowManager.h"
 
+#include "handheld/Explorer.h"
 #include "handheld/Paths.h"
 #include "interface/Chat.h"
 #include "interface/FileBrowser.h"
@@ -354,7 +355,7 @@ public:
             {
                 std::string message = intent->GetStringExtra(INTENT_EXTRA_MESSAGE);
                 CloseCallback callback = intent->GetCloseCallbackExtra(INTENT_EXTRA_CALLBACK);
-                Handheld::Paths::End();
+                Handheld::EndTerrain();
                 return ProgressWindowOpen(message, callback);
             }
 
@@ -407,7 +408,7 @@ public:
         switch (intent.GetAction())
         {
             case INTENT_ACTION_MAP:
-                Handheld::Paths::End();
+                Handheld::EndTerrain();
                 WindowMapReset();
                 break;
 

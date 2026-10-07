@@ -8,6 +8,7 @@
 #include "ControllerInput.h"
 #include "Panel.h"
 #include "Paths.h"
+#include "Water.h"
 
 #include <SDL_timer.h>
 #include <iomanip>
@@ -40,6 +41,7 @@
 namespace OpenRCT2::Ui::Handheld
 {
     static bool _terrainActive{};
+    static bool _waterTool{};
     static bool _raiseLand = true;
     static bool _selectionOwned{};
     static std::optional<CoordsXY> _terrainTile;
@@ -49,8 +51,15 @@ namespace OpenRCT2::Ui::Handheld
     {
         Paths::End();
         _terrainActive = true;
+        _waterTool = false;
         _raiseLand = raise;
         _terrainStatus.clear();
+    }
+
+    void BeginWater(bool raise)
+    {
+        BeginTerrain(raise);
+        _waterTool = true;
     }
 
     static void ClearTerrainSelection()
@@ -68,6 +77,7 @@ namespace OpenRCT2::Ui::Handheld
     void EndTerrain()
     {
         _terrainActive = false;
+        _waterTool = false;
         Paths::End();
         _terrainStatus.clear();
         ClearTerrainSelection();
@@ -75,6 +85,8 @@ namespace OpenRCT2::Ui::Handheld
 
     static GameActions::Result TerrainAction(bool execute)
     {
+        if (_waterTool)
+            return Water::Action(_terrainTile, _raiseLand, execute);
         const auto tile = *_terrainTile;
         const MapRange range{ tile.x, tile.y, tile.x, tile.y };
         const CoordsXY centre{ tile.x + 16, tile.y + 16 };
@@ -217,8 +229,7 @@ namespace OpenRCT2::Ui::Handheld
     {
         if (gLegacyScene != LegacyScene::playing)
         {
-            _terrainActive = false;
-            Paths::End();
+            EndTerrain();
         }
         ClearTerrainSelection();
         if ((_terrainActive || Paths::IsActive()) && CanExplore() && ContextHasFocus())
@@ -229,6 +240,13 @@ namespace OpenRCT2::Ui::Handheld
                 Paths::UpdatePreview();
             }
             auto coords = Paths::IsActive() ? Paths::TargetTile() : ScreenGetMapXY(Centre(), nullptr);
+            if (_waterTool)
+            {
+                const auto info = GetMapCoordinatesFromPos(
+                    Centre(), { ViewportInteractionItem::terrain, ViewportInteractionItem::water });
+                coords = info.interactionType == ViewportInteractionItem::none ? std::nullopt
+                                                                               : std::optional<CoordsXY>{ info.Loc };
+            }
             if (coords)
             {
                 _terrainTile = CoordsXY{ coords->x & ~31, coords->y & ~31 };
@@ -366,8 +384,9 @@ namespace OpenRCT2::Ui::Handheld
                             if (_terrainTile)
                             {
                                 const auto result = TerrainAction(true);
-                                _terrainStatus = result.error == GameActions::Status::ok ? "Land changed."
-                                                                                         : result.getErrorMessage();
+                                _terrainStatus = result.error == GameActions::Status::ok
+                                    ? (_waterTool ? "Water change requested." : "Land changed.")
+                                    : result.getErrorMessage();
                             }
                         }
                         else
@@ -438,7 +457,7 @@ namespace OpenRCT2::Ui::Handheld
         std::string costAmount;
         if (_terrainActive)
         {
-            status = _raiseLand ? "RAISE LAND" : "LOWER LAND";
+            status = _waterTool ? (_raiseLand ? "RAISE WATER" : "LOWER WATER") : (_raiseLand ? "RAISE LAND" : "LOWER LAND");
             if (_terrainTile)
             {
                 const auto result = TerrainAction(false);
@@ -477,7 +496,7 @@ namespace OpenRCT2::Ui::Handheld
         else
         {
             if (_terrainActive)
-                DrawTerrainOverlay(rt, Concept::kOrigin, _raiseLand);
+                DrawTerrainOverlay(rt, Concept::kOrigin, _raiseLand, _waterTool);
             DrawGameplayFooter(rt, { ContextGetWidth(), height }, status, _terrainActive);
         }
         const bool feedback = !_terrainStatus.empty();

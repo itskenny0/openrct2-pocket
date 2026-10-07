@@ -17,6 +17,7 @@ namespace OpenRCT2::Ui::Handheld
     void UpdateExplorer(ControllerInput& input);
     void EndTerrain();
     void BeginTerrain(bool raise);
+    void BeginWater(bool raise = true);
     void DrawExplorer(Drawing::RenderTarget& rt);
 } // namespace OpenRCT2::Ui::Handheld
 

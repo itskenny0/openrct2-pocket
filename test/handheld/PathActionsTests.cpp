@@ -4,6 +4,7 @@
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/Paths.h>
+#include <openrct2-ui/handheld/Water.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
 #include <openrct2/Game.h>
@@ -40,6 +41,95 @@ static PathElement* FindPath(const TileCoordsXYZ& location)
         if (path->baseHeight == location.z)
             return path;
     return nullptr;
+}
+static void TestWater(IContext& context, const std::string& profile)
+{
+    namespace Water = Ui::Handheld::Water;
+    auto& state = getGameState();
+    const CoordsXY tile{ 224, 64 }, neighbour{ 256, 64 };
+    auto* surface = MapGetSurfaceElementAt(tile);
+    surface->setOwnership({ OwnershipFlag::landOwned });
+    const auto landHeight = surface->getBaseZ();
+    const auto neighbourWater = MapGetSurfaceElementAt(neighbour)->getWaterHeight();
+    const auto initialCash = state.park.cash;
+    Require(Water::Action({}, true, true).error == GameActions::Status::invalidParameters, "Missing water target accepted");
+    Require(surface->getWaterHeight() == 0, "Water fixture not dry");
+    auto query = Water::Action(tile, true, false);
+    Require(query.error == GameActions::Status::ok && query.cost > 0, "Water raise query failed");
+    Require(state.park.cash == initialCash && surface->getWaterHeight() == 0, "Water query changed park");
+    auto result = Water::Action(tile, true, true);
+    Require(result.error == GameActions::Status::ok && surface->getWaterHeight() == 0, "Water action bypassed queue");
+    GameActions::ProcessQueue(state);
+    const auto firstHeight = surface->getWaterHeight();
+    Require(firstHeight > landHeight && state.park.cash == initialCash - query.cost, "Water raise/cash incorrect");
+    const auto beforeSecond = state.park.cash;
+    query = Water::Action(tile, true, false);
+    Require(Water::Action(tile, true, true).error == GameActions::Status::ok, "Second water raise failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        surface->getWaterHeight() > firstHeight && state.park.cash == beforeSecond - query.cost, "Second raise/cash incorrect");
+    const auto beforeLower = state.park.cash;
+    query = Water::Action(tile, false, false);
+    Require(Water::Action(tile, false, true).error == GameActions::Status::ok, "Water lower failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        surface->getWaterHeight() == firstHeight && state.park.cash == beforeLower - query.cost, "Water lower/cash incorrect");
+    Require(
+        surface->getBaseZ() == landHeight && MapGetSurfaceElementAt(neighbour)->getWaterHeight() == neighbourWater,
+        "Water changed land or neighbouring tile");
+    SaveFlags flags{};
+    flags.set(SaveFlag::exportObjects);
+    const auto save = profile + "/water.park";
+    const auto savedCash = state.park.cash;
+    Require(ScenarioSave(state, save, flags) != 0 && context.LoadParkFromFile(save), "Water save/reload failed");
+    surface = MapGetSurfaceElementAt(tile);
+    Require(
+        surface->getWaterHeight() == firstHeight && surface->getBaseZ() == landHeight && state.park.cash == savedCash,
+        "Water height/land/cash not preserved");
+    query = Water::Action(tile, false, false);
+    Require(Water::Action(tile, false, true).error == GameActions::Status::ok, "Water removal failed");
+    GameActions::ProcessQueue(state);
+    Require(surface->getWaterHeight() == 0 && state.park.cash == savedCash - query.cost, "Water removal/cash incorrect");
+    const auto validCash = state.park.cash;
+    surface->setOwnership({});
+    Require(
+        Water::Action(tile, true, false).error == GameActions::Status::disallowed
+            && Water::Action(tile, true, true).error == GameActions::Status::disallowed,
+        "Unowned water accepted");
+    surface->setOwnership({ OwnershipFlag::landOwned });
+    state.park.cash = 0;
+    Require(
+        Water::Action(tile, true, false).error == GameActions::Status::insufficientFunds
+            && Water::Action(tile, true, true).error == GameActions::Status::insufficientFunds,
+        "Unaffordable water accepted");
+    state.park.cash = validCash;
+    gGamePaused = 1;
+    Require(
+        Water::Action(tile, true, false).error == GameActions::Status::gamePaused
+            && Water::Action(tile, true, true).error == GameActions::Status::gamePaused,
+        "Paused water accepted");
+    gGamePaused = 0;
+    // Native clearance: water cannot be raised through an actual ground path.
+    InteractionInfo info;
+    info.Loc = tile;
+    info.Element = reinterpret_cast<TileElement*>(surface);
+    info.interactionType = ViewportInteractionItem::terrain;
+    Paths::Begin(false);
+    Paths::UpdateTargetFromInfo(info);
+    Require(Paths::Action(true).error == GameActions::Status::ok, "Clearance path fixture failed");
+    GameActions::ProcessQueue(state);
+    Paths::End();
+    const auto blockedCash = state.park.cash;
+    Require(
+        Water::Action(tile, true, false).error != GameActions::Status::ok
+            && Water::Action(tile, true, true).error != GameActions::Status::ok,
+        "Water ignored path clearance");
+    GameActions::ProcessQueue(state);
+    Require(
+        MapGetSurfaceElementAt(tile)->getWaterHeight() == 0 && state.park.cash == blockedCash, "Rejected water changed park");
+    Ui::Handheld::EndTerrain();
+    std::cout << "Native water raise/lower / exact cash / single tile / clearance / ownership / funds / pause / save/reload "
+                 "checks passed\n";
 }
 int main(int argc, char** argv)
 {
@@ -297,9 +387,14 @@ int main(int argc, char** argv)
             Ui::Windows::HandheldMenuBack();
             Paths::UpdatePreview();
             Require(FindPath(TileCoordsXYZ{ previewLocation }), "Pause return did not restore preview");
+            Ui::Windows::HandheldBuildOpen();
+            Ui::Windows::HandheldMenuMove(3);
+            Ui::Windows::HandheldMenuConfirm();
+            Require(!Paths::IsActive() && !FindPath(TileCoordsXYZ{ previewLocation }), "Water entry retained path tool/ghost");
             Require(context->LoadParkFromFile(save), "UI reload failed");
             Require(!Paths::IsActive() && !FindPath(TileCoordsXYZ{ previewLocation }), "Park load retained preview/tool");
         }
+        TestWater(*context, argv[2]);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;
