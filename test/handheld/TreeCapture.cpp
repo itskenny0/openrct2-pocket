@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Isolated loaded scenario, one native tree placement, native renderer and production UI.
+// Isolated loaded scenario, native tree ghost then one real placement, production UI.
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
@@ -96,6 +96,12 @@ int main(int argc, char** argv)
     const auto initialCash = state.park.cash;
     for (int mode = 0; mode < 2; ++mode)
     {
+        if (mode == 0)
+        {
+            Trees::UpdatePreview(tile, selected);
+            if (state.park.cash != initialCash)
+                return 8;
+        }
         if (mode == 1)
         {
             if (Trees::Action(tile, selected, true).error != GameActions::Status::ok)
@@ -129,7 +135,7 @@ int main(int argc, char** argv)
         else
             Ui::Handheld::DrawContextMessage(rt, { 288, 224 }, "Tree placement requested.");
         Ui::Handheld::DrawMapFocus(rt, { 256, 192 });
-        const char* names[] = { "tree-ready.png", "tree-placed.png" };
+        const char* names[] = { "tree-preview.png", "tree-placed.png" };
         Image image;
         image.Width = 512;
         image.Height = 384;
@@ -141,5 +147,6 @@ int main(int argc, char** argv)
         Imaging::WriteToFile((std::filesystem::path(argv[4]) / names[mode]).string(), image, ImageFormat::png);
         engine.EndDraw();
     }
+    Trees::ClearPreview();
     return 0;
 }

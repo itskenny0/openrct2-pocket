@@ -4,6 +4,7 @@
 #include <iostream>
 #include <openrct2-ui/ProvisionalElements.h>
 #include <openrct2-ui/UiContext.h>
+#include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/SceneryRemoval.h>
@@ -25,6 +26,8 @@
 #include <openrct2/object/ObjectManager.h>
 #include <openrct2/scenario/Scenario.h>
 #include <openrct2/ui/UiContext.h>
+#include <openrct2/ui/WindowManager.h>
+#include <openrct2/windows/Intent.h>
 #include <openrct2/world/Footpath.h>
 #include <openrct2/world/Map.h>
 #include <openrct2/world/MapOwnership.h>
@@ -505,6 +508,182 @@ static void TestTrees(IContext& context, const std::string& profile)
                  "invalid-ownership-clearance-funds-pause / save-reload checks passed\n";
 }
 
+static void TestTreeGhost(IContext& context, const std::string& profile, bool realUi)
+{
+    namespace Trees = Ui::Handheld::Trees;
+    auto& state = getGameState();
+    auto& objects = context.GetObjectManager();
+    const auto index = objects.GetLoadedObjectEntryIndex(objects.LoadObject("rct2.scenery_small.tcl"));
+    const auto second = objects.GetLoadedObjectEntryIndex(objects.LoadObject("rct2.scenery_small.tpm"));
+    ScenerySetInvented({ SCENERY_TYPE_SMALL, index });
+    ScenerySetInvented({ SCENERY_TYPE_SMALL, second });
+    const CoordsXY tile{ 448, 128 }, next{ 416, 128 };
+    MapGetSurfaceElementAt(tile)->setOwnership({ OwnershipFlag::landOwned });
+    MapGetSurfaceElementAt(next)->setOwnership({ OwnershipFlag::landOwned });
+    auto count = [](CoordsXY xy, bool ghosts) {
+        int n = 0;
+        for (auto* e : TileElementsView<SmallSceneryElement>(xy))
+            n += e->isGhost() == ghosts;
+        return n;
+    };
+    auto firstGhost = [](CoordsXY xy) -> SmallSceneryElement* {
+        for (auto* e : TileElementsView<SmallSceneryElement>(xy))
+            if (e->isGhost())
+                return e;
+        return nullptr;
+    };
+    auto clear = [&]() { return count(tile, true) == 0 && count(next, true) == 0; };
+    state.park.cash = 100000;
+    const auto cash = state.park.cash;
+    const auto groundBefore = *MapGetSurfaceElementAt(tile);
+    const auto nextBefore = *MapGetSurfaceElementAt(next);
+    auto query = Trees::Action(tile, index, false);
+    Trees::UpdatePreview(tile, index);
+    Require(count(tile, true) == 1 && count(tile, false) == 0 && state.park.cash == cash, "Tree ghost/cash incorrect");
+    Require(
+        firstGhost(tile)->getBaseZ() == query.position.z && firstGhost(tile)->getEntryIndex() == index,
+        "Tree preview identity/height incorrect");
+    // Detect replacement on unchanged updates by setting harmless ghost metadata.
+    firstGhost(tile)->setAge(7);
+    Trees::UpdatePreview(tile, index);
+    Require(firstGhost(tile)->getAge() == 7 && count(tile, true) == 1, "Unchanged tree preview replaced/duplicated");
+    const auto withGhost = Trees::Action(tile, index, false);
+    Require(
+        withGhost.error == GameActions::Status::ok && withGhost.cost == query.cost && firstGhost(tile)->getAge() == 7
+            && state.park.cash == cash,
+        "Ghost changed normal query/feedback");
+    Trees::UpdatePreview(next, index);
+    Require(count(tile, true) == 0 && count(next, true) == 1, "Old target ghost retained");
+    Trees::UpdatePreview(next, second);
+    Require(count(next, true) == 1 && firstGhost(next)->getEntryIndex() == second, "Tree selection ghost stale");
+    Trees::RemovePreviewTemporarily();
+    Trees::RemovePreviewTemporarily();
+    Require(clear() && state.park.cash == cash, "Suspension left ghost or charged cash");
+    Trees::RestorePreview();
+    Require(clear(), "Nested suspension restored too early");
+    Trees::RestorePreview();
+    Require(count(next, true) == 1, "Tree provisional restore failed");
+    const auto base = MapGetSurfaceElementAt(next)->getBaseZ();
+    const auto clearance = MapGetSurfaceElementAt(next)->getClearanceZ();
+    MapGetSurfaceElementAt(next)->setBaseZ(base + 8);
+    MapGetSurfaceElementAt(next)->setClearanceZ(clearance + 8);
+    Trees::UpdatePreview(next, second);
+    Require(firstGhost(next)->getBaseZ() == base + 8, "Ghost did not follow changed ground height");
+    MapGetSurfaceElementAt(next)->setBaseZ(base);
+    MapGetSurfaceElementAt(next)->setClearanceZ(clearance);
+    Trees::UpdatePreview(next, second);
+    Trees::UpdatePreview({}, index);
+    Require(clear(), "Invalid target left tree ghost");
+    Trees::UpdatePreview(tile, index);
+    ScenerySetNotInvented({ SCENERY_TYPE_SMALL, index });
+    Trees::UpdatePreview(tile, index);
+    Require(clear(), "Research change left ghost");
+    ScenerySetInvented({ SCENERY_TYPE_SMALL, index });
+    Trees::UpdatePreview(tile, index);
+    SetSceneryItemRestricted({ SCENERY_TYPE_SMALL, index }, true);
+    Trees::UpdatePreview(tile, index);
+    Require(clear(), "Restriction change left ghost");
+    SetSceneryItemRestricted({ SCENERY_TYPE_SMALL, index }, false);
+    Trees::UpdatePreview(tile, index);
+    MapGetSurfaceElementAt(tile)->setOwnership({});
+    state.park.flags.set(ParkFlag::forbidTreeRemoval);
+    Trees::UpdatePreview(tile, index);
+    Require(clear(), "Ownership/tree-removal rule stranded ghost");
+    state.park.flags.unset(ParkFlag::forbidTreeRemoval);
+    MapGetSurfaceElementAt(tile)->setOwnership({ OwnershipFlag::landOwned });
+    Trees::UpdatePreview(tile, index);
+    state.park.cash = 0;
+    Trees::UpdatePreview(tile, index);
+    Require(clear() && state.park.cash == 0, "Insufficient funds left ghost");
+    state.park.cash = cash;
+    Trees::UpdatePreview(tile, index);
+    gGamePaused = 1;
+    Trees::UpdatePreview(tile, index);
+    Require(clear(), "Pause left invalid ghost");
+    gGamePaused = 0;
+    Trees::UpdatePreview(tile, index);
+    Trees::RemovePreviewTemporarily();
+    Trees::ClearPreview();
+    Trees::RestorePreview();
+    Require(clear(), "Cleared suspension resurrected ghost");
+    Require(
+        std::memcmp(&groundBefore, MapGetSurfaceElementAt(tile), sizeof(SurfaceElement)) == 0
+            && std::memcmp(&nextBefore, MapGetSurfaceElementAt(next), sizeof(SurfaceElement)) == 0 && count(tile, false) == 0
+            && count(next, false) == 0 && state.park.cash == cash,
+        "Preview lifecycle permanently changed park");
+    if (realUi)
+    {
+        Ui::Handheld::BeginTrees();
+        Trees::UpdatePreview(tile, index);
+        Ui::Windows::HandheldMenuOpen();
+        Require(clear(), "Pause menu retained tree ghost");
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        Trees::UpdatePreview(tile, index);
+        Ui::Windows::HandheldBuildOpen();
+        Require(clear(), "Build menu retained tree ghost");
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        Trees::UpdatePreview(tile, index);
+        Ui::Handheld::BeginWater();
+        Require(clear(), "Other tool retained tree ghost");
+        Ui::Handheld::BeginTrees();
+        Trees::UpdatePreview(tile, index);
+        Ui::GetWindowManager()->BroadcastIntent(Intent(INTENT_ACTION_MAP));
+        Require(clear(), "Park-change intent retained tree ghost");
+        Ui::Handheld::BeginTrees();
+        Trees::UpdatePreview(tile, index);
+        Require(!ContextHasFocus(), "SDL dummy focus fixture unexpectedly focused");
+        Ui::Handheld::ControllerInput input;
+        Ui::Handheld::UpdateExplorer(input);
+        Require(clear(), "Unfocused explorer retained tree ghost");
+    }
+    Trees::UpdatePreview(tile, index);
+    SaveFlags flags{};
+    flags.set(SaveFlag::exportObjects, SaveFlag::automatic);
+    const auto save = profile + "/tree-ghost.park";
+    // The headless dummy context does not dispatch provisional intents.
+    if (!realUi)
+        Trees::RemovePreviewTemporarily();
+    Require(ScenarioSave(state, save, flags) != 0, "Tree ghost autosave failed");
+    if (!realUi)
+        Trees::RestorePreview();
+    Require(count(tile, true) == 1 && state.park.cash == cash, "Autosave failed to restore tree ghost/cash");
+    if (!realUi)
+        Trees::ClearPreview();
+    Require(context.LoadParkFromFile(save), "Tree ghost reload failed");
+    Require(clear() && count(tile, false) == 0 && state.park.cash == cash, "Ghost or charge leaked into save");
+    Trees::UpdatePreview(tile, index);
+    Require(Trees::Action(tile, index, true).error == GameActions::Status::ok, "Real tree confirmation failed");
+    Require(clear() && count(tile, false) == 0 && state.park.cash == cash, "Confirm retained ghost or bypassed queue");
+    GameActions::ProcessQueue(state);
+    Require(count(tile, false) == 1 && clear() && state.park.cash == cash - query.cost, "Confirm did not place/charge once");
+    Trees::UpdatePreview(tile, index);
+    Require(clear(), "Occupied tile got misleading ghost");
+    Trees::ClearPreview();
+    Require(count(tile, false) == 1, "Preview cleanup deleted real tree");
+    Trees::UpdatePreview(next, second);
+    if (!realUi)
+        Trees::ClearPreview();
+    flags.unset(SaveFlag::automatic);
+    Require(ScenarioSave(state, save, flags) != 0 && context.LoadParkFromFile(save), "Tree manual save/reload failed");
+    Require(
+        clear() && count(tile, false) == 1 && count(next, false) == 0 && state.park.cash == cash - query.cost,
+        "Real tree/ghost/cash save safety failed");
+    Trees::UpdatePreview(next, second);
+    Ui::Handheld::EndTerrain();
+    Trees::RestorePreview();
+    Require(clear(), "Tool exit resurrected ghost");
+    if (realUi)
+    {
+        Trees::UpdatePreview(next, second);
+        context.GetUiContext().CloseWindow();
+        Trees::RestorePreview();
+        Require(clear(), "UI shutdown retained/resurrected tree ghost");
+    }
+    std::cout
+        << "Native tree ghost / unchanged-target-selection / nested suspension / invalid-research-ownership-funds-pause / "
+           "menu-tool exit / exact real placement-cash / autosave-manual-save-reload checks passed\n";
+}
+
 int main(int argc, char** argv)
 {
     try
@@ -809,6 +988,7 @@ int main(int argc, char** argv)
         TestSurface(*context, argv[2]);
         TestSceneryRemoval(*context, argv[2]);
         TestTrees(*context, argv[2]);
+        TestTreeGhost(*context, argv[2], argc == 4);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;

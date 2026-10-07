@@ -4,6 +4,7 @@
 #include "Panel.h"
 #include "Paths.h"
 #include "SaveSlots.h"
+#include "Trees.h"
 
 #include <filesystem>
 #include <iomanip>
@@ -191,6 +192,7 @@ namespace OpenRCT2::Ui::Windows
         void onOpen() override
         {
             Handheld::Paths::ClearPreview();
+            Handheld::Trees::ClearPreview();
             setWidgets(kWidgets);
             layout();
             colours[0] = ColourWithFlags{ Colour::darkBlue };

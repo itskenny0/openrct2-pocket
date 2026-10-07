@@ -10,6 +10,7 @@
 #include "ProvisionalElements.h"
 
 #include "handheld/Paths.h"
+#include "handheld/Trees.h"
 
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/interface/WindowClasses.h>
@@ -26,6 +27,7 @@ namespace OpenRCT2::Ui
     {
         PROFILED_FUNCTION();
 
+        Handheld::Trees::RemovePreviewTemporarily();
         Handheld::Paths::RemovePreviewTemporarily();
         FootpathRemoveProvisionalTemporarily();
 
@@ -49,6 +51,7 @@ namespace OpenRCT2::Ui
 
         FootpathRestoreProvisional();
         Handheld::Paths::RestorePreview();
+        Handheld::Trees::RestorePreview();
 
         auto* windowMgr = GetWindowManager();
         if (windowMgr->FindByClass(WindowClass::rideConstruction) != nullptr)

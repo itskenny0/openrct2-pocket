@@ -11,6 +11,7 @@
 
 #include "handheld/Explorer.h"
 #include "handheld/Paths.h"
+#include "handheld/Trees.h"
 #include "interface/Chat.h"
 #include "interface/FileBrowser.h"
 #include "interface/Theme.h"
@@ -1129,6 +1130,7 @@ public:
     void CloseConstructionWindows() override
     {
         Handheld::Paths::ClearPreview();
+        Handheld::Trees::ClearPreview();
         CloseByClass(WindowClass::rideConstruction);
         CloseByClass(WindowClass::footpath);
         CloseByClass(WindowClass::trackDesignList);

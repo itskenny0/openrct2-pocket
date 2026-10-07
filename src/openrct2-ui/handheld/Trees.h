@@ -45,23 +45,10 @@ namespace OpenRCT2::Ui::Handheld::Trees
         return object ? object->GetName() : "No trees available";
     }
 
-    inline GameActions::Result Action(std::optional<CoordsXY> tile, ObjectEntryIndex index, bool execute)
-    {
-        const auto max = GetMapSizeMaxXY();
-        const bool valid = tile && tile->x >= 32 && tile->y >= 32 && tile->x <= max.x && tile->y <= max.y && tile->x % 32 == 0
-            && tile->y % 32 == 0;
-        if (!valid || !MapGetSurfaceElementAt(*tile) || !Eligible(index))
-        {
-            GameActions::Result result;
-            result.error = GameActions::Status::invalidParameters;
-            result.errorMessage = !valid ? "Move onto land." : "Tree unavailable.";
-            return result;
-        }
-        // z=0 delegates ground height and slope/water clearance to the native action.
-        // Match desktop's default orientation/colours; no independent placement controls.
-        auto action = GameActions::SmallSceneryPlaceAction(
-            { tile->x, tile->y, 0, 3 }, 0, index, Drawing::Colour::bordeauxRed, Drawing::Colour::yellow,
-            Drawing::Colour::darkBrown);
-        return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
-    }
+    // Selection remains independent of preview ownership for a future controller picker.
+    void UpdatePreview(std::optional<CoordsXY> tile, ObjectEntryIndex index);
+    void ClearPreview();
+    void RemovePreviewTemporarily();
+    void RestorePreview();
+    GameActions::Result Action(std::optional<CoordsXY> tile, ObjectEntryIndex index, bool execute);
 } // namespace OpenRCT2::Ui::Handheld::Trees

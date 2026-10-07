@@ -59,6 +59,7 @@ namespace OpenRCT2::Ui::Handheld
     void BeginTerrain(bool raise)
     {
         Paths::End();
+        Trees::ClearPreview();
         _terrainActive = true;
         _waterTool = false;
         _surfaceTool = false;
@@ -112,6 +113,7 @@ namespace OpenRCT2::Ui::Handheld
 
     void EndTerrain()
     {
+        Trees::ClearPreview();
         _terrainActive = false;
         _waterTool = false;
         _surfaceTool = false;
@@ -310,8 +312,13 @@ namespace OpenRCT2::Ui::Handheld
                 MapSelection::invalidate();
             }
         }
+        if (_treeTool && CanExplore() && ContextHasFocus())
+            Trees::UpdatePreview(_terrainTile, _treeIndex);
         if (!CanExplore() || !ContextHasFocus())
+        {
             Paths::ClearPreview();
+            Trees::ClearPreview();
+        }
         SyncFocusWindow();
         auto frame = input.update(ContextHasFocus(), SDL_GetTicks());
         auto* wm = GetWindowManager();
@@ -319,7 +326,7 @@ namespace OpenRCT2::Ui::Handheld
         {
             if (action == Action::quit)
             {
-                Paths::End();
+                EndTerrain();
                 ContextQuit();
                 input.suspend();
                 return;
@@ -480,7 +487,10 @@ namespace OpenRCT2::Ui::Handheld
                         if (_terrainActive)
                         {
                             if (_treeTool)
+                            {
                                 _treeIndex = Trees::Next(_treeIndex);
+                                Trees::UpdatePreview(_terrainTile, _treeIndex);
+                            }
                             else if (_surfaceTool)
                                 _surfaceIndex = Surface::Next(_surfaceIndex);
                             else if (!_sceneryRemovalTool)
