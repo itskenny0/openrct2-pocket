@@ -4,6 +4,7 @@
 #include "Explorer.h"
 #include "Finances.h"
 #include "ListFocus.h"
+#include "MarketingManagement.h"
 #include "Panel.h"
 #include "Paths.h"
 #include "ResearchManagement.h"
@@ -63,6 +64,12 @@ namespace OpenRCT2::Ui::Windows
         research,
         researchEditor,
         researchConfirm,
+        marketing,
+        marketingActive,
+        marketingTypes,
+        marketingEditor,
+        marketingTargets,
+        marketingConfirm,
         ride,
         shop,
         shopPrices,
@@ -113,6 +120,12 @@ namespace OpenRCT2::Ui::Windows
         std::optional<money64> _priceDraft;
         std::optional<Handheld::Finances::Draft> _financeDraft;
         std::optional<Handheld::ResearchManagement::Draft> _researchDraft;
+        std::optional<Handheld::MarketingManagement::Draft> _marketingDraft;
+        std::vector<int> _marketingTypes, _marketingActiveTypes;
+        std::vector<Handheld::MarketingManagement::Target> _marketingTargets;
+        int _marketingActiveType = -1;
+        bool _marketingBusy{};
+        std::shared_ptr<int> _marketingLifetime = std::make_shared<int>(0);
         std::vector<Handheld::StaffManagement::Target> _staffRoster;
         std::optional<Handheld::StaffManagement::Target> _staffTarget;
         StaffType _hireType = StaffType::handyman;
@@ -159,9 +172,28 @@ namespace OpenRCT2::Ui::Windows
                                                     : View::confirmation,
                 _focus.index(), _researchDraft, _status);
         }
+        bool marketingManagement() const
+        {
+            return _page == Page::marketing || _page == Page::marketingActive || _page == Page::marketingTypes
+                || _page == Page::marketingEditor || _page == Page::marketingTargets || _page == Page::marketingConfirm;
+        }
+        Handheld::ManagementPresentation marketingPresentationFor(Page current, size_t selected) const
+        {
+            using Handheld::MarketingManagement::View;
+            const auto view = current == Page::marketing ? View::overview
+                : current == Page::marketingActive       ? View::active
+                : current == Page::marketingTypes        ? View::types
+                : current == Page::marketingTargets      ? View::targets
+                : current == Page::marketingEditor       ? View::editor
+                                                         : View::confirmation;
+            return Handheld::MarketingManagement::Presentation(
+                view, selected, _marketingDraft, _marketingActiveType,
+                view == View::overview ? _marketingActiveTypes : _marketingTypes, _marketingTargets, _status);
+        }
         bool managementShell() const
         {
-            return _page == Page::dashboard || financeManagement() || staffManagement() || researchManagement();
+            return _page == Page::dashboard || financeManagement() || staffManagement() || researchManagement()
+                || marketingManagement();
         }
         bool shopManagement() const
         {
@@ -215,6 +247,14 @@ namespace OpenRCT2::Ui::Windows
             ++_staffRequest;
             if (next == Page::staff)
                 _staffRoster = Handheld::StaffManagement::Roster();
+            if (next == Page::marketing)
+                _marketingActiveTypes = Handheld::MarketingManagement::ActiveTypes();
+            if (next == Page::marketingTypes)
+                _marketingTypes = Handheld::MarketingManagement::Types();
+            if (next == Page::marketingTargets && _marketingDraft)
+                _marketingTargets = Handheld::MarketingManagement::Targets(_marketingDraft->type);
+            if (next != Page::marketingEditor && next != Page::marketingTargets && next != Page::marketingConfirm)
+                _marketingDraft.reset();
             _page = next;
             if (next == Page::dashboard)
                 _dashboard.focus = Handheld::Dashboard::Focus::rail;
@@ -222,6 +262,8 @@ namespace OpenRCT2::Ui::Windows
                 _dashboard.section = Handheld::Dashboard::Section::staff;
             else if (next == Page::finances)
                 _dashboard.section = Handheld::Dashboard::Section::finances;
+            if (next == Page::marketing)
+                _dashboard.section = Handheld::Dashboard::Section::marketing;
             if (next == Page::research)
                 _dashboard.section = Handheld::Dashboard::Section::research;
             if (next != Page::researchEditor && next != Page::researchConfirm)
@@ -236,7 +278,8 @@ namespace OpenRCT2::Ui::Windows
                 _focus.move(static_cast<int32_t>(std::min(_staffRosterFocus, rows().size() - 1)), rows().size());
 
             if (next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish
-                || next == Page::financeConfirm || next == Page::staffHire || next == Page::staffDismiss)
+                || next == Page::financeConfirm || next == Page::marketingConfirm || next == Page::staffHire
+                || next == Page::staffDismiss)
                 _focus.move(1, 2); // destructive confirmations default to Cancel
             if (next == Page::researchConfirm)
                 _focus.move(static_cast<int32_t>(rows().size() - 1), rows().size());
@@ -267,6 +310,13 @@ namespace OpenRCT2::Ui::Windows
                 case Page::overview:
                 case Page::guests:
                     return { "Back to dashboard" };
+                case Page::marketing:
+                case Page::marketingActive:
+                case Page::marketingTypes:
+                case Page::marketingEditor:
+                case Page::marketingTargets:
+                case Page::marketingConfirm:
+                    return marketingPresentationFor(_page, _focus.index()).rows;
                 case Page::research:
                 case Page::researchEditor:
                 case Page::researchConfirm:
@@ -496,7 +546,8 @@ namespace OpenRCT2::Ui::Windows
         bool dashboardCanSwitch() const
         {
             return _page == Page::dashboard || _page == Page::finances || _page == Page::staff || _page == Page::staffInspect
-                || _page == Page::staffStats || _page == Page::research;
+                || _page == Page::staffStats || _page == Page::research || _page == Page::marketing
+                || _page == Page::marketingActive;
         }
         void enterDashboardContent()
         {
@@ -504,6 +555,7 @@ namespace OpenRCT2::Ui::Windows
             const auto root = _dashboard.section == Section::staff ? std::optional<Page>{ Page::staff }
                 : _dashboard.section == Section::finances          ? std::optional<Page>{ Page::finances }
                 : _dashboard.section == Section::research          ? std::optional<Page>{ Page::research }
+                : _dashboard.section == Section::marketing         ? std::optional<Page>{ Page::marketing }
                                                                    : std::nullopt;
             if (!root || !_dashboard.enter())
                 return;
@@ -545,6 +597,18 @@ namespace OpenRCT2::Ui::Windows
                 if (y)
                 {
                     _dashboard.move(y);
+                    _status.clear();
+                    invalidate();
+                }
+            }
+            else if (marketingManagement())
+            {
+                if (y)
+                    move(y);
+                if (x && _page == Page::marketingEditor && _marketingDraft
+                    && _focus.index() == (Handheld::MarketingManagement::NeedsTarget(_marketingDraft->type) ? 1u : 0u))
+                {
+                    Handheld::MarketingManagement::AdjustWeeks(*_marketingDraft, x);
                     _status.clear();
                     invalidate();
                 }
@@ -685,6 +749,20 @@ namespace OpenRCT2::Ui::Windows
                 case Page::staff:
                     page(Page::dashboard);
                     break;
+                case Page::marketing:
+                    page(Page::dashboard);
+                    break;
+                case Page::marketingActive:
+                case Page::marketingTypes:
+                    page(Page::marketing);
+                    break;
+                case Page::marketingEditor:
+                    page(Page::marketingTypes);
+                    break;
+                case Page::marketingTargets:
+                case Page::marketingConfirm:
+                    page(Page::marketingEditor);
+                    break;
                 case Page::researchConfirm:
                     page(Page::researchEditor);
                     break;
@@ -728,6 +806,8 @@ namespace OpenRCT2::Ui::Windows
         }
         void confirm()
         {
+            if (marketingManagement() && _marketingBusy)
+                return;
             const auto choice = _focus.index();
             switch (_page)
             {
@@ -996,6 +1076,113 @@ namespace OpenRCT2::Ui::Windows
                 case Page::guests:
                     page(Page::dashboard);
                     break;
+                case Page::marketing:
+                    if (choice == 0)
+                    {
+                        if (!Handheld::MarketingManagement::Types().empty())
+                            page(Page::marketingTypes);
+                    }
+                    else if (choice == 1)
+                        page(Page::dashboard);
+                    else if (choice - 2 < _marketingActiveTypes.size())
+                    {
+                        _marketingActiveType = _marketingActiveTypes[choice - 2];
+                        page(Page::marketingActive);
+                    }
+                    break;
+                case Page::marketingActive:
+                    page(Page::marketing);
+                    break;
+                case Page::marketingTypes:
+                    if (choice >= _marketingTypes.size())
+                        page(Page::marketing);
+                    else if (Handheld::MarketingManagement::Eligible(_marketingTypes[choice]))
+                    {
+                        _marketingDraft = Handheld::MarketingManagement::Draft{ _marketingTypes[choice], 2, {} };
+                        page(Page::marketingEditor);
+                    }
+                    else
+                    {
+                        _status = "Campaign no longer available";
+                        invalidate();
+                    }
+                    break;
+                case Page::marketingEditor:
+                    if (_marketingDraft)
+                    {
+                        const size_t duration = Handheld::MarketingManagement::NeedsTarget(_marketingDraft->type) ? 1 : 0;
+                        if (duration && choice == 0)
+                            page(Page::marketingTargets);
+                        else if (choice == duration)
+                        {
+                            Handheld::MarketingManagement::AdjustWeeks(
+                                *_marketingDraft, _marketingDraft->weeks == 12 ? -10 : 1);
+                            _status.clear();
+                            invalidate();
+                        }
+                        else if (choice == duration + 2)
+                            page(Page::marketing);
+                        else if (choice == duration + 1)
+                        {
+                            const auto result = Handheld::MarketingManagement::Action(*_marketingDraft, false);
+                            if (result.error == GameActions::Status::ok)
+                                page(Page::marketingConfirm);
+                            else
+                            {
+                                _status = Handheld::Finances::Feedback(result);
+                                invalidate();
+                            }
+                        }
+                    }
+                    break;
+                case Page::marketingTargets:
+                    if (choice >= _marketingTargets.size())
+                        page(Page::marketingEditor);
+                    else if (
+                        _marketingDraft
+                        && Handheld::MarketingManagement::SelectTarget(*_marketingDraft, _marketingTargets[choice]))
+                        page(Page::marketingEditor);
+                    else
+                    {
+                        _status = "Target changed; choose again";
+                        invalidate();
+                    }
+                    break;
+                case Page::marketingConfirm:
+                    if (choice == 1)
+                        page(Page::marketing);
+                    else if (_marketingDraft)
+                    {
+                        _marketingBusy = true;
+                        const auto result = Handheld::MarketingManagement::Action(
+                            *_marketingDraft, true,
+                            [this, lifetime = std::weak_ptr<int>(_marketingLifetime)](
+                                const GameActions::GameAction*, const GameActions::Result* outcome) {
+                                if (lifetime.expired())
+                                    return;
+                                _marketingBusy = false;
+                                if (_page == Page::marketing)
+                                {
+                                    page(Page::marketing);
+                                    _status = outcome->error == GameActions::Status::ok
+                                        ? "Campaign started"
+                                        : Handheld::Finances::Feedback(*outcome);
+                                    invalidate();
+                                }
+                            });
+                        if (result.error == GameActions::Status::ok)
+                        {
+                            page(Page::marketing);
+                            _status = _marketingBusy ? "Campaign start requested" : "Campaign started";
+                        }
+                        else
+                        {
+                            _marketingBusy = false;
+                            _status = Handheld::Finances::Feedback(result);
+                        }
+                        invalidate();
+                    }
+                    break;
                 case Page::research:
                     if (choice == 1)
                         page(Page::dashboard);
@@ -1182,6 +1369,15 @@ namespace OpenRCT2::Ui::Windows
                     }
                     else if (_dashboard.section == Handheld::Dashboard::Section::finances)
                         model = Handheld::Finances::Presentation(Handheld::Finances::View::overview, 0);
+                    else if (_dashboard.section == Handheld::Dashboard::Section::marketing)
+                    {
+                        const auto resume = _sectionResume[_dashboard.index()];
+                        model = resume.page && *resume.page == Page::marketingActive
+                            ? marketingPresentationFor(Page::marketingActive, resume.row)
+                            : Handheld::MarketingManagement::Presentation(
+                                  Handheld::MarketingManagement::View::overview, 0, {}, -1,
+                                  Handheld::MarketingManagement::ActiveTypes());
+                    }
                     else if (_dashboard.section == Handheld::Dashboard::Section::research)
                         model = Handheld::ResearchManagement::Presentation(Handheld::ResearchManagement::View::overview, 0);
                     else
@@ -1193,6 +1389,8 @@ namespace OpenRCT2::Ui::Windows
                     model = staffPresentation();
                 else if (researchManagement())
                     model = researchPresentation();
+                else if (marketingManagement())
+                    model = marketingPresentationFor(_page, _focus.index());
                 else
                 {
                     using Handheld::Finances::View;

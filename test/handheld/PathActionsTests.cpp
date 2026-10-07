@@ -9,6 +9,7 @@
 #include <openrct2-ui/handheld/Dashboard.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/Finances.h>
+#include <openrct2-ui/handheld/MarketingManagement.h>
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/ResearchManagement.h>
 #include <openrct2-ui/handheld/SceneryRemoval.h>
@@ -27,6 +28,7 @@
 #include <openrct2/PlatformEnvironment.h>
 #include <openrct2/actions/GameActionRunner.h>
 #include <openrct2/actions/footpath/FootpathPlaceAction.h>
+#include <openrct2/actions/park/ParkMarketingAction.h>
 #include <openrct2/actions/park/ParkSetEntranceFeeAction.h>
 #include <openrct2/actions/park/ParkSetLoanAction.h>
 #include <openrct2/actions/park/ParkSetResearchFundingAction.h>
@@ -35,11 +37,14 @@
 #include <openrct2/audio/AudioContext.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/entity/EntityList.h>
+#include <openrct2/entity/Guest.h>
 #include <openrct2/interface/Viewport.h>
 #include <openrct2/localisation/CurrencyTypes.h>
 #include <openrct2/management/Finance.h>
+#include <openrct2/management/Marketing.h>
 #include <openrct2/management/Research.h>
 #include <openrct2/object/ObjectManager.h>
+#include <openrct2/ride/RideManager.hpp>
 #include <openrct2/scenario/Scenario.h>
 #include <openrct2/ui/UiContext.h>
 #include <openrct2/ui/WindowManager.h>
@@ -2292,6 +2297,267 @@ static void TestResearchManagement(IContext& context, const std::string& profile
                  "progression-picker-unlock / save-reload passed\n";
 }
 
+static void TestMarketingManagement(IContext& context, const std::string& profile, bool realUi)
+{
+    namespace M = Ui::Handheld::MarketingManagement;
+    namespace H = Ui::Handheld;
+    namespace W = Ui::Windows;
+    auto& state = getGameState();
+    auto& park = state.park;
+    gGamePaused = 0;
+    const auto original = profile + "/marketing-original.park";
+    SaveFlags saveFlags{};
+    saveFlags.set(SaveFlag::exportObjects);
+    Require(ScenarioSave(state, original, saveFlags) != 0, "Marketing original save failed");
+    park.marketingCampaigns.clear();
+    for (auto& ride : RideManager(state))
+        ride.status = RideStatus::closed; // Isolate target-provider fixtures.
+    park.flags.unset(ParkFlag::forbidMarketingCampaigns);
+    park.flags.unset(ParkFlag::noMoney);
+    park.flags.set(ParkFlag::unlockAllPrices);
+    park.cash = 10000.00_GBP;
+    // Fixture-only native ride records to exercise unrestricted roster paging.
+    auto& objects = context.GetObjectManager();
+    auto* rideObject = objects.LoadObject("rct2.ride.mgr1");
+    auto* foodObject = objects.LoadObject("rct2.ride.burgb");
+    Require(rideObject && foodObject, "Marketing object fixtures missing");
+    const auto rideIndex = objects.GetLoadedObjectEntryIndex(rideObject);
+    const auto foodIndex = objects.GetLoadedObjectEntryIndex(foodObject);
+    std::vector<RideId> rides;
+    for (uint16_t i = 100; rides.size() < 18; ++i)
+        if (!GetRide(RideId::FromUnderlying(i)))
+        {
+            auto* ride = RideAllocateAtIndex(RideId::FromUnderlying(i));
+            Require(ride, "Marketing ride fixture allocation failed");
+            ride->type = RIDE_TYPE_MERRY_GO_ROUND;
+            ride->subtype = rideIndex;
+            ride->status = RideStatus::open;
+            ride->customName = "Marketing fixture " + std::to_string(i);
+            ride->overallView = { 64 + static_cast<int>(rides.size()) * 32, 64 };
+            ride->price[0] = 2.00_GBP;
+            rides.push_back(ride->id);
+        }
+    auto* food = RideAllocateAtIndex(RideId::FromUnderlying(150));
+    Require(food, "Marketing food fixture allocation failed");
+    food->type = ShopPlacement::Type(foodIndex);
+    food->subtype = foodIndex;
+    food->status = RideStatus::open;
+    auto types = M::Types();
+    Require(types.size() == ADVERTISING_CAMPAIGN_COUNT, "Native eligible campaign types missing");
+    auto targets = M::Targets(ADVERTISING_CAMPAIGN_RIDE);
+    Require(targets.size() >= 18, "Marketing ride target list truncated");
+    Require(
+        std::none_of(targets.begin(), targets.end(), [&](const auto& t) { return t.item == 150; }),
+        "Shop included as ride target");
+    const auto products = M::Targets(ADVERTISING_CAMPAIGN_FOOD_OR_DRINK_FREE);
+    Require(
+        !products.empty() && std::none_of(products.begin(), products.end(), [](const auto& t) { return t.ride; }),
+        "Native food target list invalid");
+    park.flags.unset(ParkFlag::unlockAllPrices);
+    park.flags.set(ParkFlag::freeEntry);
+    Require(
+        !M::Eligible(ADVERTISING_CAMPAIGN_PARK_ENTRY_FREE) && !M::Eligible(ADVERTISING_CAMPAIGN_PARK_ENTRY_HALF_PRICE),
+        "Locked admission campaign offered");
+    park.flags.unset(ParkFlag::freeEntry);
+    Require(!M::Eligible(ADVERTISING_CAMPAIGN_RIDE_FREE), "Locked ride-price campaign offered");
+    park.flags.set(ParkFlag::unlockAllPrices);
+    M::Draft draft{ ADVERTISING_CAMPAIGN_PARK, 2, {} };
+    M::AdjustWeeks(draft, std::numeric_limits<int>::max());
+    Require(draft.weeks == 12, "Campaign upper bound failed");
+    M::AdjustWeeks(draft, std::numeric_limits<int>::min());
+    Require(draft.weeks == 2, "Campaign lower bound failed");
+    auto bad = draft;
+    bad.weeks = 1;
+    Require(M::Action(bad, true).error != GameActions::Status::ok, "Out-of-range handheld duration accepted");
+    bad.type = -1;
+    Require(M::Action(bad, false).error != GameActions::Status::ok, "Invalid campaign type accepted");
+    GameActions::ParkMarketingAction invalidNative(ADVERTISING_CAMPAIGN_COUNT, 0, 2);
+    Require(GameActions::Query(&invalidNative, state).error != GameActions::Status::ok, "Native invalid type accepted");
+    GameActions::ParkMarketingAction invalidWeeks(ADVERTISING_CAMPAIGN_PARK, 0, 256);
+    Require(GameActions::Query(&invalidWeeks, state).error != GameActions::Status::ok, "Native invalid duration accepted");
+    park.flags.set(ParkFlag::forbidMarketingCampaigns);
+    Require(M::Types().empty() && M::Action(draft, true).error != GameActions::Status::ok, "Authority restriction bypassed");
+    park.flags.unset(ParkFlag::forbidMarketingCampaigns);
+    const auto cash = park.cash;
+    park.cash = 0;
+    Require(
+        M::Action(draft, true).error == GameActions::Status::insufficientFunds && !MarketingGetCampaign(draft.type),
+        "Unaffordable campaign started");
+    park.cash = cash;
+    M::Draft rideDraft{ ADVERTISING_CAMPAIGN_RIDE, 2, {} };
+    Require(M::Action(rideDraft, true).error != GameActions::Status::ok, "Missing campaign target accepted");
+    Require(M::SelectTarget(rideDraft, targets.back()), "Native ride target selection failed");
+    auto* targeted = GetRide(RideId::FromUnderlying(rideDraft.target->item));
+    const auto identity = *rideDraft.target;
+    targeted->status = RideStatus::closed;
+    Require(M::Action(rideDraft, true).error != GameActions::Status::ok, "Closed ride target accepted");
+    targeted->status = RideStatus::open;
+    const auto oldName = targeted->getName();
+    RideDelete(targeted->id);
+    if (realUi)
+        Ui::GetWindowManager()->CloseByNumber(WindowClass::ride, static_cast<WindowNumber>(identity.item));
+    else
+        M::RideRemoved(RideId::FromUnderlying(identity.item));
+    targeted = RideAllocateAtIndex(RideId::FromUnderlying(identity.item));
+    Require(targeted, "Marketing slot reuse failed");
+    targeted->type = identity.type;
+    targeted->subtype = identity.object;
+    targeted->buildDate = identity.buildDate;
+    targeted->overallView = identity.location;
+    targeted->status = RideStatus::open;
+    targeted->customName = oldName;
+    targeted->price[0] = 2.00_GBP;
+    Require(
+        !M::SelectTarget(rideDraft, identity) && M::Action(rideDraft, true).error != GameActions::Status::ok,
+        "Reused ride slot revived stale campaign target");
+    targets = M::Targets(ADVERTISING_CAMPAIGN_RIDE);
+    Require(M::SelectTarget(rideDraft, targets.back()), "Refreshed target selection failed");
+    M::Draft foodDraft{ ADVERTISING_CAMPAIGN_FOOD_OR_DRINK_FREE, 2, {} };
+    Require(M::SelectTarget(foodDraft, products.front()), "Native product selection failed");
+    food->status = RideStatus::closed;
+    Require(M::Action(foodDraft, true).error != GameActions::Status::ok, "Unavailable food target accepted");
+    food->status = RideStatus::open;
+    if (realUi)
+    {
+        H::ControllerInput input;
+        auto press = [&](H::Action value) {
+            H::Frame frame;
+            frame.actions = { value, value };
+            Require(H::HandleMenuInput(input, frame), "Marketing semantic input unhandled");
+        };
+        W::HandheldDashboardOpen();
+        W::HandheldDashboardMove(0, 2);
+        press(H::Action::confirm);
+        Require(!W::HandheldDashboardRailFocused(), "Marketing did not enter content");
+        press(H::Action::openBuild);
+        Require(W::HandheldDashboardRailFocused(), "Marketing content->rail failed");
+        press(H::Action::openBuild);
+        press(H::Action::confirm); // Types only.
+        W::HandheldDashboardMove(0, 3);
+        press(H::Action::confirm); // Food editor only.
+        Require(park.marketingCampaigns.empty() && park.cash == cash, "Selecting campaign spilled into submission");
+        press(H::Action::openBuild);
+        Require(!W::HandheldDashboardRailFocused(), "Select escaped marketing draft");
+        press(H::Action::confirm); // Targets.
+        press(H::Action::back);    // Cancel preserves empty draft target.
+        press(H::Action::confirm);
+        press(H::Action::confirm); // Target selection -> editor, no duration/placement spill.
+        W::HandheldDashboardMove(0, 1);
+        W::HandheldDashboardMove(1, 0);
+        W::HandheldDashboardMove(0, 1);
+        press(H::Action::confirm);
+        press(H::Action::openBuild);
+        Require(!W::HandheldDashboardRailFocused(), "Select escaped marketing confirmation");
+        press(H::Action::back); // Retain draft.
+        W::HandheldDashboardMove(0, 2);
+        press(H::Action::confirm);
+        press(H::Action::confirm); // Cancel-first review.
+        Require(park.marketingCampaigns.empty() && park.cash == cash, "Marketing cancellation spent money/started campaign");
+        press(H::Action::confirm); // Types.
+        W::HandheldDashboardMove(0, 5);
+        press(H::Action::confirm); // Advertise ride.
+        press(H::Action::confirm); // Targets.
+        W::HandheldDashboardMove(0, static_cast<int>(targets.size() - 1));
+        press(H::Action::confirm); // Last page target.
+        W::HandheldDashboardMove(0, 2);
+        press(H::Action::confirm); // Review.
+        W::HandheldDashboardMove(0, -1);
+        press(H::Action::confirm); // Submit once.
+        press(H::Action::confirm); // While queued cannot start another draft.
+        GameActions::ProcessQueue(state);
+        Require(
+            MarketingGetCampaign(ADVERTISING_CAMPAIGN_RIDE)
+                && MarketingGetCampaign(ADVERTISING_CAMPAIGN_RIDE)->rideId == RideId::FromUnderlying(targets.back().item)
+                && park.cash == cash - AdvertisingCampaignPricePerWeek[ADVERTISING_CAMPAIGN_RIDE] * 2,
+            "Paged ride campaign selection/one charge/input guard failed");
+        W::HandheldDashboardMove(0, 2);
+        press(H::Action::confirm); // Active campaign inspection.
+        press(H::Action::openBuild);
+        Require(W::HandheldDashboardRailFocused(), "Active campaign could not switch pane");
+        press(H::Action::openBuild);
+        press(H::Action::back);    // Overview.
+        press(H::Action::confirm); // Types.
+        press(H::Action::confirm); // First eligible campaign draft.
+        press(H::Action::openMenu);
+        Require(!W::HandheldDashboardIsOpen(), "Marketing Start did not discard draft");
+        press(H::Action::back);
+        Require(!gGamePaused, "Marketing pause ownership leaked");
+        park.marketingCampaigns.clear();
+        park.cash = cash; // Restore isolated fixture for native action tests below.
+    }
+    const auto marketingLedger = park.expenditureTable[0][static_cast<size_t>(ExpenditureType::marketing)];
+    gGamePaused = 1;
+    const auto query = M::Action(draft, false);
+    Require(
+        query.error == GameActions::Status::ok && query.cost == AdvertisingCampaignPricePerWeek[draft.type] * draft.weeks
+            && park.cash == cash && park.marketingCampaigns.empty(),
+        "Paused native query/cost mutated park");
+    Require(M::Action(draft, true).error == GameActions::Status::ok, "Paused marketing native action rejected");
+    GameActions::ProcessQueue(state);
+    Require(
+        park.cash == cash - query.cost
+            && park.expenditureTable[0][static_cast<size_t>(ExpenditureType::marketing)] == marketingLedger - query.cost
+            && MarketingGetCampaign(draft.type)->weeksLeft == 2
+            && MarketingGetCampaign(draft.type)->flags.has(MarketingCampaignFlag::firstWeek),
+        "Native campaign exact charge/ledger/initial state failed");
+    Require(
+        !M::Eligible(draft.type) && M::Action(draft, true).error != GameActions::Status::ok,
+        "Active campaign offered for duplicate purchase");
+    const auto paidCash = park.cash;
+    park.flags.set(ParkFlag::noMoney);
+    Require(M::Action(foodDraft, true).error == GameActions::Status::ok, "Native no-money campaign rejected");
+    GameActions::ProcessQueue(state);
+    Require(
+        park.cash == paidCash
+            && park.expenditureTable[0][static_cast<size_t>(ExpenditureType::marketing)] == marketingLedger - query.cost
+            && MarketingGetCampaign(foodDraft.type)->shopItemType == static_cast<ShopItem>(foodDraft.target->item),
+        "No-money campaign invented charge/incorrect product");
+    park.flags.unset(ParkFlag::noMoney);
+    Guest guest{};
+    MarketingSetGuestCampaign(&guest, ADVERTISING_CAMPAIGN_FOOD_OR_DRINK_FREE);
+    Require(
+        guest.hasItem(ShopItem::voucher) && guest.voucherType == VOUCHER_TYPE_FOOD_OR_DRINK_FREE
+            && guest.voucherShopItem == static_cast<ShopItem>(foodDraft.target->item),
+        "Native campaign product voucher effect changed");
+    Require(MarketingGetCampaignGuestGenerationProbability(draft.type) > 0, "Native campaign generation effect missing");
+    const auto saved = profile + "/marketing-roundtrip.park";
+    Require(ScenarioSave(state, saved, saveFlags) != 0, "Marketing save failed");
+    if (realUi)
+    {
+        W::HandheldDashboardOpen();
+        W::HandheldDashboardMove(0, 2);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuConfirm();
+        W::HandheldMenuConfirm();
+    }
+    Require(context.LoadParkFromFile(saved), "Marketing reload failed");
+    Require(
+        park.cash == paidCash && MarketingGetCampaign(draft.type) && MarketingGetCampaign(draft.type)->weeksLeft == 2
+            && MarketingGetCampaign(foodDraft.type)->shopItemType == static_cast<ShopItem>(foodDraft.target->item)
+            && (!realUi || !W::HandheldDashboardIsOpen()),
+        "Marketing campaign/cash/draft save-reload failed");
+    MarketingUpdate();
+    Require(
+        MarketingGetCampaign(draft.type)->weeksLeft == 2
+            && !MarketingGetCampaign(draft.type)->flags.has(MarketingCampaignFlag::firstWeek),
+        "Native first partial week behavior changed");
+    state.cheats.neverendingMarketing = true;
+    MarketingUpdate();
+    Require(MarketingGetCampaign(draft.type)->weeksLeft == 2, "Neverending campaign rule bypassed");
+    state.cheats.neverendingMarketing = false;
+    MarketingUpdate();
+    Require(MarketingGetCampaign(draft.type)->weeksLeft == 1, "Native weekly countdown failed");
+    MarketingUpdate();
+    Require(
+        park.marketingCampaigns.empty() && park.cash == paidCash
+            && MarketingGetCampaignGuestGenerationProbability(draft.type) == 0,
+        "Campaign expiration/recurring charge/generation effect incorrect");
+    Require(context.LoadParkFromFile(original), "Marketing original restoration failed");
+    gGamePaused = 0;
+    std::cout << "Native Marketing / eligibility-target-pages / bounded-stale-drafts / cancel-input-queue / exact "
+                 "cost-no-money-pause / native vouchers-weekly-expiration / save-reload passed\n";
+}
+
 static void TestDashboard(IContext& context, const std::string& profile, bool realUi)
 {
     namespace D = Ui::Handheld::Dashboard;
@@ -2303,11 +2569,11 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
     Require(
         navigation.section == D::Section::finances && navigation.focus == D::Focus::rail,
         "Dashboard default section/focus wrong");
-    navigation.move(2);
+    navigation.move(-2);
     Require(
-        navigation.section == D::Section::marketing && !navigation.enter() && navigation.focus == D::Focus::rail,
+        navigation.section == D::Section::guests && !navigation.enter() && navigation.focus == D::Focus::rail,
         "Unavailable section entered");
-    navigation.move(-3);
+    navigation.move(1);
     Require(navigation.section == D::Section::staff && navigation.enter(), "Staff rail route missing");
     navigation.move(7);
     Require(navigation.section == D::Section::staff, "Rail wrap failed");
@@ -2330,14 +2596,14 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
     Require(
         W::HandheldDashboardIsOpen() && W::HandheldDashboardRailFocused() && gGamePaused,
         "Dashboard open did not own pause/rail");
-    W::HandheldDashboardMove(0, 2); // Marketing is explicitly unavailable
+    W::HandheldDashboardMove(0, -2); // Guests is explicitly unavailable
     action(H::Action::confirm);
     action(H::Action::openBuild);
     Require(
         W::HandheldDashboardRailFocused() && !W::HandheldFinancesIsOpen() && !W::HandheldStaffIsOpen(),
         "Unavailable category acquired content focus");
     Require(park.cash == cash && S::Roster() == roster, "Unavailable category changed native state");
-    W::HandheldDashboardMove(0, -2);
+    W::HandheldDashboardMove(0, 2);
     action(H::Action::openBuild); // Select enters Finances
     Require(!W::HandheldDashboardRailFocused() && W::HandheldFinancesIsOpen(), "Rail -> Finances focus failed");
     action(H::Action::openBuild);
@@ -2824,6 +3090,7 @@ int main(int argc, char** argv)
         TestStaff(*context, argv[2], argc == 4);
         TestDashboard(*context, argv[2], argc == 4);
         TestResearchManagement(*context, argv[2], argc == 4);
+        TestMarketingManagement(*context, argv[2], argc == 4);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;

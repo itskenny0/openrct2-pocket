@@ -23,10 +23,10 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         bool available;
     };
     inline constexpr std::array kCategories{
-        Category{ Section::overview, "Overview", false },  Category{ Section::rides, "Rides", false },
-        Category{ Section::guests, "Guests", false },      Category{ Section::staff, "Staff", true },
-        Category{ Section::finances, "Finances", true },   Category{ Section::research, "Research", true },
-        Category{ Section::marketing, "Marketing", false }
+        Category{ Section::overview, "Overview", false }, Category{ Section::rides, "Rides", false },
+        Category{ Section::guests, "Guests", false },     Category{ Section::staff, "Staff", true },
+        Category{ Section::finances, "Finances", true },  Category{ Section::research, "Research", true },
+        Category{ Section::marketing, "Marketing", true }
     };
     enum class Focus
     {
