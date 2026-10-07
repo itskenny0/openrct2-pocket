@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
+#include <openrct2/Game.h>
 #include <openrct2/GameState.h>
 #include <openrct2/actions/GameActionRunner.h>
 #include <openrct2/actions/footpath/FootpathPlaceAction.h>
@@ -27,8 +28,114 @@ namespace OpenRCT2::Ui::Handheld::Paths
     static std::optional<int32_t> fixedHeight;
     static std::optional<FootpathSlope> fixedSlope;
 
+    struct Preview
+    {
+        CoordsXYZ position;
+        FootpathSlope slope;
+        ObjectEntryIndex surface, railings;
+        PathConstructFlags flags;
+        bool operator==(const Preview&) const = default;
+    };
+    static std::optional<Preview> ghost, suspendedGhost, checkedPreview;
+    static GameActions::Result previewResult;
+    static uint32_t checkedTick{};
+    static money64 checkedCash{};
+    static uint8_t checkedPause{};
+
+    static std::optional<Preview> RequestedPreview()
+    {
+        if (!active || removing || !target || !available)
+            return {};
+        auto type = gFootpathSelection.getSelectedSurface();
+        PathConstructFlags flags = IsQueue() ? PathConstructFlag::IsQueue : 0;
+        if (gFootpathSelection.legacyPath != kObjectEntryIndexNull)
+        {
+            type = gFootpathSelection.legacyPath;
+            flags |= PathConstructFlag::IsLegacyPathObject;
+        }
+        if (type == kObjectEntryIndexNull)
+            return {};
+        auto position = *target;
+        position.z = fixedHeight.value_or(target->z);
+        return Preview{ position, fixedSlope.value_or(slope), type, gFootpathSelection.railings, flags };
+    }
+
+    static void RemoveGhost()
+    {
+        if (!ghost)
+            return;
+        const auto position = ghost->position;
+        ghost.reset(); // Clear ownership before native actions broadcast provisional intents.
+        auto action = GameActions::FootpathRemoveAction(position);
+        action.SetFlags(
+            { GameActions::CommandFlag::ghost, GameActions::CommandFlag::noSpend,
+              GameActions::CommandFlag::allowDuringPaused });
+        auto& state = getGameState();
+        const auto result = GameActions::Execute(&action, state);
+        // Ownership can change after a preview was shown. The ghost-only native
+        // executor can discard our temporary element even if its removal query
+        // now rejects the land. It cannot select a real path with these flags.
+        if (result.error == GameActions::Status::notOwned)
+            action.Execute(state, state.park);
+    }
+    void ClearPreview()
+    {
+        RemoveGhost();
+        suspendedGhost.reset();
+        checkedPreview.reset();
+    }
+    void RemovePreviewTemporarily()
+    {
+        if (ghost)
+        {
+            suspendedGhost = ghost;
+            RemoveGhost();
+        }
+    }
+    void RestorePreview()
+    {
+        if (!suspendedGhost)
+            return;
+        suspendedGhost.reset();
+        checkedPreview.reset();
+        UpdatePreview(); // Revalidate using the real action, including cash/pause/ownership.
+    }
+    void UpdatePreview()
+    {
+        const auto requested = RequestedPreview();
+        auto& state = getGameState();
+        if (!requested)
+        {
+            ClearPreview();
+            return;
+        }
+        if (requested == checkedPreview && checkedTick == state.currentTicks && checkedCash == state.park.cash
+            && checkedPause == gGamePaused)
+            return;
+        ClearPreview();
+        previewResult = Action(false);
+        if (previewResult.error == GameActions::Status::ok)
+        {
+            auto action = GameActions::FootpathPlaceAction(
+                requested->position, requested->slope, requested->surface, requested->railings, kInvalidDirection,
+                requested->flags);
+            action.SetFlags(
+                { GameActions::CommandFlag::ghost, GameActions::CommandFlag::noSpend,
+                  GameActions::CommandFlag::allowDuringPaused });
+            const auto result = GameActions::Execute(&action, state);
+            // Native ghosts intentionally cannot obscure/convert an existing real path.
+            if (result.error == GameActions::Status::ok)
+                ghost = requested;
+        }
+        checkedPreview = requested;
+        checkedTick = state.currentTicks;
+        checkedCash = state.park.cash;
+        checkedPause = gGamePaused;
+    }
+
     void Begin(bool queue, bool remove)
     {
+        ClearPreview();
         available = Windows::WindowFootpathSelectDefault();
         gFootpathSelection.isQueueSelected = queue;
         active = true;
@@ -38,6 +145,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
     }
     void End()
     {
+        ClearPreview();
         active = false;
         target.reset();
     }
@@ -55,11 +163,13 @@ namespace OpenRCT2::Ui::Handheld::Paths
     }
     void ToggleRemove()
     {
+        ClearPreview();
         removing = !removing;
     }
 
     void FollowGround()
     {
+        ClearPreview();
         fixedHeight.reset();
         fixedSlope.reset();
     }
@@ -71,6 +181,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
         const auto next = std::clamp(height + direction * kPathHeightStep, kFootpathMinHeight, kFootpathMaxHeight);
         if (next == height)
             return false;
+        ClearPreview();
         fixedHeight = next;
         if (!fixedSlope)
             fixedSlope = slope;
@@ -80,6 +191,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
     {
         if (!target)
             return false;
+        ClearPreview();
         if (!fixedHeight)
             fixedHeight = target->z;
         auto next = fixedSlope.value_or(slope);
@@ -91,6 +203,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
     {
         if (!target)
             return false;
+        ClearPreview();
         if (!fixedHeight)
             fixedHeight = target->z;
         auto next = fixedSlope.value_or(slope);
@@ -114,6 +227,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
 
     void CycleSurface()
     {
+        ClearPreview();
         if (gFootpathSelection.legacyPath != kObjectEntryIndexNull)
         {
             auto& objects = GetContext()->GetObjectManager();
@@ -153,7 +267,10 @@ namespace OpenRCT2::Ui::Handheld::Paths
         target.reset();
         targetIsPath = false;
         if (!info.Element)
+        {
+            ClearPreview();
             return;
+        }
         const CoordsXY tile{ info.Loc.x & ~31, info.Loc.y & ~31 };
         if (info.interactionType == ViewportInteractionItem::footpath)
         {
@@ -184,6 +301,11 @@ namespace OpenRCT2::Ui::Handheld::Paths
     }
     GameActions::Result Action(bool execute)
     {
+        const auto requested = RequestedPreview();
+        if (!execute && requested && requested == checkedPreview && checkedTick == getGameState().currentTicks
+            && checkedCash == getGameState().park.cash && checkedPause == gGamePaused)
+            return previewResult;
+        ClearPreview();
         if (!target || (!removing && !available) || (removing && !targetIsPath))
         {
             GameActions::Result result;

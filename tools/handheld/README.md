@@ -62,3 +62,9 @@ The authoritative Concept B styling and current validation are documented in
 python3 tools/handheld/generate_font.py /path/to/DejaVuSans-Bold.ttf \
   src/openrct2-ui/handheld/PocketSansStrongData.h --namespace PocketSansStrong --width 16
 ```
+
+Native path ghosts and real-scenario captures are documented in
+`docs/handheld/PATH-GHOST-CHECKPOINT.md`. `render_path_preview.py` renders the
+actual loaded park with locally supplied RCT assets; proprietary asset files
+are not part of the source checkpoint. The optional `run_native_test.py --assets`
+mode also exercises the real UI modal/load lifecycle with SDL dummy drivers.

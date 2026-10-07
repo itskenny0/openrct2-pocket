@@ -14,6 +14,10 @@ namespace OpenRCT2::Ui::Handheld::Paths
     void Begin(bool queue, bool remove = false);
     void End();
     bool IsActive();
+    void UpdatePreview();
+    void ClearPreview();
+    void RemovePreviewTemporarily();
+    void RestorePreview();
     bool IsRemoving();
     bool IsQueue();
     void ToggleRemove();

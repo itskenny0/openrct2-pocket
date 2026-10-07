@@ -221,10 +221,13 @@ namespace OpenRCT2::Ui::Handheld
             Paths::End();
         }
         ClearTerrainSelection();
-        if ((_terrainActive || Paths::IsActive()) && CanExplore())
+        if ((_terrainActive || Paths::IsActive()) && CanExplore() && ContextHasFocus())
         {
             if (Paths::IsActive())
+            {
                 Paths::UpdateTarget(Centre());
+                Paths::UpdatePreview();
+            }
             auto coords = Paths::IsActive() ? Paths::TargetTile() : ScreenGetMapXY(Centre(), nullptr);
             if (coords)
             {
@@ -236,6 +239,8 @@ namespace OpenRCT2::Ui::Handheld
                 MapSelection::invalidate();
             }
         }
+        if (!CanExplore() || !ContextHasFocus())
+            Paths::ClearPreview();
         SyncFocusWindow();
         auto frame = input.update(ContextHasFocus(), SDL_GetTicks());
         auto* wm = GetWindowManager();
@@ -243,6 +248,7 @@ namespace OpenRCT2::Ui::Handheld
         {
             if (action == Action::quit)
             {
+                Paths::End();
                 ContextQuit();
                 input.suspend();
                 return;

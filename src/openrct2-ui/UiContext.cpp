@@ -14,6 +14,7 @@
 #include "TextComposition.h"
 #include "WindowManager.h"
 #include "drawing/engines/DrawingEngineFactory.hpp"
+#include "handheld/Paths.h"
 #include "input/ShortcutManager.h"
 #include "interface/Chat.h"
 #include "interface/InGameConsole.h"
@@ -644,6 +645,7 @@ public:
 
     void CloseWindow() override
     {
+        Handheld::Paths::End();
         DrawingEngineDispose();
         if (_window != nullptr)
         {

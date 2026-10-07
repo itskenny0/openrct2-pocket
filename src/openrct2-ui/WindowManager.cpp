@@ -9,6 +9,7 @@
 
 #include "WindowManager.h"
 
+#include "handheld/Paths.h"
 #include "interface/Chat.h"
 #include "interface/FileBrowser.h"
 #include "interface/Theme.h"
@@ -353,6 +354,7 @@ public:
             {
                 std::string message = intent->GetStringExtra(INTENT_EXTRA_MESSAGE);
                 CloseCallback callback = intent->GetCloseCallbackExtra(INTENT_EXTRA_CALLBACK);
+                Handheld::Paths::End();
                 return ProgressWindowOpen(message, callback);
             }
 
@@ -405,6 +407,7 @@ public:
         switch (intent.GetAction())
         {
             case INTENT_ACTION_MAP:
+                Handheld::Paths::End();
                 WindowMapReset();
                 break;
 
@@ -575,6 +578,7 @@ public:
                 ProvisionalElementsRestore();
                 break;
             case INTENT_ACTION_REMOVE_PROVISIONAL_FOOTPATH:
+                Handheld::Paths::ClearPreview();
                 FootpathRemoveProvisional();
                 break;
             case INTENT_ACTION_REMOVE_PROVISIONAL_TRACK_PIECE:
@@ -1123,6 +1127,7 @@ public:
      */
     void CloseConstructionWindows() override
     {
+        Handheld::Paths::ClearPreview();
         CloseByClass(WindowClass::rideConstruction);
         CloseByClass(WindowClass::footpath);
         CloseByClass(WindowClass::trackDesignList);

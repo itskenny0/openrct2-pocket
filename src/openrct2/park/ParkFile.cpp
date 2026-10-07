@@ -50,6 +50,7 @@
 #include "../scenario/ScenarioRepository.h"
 #include "../scripting/ScriptEngine.h"
 #include "../ui/WindowManager.h"
+#include "../windows/Intent.h"
 #include "../world/Entrance.h"
 #include "../world/Map.h"
 #include "../world/Scenery.h"
@@ -2878,6 +2879,22 @@ int32_t ScenarioSave(GameState_t& gameState, u8string_view path, SaveFlags flags
         windowMgr->CloseConstructionWindows();
     }
 
+    // Ghost paths can also temporarily alter their neighbours' connection edges.
+    // Suspend native provisional elements for the entire save, including autosaves,
+    // rather than merely omitting ghost tile elements from the serialized map.
+    struct ProvisionalSaveGuard
+    {
+        ProvisionalSaveGuard()
+        {
+            auto intent = Intent(INTENT_ACTION_REMOVE_PROVISIONAL_ELEMENTS);
+            ContextBroadcastIntent(&intent);
+        }
+        ~ProvisionalSaveGuard()
+        {
+            auto intent = Intent(INTENT_ACTION_RESTORE_PROVISIONAL_ELEMENTS);
+            ContextBroadcastIntent(&intent);
+        }
+    } provisionalSaveGuard;
     PrepareMapForSave();
 
     bool result = false;

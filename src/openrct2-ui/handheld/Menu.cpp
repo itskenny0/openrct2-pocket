@@ -188,6 +188,7 @@ namespace OpenRCT2::Ui::Windows
     public:
         void onOpen() override
         {
+            Handheld::Paths::ClearPreview();
             setWidgets(kWidgets);
             layout();
             colours[0] = ColourWithFlags{ Colour::darkBlue };

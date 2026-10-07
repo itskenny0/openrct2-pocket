@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Link a handheld integration test against a completed native GUI build."""
 import argparse
+import os
 from pathlib import Path
 import shlex
 import subprocess
@@ -10,6 +11,7 @@ parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--build',type=Path,required=True)
 parser.add_argument('--data',type=Path,required=True)
 parser.add_argument('--ninja',default='ninja')
+parser.add_argument('--assets',type=Path,help='Optional local RCT installation; enables real UI lifecycle testing with SDL dummy drivers')
 args=parser.parse_args()
 repo=Path(__file__).resolve().parents[2]
 build=args.build.resolve()
@@ -33,4 +35,10 @@ with tempfile.TemporaryDirectory(prefix='pocket-native-test-') as directory:
     link.insert(i,str(repo/'test/handheld/PathActionsTests.cpp'))
     link[1:1]=['-std=c++20',*definitions,*includes,f'-I{repo / "src"}',f'-I{repo / "src/thirdparty"}']
     subprocess.run(link,cwd=build,check=True)
-    subprocess.run([str(root/'test'),str(args.data.resolve()),str(root/'profile')],check=True)
+    test_args=[str(root/'test'),str(args.data.resolve()),str(root/'profile')]
+    if args.assets: test_args.append(str(args.assets.resolve()))
+    test_env=os.environ.copy()
+    if args.assets:
+        test_env.setdefault("SDL_VIDEODRIVER", "dummy")
+        test_env.setdefault("SDL_AUDIODRIVER", "dummy")
+    subprocess.run(test_args,check=True,env=test_env)
