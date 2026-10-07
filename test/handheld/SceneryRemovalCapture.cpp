@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+#include <openrct2-ui/handheld/Currency.h>
 // Isolated loaded scenario, real targeted scenery removal, native renderer and production UI.
 #include <filesystem>
 #include <iomanip>
@@ -124,10 +125,9 @@ int main(int argc, char** argv)
         Ui::Handheld::DrawSceneryRemovalOverlay(
             rt, Ui::Handheld::Concept::kOrigin, Removal::Name(selected), selected.has_value());
         Ui::Handheld::DrawSceneryRemovalFooter(rt, { 512, 384 });
-        std::ostringstream cost;
-        cost << "$" << std::fixed << std::setprecision(2) << result.cost / 100.0;
+        const auto cost = Ui::Handheld::FormatMoney(result.cost);
         if (result.error == GameActions::Status::ok)
-            Ui::Handheld::DrawCostBadge(rt, { 288, 224 }, cost.str());
+            Ui::Handheld::DrawCostBadge(rt, { 288, 224 }, cost);
         else
             Ui::Handheld::DrawContextMessage(rt, { 288, 224 }, result.getErrorMessage());
         Ui::Handheld::DrawMapFocus(rt, { 256, 192 });

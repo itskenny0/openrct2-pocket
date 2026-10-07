@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+#include <openrct2-ui/handheld/Currency.h>
 // Isolated native scenario, production picker previews and shop ghost and real placement.
 #include <filesystem>
 #include <iomanip>
@@ -179,10 +180,9 @@ int main(int argc, char** argv)
         {
             Ui::Handheld::DrawShopOverlay(rt, Ui::Handheld::Concept::kOrigin, Shops::Name(chosen), true, direction);
             Ui::Handheld::DrawShopFooter(rt, { 512, 384 });
-            std::ostringstream amount;
-            amount << "$" << std::fixed << std::setprecision(2) << cost / 100.0;
+            const auto amount = Ui::Handheld::FormatMoney(cost);
             if (mode == 1)
-                Ui::Handheld::DrawCostBadge(rt, { 288, 224 }, amount.str());
+                Ui::Handheld::DrawCostBadge(rt, { 288, 224 }, amount);
             else
                 Ui::Handheld::DrawContextMessage(rt, { 288, 224 }, "Placed / Open");
             Ui::Handheld::DrawMapFocus(rt, { 256, 192 });

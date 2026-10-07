@@ -16,6 +16,7 @@ namespace OpenRCT2::Drawing
 namespace OpenRCT2::Ui::Handheld
 {
     class ControllerInput;
+    struct ManagementPresentation;
     struct Frame;
     bool HandleMenuInput(ControllerInput& input, const Frame& frame);
     void UpdateExplorer(ControllerInput& input);
@@ -39,6 +40,10 @@ namespace OpenRCT2::Ui::Handheld
 namespace OpenRCT2::Ui::Windows
 {
     void HandheldRideOpen(RideId ride);
+    Handheld::ManagementPresentation HandheldDashboardPresentation(size_t selected);
+    bool HandheldFinancesIsOpen();
+    void HandheldFinancesMove(int x, int y);
+    void HandheldFinancesPause();
     bool HandheldShopManagementIsOpen();
     void HandheldShopManagementMove(int x, int y);
     void HandheldShopManagementPause();

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+#include <openrct2-ui/handheld/Currency.h>
 // Isolated loaded scenario, real water actions, native renderer and production UI.
 #include <filesystem>
 #include <iomanip>
@@ -144,9 +145,8 @@ int main(int argc, char** argv)
         ViewportRender(rt, &viewport);
         Ui::Handheld::DrawTerrainOverlay(rt, Ui::Handheld::Concept::kOrigin, raise, true);
         Ui::Handheld::DrawGameplayFooter(rt, { 512, 384 }, "", true);
-        std::ostringstream cost;
-        cost << "$" << std::fixed << std::setprecision(2) << result.cost / 100.0;
-        Ui::Handheld::DrawCostBadge(rt, { 288, 224 }, cost.str());
+        const auto cost = Ui::Handheld::FormatMoney(result.cost);
+        Ui::Handheld::DrawCostBadge(rt, { 288, 224 }, cost);
         Ui::Handheld::DrawMapFocus(rt, { 256, 192 });
         const char* names[] = { "water-raised.png", "water-lowered.png" };
         Image image;

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+#include <openrct2-ui/handheld/Currency.h>
 // Isolated native scenario, production picker previews and selected tree ghost.
 #include <filesystem>
 #include <iomanip>
@@ -136,9 +137,8 @@ int main(int argc, char** argv)
         {
             Ui::Handheld::DrawTreeOverlay(rt, Ui::Handheld::Concept::kOrigin, Trees::Name(chosen), true);
             Ui::Handheld::DrawTreeFooter(rt, { 512, 384 });
-            std::ostringstream cost;
-            cost << "$" << std::fixed << std::setprecision(2) << result.cost / 100.0;
-            Ui::Handheld::DrawCostBadge(rt, { 288, 224 }, cost.str());
+            const auto cost = Ui::Handheld::FormatMoney(result.cost);
+            Ui::Handheld::DrawCostBadge(rt, { 288, 224 }, cost);
             Ui::Handheld::DrawMapFocus(rt, { 256, 192 });
         }
         const char* names[] = { "tree-picker.png", "tree-picker-last.png", "tree-picker-selection.png" };

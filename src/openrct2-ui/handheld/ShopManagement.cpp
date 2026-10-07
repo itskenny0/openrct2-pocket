@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "ShopManagement.h"
 
+#include "Currency.h"
+
 #include <openrct2-ui/UiStringIds.h>
 #include <openrct2/GameState.h>
 #include <openrct2/actions/ride/RideDemolishAction.h>
@@ -107,9 +109,7 @@ namespace OpenRCT2::Ui::Handheld::ShopManagement
     }
     std::string Money(money64 value)
     {
-        if (value == kMoney64Undefined)
-            return "Unavailable";
-        return FormatStringID(STR_CURRENCY2DP, value);
+        return FormatMoney(value);
     }
     void Draw(
         Drawing::RenderTarget& rt, ScreenSize screen, const std::optional<Target>& target, View view, size_t focus,

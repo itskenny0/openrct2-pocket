@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+#include <openrct2-ui/handheld/Currency.h>
 // Real loaded scenario, native world renderer and production handheld components.
 #include <filesystem>
 #include <iomanip>
@@ -151,9 +152,8 @@ int main(int argc, char** argv)
         Ui::Handheld::DrawPathOverlay(
             rt, Ui::Handheld::Concept::kOrigin, Paths::SurfaceName(), Paths::IsQueue(), false, Paths::PlacementName());
         Ui::Handheld::DrawPathFooter(rt, { 512, 384 }, "");
-        std::ostringstream cost;
-        cost << "$" << std::fixed << std::setprecision(2) << result.cost / 100.0;
-        Ui::Handheld::DrawCostBadge(rt, { 288, 224 }, cost.str());
+        const auto cost = Ui::Handheld::FormatMoney(result.cost);
+        Ui::Handheld::DrawCostBadge(rt, { 288, 224 }, cost);
         Ui::Handheld::DrawMapFocus(rt, { 256, 192 });
         const char* names[] = { "path-ghost-ground.png", "path-ghost-queue.png", "path-ghost-slope.png" };
         Image image;

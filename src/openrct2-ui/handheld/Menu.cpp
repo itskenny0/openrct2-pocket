@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+#include "Currency.h"
 #include "Explorer.h"
+#include "Finances.h"
 #include "ListFocus.h"
 #include "Panel.h"
 #include "Paths.h"
@@ -45,6 +47,8 @@ namespace OpenRCT2::Ui::Windows
         dashboard,
         overview,
         finances,
+        financeEditor,
+        financeConfirm,
         guests,
         research,
         ride,
@@ -57,6 +61,27 @@ namespace OpenRCT2::Ui::Windows
         discard,
         exit
     };
+
+    struct ManagementSection
+    {
+        Page page;
+        const char* label;
+    };
+    static constexpr std::array kManagementSections{ ManagementSection{ Page::overview, "Overview" },
+                                                     ManagementSection{ Page::finances, "Finances" },
+                                                     ManagementSection{ Page::guests, "Guests" },
+                                                     ManagementSection{ Page::research, "Research" } };
+    Handheld::ManagementPresentation HandheldDashboardPresentation(size_t selected)
+    {
+        Handheld::ManagementPresentation model;
+        model.breadcrumb = "Park management";
+        model.title = getGameState().park.name;
+        model.selected = selected;
+        for (const auto& section : kManagementSections)
+            model.rows.emplace_back(section.label);
+        model.rows.emplace_back("Back to park");
+        return model;
+    }
 
     static fs::path SlotPath(size_t slot)
     {
@@ -73,10 +98,20 @@ namespace OpenRCT2::Ui::Windows
         bool _shopPickerFromBuild{};
         bool _exitAfterSave{};
         size_t _slot{};
+        size_t _dashboardFocus{};
         std::string _status;
         RideId _rideId = RideId::GetNull();
         std::optional<Handheld::ShopManagement::Target> _shop;
         std::optional<money64> _priceDraft;
+        std::optional<Handheld::Finances::Draft> _financeDraft;
+        bool financeManagement() const
+        {
+            return _page == Page::finances || _page == Page::financeEditor || _page == Page::financeConfirm;
+        }
+        bool managementShell() const
+        {
+            return _page == Page::dashboard || financeManagement();
+        }
         bool shopManagement() const
         {
             return _page == Page::shop || _page == Page::shopPrices || _page == Page::shopDemolish;
@@ -99,11 +134,7 @@ namespace OpenRCT2::Ui::Windows
         }
         static std::string money(money64 value)
         {
-            if (value == kMoney64Undefined)
-                return "Not available";
-            std::ostringstream text;
-            text << "$" << std::fixed << std::setprecision(2) << value / 100.0;
-            return text.str();
+            return Handheld::FormatMoney(value);
         }
 
         void layout()
@@ -113,14 +144,14 @@ namespace OpenRCT2::Ui::Windows
             const ScreenSize target{ _page == Page::overwrite || _page == Page::discard || _page == Page::exit ? 330
                                                                                                                : size.width,
                                      size.height };
-            const ScreenSize bounds = (_page == Page::pathOptions || picker() || shopManagement())
+            const ScreenSize bounds = (_page == Page::pathOptions || picker() || shopManagement() || managementShell())
                 ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
                 : information() ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 }
                                 : target;
             WindowSetResize(*this, bounds, bounds);
             WindowSetPosition(
                 *this,
-                (_page == Page::pathOptions || picker() || shopManagement())
+                (_page == Page::pathOptions || picker() || shopManagement() || managementShell())
                     ? ScreenCoordsXY{ 0, 0 }
                     : ScreenCoordsXY{ 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
         }
@@ -128,11 +159,16 @@ namespace OpenRCT2::Ui::Windows
         void page(Page next)
         {
             _page = next;
+            if (next != Page::financeEditor && next != Page::financeConfirm)
+                _financeDraft.reset();
             _focus = {};
             _status.clear();
             _priceDraft.reset();
             layout();
-            if (next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish)
+            if (next == Page::dashboard)
+                _focus.move(static_cast<int32_t>(_dashboardFocus), rows().size());
+            if (next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish
+                || next == Page::financeConfirm)
                 _focus.move(1, 2); // destructive confirmations default to Cancel
             invalidate();
         }
@@ -144,9 +180,14 @@ namespace OpenRCT2::Ui::Windows
                     return { "Resume park",   "Build",     "Park dashboard",     "Save park",
                              "Save and exit", "Load park", "Exit without saving" };
                 case Page::dashboard:
-                    return { "Overview", "Finances", "Guests", "Research", "Back to park" };
-                case Page::overview:
+                    return HandheldDashboardPresentation(0).rows;
                 case Page::finances:
+                    return Handheld::Finances::Presentation(Handheld::Finances::View::overview, 0).rows;
+                case Page::financeEditor:
+                    return { "Review change...", "Cancel" };
+                case Page::financeConfirm:
+                    return { "Apply", "Cancel" };
+                case Page::overview:
                 case Page::guests:
                     return { "Back to dashboard" };
                 case Page::research:
@@ -333,6 +374,28 @@ namespace OpenRCT2::Ui::Windows
         {
             page(Page::load);
         }
+        bool financeIsOpen() const
+        {
+            return financeManagement();
+        }
+        void financeMove(int x, int y)
+        {
+            if (!financeManagement())
+                return;
+            if (y != 0)
+                move(y);
+            if (_page == Page::financeEditor && _financeDraft && x != 0)
+            {
+                Handheld::Finances::Adjust(*_financeDraft, x);
+                _status.clear();
+                invalidate();
+            }
+        }
+        void financePause()
+        {
+            if (financeManagement())
+                page(Page::park);
+        }
         bool shopIsOpen() const
         {
             return shopManagement();
@@ -384,6 +447,12 @@ namespace OpenRCT2::Ui::Windows
                 case Page::pathOptions:
                 case Page::treePicker:
                     close();
+                    break;
+                case Page::financeConfirm:
+                    page(Page::financeEditor);
+                    break;
+                case Page::financeEditor:
+                    page(Page::finances);
                     break;
                 case Page::overview:
                 case Page::finances:
@@ -528,17 +597,54 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 }
                 case Page::dashboard:
-                    if (choice == 4)
-                        page(Page::park);
+                    _dashboardFocus = choice;
+                    page(choice < kManagementSections.size() ? kManagementSections[choice].page : Page::park);
+                    break;
+                case Page::finances:
+                    if (choice == 2)
+                        page(Page::dashboard);
                     else
-                        page(
-                            choice == 0       ? Page::overview
-                                : choice == 1 ? Page::finances
-                                : choice == 2 ? Page::guests
-                                              : Page::research);
+                    {
+                        const auto field = choice == 0 ? Handheld::Finances::Field::loan : Handheld::Finances::Field::admission;
+                        if (Handheld::Finances::Available(field))
+                        {
+                            _financeDraft = Handheld::Finances::Begin(field);
+                            page(Page::financeEditor);
+                        }
+                    }
+                    break;
+                case Page::financeEditor:
+                    if (choice == 1)
+                        page(Page::finances);
+                    else if (_financeDraft)
+                    {
+                        const auto result = Handheld::Finances::Action(*_financeDraft, false);
+                        if (result.error == GameActions::Status::ok)
+                            page(Page::financeConfirm);
+                        else
+                        {
+                            _status = Handheld::Finances::Feedback(result);
+                            invalidate();
+                        }
+                    }
+                    break;
+                case Page::financeConfirm:
+                    if (choice == 1)
+                        page(Page::finances);
+                    else if (_financeDraft)
+                    {
+                        const auto result = Handheld::Finances::Action(*_financeDraft, true);
+                        if (result.error == GameActions::Status::ok)
+                        {
+                            page(Page::finances);
+                            _status = "Financial change requested";
+                        }
+                        else
+                            _status = Handheld::Finances::Feedback(result);
+                        invalidate();
+                    }
                     break;
                 case Page::overview:
-                case Page::finances:
                 case Page::guests:
                     page(Page::dashboard);
                     break;
@@ -674,6 +780,26 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
+            if (managementShell())
+            {
+                Handheld::ManagementPresentation model;
+                if (_page == Page::dashboard)
+                {
+                    model = HandheldDashboardPresentation(_focus.index());
+                    model.status = _status;
+                }
+                else
+                {
+                    using Handheld::Finances::View;
+                    model = Handheld::Finances::Presentation(
+                        _page == Page::finances            ? View::overview
+                            : _page == Page::financeEditor ? View::editor
+                                                           : View::confirmation,
+                        _focus.index(), _financeDraft, _status);
+                }
+                Handheld::DrawManagementPanel(rt, { ContextGetWidth(), ContextGetHeight() }, model);
+                return;
+            }
             if (shopManagement())
             {
                 using Handheld::ShopManagement::View;
@@ -971,5 +1097,24 @@ namespace OpenRCT2::Ui::Windows
         return window && static_cast<const HandheldMenuWindow*>(window)->treePicker()
             ? static_cast<const HandheldMenuWindow*>(window)->pickerFocus()
             : kObjectEntryIndexNull;
+    }
+} // namespace OpenRCT2::Ui::Windows
+
+namespace OpenRCT2::Ui::Windows
+{
+    bool HandheldFinancesIsOpen()
+    {
+        const auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window && static_cast<const HandheldMenuWindow*>(window)->financeIsOpen();
+    }
+    void HandheldFinancesMove(int x, int y)
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            static_cast<HandheldMenuWindow*>(window)->financeMove(x, y);
+    }
+    void HandheldFinancesPause()
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            static_cast<HandheldMenuWindow*>(window)->financePause();
     }
 } // namespace OpenRCT2::Ui::Windows

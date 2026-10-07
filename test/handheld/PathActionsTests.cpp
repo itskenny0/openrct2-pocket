@@ -7,6 +7,7 @@
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/handheld/Explorer.h>
+#include <openrct2-ui/handheld/Finances.h>
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/SceneryRemoval.h>
 #include <openrct2-ui/handheld/ShopManagement.h>
@@ -23,10 +24,13 @@
 #include <openrct2/PlatformEnvironment.h>
 #include <openrct2/actions/GameActionRunner.h>
 #include <openrct2/actions/footpath/FootpathPlaceAction.h>
+#include <openrct2/actions/park/ParkSetEntranceFeeAction.h>
+#include <openrct2/actions/park/ParkSetLoanAction.h>
 #include <openrct2/actions/park/ParkSetResearchFundingAction.h>
 #include <openrct2/audio/AudioContext.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/interface/Viewport.h>
+#include <openrct2/localisation/CurrencyTypes.h>
 #include <openrct2/management/Research.h>
 #include <openrct2/object/ObjectManager.h>
 #include <openrct2/scenario/Scenario.h>
@@ -1463,6 +1467,316 @@ static void TestShopManagement(IContext& context, const std::string& profile, bo
                  "stale-pause / save-reload passed\n";
 }
 
+static void TestFinances(IContext& context, const std::string& profile, bool realUi)
+{
+    namespace H = Ui::Handheld;
+    namespace F = H::Finances;
+    namespace W = Ui::Windows;
+    auto& state = getGameState();
+    auto& park = state.park;
+    H::EndTerrain();
+    gGamePaused = 0;
+    park.flags.unset(ParkFlag::noMoney, ParkFlag::freeEntry, ParkFlag::unlockAllPrices);
+    park.cash = 5000.00_GBP;
+    park.bankLoan = 1000.00_GBP;
+    park.maxBankLoan = 5000.00_GBP;
+    park.entranceFee = 10.00_GBP;
+    for (auto& value : park.expenditureTable[0])
+        value = 0;
+    park.expenditureTable[0][EnumValue(ExpenditureType::shopSales)] = 150.00_GBP;
+    park.expenditureTable[0][EnumValue(ExpenditureType::wages)] = -42.00_GBP;
+    Require(
+        F::MonthlyTotals() == std::pair<money64, money64>{ 150.00_GBP, 42.00_GBP }, "Monthly native ledger totals incorrect");
+    const auto currency = Config::Get().general.currencyFormat;
+    for (const auto choice : { CurrencyType::pounds, CurrencyType::dollars, CurrencyType::euros })
+    {
+        Config::Get().general.currencyFormat = choice;
+        Require(
+            H::FormatMoney(10.00_GBP) == FormatStringID(STR_CURRENCY2DP, 10.00_GBP)
+                && H::FormatMoney(-10.00_GBP) == FormatStringID(STR_CURRENCY2DP, -10.00_GBP),
+            "Shared native currency/sign incorrect");
+    }
+    Config::Get().general.currencyFormat = currency;
+    Require(H::FormatMoney(kMoney64Undefined) == "Unavailable", "Undefined financial value disguised as zero");
+    park.expenditureTable[0][0] = kMoney64Undefined;
+    Require(F::MonthlyTotals().first == kMoney64Undefined, "Unavailable ledger hidden");
+    park.expenditureTable[0][0] = 0;
+    const auto ledger = std::vector<money64>(std::begin(park.expenditureTable[0]), std::end(park.expenditureTable[0]));
+    auto loan = F::Begin(F::Field::loan);
+    const auto originalCash = park.cash;
+    F::Adjust(loan, 1);
+    Require(
+        loan.value == 2000.00_GBP && F::Action(loan, false).error == GameActions::Status::ok && park.cash == originalCash
+            && park.bankLoan == loan.baseline,
+        "Loan draft/query mutated cash");
+    Require(F::Action(loan, true).error == GameActions::Status::ok && park.bankLoan == loan.baseline, "Loan bypassed queue");
+    GameActions::ProcessQueue(state);
+    Require(park.bankLoan == loan.value && park.cash == originalCash + 1000.00_GBP, "Borrow did not add exact cash once");
+    loan = F::Begin(F::Field::loan);
+    F::Adjust(loan, -1);
+    Require(F::Action(loan, true).error == GameActions::Status::ok, "Repay submission failed");
+    GameActions::ProcessQueue(state);
+    Require(park.bankLoan == 1000.00_GBP && park.cash == originalCash, "Repay did not deduct exact cash once");
+    Require(std::equal(ledger.begin(), ledger.end(), std::begin(park.expenditureTable[0])), "Loan altered operating ledger");
+    loan = F::Begin(F::Field::loan);
+    for (int i = 0; i < 20; ++i)
+        F::Adjust(loan, 1);
+    Require(loan.value == park.maxBankLoan, "Loan upper bound failed");
+    loan.value = park.maxBankLoan + 1;
+    Require(F::Action(loan, true).error != GameActions::Status::ok, "Excess loan allowed");
+    loan.value = -1;
+    Require(F::Action(loan, true).error != GameActions::Status::ok, "Negative loan allowed");
+    loan = F::Begin(F::Field::loan);
+    for (int i = 0; i < 20; ++i)
+        F::Adjust(loan, -1);
+    Require(loan.value == 0, "Loan lower bound failed");
+    park.cash = 0;
+    Require(F::Action(loan, true).error == GameActions::Status::insufficientFunds, "Unaffordable repayment allowed");
+    park.cash = -100.00_GBP;
+    loan = F::Begin(F::Field::loan);
+    F::Adjust(loan, 1);
+    Require(F::Action(loan, true).error == GameActions::Status::ok, "Borrowing while in debt blocked");
+    GameActions::ProcessQueue(state);
+    Require(park.cash == 900.00_GBP && park.bankLoan == 2000.00_GBP, "Debt borrowing delta wrong");
+    park.bankLoan = 6000.00_GBP;
+    loan = F::Begin(F::Field::loan);
+    F::Adjust(loan, 1);
+    Require(loan.value == 6000.00_GBP, "Above-limit current loan increased or silently clamped");
+    F::Adjust(loan, -1);
+    Require(loan.value == 5000.00_GBP, "Above-limit repayment blocked");
+    park.bankLoan = 1000.00_GBP;
+    park.cash = originalCash;
+    loan = F::Begin(F::Field::loan);
+    F::Adjust(loan, 1);
+    park.bankLoan += 1;
+    Require(F::Action(loan, true).error != GameActions::Status::ok, "Stale loan draft accepted");
+    park.bankLoan = 1000.00_GBP;
+    auto admission = F::Begin(F::Field::admission);
+    F::Adjust(admission, 1);
+    Require(
+        admission.value == 11.00_GBP && F::Action(admission, false).error == GameActions::Status::ok
+            && park.entranceFee == 10.00_GBP,
+        "Admission draft/query applied");
+    gGamePaused = 1;
+    Require(F::Action(admission, true).error == GameActions::Status::ok, "Native paused admission change rejected");
+    GameActions::ProcessQueue(state);
+    Require(park.entranceFee == 11.00_GBP && park.cash == originalCash, "Admission change charged immediate cash");
+    loan = F::Begin(F::Field::loan);
+    F::Adjust(loan, 1);
+    Require(F::Action(loan, true).error == GameActions::Status::ok, "Native paused loan change rejected");
+    GameActions::ProcessQueue(state);
+    Require(park.cash == originalCash + 1000.00_GBP, "Paused loan cash incorrect");
+    gGamePaused = 0;
+    admission = F::Begin(F::Field::admission);
+    for (int i = 0; i < 1100; ++i)
+        F::Adjust(admission, 1);
+    Require(admission.value == kMaxEntranceFee, "Admission upper bound failed");
+    admission.value = kMaxEntranceFee + 1;
+    Require(F::Action(admission, true).error != GameActions::Status::ok, "Invalid admission high accepted");
+    admission.value = -1;
+    Require(F::Action(admission, true).error != GameActions::Status::ok, "Invalid admission low accepted");
+    admission = F::Begin(F::Field::admission);
+    for (int i = 0; i < 1100; ++i)
+        F::Adjust(admission, -1);
+    Require(admission.value == 0, "Admission lower bound failed");
+    auto staleAdmission = F::Begin(F::Field::admission);
+    F::Adjust(staleAdmission, 1);
+    park.entranceFee += 1;
+    Require(F::Action(staleAdmission, true).error != GameActions::Status::ok, "Stale admission draft accepted");
+    park.entranceFee -= 1;
+    park.flags.set(ParkFlag::freeEntry);
+    Require(
+        !F::Available(F::Field::admission) && F::Action(admission, true).error != GameActions::Status::ok,
+        "Locked admission editable");
+    park.flags.set(ParkFlag::unlockAllPrices);
+    Require(
+        F::Available(F::Field::admission) && F::Action(admission, false).error == GameActions::Status::ok,
+        "Native unlock-all-prices rule ignored");
+    park.flags.unset(ParkFlag::freeEntry, ParkFlag::unlockAllPrices);
+    park.flags.set(ParkFlag::noMoney);
+    Require(
+        !F::Available(F::Field::loan) && !F::Available(F::Field::admission)
+            && F::Action(F::Begin(F::Field::loan), true).error != GameActions::Status::ok
+            && F::Action(F::Begin(F::Field::admission), true).error != GameActions::Status::ok,
+        "No-money finances changed");
+    Require(
+        F::Presentation(F::View::overview, 0).stats[0].second == "Not applicable",
+        "No-money statistics presented as spendable cash");
+    park.flags.unset(ParkFlag::noMoney);
+    park.cash = originalCash;
+    park.bankLoan = 1000.00_GBP;
+    if (realUi)
+    {
+        H::ControllerInput input;
+        H::Frame frame;
+        auto open = [&]() {
+            W::HandheldMenuOpen();
+            W::HandheldMenuMove(1);
+            W::HandheldMenuMove(1);
+            W::HandheldMenuConfirm();
+            W::HandheldMenuMove(1);
+            W::HandheldMenuConfirm();
+            Require(W::HandheldFinancesIsOpen() && gGamePaused, "Dashboard finance navigation failed");
+        };
+        open();
+        W::HandheldMenuConfirm();
+        W::HandheldFinancesMove(1, 0);
+        W::HandheldMenuBack();
+        Require(park.cash == originalCash && park.bankLoan == 1000.00_GBP, "B applied draft");
+        W::HandheldMenuConfirm();
+        W::HandheldFinancesMove(1, 0);
+        frame.actions = { H::Action::confirm, H::Action::confirm };
+        H::HandleMenuInput(input, frame);
+        GameActions::ProcessQueue(state);
+        Require(park.bankLoan == 1000.00_GBP, "Review A spilled into confirmation");
+        W::HandheldMenuConfirm(); // Default Cancel.
+        Require(park.cash == originalCash && park.bankLoan == 1000.00_GBP, "Default Cancel applied loan");
+        W::HandheldMenuConfirm();
+        W::HandheldFinancesMove(1, 0);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuMove(-1);
+        H::HandleMenuInput(input, frame);
+        GameActions::ProcessQueue(state);
+        Require(
+            park.bankLoan == 2000.00_GBP && park.cash == originalCash + 1000.00_GBP,
+            "Confirmation charged twice or wrong delta");
+        W::HandheldMenuMove(1);
+        W::HandheldMenuConfirm();
+        W::HandheldFinancesMove(1, 0);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuMove(-1);
+        H::HandleMenuInput(input, frame);
+        GameActions::ProcessQueue(state);
+        Require(park.entranceFee == 12.00_GBP && park.cash == originalCash + 1000.00_GBP, "Controller admission change failed");
+        W::HandheldMenuConfirm();
+        W::HandheldFinancesMove(1, 0);
+        frame.actions = { H::Action::openMenu };
+        H::HandleMenuInput(input, frame);
+        Require(!W::HandheldFinancesIsOpen(), "Start did not discard finance editor");
+        W::HandheldMenuBack();
+        Require(!gGamePaused, "Finances pause state leaked");
+        Require(park.bankLoan == 2000.00_GBP && park.entranceFee == 12.00_GBP, "Start applied draft");
+        open();
+        W::HandheldMenuBack();
+        W::HandheldMenuConfirm();
+        Require(W::HandheldFinancesIsOpen(), "Dashboard did not retain section focus");
+        W::HandheldMenuBack();
+        W::HandheldMenuBack();
+        W::HandheldMenuBack();
+        Require(!gGamePaused, "Finance exit left pause");
+        SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+        Require(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) == 0, "Finance controller init failed");
+        {
+            H::ControllerInput controller;
+            controller.update(true, 3000);
+            const auto device = SDL_JoystickAttachVirtual(
+                SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);
+            auto* joystick = SDL_JoystickOpen(device);
+            Require(joystick, "Finance virtual controller failed");
+            auto pump = [&]() {
+                SDL_Event e;
+                while (SDL_PollEvent(&e))
+                    controller.handleEvent(e);
+            };
+            pump();
+            controller.update(true, 3010);
+            pump();
+            controller.update(true, 3020);
+            auto press = [&](bool down) {
+                SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, down);
+                SDL_JoystickUpdate();
+                pump();
+            };
+            open();
+            W::HandheldMenuConfirm();
+            W::HandheldFinancesMove(1, 0);
+            press(true);
+            auto f = controller.update(true, 3030);
+            Require(f.actions.size() == 1 && H::HandleMenuInput(controller, f), "Finance review press lost");
+            Require(controller.update(true, 3040).actions.empty(), "Held review A leaked");
+            press(false);
+            Require(controller.update(true, 3050).actions.empty(), "Review release applied finance");
+            W::HandheldMenuMove(-1);
+            press(true);
+            f = controller.update(true, 3060);
+            Require(f.actions.size() == 1 && H::HandleMenuInput(controller, f), "Fresh finance confirmation lost");
+            GameActions::ProcessQueue(state);
+            Require(
+                park.bankLoan == 3000.00_GBP && park.cash == originalCash + 2000.00_GBP,
+                "Fresh finance confirmation cash wrong");
+            Require(controller.update(true, 3070).actions.empty(), "Held confirming A reopened editor");
+            press(false);
+            controller.update(true, 3080);
+            W::HandheldMenuBack();
+            W::HandheldMenuBack();
+            W::HandheldMenuBack();
+            SDL_JoystickClose(joystick);
+            SDL_JoystickDetachVirtual(device);
+        }
+    }
+    if (realUi)
+    {
+        const auto cash = park.cash, loanValue = park.bankLoan, feeValue = park.entranceFee;
+        park.flags.set(ParkFlag::noMoney);
+        W::HandheldMenuOpen();
+        W::HandheldMenuMove(1);
+        W::HandheldMenuMove(1);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuMove(1);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuConfirm();
+        W::HandheldFinancesMove(1, 0);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuMove(1);
+        W::HandheldMenuConfirm();
+        GameActions::ProcessQueue(state);
+        Require(
+            W::HandheldFinancesIsOpen() && park.cash == cash && park.bankLoan == loanValue && park.entranceFee == feeValue,
+            "No-money UI changed financial state");
+        W::HandheldMenuBack();
+        W::HandheldMenuBack();
+        W::HandheldMenuBack();
+        park.flags.unset(ParkFlag::noMoney);
+        gGamePaused = 1;
+        W::HandheldMenuOpen();
+        W::HandheldMenuMove(1);
+        W::HandheldMenuMove(1);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuMove(1);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuBack();
+        W::HandheldMenuBack();
+        W::HandheldMenuBack();
+        Require(gGamePaused == 1, "Finance exit unpaused externally paused park");
+        gGamePaused = 0;
+    }
+    SaveFlags flags{};
+    flags.set(SaveFlag::exportObjects);
+    const auto save = profile + "/finances.park";
+    const auto savedCash = park.cash, savedLoan = park.bankLoan, savedFee = park.entranceFee;
+    Require(ScenarioSave(state, save, flags) != 0, "Finance save failed");
+    if (realUi)
+    {
+        W::HandheldMenuOpen();
+        W::HandheldMenuMove(1);
+        W::HandheldMenuMove(1);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuMove(1);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuConfirm();
+        W::HandheldFinancesMove(1, 0);
+    }
+    Require(context.LoadParkFromFile(save), "Finance reload failed");
+    Require(
+        park.cash == savedCash && park.bankLoan == savedLoan && park.entranceFee == savedFee
+            && std::equal(ledger.begin(), ledger.end(), std::begin(park.expenditureTable[0])),
+        "Finance/ledger state not persisted");
+    if (realUi)
+        Require(!W::HandheldFinancesIsOpen(), "Load retained finance draft/menu");
+    std::cout << "Native finances / ledger-currency / bounded loan-exact cash-debt-repay / admission-restrictions / "
+                 "cancel-input-pause-no-money / save-reload passed\n";
+}
+
 int main(int argc, char** argv)
 {
     try
@@ -1771,6 +2085,7 @@ int main(int argc, char** argv)
         TestTreeGhost(*context, argv[2], argc == 4);
         TestShops(*context, argv[2], argc == 4);
         TestShopManagement(*context, argv[2], argc == 4);
+        TestFinances(*context, argv[2], argc == 4);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;

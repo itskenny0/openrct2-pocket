@@ -6,6 +6,7 @@
 #include "Explorer.h"
 
 #include "ControllerInput.h"
+#include "Currency.h"
 #include "Panel.h"
 #include "Paths.h"
 #include "SceneryRemoval.h"
@@ -349,6 +350,8 @@ namespace OpenRCT2::Ui::Handheld
         {
             if (Windows::HandheldObjectPickerIsOpen())
                 Windows::HandheldObjectPickerMove(frame.navigateX, frame.navigateY);
+            else if (Windows::HandheldFinancesIsOpen())
+                Windows::HandheldFinancesMove(frame.navigateX, frame.navigateY);
             else if (Windows::HandheldShopManagementIsOpen())
                 Windows::HandheldShopManagementMove(frame.navigateX, frame.navigateY);
             else if (frame.navigateY != 0)
@@ -361,6 +364,8 @@ namespace OpenRCT2::Ui::Handheld
                     Windows::HandheldObjectPickerPause();
                 else if (action == Action::openMenu && Windows::HandheldShopManagementIsOpen())
                     Windows::HandheldShopManagementPause();
+                else if (action == Action::openMenu && Windows::HandheldFinancesIsOpen())
+                    Windows::HandheldFinancesPause();
                 else if (action == Action::back || action == Action::openMenu)
                     Windows::HandheldMenuBack();
                 input.suspend();
@@ -636,9 +641,7 @@ namespace OpenRCT2::Ui::Handheld
                 const auto result = TerrainAction(false);
                 if (result.error == GameActions::Status::ok)
                 {
-                    std::ostringstream cost;
-                    cost << "$" << std::fixed << std::setprecision(2) << result.cost / 100.0;
-                    costAmount = cost.str();
+                    costAmount = FormatMoney(result.cost);
                 }
                 else
                     status += "  " + result.getErrorMessage();
@@ -654,9 +657,7 @@ namespace OpenRCT2::Ui::Handheld
             status = Paths::IsRemoving() ? "REMOVE PATH" : "PLACE PATH";
             if (result.error == GameActions::Status::ok)
             {
-                std::ostringstream cost;
-                cost << "$" << std::fixed << std::setprecision(2) << result.cost / 100.0;
-                costAmount = cost.str();
+                costAmount = FormatMoney(result.cost);
             }
             else
                 status = result.getErrorMessage();
