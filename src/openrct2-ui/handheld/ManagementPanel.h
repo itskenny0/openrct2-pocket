@@ -19,6 +19,7 @@ namespace OpenRCT2::Ui::Handheld
         std::string primaryAction;
         bool editing{};
         bool confirmation{};
+        std::vector<std::string> bodyLines; // Optional native wrapped read-only detail; section controls paging.
     };
     inline void DrawManagementContent(
         Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const ManagementPresentation& model, bool focused = true)
@@ -26,7 +27,7 @@ namespace OpenRCT2::Ui::Handheld
         using namespace Concept;
         const int width = size.width;
         const int valueX = 14 + (width - 30) * 45 / 100;
-        const int rowStart = 70 + static_cast<int>(model.stats.size()) * 24;
+        const int rowStart = 70 + static_cast<int>(model.stats.size()) * 24 + static_cast<int>(model.bodyLines.size()) * 16;
         const size_t capacity = std::max(1, (size.height - rowStart - 30) / 30);
         const size_t first = model.selected / capacity * capacity;
         const size_t visible = std::min(capacity, model.rows.size() - std::min(first, model.rows.size()));
@@ -47,6 +48,10 @@ namespace OpenRCT2::Ui::Handheld
                 rt, p + ScreenCoordsXY{ valueX, y + 4 }, width - valueX - 10,
                 std::string(highlight ? "{BLACK}" : "{WHITE}") + model.stats[i].second);
         }
+        for (size_t i = 0; i < model.bodyLines.size(); ++i)
+            drawText(
+                rt, p + ScreenCoordsXY{ 10, 67 + static_cast<int>(model.stats.size()) * 24 + static_cast<int>(i) * 16 },
+                "{WHITE}" + model.bodyLines[i]);
         for (size_t i = first; i < first + visible; ++i)
         {
             const int y = rowStart + static_cast<int>(i - first) * 30;

@@ -9,6 +9,7 @@
 #include <openrct2-ui/handheld/Dashboard.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/Finances.h>
+#include <openrct2-ui/handheld/GuestManagement.h>
 #include <openrct2-ui/handheld/MarketingManagement.h>
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/ResearchManagement.h>
@@ -2558,6 +2559,308 @@ static void TestMarketingManagement(IContext& context, const std::string& profil
                  "cost-no-money-pause / native vouchers-weekly-expiration / save-reload passed\n";
 }
 
+static void TestGuests(IContext& context, const std::string& profile, bool realUi)
+{
+    namespace G = Ui::Handheld::GuestManagement;
+    namespace H = Ui::Handheld;
+    namespace W = Ui::Windows;
+    auto& state = getGameState();
+    const auto original = profile + "/guests-original.park";
+    SaveFlags flags{};
+    flags.set(SaveFlag::exportObjects);
+    Require(ScenarioSave(state, original, flags) != 0, "Guest original save failed");
+    Require(context.GetObjectManager().LoadObject("rct2.peep_animations.guest"), "Guest fixture animations missing");
+    for (auto* guest : EntityList<Guest>())
+        guest->outsideOfPark = true;
+    state.park.numGuestsInPark = 0;
+    state.park.numGuestsHeadingForPark = 0;
+    state.park.flags.unset(ParkFlag::noMoney);
+    gGamePaused = 0;
+    for (int i = 0; i < 20; ++i)
+    {
+        auto* guest = Guest::generate({ 320 + i * 2, 320, 16 });
+        Require(guest, "Guest fixture generation failed");
+        guest->outsideOfPark = false;
+        guest->setParkEntryTime(state.currentTicks);
+        DecrementGuestsHeadingForPark();
+        IncrementGuestsInPark();
+    }
+    auto* outside = Guest::generate({ 320, 320, 16 });
+    Require(outside && !G::Identify(outside->id), "Outside guest included");
+    const auto roster = G::Roster();
+    Require(
+        roster.size() == 20 && G::Presentation(G::View::roster, 19, roster).rows.size() == 21, "Full guest roster truncated");
+    const auto target = roster.back();
+    auto* guest = state.entities.tryGetEntity<Guest>(target.id);
+    guest->happiness = 204;
+    guest->energy = 80;
+    guest->hunger = 32;
+    guest->thirst = 190;
+    guest->nausea = 255;
+    guest->toilet = 64;
+    guest->cashInPocket = 13.20_GBP;
+    guest->cashSpent = 6.80_GBP;
+    guest->paidToEnter = 2.00_GBP;
+    guest->paidOnRides = 3.00_GBP;
+    guest->paidOnFood = 1.00_GBP;
+    guest->paidOnDrink = 0.50_GBP;
+    guest->paidOnSouvenirs = 0.30_GBP;
+    for (auto& thought : guest->thoughts)
+        thought.type = PeepThoughtType::none;
+    guest->thoughts[0] = { PeepThoughtType::hungry, { .item = kPeepThoughtItemNone }, 1, 0 };
+    guest->thoughts[1] = { PeepThoughtType::thirsty, { .item = kPeepThoughtItemNone }, 0, 0 };
+    guest->giveItem(ShopItem::map);
+    guest->giveItem(ShopItem::voucher);
+    guest->voucherType = VOUCHER_TYPE_FOOD_OR_DRINK_FREE;
+    guest->voucherShopItem = static_cast<ShopItemIndex>(ShopItem::burger);
+    std::array<uint8_t, sizeof(Guest)> bytes{};
+    std::memcpy(bytes.data(), guest, sizeof(Guest));
+    const auto cash = state.park.cash;
+    const auto ledger = state.park.expenditureTable;
+    auto needs = G::Presentation(G::View::needs, 0, roster, target);
+    Require(
+        needs.stats[0].second == "80%" && needs.stats[1].second == "50%" && needs.stats[2].second == "100%"
+            && needs.stats[3].second == "0%" && needs.stats[4].second == "100%" && needs.stats[5].second == "0%",
+        "Native guest needs normalization wrong");
+    auto spending = G::Presentation(G::View::spending, 0, roster, target);
+    Require(
+        spending.stats.size() == 7 && spending.stats[0].second == H::FormatMoney(13.20_GBP)
+            && spending.stats[1].second == H::FormatMoney(6.80_GBP),
+        "Native guest spending incorrect");
+    Require(G::Thoughts(*guest).size() == 1 && !G::Thoughts(*guest).front().empty(), "Native thoughts/freshness wrong");
+    Require(G::Inventory(*guest).size() == 2 && !G::Inventory(*guest).back().empty(), "Native inventory/voucher missing");
+    std::string longText;
+    for (int i = 0; i < 20; ++i)
+        longText += "Native text detail{NEWLINE}";
+    auto detail = G::Presentation(G::View::text, 0, roster, target, {}, longText, 999);
+    Require(
+        detail.bodyLines.size() <= 6 && detail.rows.size() == 3 && G::TextLines(longText).size() > 6,
+        "Long guest detail not bounded/paged");
+    state.park.flags.set(ParkFlag::noMoney);
+    Require(
+        G::Presentation(G::View::spending, 0, roster, target).stats[0].second == "Not applicable",
+        "No-money guest spending fabricated");
+    state.park.flags.unset(ParkFlag::noMoney);
+    const auto oldState = guest->state;
+    guest->state = PeepState::picked;
+    Require(!G::Location(target), "Picked guest fabricated location");
+    guest->state = oldState;
+    RideId fallbackId = RideId::FromUnderlying(200);
+    while (GetRide(fallbackId))
+        fallbackId = RideId::FromUnderlying(fallbackId.ToUnderlying() + 1);
+    auto* fallbackRide = RideAllocateAtIndex(fallbackId);
+    Require(fallbackRide, "Guest ride fallback fixture failed");
+    fallbackRide->type = RIDE_TYPE_MERRY_GO_ROUND;
+    fallbackRide->overallView = { 320, 320 };
+    const auto oldRide = guest->currentRide;
+    const auto oldLocation = guest->getLocation();
+    guest->state = PeepState::onRide;
+    guest->currentRide = fallbackId;
+    guest->setLocation({ kLocationNull, 0, 0 });
+    const auto rideLocation = G::Location(target);
+    Require(rideLocation && rideLocation->x == 336 && rideLocation->y == 336, "Native hidden-on-ride guest fallback failed");
+    guest->setLocation(oldLocation);
+    guest->currentRide = oldRide;
+    guest->state = oldState;
+    RideDelete(fallbackId);
+    auto stale = target;
+    ++stale.peepId;
+    Require(!G::Resolve(stale) && !G::Locate(stale), "Stale guest accepted");
+    guest->outsideOfPark = true;
+    Require(!G::Resolve(target) && G::Roster().size() == 19 && !G::Location(target), "Departed guest accepted");
+    guest->outsideOfPark = false;
+    Require(
+        std::memcmp(bytes.data(), guest, sizeof(Guest)) == 0 && state.park.cash == cash
+            && state.park.expenditureTable == ledger,
+        "Guest presentation mutated native state");
+    if (realUi)
+    {
+        H::EndTerrain();
+        Require(W::MainOpen(), "Guest locate viewport missing");
+        H::ControllerInput input;
+        auto press = [&](H::Action value) {
+            H::Frame frame;
+            frame.actions = { value, value };
+            Require(H::HandleMenuInput(input, frame), "Guest semantic input lost");
+        };
+        auto open = [&] {
+            W::HandheldDashboardOpen();
+            W::HandheldDashboardMove(0, -2);
+            press(H::Action::confirm);
+            Require(W::HandheldGuestsIsOpen() && !W::HandheldDashboardRailFocused(), "Guests route unavailable");
+        };
+        open();
+        Require(W::HandheldGuestsPresentation().title == "Guests", "Guest overview selection spilled");
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(0, 19);
+        press(H::Action::confirm);
+        Require(
+            W::HandheldGuestsIsOpen() && W::HandheldGuestsPresentation().title == guest->getName(),
+            "Later-page guest selection/Locate handoff wrong");
+        press(H::Action::openBuild);
+        Require(W::HandheldDashboardRailFocused(), "Guest detail cannot focus rail");
+        press(H::Action::openBuild);
+        Require(
+            !W::HandheldDashboardRailFocused() && W::HandheldGuestsPresentation().title == guest->getName(),
+            "Guest detail resume failed");
+        W::HandheldDashboardMove(0, 1);
+        press(H::Action::confirm);
+        Require(W::HandheldGuestsPresentation().stats == needs.stats, "Guest Needs route incorrect");
+        press(H::Action::back);
+        W::HandheldDashboardMove(0, 2);
+        press(H::Action::confirm);
+        press(H::Action::confirm);
+        Require(!W::HandheldGuestsPresentation().bodyLines.empty(), "Thought selection skipped detail");
+        press(H::Action::back);
+        press(H::Action::back);
+        W::HandheldDashboardMove(0, 3);
+        press(H::Action::confirm);
+        Require(W::HandheldGuestsPresentation().stats == spending.stats, "Guest spending route incorrect");
+        press(H::Action::back);
+        W::HandheldDashboardMove(0, 4);
+        press(H::Action::confirm);
+        press(H::Action::confirm);
+        Require(!W::HandheldGuestsPresentation().bodyLines.empty(), "Item selection skipped detail");
+        press(H::Action::back);
+        press(H::Action::back);
+        press(H::Action::back);
+        Require(W::HandheldGuestsPresentation().selected == 19, "Guest roster return lost focus");
+        press(H::Action::confirm);
+        const auto location = G::Location(target);
+        Require(location && *location == guest->getLocation(), "Native guest locate coordinate wrong");
+        press(H::Action::confirm);
+        Require(!W::HandheldDashboardIsOpen() && !gGamePaused, "Locate did not return to unobstructed park");
+        Require(std::memcmp(bytes.data(), guest, sizeof(Guest)) == 0, "Inspection/locating altered guest");
+        // Real mapped A must be released and pressed again between selecting and locating.
+        open();
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(0, 19);
+        SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+        Require(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) == 0, "Guest SDL init failed");
+        {
+            H::ControllerInput controller;
+            controller.update(true, 7000);
+            const auto device = SDL_JoystickAttachVirtual(
+                SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);
+            auto* joystick = SDL_JoystickOpen(device);
+            Require(joystick, "Guest virtual controller missing");
+            auto pump = [&] {
+                SDL_Event e;
+                while (SDL_PollEvent(&e))
+                    controller.handleEvent(e);
+            };
+            pump();
+            controller.update(true, 7010);
+            pump();
+            controller.update(true, 7020);
+            auto button = [&](bool down) {
+                SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, down);
+                SDL_JoystickUpdate();
+                pump();
+            };
+            button(true);
+            auto frame = controller.update(true, 7030);
+            Require(frame.actions.size() == 1 && H::HandleMenuInput(controller, frame), "Guest mapped selection lost");
+            Require(
+                controller.update(true, 7040).actions.empty() && W::HandheldGuestsIsOpen(), "Held selecting A located guest");
+            button(false);
+            Require(controller.update(true, 7050).actions.empty(), "Guest A release located");
+            button(true);
+            frame = controller.update(true, 7060);
+            Require(
+                frame.actions.size() == 1 && H::HandleMenuInput(controller, frame) && !W::HandheldDashboardIsOpen(),
+                "Fresh A did not locate");
+            Require(controller.update(true, 7070).actions.empty(), "Locate A spilled into park");
+            button(false);
+            controller.update(true, 7080);
+            SDL_JoystickClose(joystick);
+            SDL_JoystickDetachVirtual(device);
+        }
+        open();
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(0, 19);
+        press(H::Action::confirm);
+        guest->outsideOfPark = true;
+        press(H::Action::confirm);
+        Require(
+            W::HandheldGuestsIsOpen() && W::HandheldGuestsPresentation().rows.size() == 20,
+            "Stale guest Locate exited or selected replacement");
+        guest->outsideOfPark = false;
+        press(H::Action::openMenu);
+        Require(!W::HandheldDashboardIsOpen(), "Start failed guest pause transition");
+        W::HandheldMenuBack();
+        Require(!gGamePaused, "Guest pause ownership leaked");
+    }
+    // Native removal closes peep windows even if no desktop Guest window is open.
+    const auto oldId = target.id;
+    const auto oldPeep = target.peepId;
+    const auto oldEntry = target.entryTime;
+    if (realUi)
+    {
+        W::HandheldDashboardOpen();
+        W::HandheldDashboardMove(0, -2);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuConfirm();
+        W::HandheldDashboardMove(0, 19);
+        W::HandheldMenuConfirm();
+    }
+    PeepEntityRemove(guest);
+    if (!realUi)
+        G::Invalidate(oldId); // Dummy WindowManager has no UI invalidation notification.
+    Require(!G::Resolve(target) && !G::Locate(target), "Removed guest still resolved");
+    auto* replacement = state.entities.createEntityAt<Guest>(oldId);
+    Require(replacement, "Guest slot reuse fixture failed");
+    replacement->outsideOfPark = false;
+    replacement->peepId = oldPeep;
+    replacement->parkEntryTime = oldEntry;
+    Require(G::Identify(oldId) && !G::Resolve(target), "Reused guest identity revived stale target");
+    if (realUi)
+    {
+        W::HandheldMenuConfirm();
+        Require(
+            W::HandheldGuestsIsOpen() && W::HandheldGuestsPresentation().title == "Guests",
+            "Reused guest selected/located from stale inspection");
+        W::HandheldDashboardPause();
+        W::HandheldMenuBack();
+    }
+    PeepEntityRemove(replacement);
+    const auto savedRoster = G::Roster();
+    auto* persistedGuest = state.entities.tryGetEntity<Guest>(savedRoster.front().id);
+    persistedGuest->happiness = 178;
+    persistedGuest->cashSpent = 12.30_GBP;
+    persistedGuest->giveItem(ShopItem::map);
+    persistedGuest->thoughts[0] = { PeepThoughtType::scenery, { .item = kPeepThoughtItemNone }, 1, 0 };
+    persistedGuest->thoughts[1].type = PeepThoughtType::none;
+    const auto persistedNeeds = G::Presentation(G::View::needs, 0, savedRoster, savedRoster.front()).stats;
+    const auto persistedSpending = G::Presentation(G::View::spending, 0, savedRoster, savedRoster.front()).stats;
+    const auto persistedThoughts = G::Thoughts(*persistedGuest), persistedItems = G::Inventory(*persistedGuest);
+    const auto save = profile + "/guests-roundtrip.park";
+    Require(ScenarioSave(state, save, flags) != 0, "Guest roundtrip save failed");
+    if (realUi)
+    {
+        W::HandheldDashboardOpen();
+        W::HandheldDashboardMove(0, -2);
+        W::HandheldMenuConfirm();
+        W::HandheldMenuConfirm();
+    }
+    Require(context.LoadParkFromFile(save), "Guest reload failed");
+    Require(
+        G::Roster() == savedRoster && state.park.cash == cash && state.park.expenditureTable == ledger,
+        "Guest roster/cash persistence failed");
+    Require(
+        G::Presentation(G::View::needs, 0, savedRoster, savedRoster.front()).stats == persistedNeeds
+            && G::Presentation(G::View::spending, 0, savedRoster, savedRoster.front()).stats == persistedSpending
+            && G::Thoughts(*G::Resolve(savedRoster.front())) == persistedThoughts
+            && G::Inventory(*G::Resolve(savedRoster.front())) == persistedItems,
+        "Guest native information failed save/reload");
+    if (realUi)
+        Require(!W::HandheldDashboardIsOpen(), "Load retained guest inspection");
+    Require(context.LoadParkFromFile(original), "Guest original restoration failed");
+    gGamePaused = 0;
+    std::cout << "Native Guests / full-roster-needs-thoughts-items-money / focus-resume-input-locate / departed-reused-target "
+                 "/ readonly-save-reload passed\n";
+}
+
 static void TestDashboard(IContext& context, const std::string& profile, bool realUi)
 {
     namespace D = Ui::Handheld::Dashboard;
@@ -2569,11 +2872,11 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
     Require(
         navigation.section == D::Section::finances && navigation.focus == D::Focus::rail,
         "Dashboard default section/focus wrong");
-    navigation.move(-2);
+    navigation.move(-3);
     Require(
-        navigation.section == D::Section::guests && !navigation.enter() && navigation.focus == D::Focus::rail,
+        navigation.section == D::Section::rides && !navigation.enter() && navigation.focus == D::Focus::rail,
         "Unavailable section entered");
-    navigation.move(1);
+    navigation.move(2);
     Require(navigation.section == D::Section::staff && navigation.enter(), "Staff rail route missing");
     navigation.move(7);
     Require(navigation.section == D::Section::staff, "Rail wrap failed");
@@ -2596,14 +2899,14 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
     Require(
         W::HandheldDashboardIsOpen() && W::HandheldDashboardRailFocused() && gGamePaused,
         "Dashboard open did not own pause/rail");
-    W::HandheldDashboardMove(0, -2); // Guests is explicitly unavailable
+    W::HandheldDashboardMove(0, -3); // Rides is explicitly unavailable
     action(H::Action::confirm);
     action(H::Action::openBuild);
     Require(
         W::HandheldDashboardRailFocused() && !W::HandheldFinancesIsOpen() && !W::HandheldStaffIsOpen(),
         "Unavailable category acquired content focus");
     Require(park.cash == cash && S::Roster() == roster, "Unavailable category changed native state");
-    W::HandheldDashboardMove(0, 2);
+    W::HandheldDashboardMove(0, 3);
     action(H::Action::openBuild); // Select enters Finances
     Require(!W::HandheldDashboardRailFocused() && W::HandheldFinancesIsOpen(), "Rail -> Finances focus failed");
     action(H::Action::openBuild);
@@ -3091,6 +3394,7 @@ int main(int argc, char** argv)
         TestDashboard(*context, argv[2], argc == 4);
         TestResearchManagement(*context, argv[2], argc == 4);
         TestMarketingManagement(*context, argv[2], argc == 4);
+        TestGuests(*context, argv[2], argc == 4);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;

@@ -3,6 +3,7 @@
 #include "Dashboard.h"
 #include "Explorer.h"
 #include "Finances.h"
+#include "GuestManagement.h"
 #include "ListFocus.h"
 #include "MarketingManagement.h"
 #include "Panel.h"
@@ -61,6 +62,13 @@ namespace OpenRCT2::Ui::Windows
         staffHire,
         staffDismiss,
         guests,
+        guestRoster,
+        guestInspect,
+        guestNeeds,
+        guestThoughts,
+        guestSpending,
+        guestInventory,
+        guestText,
         research,
         researchEditor,
         researchConfirm,
@@ -126,6 +134,12 @@ namespace OpenRCT2::Ui::Windows
         int _marketingActiveType = -1;
         bool _marketingBusy{};
         std::shared_ptr<int> _marketingLifetime = std::make_shared<int>(0);
+        std::vector<Handheld::GuestManagement::Target> _guestRoster;
+        std::optional<Handheld::GuestManagement::Target> _guestTarget;
+        size_t _guestRosterFocus{};
+        Page _guestTextParent = Page::guestThoughts;
+        std::string _guestText;
+        size_t _guestTextPage{};
         std::vector<Handheld::StaffManagement::Target> _staffRoster;
         std::optional<Handheld::StaffManagement::Target> _staffTarget;
         StaffType _hireType = StaffType::handyman;
@@ -190,10 +204,30 @@ namespace OpenRCT2::Ui::Windows
                 view, selected, _marketingDraft, _marketingActiveType,
                 view == View::overview ? _marketingActiveTypes : _marketingTypes, _marketingTargets, _status);
         }
+        bool guestManagement() const
+        {
+            return _page == Page::guests || _page == Page::guestRoster || _page == Page::guestInspect
+                || _page == Page::guestNeeds || _page == Page::guestThoughts || _page == Page::guestSpending
+                || _page == Page::guestInventory || _page == Page::guestText;
+        }
+        Handheld::ManagementPresentation guestPresentationFor(Page current, size_t selected) const
+        {
+            using Handheld::GuestManagement::View;
+            const auto view = current == Page::guests ? View::overview
+                : current == Page::guestRoster        ? View::roster
+                : current == Page::guestInspect       ? View::inspection
+                : current == Page::guestNeeds         ? View::needs
+                : current == Page::guestThoughts      ? View::thoughts
+                : current == Page::guestSpending      ? View::spending
+                : current == Page::guestInventory     ? View::inventory
+                                                      : View::text;
+            return Handheld::GuestManagement::Presentation(
+                view, selected, _guestRoster, _guestTarget, _status, _guestText, _guestTextPage);
+        }
         bool managementShell() const
         {
             return _page == Page::dashboard || financeManagement() || staffManagement() || researchManagement()
-                || marketingManagement();
+                || marketingManagement() || guestManagement();
         }
         bool shopManagement() const
         {
@@ -241,10 +275,14 @@ namespace OpenRCT2::Ui::Windows
 
         void page(Page next)
         {
+            if (_page == Page::guestRoster)
+                _guestRosterFocus = _focus.index();
             if (next == Page::dashboard && _page != Page::dashboard && managementShell() && dashboardCanSwitch())
                 _sectionResume[_dashboard.index()] = { _page, _focus.index() };
             _staffBusy = false;
             ++_staffRequest;
+            if (next == Page::guestRoster)
+                _guestRoster = Handheld::GuestManagement::Roster();
             if (next == Page::staff)
                 _staffRoster = Handheld::StaffManagement::Roster();
             if (next == Page::marketing)
@@ -262,6 +300,8 @@ namespace OpenRCT2::Ui::Windows
                 _dashboard.section = Handheld::Dashboard::Section::staff;
             else if (next == Page::finances)
                 _dashboard.section = Handheld::Dashboard::Section::finances;
+            if (next == Page::guests)
+                _dashboard.section = Handheld::Dashboard::Section::guests;
             if (next == Page::marketing)
                 _dashboard.section = Handheld::Dashboard::Section::marketing;
             if (next == Page::research)
@@ -277,6 +317,8 @@ namespace OpenRCT2::Ui::Windows
             if (next == Page::staff)
                 _focus.move(static_cast<int32_t>(std::min(_staffRosterFocus, rows().size() - 1)), rows().size());
 
+            if (next == Page::guestRoster)
+                _focus.move(static_cast<int32_t>(std::min(_guestRosterFocus, rows().size() - 1)), rows().size());
             if (next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish
                 || next == Page::financeConfirm || next == Page::marketingConfirm || next == Page::staffHire
                 || next == Page::staffDismiss)
@@ -308,8 +350,16 @@ namespace OpenRCT2::Ui::Windows
                 case Page::financeConfirm:
                     return { "Apply", "Cancel" };
                 case Page::overview:
-                case Page::guests:
                     return { "Back to dashboard" };
+                case Page::guests:
+                case Page::guestRoster:
+                case Page::guestInspect:
+                case Page::guestNeeds:
+                case Page::guestThoughts:
+                case Page::guestSpending:
+                case Page::guestInventory:
+                case Page::guestText:
+                    return guestsPresentation().rows;
                 case Page::marketing:
                 case Page::marketingActive:
                 case Page::marketingTypes:
@@ -403,6 +453,14 @@ namespace OpenRCT2::Ui::Windows
         }
 
     public:
+        bool guestsIsOpen() const
+        {
+            return guestManagement();
+        }
+        Handheld::ManagementPresentation guestsPresentation() const
+        {
+            return guestPresentationFor(_page, _focus.index());
+        }
         void onOpen() override
         {
             Handheld::Paths::ClearPreview();
@@ -474,6 +532,27 @@ namespace OpenRCT2::Ui::Windows
         }
         void onUpdate() override
         {
+            if (_page == Page::guestRoster)
+            {
+                const auto updated = Handheld::GuestManagement::Roster();
+                if (updated != _guestRoster)
+                {
+                    const auto selected = _focus.index() < _guestRoster.size()
+                        ? std::optional<Handheld::GuestManagement::Target>{ _guestRoster[_focus.index()] }
+                        : std::nullopt;
+                    size_t row = std::min(_focus.index(), updated.size());
+                    if (selected)
+                        if (const auto found = std::find(updated.begin(), updated.end(), *selected); found != updated.end())
+                            row = std::distance(updated.begin(), found);
+                    _guestRoster = updated;
+                    _guestRosterFocus = row;
+                    _focus = {};
+                    _focus.move(static_cast<int32_t>(row), rows().size());
+                    invalidate();
+                }
+            }
+            if (guestManagement())
+                invalidate(); // read native state without clearing native guest invalidation flags
             if (_page == Page::staff)
             {
                 const auto updated = Handheld::StaffManagement::Roster();
@@ -547,7 +626,7 @@ namespace OpenRCT2::Ui::Windows
         {
             return _page == Page::dashboard || _page == Page::finances || _page == Page::staff || _page == Page::staffInspect
                 || _page == Page::staffStats || _page == Page::research || _page == Page::marketing
-                || _page == Page::marketingActive;
+                || _page == Page::marketingActive || guestManagement();
         }
         void enterDashboardContent()
         {
@@ -556,6 +635,7 @@ namespace OpenRCT2::Ui::Windows
                 : _dashboard.section == Section::finances          ? std::optional<Page>{ Page::finances }
                 : _dashboard.section == Section::research          ? std::optional<Page>{ Page::research }
                 : _dashboard.section == Section::marketing         ? std::optional<Page>{ Page::marketing }
+                : _dashboard.section == Section::guests            ? std::optional<Page>{ Page::guests }
                                                                    : std::nullopt;
             if (!root || !_dashboard.enter())
                 return;
@@ -585,6 +665,8 @@ namespace OpenRCT2::Ui::Windows
                 enterDashboardContent();
             else
             {
+                if (_page == Page::guestRoster)
+                    _guestRosterFocus = _focus.index();
                 if (_page == Page::staff)
                     _staffRosterFocus = _focus.index();
                 page(Page::dashboard);
@@ -736,6 +818,25 @@ namespace OpenRCT2::Ui::Windows
                 case Page::pathOptions:
                 case Page::treePicker:
                     close();
+                    break;
+                case Page::guestRoster:
+                    page(Page::guests);
+                    break;
+                case Page::guestInspect:
+                    page(Page::guestRoster);
+                    break;
+                case Page::guestText:
+                    page(
+                        _guestTarget && Handheld::GuestManagement::Resolve(*_guestTarget) ? _guestTextParent
+                                                                                          : Page::guestRoster);
+                    break;
+                case Page::guestNeeds:
+                case Page::guestThoughts:
+                case Page::guestSpending:
+                case Page::guestInventory:
+                    page(
+                        _guestTarget && Handheld::GuestManagement::Resolve(*_guestTarget) ? Page::guestInspect
+                                                                                          : Page::guestRoster);
                     break;
                 case Page::staffHire:
                 case Page::staffInspect:
@@ -1073,8 +1174,101 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::overview:
-                case Page::guests:
                     page(Page::dashboard);
+                    break;
+                case Page::guests:
+                    page(choice == 0 ? Page::guestRoster : Page::dashboard);
+                    break;
+                case Page::guestRoster:
+                    _guestRosterFocus = choice;
+                    if (choice >= _guestRoster.size())
+                        page(Page::guests);
+                    else if (Handheld::GuestManagement::Resolve(_guestRoster[choice]))
+                    {
+                        _guestTarget = _guestRoster[choice];
+                        page(Page::guestInspect);
+                    }
+                    else
+                    {
+                        _status = "Guest no longer in park";
+                        invalidate();
+                    }
+                    break;
+                case Page::guestInspect:
+                    if (!_guestTarget || !Handheld::GuestManagement::Resolve(*_guestTarget))
+                    {
+                        page(Page::guestRoster);
+                        break;
+                    }
+                    if (choice == 0)
+                    {
+                        const auto target = *_guestTarget;
+                        if (WindowGetMain() && Handheld::GuestManagement::Location(target))
+                        {
+                            close();
+                            Handheld::GuestManagement::Locate(target);
+                            return;
+                        }
+                        _status = "Location unavailable";
+                        invalidate();
+                    }
+                    else
+                        page(
+                            choice == 1       ? Page::guestNeeds
+                                : choice == 2 ? Page::guestThoughts
+                                : choice == 3 ? Page::guestSpending
+                                : choice == 4 ? Page::guestInventory
+                                              : Page::guestRoster);
+                    break;
+                case Page::guestNeeds:
+                case Page::guestSpending:
+                    page(
+                        _guestTarget && Handheld::GuestManagement::Resolve(*_guestTarget) ? Page::guestInspect
+                                                                                          : Page::guestRoster);
+                    break;
+                case Page::guestThoughts:
+                case Page::guestInventory:
+                    if (_guestTarget)
+                    {
+                        const auto* guest = Handheld::GuestManagement::Resolve(*_guestTarget);
+                        if (!guest)
+                        {
+                            page(Page::guestRoster);
+                            break;
+                        }
+                        const auto values = _page == Page::guestThoughts ? Handheld::GuestManagement::Thoughts(*guest)
+                                                                         : Handheld::GuestManagement::Inventory(*guest);
+                        if (choice >= values.size())
+                            page(Page::guestInspect);
+                        else
+                        {
+                            _guestText = values[choice];
+                            _guestTextParent = _page;
+                            _guestTextPage = 0;
+                            page(Page::guestText);
+                        }
+                    }
+                    else
+                        page(Page::guestRoster);
+                    break;
+                case Page::guestText:
+                    if (!_guestTarget || !Handheld::GuestManagement::Resolve(*_guestTarget))
+                    {
+                        page(Page::guestRoster);
+                        break;
+                    }
+                    if (rows().size() == 1 || choice == 2)
+                        page(_guestTextParent);
+                    else
+                    {
+                        const auto pages = std::max<size_t>(
+                            1, (Handheld::GuestManagement::TextLines(_guestText).size() + 5) / 6);
+                        if (choice == 0 && _guestTextPage)
+                            --_guestTextPage;
+                        if (choice == 1 && _guestTextPage + 1 < pages)
+                            ++_guestTextPage;
+                        invalidate();
+                    }
                     break;
                 case Page::marketing:
                     if (choice == 0)
@@ -1367,6 +1561,13 @@ namespace OpenRCT2::Ui::Windows
                             model = Handheld::StaffManagement::Presentation(
                                 Handheld::StaffManagement::View::roster, resume.row, Handheld::StaffManagement::Roster());
                     }
+                    else if (_dashboard.section == Handheld::Dashboard::Section::guests)
+                    {
+                        const auto resume = _sectionResume[_dashboard.index()];
+                        model = resume.page
+                            ? guestPresentationFor(*resume.page, resume.row)
+                            : Handheld::GuestManagement::Presentation(Handheld::GuestManagement::View::overview, 0);
+                    }
                     else if (_dashboard.section == Handheld::Dashboard::Section::finances)
                         model = Handheld::Finances::Presentation(Handheld::Finances::View::overview, 0);
                     else if (_dashboard.section == Handheld::Dashboard::Section::marketing)
@@ -1385,6 +1586,8 @@ namespace OpenRCT2::Ui::Windows
                     if (!_status.empty())
                         model.status = _status;
                 }
+                else if (guestManagement())
+                    model = guestsPresentation();
                 else if (staffManagement())
                     model = staffPresentation();
                 else if (researchManagement())
@@ -1774,5 +1977,20 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->dashboardSwitchPane();
+    }
+} // namespace OpenRCT2::Ui::Windows
+
+namespace OpenRCT2::Ui::Windows
+{
+    bool HandheldGuestsIsOpen()
+    {
+        const auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window && static_cast<const HandheldMenuWindow*>(window)->guestsIsOpen();
+    }
+    Handheld::ManagementPresentation HandheldGuestsPresentation()
+    {
+        const auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window ? static_cast<const HandheldMenuWindow*>(window)->guestsPresentation()
+                      : Handheld::ManagementPresentation{};
     }
 } // namespace OpenRCT2::Ui::Windows

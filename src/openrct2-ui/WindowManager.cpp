@@ -10,6 +10,7 @@
 #include "WindowManager.h"
 
 #include "handheld/Explorer.h"
+#include "handheld/GuestManagement.h"
 #include "handheld/MarketingManagement.h"
 #include "handheld/Paths.h"
 #include "handheld/Shops.h"
@@ -1071,7 +1072,10 @@ public:
     void CloseByNumber(WindowClass cls, EntityId number) override
     {
         if (cls == WindowClass::peep)
+        {
             HandheldStaffRemoved(number);
+            Handheld::GuestManagement::Invalidate(number);
+        }
         CloseByNumber(cls, static_cast<WindowNumber>(number.ToUnderlying()));
     }
 
