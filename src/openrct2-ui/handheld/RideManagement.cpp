@@ -12,9 +12,11 @@
 #include <openrct2/actions/ride/RideDemolishAction.h>
 #include <openrct2/actions/ride/RideSetPriceAction.h>
 #include <openrct2/actions/ride/RideSetStatusAction.h>
+#include <openrct2/entity/Staff.h>
 #include <openrct2/interface/Window.h>
 #include <openrct2/localisation/Formatting.h>
 #include <openrct2/management/Research.h>
+#include <openrct2/object/MusicObject.h>
 #include <openrct2/object/ObjectManager.h>
 #include <openrct2/ride/RideData.h>
 #include <openrct2/ride/RideManager.hpp>
@@ -105,7 +107,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                       false,
                       0 };
     }
-    static std::array<uint16_t, 15> Snapshot(const Ride& ride)
+    static std::array<uint16_t, 17> Snapshot(const Ride& ride)
     {
         return { static_cast<uint8_t>(ride.mode),
                  ride.minWaitingTime,
@@ -121,7 +123,9 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                  ride.numBlockBrakes,
                  ride.numCircuits,
                  ride.operationOption,
-                 static_cast<uint16_t>(ride.flags.has(RideFlag::reversedTrains)) };
+                 static_cast<uint16_t>(ride.flags.has(RideFlag::reversedTrains)),
+                 ride.music,
+                 static_cast<uint16_t>(ride.flags.has(RideFlag::music)) };
     }
     std::vector<Setting> Settings(const Ride& ride, bool maintenance)
     {
@@ -222,7 +226,11 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 case RideMode::backwardRotation:
                     caption = STR_NUMBER_OF_ROTATIONS;
                     break;
+                case RideMode::shopStall:
+                    break;
                 default:
+                    if (type.flags.has(RtdFlag::noVehicles))
+                        caption = STR_MAX_PEOPLE_ON_RIDE;
                     break;
             }
             const auto& options = type.OperatingSettings;
@@ -397,11 +405,47 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             toggle("Synchronise stations", RIDE_DEPART_SYNCHRONISE_WITH_ADJACENT_STATIONS);
         return result;
     }
+    std::vector<Setting> MusicSettings(const Ride& ride)
+    {
+        using GameActions::RideSetSetting;
+        const auto& type = ride.getRideTypeDescriptor();
+        if (!ride.getRideEntry() || !type.flags.has(RtdFlag::allowMusic))
+            return {};
+        Setting enabled{ RideSetSetting::music,
+                         "Play music",
+                         { 0, 1 },
+                         { "Off", "On" },
+                         static_cast<uint16_t>(ride.flags.has(RideFlag::music)) };
+        enabled.section = View::music;
+        std::vector<Setting> result{ enabled };
+        Setting style{ RideSetSetting::musicType, "Music style", {}, {}, ride.music };
+        style.section = View::music;
+        auto& manager = GetContext()->GetObjectManager();
+        for (ObjectEntryIndex i = 0; i < kMaxMusicObjects; ++i)
+        {
+            auto* object = manager.GetLoadedObject<MusicObject>(i);
+            if (!object)
+                continue;
+            const auto original = object->GetOriginalStyleId();
+            if (original && (*original == MUSIC_STYLE_CUSTOM_MUSIC_1 || *original == MUSIC_STYLE_CUSTOM_MUSIC_2)
+                && (object->GetTrackCount() == 0 || !object->GetTrack(0)->Asset.IsAvailable()))
+                continue;
+            if (!getGameState().cheats.unlockOperatingLimits
+                && !object->SupportsRideType(ride.type, type.flags.has(RtdFlag::requireExplicitListingInMusicObjects)))
+                continue;
+            style.values.push_back(i);
+            style.labels.push_back(FmtString(FormatStringID(object->NameStringId)).WithoutFormatTokens());
+        }
+        if (!style.values.empty())
+            result.push_back(std::move(style));
+        return result;
+    }
     static std::vector<Setting> SectionSettings(const Ride& ride, View section)
     {
-        return section == View::vehicles ? VehicleSettings(ride)
-            : section == View::dispatch  ? DispatchSettings(ride)
-                                         : Settings(ride, section == View::maintenance);
+        return section == View::music   ? MusicSettings(ride)
+            : section == View::vehicles ? VehicleSettings(ride)
+            : section == View::dispatch ? DispatchSettings(ride)
+                                        : Settings(ride, section == View::maintenance);
     }
     std::optional<Draft> BeginSetting(const Target& target, const Setting& selected)
     {
@@ -409,6 +453,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         if (!ride)
             return {};
         const auto section = selected.vehicle                                 ? View::vehicles
+            : selected.section == View::music                                 ? View::music
             : selected.section == View::dispatch                              ? View::dispatch
             : selected.key == GameActions::RideSetSetting::inspectionInterval ? View::maintenance
                                                                               : View::operations;
@@ -468,6 +513,32 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         draft.refund = RideGetRefundPrice(*ride);
         return draft;
     }
+    std::optional<Draft> BeginRefurbishment(const Target& target)
+    {
+        auto draft = BeginDemolition(target);
+        if (!draft)
+            return {};
+        draft->demolition = false;
+        draft->refurbishment = true;
+        GameActions::RideDemolishAction action(target.id, GameActions::RideModifyType::renew);
+        const auto query = GameActions::Query(&action, getGameState());
+        draft->refund = query.cost;
+        return draft;
+    }
+    bool LocateMechanic(const Target& target)
+    {
+        const auto* ride = Resolve(target);
+        auto* main = WindowGetMain();
+        if (!ride || !main)
+            return false;
+        auto* mechanic = RideGetAssignedMechanic(*ride);
+        if (!mechanic)
+            mechanic = RideFindClosestMechanic(*ride, 1);
+        if (!mechanic || mechanic->getLocation().isNull())
+            return false;
+        WindowScrollToLocation(*main, mechanic->getLocation());
+        return true;
+    }
     static std::string SettingValue(const Setting& setting, uint16_t value)
     {
         auto found = std::find(setting.values.begin(), setting.values.end(), value);
@@ -494,7 +565,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 }
             return;
         }
-        if (!draft.status && !draft.demolition)
+        if (!draft.status && !draft.demolition && !draft.refurbishment)
             draft.price = std::clamp<money64>(
                 draft.price
                     + (direction > 0       ? 1
@@ -518,6 +589,17 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             || Park::RidePricesUnlocked(getGameState().park) != draft.pricesUnlocked
             || getGameState().park.flags.has(ParkFlag::noMoney) != draft.noMoney)
             return Invalid("Ride/settings changed; reopen review");
+        if (draft.refurbishment)
+        {
+            GameActions::RideDemolishAction action(draft.target.id, GameActions::RideModifyType::renew);
+            const auto query = GameActions::Query(&action, getGameState());
+            if (query.error != GameActions::Status::ok)
+                return query;
+            if (query.cost != draft.refund)
+                return Invalid("Refurbishment cost changed; reopen review");
+            action.SetCallback(std::move(callback));
+            return execute ? GameActions::Execute(&action, getGameState()) : query;
+        }
         if (draft.demolition)
         {
             // Native demolition Query validates rules but its cost is populated only by Execute.
@@ -643,13 +725,16 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.rows.push_back("Access / paths...");
             if (CustomTracks::CanResume(*target))
                 model.rows.push_back("Continue track...");
+            model.rows.push_back("Music...");
             model.rows.push_back("Vehicles...");
             model.rows.push_back("Dispatch...");
             model.rows.push_back("Operations...");
             model.rows.push_back("Maintenance...");
             model.rows.push_back("Demolish...");
         }
-        else if (view == View::operations || view == View::maintenance || view == View::vehicles || view == View::dispatch)
+        else if (
+            view == View::operations || view == View::maintenance || view == View::vehicles || view == View::dispatch
+            || view == View::music)
         {
             model.breadcrumb = view == View::maintenance ? "Rides / Maintenance" : "Rides / Operations";
             if (view == View::maintenance)
@@ -685,8 +770,20 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.breadcrumb = "Rides / Dispatch";
                 model.stats = { { "Mode", FormatStringID(kRideModeNames[static_cast<uint8_t>(ride->mode)]) } };
             }
+            if (view == View::music)
+            {
+                model.breadcrumb = "Rides / Music";
+                model.stats = { { "Playback", ride->flags.has(RideFlag::music) ? "On" : "Off" } };
+                if (MusicSettings(*ride).empty())
+                    model.status = "Music unavailable for this ride";
+            }
             for (const auto& setting : SectionSettings(*ride, view))
                 model.rows.push_back(setting.name + ": " + SettingValue(setting, setting.current));
+            if (view == View::maintenance && !ride->getRideTypeDescriptor().availableBreakdowns.isEmpty())
+            {
+                model.rows.push_back("Locate mechanic");
+                model.rows.push_back("Refurbish...");
+            }
             model.rows.push_back("Back to ride");
         }
         else if (view == View::statistics)
@@ -731,6 +828,16 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                     "Refund",
                     draft->noMoney                                 ? "Not applicable"
                         : queried.error == GameActions::Status::ok ? FormatMoney(-queried.cost)
+                                                                   : "Unavailable");
+            }
+            else if (draft->refurbishment)
+            {
+                model.breadcrumb = "Rides / Refurbish";
+                model.stats.emplace_back("Work", "Renew age and reliability");
+                model.stats.emplace_back(
+                    "Cost",
+                    draft->noMoney                                 ? "Not applicable"
+                        : queried.error == GameActions::Status::ok ? FormatMoney(queried.cost)
                                                                    : "Unavailable");
             }
             else if (draft->setting)

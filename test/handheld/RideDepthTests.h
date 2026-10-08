@@ -15,7 +15,51 @@ static void TestRideDepth(
     target = *R::Identify(target.id);
     TestVehicleDispatch(context, profile, target.id, realUi);
     target = *R::Identify(target.id);
-    const auto cash = state.park.cash;
+    // Music uses a genuinely placed flat ride and loaded public music objects.
+    Require(context.GetObjectManager().LoadObject("rct2.music.organ"), "Public music metadata missing");
+    auto music = R::MusicSettings(*GetRide(target.id));
+    Require(!music.empty() && music.front().key == GameActions::RideSetSetting::music, "Supported flat music absent");
+    auto musicDraft = *R::BeginSetting(target, music.front());
+    const auto musicCash = state.park.cash;
+    R::AdjustPrice(musicDraft, musicDraft.value ? -1 : 1);
+    Require(
+        R::Action(musicDraft, false).error == GameActions::Status::ok
+            && GetRide(target.id)->flags.has(RideFlag::music) != bool(musicDraft.value) && state.park.cash == musicCash,
+        "Music query mutated state");
+    Require(R::Action(musicDraft, true).error == GameActions::Status::ok, "Music native toggle failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        GetRide(target.id)->flags.has(RideFlag::music) == bool(musicDraft.value) && state.park.cash == musicCash,
+        "Music toggle/accounting differs");
+    Require(R::Action(musicDraft, true).error != GameActions::Status::ok, "Repeated music accepted");
+    auto invalidMusic = *R::BeginSetting(target, R::MusicSettings(*GetRide(target.id)).front());
+    invalidMusic.value = 2;
+    Require(R::Action(invalidMusic, true).error != GameActions::Status::ok, "Invalid toggle accepted");
+    // The carousel requires explicit music listing; organ must be filtered until
+    // the already-existing native operating-limit cheat policy permits it.
+    const bool oldUnlock = state.cheats.unlockOperatingLimits;
+    state.cheats.unlockOperatingLimits = true;
+    music = R::MusicSettings(*GetRide(target.id));
+    Require(music.size() > 1, "Loaded supported music style absent");
+    if (music.size() > 1)
+    {
+        auto style = *R::BeginSetting(target, music[1]);
+        auto alternative = std::find_if(
+            style.setting->values.begin(), style.setting->values.end(), [&](auto value) { return value != music[1].current; });
+        if (alternative != style.setting->values.end())
+        {
+            style.value = *alternative;
+            Require(R::Action(style, false).error == GameActions::Status::ok, "Music style query failed");
+            Require(R::Action(style, true).error == GameActions::Status::ok, "Native music style failed");
+            GameActions::ProcessQueue(state);
+            Require(GetRide(target.id)->music == style.value, "Style not applied");
+        }
+    }
+    state.cheats.unlockOperatingLimits = oldUnlock;
+    std::cout << "Native Music / toggle-style-query-cancel-repeat-bounds / zero cash / persistence fixture passed\n";
+    const auto savedMusic = GetRide(target.id)->music;
+    const bool savedPlaying = GetRide(target.id)->flags.has(RideFlag::music);
+    auto cash = state.park.cash;
     auto* ride = GetRide(target.id);
     Require(ride, "Ride depth native placement missing");
     auto closing = R::Begin(target, RideStatus::closed);
@@ -67,7 +111,33 @@ static void TestRideDepth(
     const auto save = profile + "/ride-depth.park";
     Require(ScenarioSave(state, save, flags) && context.LoadParkFromFile(save), "Ride depth save/reload failed");
     target = *R::Identify(target.id);
+    Require(
+        GetRide(target.id)->music == savedMusic && GetRide(target.id)->flags.has(RideFlag::music) == savedPlaying,
+        "Music serialization differs");
     Require(GetRide(target.id)->inspectionInterval == interval && state.park.cash == cash, "Depth setting not persisted");
+    auto renew = *R::BeginRefurbishment(target);
+    const auto renewQuery = R::Action(renew, false);
+    GameActions::RideDemolishAction nativeRenew(target.id, GameActions::RideModifyType::renew);
+    const auto nativeRenewQuery = GameActions::Query(&nativeRenew, state);
+    Require(
+        renewQuery.error == nativeRenewQuery.error && renewQuery.cost == nativeRenewQuery.cost && state.park.cash == cash,
+        "Refurbish query differs/spends");
+    if (renewQuery.error == GameActions::Status::ok)
+    {
+        const auto beforeName = GetRide(target.id)->getName();
+        const auto beforeMusic = GetRide(target.id)->music;
+        Require(R::Action(renew, true).error == GameActions::Status::ok, "Native refurbishment failed");
+        GameActions::ProcessQueue(state);
+        Require(
+            GetRide(target.id) && !GetRide(target.id)->flags.has(RideFlag::everBeenOpened) && GetRide(target.id)->getAge() == 0
+                && GetRide(target.id)->getName() == beforeName && GetRide(target.id)->music == beforeMusic
+                && state.park.cash == cash - renewQuery.cost,
+            "Refurbishment renewal/accounting differs");
+        Require(R::Action(renew, true).error != GameActions::Status::ok, "Repeated refurbishment accepted");
+        target = *R::Identify(target.id);
+        cash = state.park.cash;
+    }
+    std::cout << "Native Refurbishment / native-query-cancel-repeat / age-reliability-retained-ride / exact cost passed\n";
     draft = *R::BeginDemolition(target);
     auto pathCount = [&] {
         size_t count = 0;

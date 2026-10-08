@@ -172,6 +172,14 @@ int main(int argc, char** argv)
         press(H::Action::confirm);
         press(H::Action::confirm);
         auto model = W::HandheldRidesPresentation();
+        W::HandheldDashboardMove(0, model.rows.size() - 6);
+        press(H::Action::confirm);
+        Require(W::HandheldRidesPresentation().breadcrumb == "Rides / Music", "Music route lost");
+        press(H::Action::openBuild);
+        Require(W::HandheldDashboardRailFocused(), "Music rail switch lost");
+        press(H::Action::openBuild);
+        Require(W::HandheldRidesPresentation().breadcrumb == "Rides / Music", "Music resume lost");
+        press(H::Action::back);
         W::HandheldDashboardMove(0, model.rows.size() - 4);
         press(H::Action::confirm);
         Require(W::HandheldRidesPresentation().breadcrumb == "Rides / Dispatch", "Dispatch route lost");
@@ -353,6 +361,19 @@ int main(int argc, char** argv)
             W::HandheldRidesPresentation().breadcrumb == "Rides / Maintenance"
                 && ride->inspectionInterval != RideInspection::every10Minutes && state.park.cash == settingsCash,
             "Confirmed maintenance did not return safely");
+        auto maintenance = W::HandheldRidesPresentation();
+        W::HandheldDashboardMove(0, maintenance.rows.size() - 2);
+        press(H::Action::confirm);
+        Require(
+            W::HandheldRidesPresentation().confirmation && W::HandheldRidesPresentation().selected == 1
+                && W::HandheldRidesPresentation().breadcrumb == "Rides / Refurbish",
+            "Refurbishment review not Cancel-first");
+        Require(GameIsNotPaused(), "Dashboard pause blocked refurbishment review");
+        press(H::Action::confirm);
+        Require(
+            W::HandheldRidesPresentation().breadcrumb == "Rides / Maintenance" && R::Resolve(target)
+                && state.park.cash == settingsCash && GameIsPaused(),
+            "Refurbish cancel changed state/pause/parent");
         press(H::Action::back);
         model = W::HandheldRidesPresentation();
         W::HandheldDashboardMove(0, model.rows.size() - 1);

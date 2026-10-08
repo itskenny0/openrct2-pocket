@@ -44,14 +44,56 @@ physical Brick readability are not claimed by metadata/component fixtures.
 | Feature | State | Native references / dependency |
 | --- | --- | --- |
 | Appearance, track/vehicle schemes and entrance styles | Missing | Ride.cpp colour page; RideSetAppearanceAction / RideSetColourSchemeAction |
-| Music enable/style | Missing | Ride.cpp music page; MusicObject::SupportsRideType; RideSetSettingAction |
+| Music enable/style | Complete in Phase 2 | Ride.cpp music page; MusicObject::SupportsRideType; RideSetSettingAction |
 | Ride/shop rename and reusable keyboard | Missing | RideSetNameAction; native UTF-8 constraints; reusable controller text entry |
-| Refurbishment and mechanic locate | Missing | RideDemolishAction renew; RideGetAssignedMechanic / RideFindClosestMechanic |
+| Refurbishment and mechanic locate | Complete in Phase 3 | RideDemolishAction renew; RideGetAssignedMechanic / RideFindClosestMechanic |
 | Existing maintenance interval/information | Complete in prior scope | RIDE-DEPTH-CHECKPOINT.md |
 | Customer/financial information depth | Partial | Ride totals, rolling data, queue/stations, undefined-value guards |
 | Ride graphs | Missing | RideMeasurement samples and native desktop graph conversions |
 | Track colour scheme painting / random vehicle colours / other small parity | Missing | Native actions, map targeting, per-car/train scheme semantics |
-| No-vehicle maximum-rider Operations fallback | Missing | Desktop operating mode fallback, RideSetSettingAction |
+| No-vehicle maximum-rider Operations fallback | Complete in Phase 2 | Desktop operating mode fallback, RideSetSettingAction |
 
 No naming/appearance/graph/maintenance action is implied working by this Phase 1
 checkpoint. Follow subsequent phase entries in this document for current state.
+
+## Phase 2: Music and no-vehicle Operations
+
+Music has its own inspector section using the shared bounded draft, native query,
+Cancel-first confirmation, busy and held-input architecture. Enable/disable uses
+RideSetSettingAction; style choices use loaded MusicObject entries and native
+SupportsRideType with explicit-listing and existing unlockOperatingLimits policy.
+Unavailable custom WAV styles are omitted as on desktop. Pocket loads no music
+objects and changes no cheats. The operation snapshot now includes style and
+playback, rejecting external changes and repeated drafts. Object availability is
+rederived on review. No audio playback is claimed by metadata-only fixtures.
+
+No-vehicle operating modes now use the native maximum-people caption and native
+OperatingSettings bounds for the desktop default case (excluding shopStall).
+Existing mode-specific parameters and circuit behavior are unchanged.
+
+Validation: Release GUI/CLI build; full public-data native driver (toggle, loaded
+style selection, query cancellation, repeated/invalid drafts, zero cash and
+native park serialization); SDL lifecycle driver (Music route, rail and resume,
+existing Dispatch/Vehicles/Operations/modal regressions). Target hardware music
+playback and complete coaster assets remain follow-up validation.
+
+## Phase 3: Maintenance actions
+
+Maintenance now offers mechanic locate and refurbishment for types with native
+breakdowns. Locate checks RideGetAssignedMechanic then RideFindClosestMechanic
+for inspection and pans to the live entity; no assignment or teleport is made.
+Unavailable mechanics report a visible message.
+
+Refurbishment uses RideDemolishAction renew, native Query price and native
+closed/empty/ever-opened/need/funds/pause policy. Native execution owns age,
+reliability, downtime and cash. Review is Cancel-first and temporarily releases
+only Dashboard's owned pause, restoring it on cancellation/return. It compares
+fresh cost and the existing ride identity, status and money snapshot; repeated
+renewal is rejected by native ever-opened policy. Successful owned renewal
+refreshes the identity build date and returns to Maintenance. Ride, track,
+entrances, vehicle configuration and music remain under native rules.
+
+Validation includes native query/cancel, exact renewal cost, zero age, retained
+name/music, repeat rejection and original demolition regression; real SDL review
+handoff and Cancel-first pause/parent restoration. Complete operating scenarios
+and physical Brick input/readability are still not claimed by public fixtures.

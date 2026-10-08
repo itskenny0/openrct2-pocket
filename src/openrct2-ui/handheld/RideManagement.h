@@ -29,6 +29,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         maintenance,
         vehicles,
         dispatch,
+        music,
         price,
         confirmation
     };
@@ -46,6 +47,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
     std::vector<Setting> Settings(const Ride& ride, bool maintenance = false);
     std::vector<Setting> VehicleSettings(const Ride& ride);
     std::vector<Setting> DispatchSettings(const Ride& ride);
+    std::vector<Setting> MusicSettings(const Ride& ride);
     struct Draft
     {
         Target target;
@@ -57,10 +59,11 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         money64 price;
         std::optional<Setting> setting;
         uint16_t value{};
-        std::array<uint16_t, 15> baselineSettings{};
+        std::array<uint16_t, 17> baselineSettings{};
         std::array<uint8_t, 2> effectiveVehicles{};
         bool demolition{};
         money64 refund{};
+        bool refurbishment{};
     };
     void Invalidate(RideId id);
     void InvalidateAll();
@@ -73,6 +76,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
     std::optional<Draft> Begin(const Target& target, std::optional<RideStatus> status = {});
     std::optional<Draft> BeginSetting(const Target& target, const Setting& setting);
     std::optional<Draft> BeginDemolition(const Target& target);
+    std::optional<Draft> BeginRefurbishment(const Target& target);
+    bool LocateMechanic(const Target& target);
     void AdjustPrice(Draft& draft, int direction);
     GameActions::Result Action(const Draft& draft, bool execute, GameActions::GameAction::Callback_t callback = {});
     ManagementPresentation Presentation(
