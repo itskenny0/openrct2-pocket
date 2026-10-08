@@ -172,6 +172,33 @@ int main(int argc, char** argv)
         press(H::Action::confirm);
         press(H::Action::confirm);
         auto model = W::HandheldRidesPresentation();
+        W::HandheldDashboardMove(0, model.rows.size() - 8);
+        press(H::Action::confirm);
+        const auto beforeName = ride->getName();
+        Require(
+            W::HandheldRidesPresentation().columns == 8 && W::HandheldRidesPresentation().rows.size() == 48,
+            "Name keyboard grid absent");
+        press(H::Action::confirm);
+        Require(
+            W::HandheldRidesPresentation().title == beforeName + "A" && ride->getName() == beforeName,
+            "Duplicate A inserted/applied more than one key");
+        press(H::Action::openBuild);
+        Require(!W::HandheldDashboardRailFocused(), "Name keyboard escaped to rail");
+        W::HandheldDashboardMove(6, 5);
+        press(H::Action::confirm);
+        Require(
+            W::HandheldRidesPresentation().confirmation && W::HandheldRidesPresentation().selected == 1,
+            "Name review not Cancel-first");
+        press(H::Action::confirm);
+        Require(
+            ride->getName() == beforeName && W::HandheldRidesPresentation().columns == 8,
+            "Name cancel changed name/lost keyboard");
+        press(H::Action::back);
+        Require(W::HandheldRidesPresentation().breadcrumb == "Park dashboard / Rides", "Name back lost inspector");
+        W::HandheldDashboardMove(0, model.rows.size() - 7);
+        press(H::Action::confirm);
+        Require(W::HandheldRidesPresentation().breadcrumb == "Rides / Appearance", "Appearance route lost");
+        press(H::Action::back);
         W::HandheldDashboardMove(0, model.rows.size() - 6);
         press(H::Action::confirm);
         Require(W::HandheldRidesPresentation().breadcrumb == "Rides / Music", "Music route lost");

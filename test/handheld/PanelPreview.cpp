@@ -7,6 +7,7 @@
 #include <openrct2-ui/handheld/ObjectPicker.h>
 #include <openrct2-ui/handheld/Panel.h>
 #include <openrct2-ui/handheld/RideManagement.h>
+#include <openrct2-ui/handheld/TextEntry.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
 #include <openrct2/OpenRCT2.h>
@@ -241,6 +242,10 @@ int main(int argc, char** argv)
         auto view = page == "ride-depth-summary"     ? R::View::inspection
             : page == "ride-depth-maintenance"       ? R::View::maintenance
             : page.starts_with("ride-depth-vehicle") ? R::View::vehicles
+            : page == "ride-depth-appearance"        ? R::View::appearance
+            : page == "ride-depth-music"             ? R::View::music
+            : page == "ride-depth-customers"         ? R::View::customers
+            : page == "ride-depth-finances"          ? R::View::earnings
             : page == "ride-depth-dispatch"          ? R::View::dispatch
                                                      : R::View::operations;
         size_t selected = page == "ride-depth-dense" ? R::Settings(*ride).size() - 1 : 0;
@@ -284,10 +289,23 @@ int main(int argc, char** argv)
             }
         }
         auto content = R::Presentation(view, selected, {}, target, draft);
+        if (page == "ride-depth-keyboard")
+        {
+            H::TextEntry keyboard{ "Pocket Coaster" };
+            content.breadcrumb = "Name / Keyboard";
+            content.title = keyboard.text;
+            content.stats.clear();
+            content.rows = keyboard.Keys();
+            content.columns = H::TextEntry::columns;
+            content.selected = 46;
+            content.status = "14 / 32 characters";
+        }
         H::Dashboard::State dashboard;
         dashboard.section = H::Dashboard::Section::rides;
         dashboard.focus = H::Dashboard::Focus::content;
-        H::Dashboard::Draw(rt, { 512, 384 }, dashboard, content, view != R::View::confirmation && view != R::View::price);
+        H::Dashboard::Draw(
+            rt, { 512, 384 }, dashboard, content,
+            page != "ride-depth-keyboard" && view != R::View::confirmation && view != R::View::price);
     }
     else if (page == "dashboard" || page == "inspection" || page == "confirmation")
     {

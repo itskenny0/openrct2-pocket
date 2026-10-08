@@ -1436,6 +1436,17 @@ static void TestShopManagement(IContext& context, const std::string& profile, bo
     gGamePaused = 0;
     SaveFlags flags{};
     flags.set(SaveFlag::exportObjects);
+    auto shopName = *H::RideManagement::BeginName(*H::RideManagement::Identify(first.id, true));
+    shopName.name = "Pocket Burger";
+    Require(
+        H::RideManagement::Action(shopName, false).error == GameActions::Status::ok
+            && GetRide(first.id)->getName() == shopName.baselineName,
+        "Shop name query changed state");
+    Require(H::RideManagement::Action(shopName, true).error == GameActions::Status::ok, "Native shop name failed");
+    GameActions::ProcessQueue(state);
+    auto duplicateName = *H::RideManagement::BeginName(*H::RideManagement::Identify(second.id, true));
+    duplicateName.name = shopName.name;
+    Require(H::RideManagement::Action(duplicateName, true).error != GameActions::Status::ok, "Duplicate shop name accepted");
     const auto saved = profile + "/shop-management.park";
     const auto storedPrice = GetRide(first.id)->price[0];
     const auto storedStatus = GetRide(first.id)->status;
@@ -1450,6 +1461,7 @@ static void TestShopManagement(IContext& context, const std::string& profile, bo
         M::Find(first) && GetRide(first.id)->price[0] == storedPrice && GetRide(first.id)->status == storedStatus
             && state.park.samePriceThroughoutPark == common && state.park.cash == cash,
         "Management state not persisted");
+    Require(GetRide(first.id)->getName() == shopName.name, "Shop name not serialized");
     gGamePaused = 0;
     const auto refund = M::Demolish(first, false);
     Require(

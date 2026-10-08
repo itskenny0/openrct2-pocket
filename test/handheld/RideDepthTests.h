@@ -4,6 +4,7 @@
 #include "VehicleDispatchTests.h"
 
 #include <openrct2-ui/handheld/FlatRides.h>
+#include <openrct2-ui/handheld/TextEntry.h>
 #include <openrct2/actions/ride/RideDemolishAction.h>
 #include <openrct2/actions/ride/RideSetSettingAction.h>
 static void TestRideDepth(
@@ -57,6 +58,31 @@ static void TestRideDepth(
     }
     state.cheats.unlockOperatingLimits = oldUnlock;
     std::cout << "Native Music / toggle-style-query-cancel-repeat-bounds / zero cash / persistence fixture passed\n";
+    Ui::Handheld::TextEntry keyboard{ "Café" };
+    Require(keyboard.Length() == 4, "Keyboard UTF-8 length differs");
+    keyboard.Press(43);
+    Require(keyboard.text == "Caf", "Keyboard split UTF-8 deletion");
+    keyboard.Press(44);
+    keyboard.Press(4);
+    Require(keyboard.text == "Cafe", "Keyboard lowercase failed");
+    for (int n = 0; n < 40; ++n)
+        keyboard.Press(0);
+    Require(keyboard.Length() == 32, "Keyboard length unbounded");
+    keyboard.Press(45);
+    Require(
+        keyboard.text.empty() && keyboard.Move(0, -1, -1) == 0 && keyboard.Move(47, 1, 1) == 47,
+        "Keyboard clear/grid bounds differ");
+    auto nameDraft = *R::BeginName(target);
+    nameDraft.name = "Pocket Café";
+    Require(
+        R::Action(nameDraft, false).error == GameActions::Status::ok && GetRide(target.id)->getName() == nameDraft.baselineName,
+        "Name query changed ride");
+    Require(R::Action(nameDraft, true).error == GameActions::Status::ok, "Native name failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        GetRide(target.id)->getName() == nameDraft.name && R::Action(nameDraft, true).error != GameActions::Status::ok,
+        "Name not applied/repeated");
+    const auto savedName = GetRide(target.id)->getName();
     const auto savedMusic = GetRide(target.id)->music;
     const bool savedPlaying = GetRide(target.id)->flags.has(RideFlag::music);
     auto cash = state.park.cash;

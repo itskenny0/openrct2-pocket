@@ -156,9 +156,10 @@ namespace OpenRCT2::Ui::Handheld::ShopManagement
             }
             if (prices.empty())
                 text(164, "{MUTED}No products or admission price");
-            row(212, ride->status == RideStatus::open ? "Close" : "Open", focus == 0);
-            row(242, noMoney ? "No-money park" : prices.empty() ? "Prices unavailable" : "Prices...", focus == 1);
-            row(272, "Demolish...", focus == 2);
+            row(202, ride->status == RideStatus::open ? "Close" : "Open", focus == 0);
+            row(228, noMoney ? "No-money park" : prices.empty() ? "Prices unavailable" : "Prices...", focus == 1);
+            row(254, "Demolish...", focus == 2);
+            row(280, "Rename...", focus == 3);
         }
         else if (ride && view == View::prices)
         {

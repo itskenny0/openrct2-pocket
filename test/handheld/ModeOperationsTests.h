@@ -85,6 +85,11 @@ static void TestModeOperations(
         created.push_back(t);
         return t;
     };
+    const auto mazeCapacity = create("rct2.ride.hmaze", RIDE_TYPE_MAZE);
+    const auto capacity = parameter(*GetRide(mazeCapacity.id), GameActions::RideSetSetting::operation);
+    Require(capacity && capacity->name == caption(STR_MAX_PEOPLE_ON_RIDE), "No-vehicle capacity caption absent");
+    exercise(mazeCapacity, GameActions::RideSetSetting::operation);
+    Require(R::MusicSettings(*GetRide(mazeCapacity.id)).empty(), "Unsupported music exposed");
     const auto dodg = create("rct2.ride.dodg1", RIDE_TYPE_DODGEMS);
     auto dodgSetting = *parameter(*GetRide(dodg.id), GameActions::RideSetSetting::operation);
     Require(

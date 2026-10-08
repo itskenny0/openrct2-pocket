@@ -85,6 +85,7 @@ namespace OpenRCT2::Ui::Windows
         bool alwaysHideSpecialColours = false);
 
     Drawing::Colour ColourDropDownIndexToColour(uint8_t ddidx);
+    StringId ColourDropDownIndexToName(uint8_t ddidx);
 
     uint32_t DropdownGetAppropriateImageDropdownItemsPerRow(uint32_t numItems);
 } // namespace OpenRCT2::Ui::Windows

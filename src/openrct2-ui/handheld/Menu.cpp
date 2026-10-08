@@ -19,6 +19,7 @@
 #include "ShopManagement.h"
 #include "Shops.h"
 #include "StaffManagement.h"
+#include "TextEntry.h"
 #include "TreePicker.h"
 #include "Trees.h"
 
@@ -86,11 +87,15 @@ namespace OpenRCT2::Ui::Windows
         ridesInspect,
         ridesAccess,
         ridesStats,
+        ridesCustomers,
+        ridesEarnings,
         ridesOperations,
         ridesMaintenance,
         ridesVehicles,
         ridesDispatch,
         ridesMusic,
+        ridesAppearance,
+        ridesName,
         ridesPrice,
         ridesConfirm,
         research,
@@ -184,11 +189,17 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::RideManagement::Draft> _ridesDraft;
         size_t _ridesRosterFocus{};
         bool _ridesBusy{};
+        Handheld::TextEntry _nameEntry;
         bool _ridesReviewResumed{};
         uint64_t _ridesRequest{};
         std::shared_ptr<int> _ridesLifetime = std::make_shared<int>(0);
         Page ridesDraftParent() const
         {
+            if (_ridesDraft && _ridesDraft->renaming)
+                return Page::ridesName;
+            if (_ridesDraft && _ridesDraft->setting
+                && _ridesDraft->setting->section == Handheld::RideManagement::View::appearance)
+                return Page::ridesAppearance;
             if (_ridesDraft && _ridesDraft->refurbishment)
                 return Page::ridesMaintenance;
             if (_ridesDraft && _ridesDraft->setting
@@ -206,23 +217,41 @@ namespace OpenRCT2::Ui::Windows
         }
         bool ridesManagement() const
         {
-            return _page == Page::ridesRoster || _page == Page::ridesInspect || _page == Page::ridesStats
-                || _page == Page::ridesVehicles || _page == Page::ridesMusic || _page == Page::ridesDispatch
-                || _page == Page::ridesOperations || _page == Page::ridesMaintenance || _page == Page::ridesAccess
-                || _page == Page::ridesPrice || _page == Page::ridesConfirm;
+            return _page == Page::ridesRoster || _page == Page::ridesInspect || _page == Page::ridesCustomers
+                || _page == Page::ridesEarnings || _page == Page::ridesStats || _page == Page::ridesVehicles
+                || _page == Page::ridesName || _page == Page::ridesAppearance || _page == Page::ridesMusic
+                || _page == Page::ridesDispatch || _page == Page::ridesOperations || _page == Page::ridesMaintenance
+                || _page == Page::ridesAccess || _page == Page::ridesPrice || _page == Page::ridesConfirm;
         }
         Handheld::ManagementPresentation ridesPresentationFor(Page current, size_t selected) const
         {
             using Handheld::RideManagement::View;
+            if (current == Page::ridesName)
+            {
+                Handheld::ManagementPresentation model;
+                model.breadcrumb = "Name / Keyboard";
+                model.title = _nameEntry.text.empty() ? "Default name" : _nameEntry.text;
+                model.rows = _nameEntry.Keys();
+                model.columns = Handheld::TextEntry::columns;
+                model.selected = selected;
+                model.status = std::to_string(_nameEntry.Length()) + " / 32 characters";
+                if (!_status.empty())
+                    model.status = _status;
+                model.primaryAction = "Type";
+                return model;
+            }
             if (current == Page::ridesAccess && _ridesTarget)
                 return Handheld::RideAccess::Presentation(*_ridesTarget, selected, _status);
             return Handheld::RideManagement::Presentation(
                 current == Page::ridesRoster            ? View::roster
                     : current == Page::ridesInspect     ? View::inspection
+                    : current == Page::ridesCustomers   ? View::customers
+                    : current == Page::ridesEarnings    ? View::earnings
                     : current == Page::ridesStats       ? View::statistics
                     : current == Page::ridesOperations  ? View::operations
                     : current == Page::ridesMaintenance ? View::maintenance
                     : current == Page::ridesVehicles    ? View::vehicles
+                    : current == Page::ridesAppearance  ? View::appearance
                     : current == Page::ridesMusic       ? View::music
                     : current == Page::ridesDispatch    ? View::dispatch
                     : current == Page::ridesPrice       ? View::price
@@ -381,7 +410,7 @@ namespace OpenRCT2::Ui::Windows
                 _ridesRosterFocus = _focus.index();
             if (next == Page::ridesRoster)
                 _ridesRoster = Handheld::RideManagement::Roster();
-            if (next != Page::ridesPrice && next != Page::ridesConfirm)
+            if (next != Page::ridesPrice && next != Page::ridesConfirm && next != Page::ridesName)
                 _ridesDraft.reset();
             _ridesBusy = false;
             ++_ridesRequest;
@@ -472,10 +501,14 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ridesInspect:
                 case Page::ridesAccess:
                 case Page::ridesVehicles:
+                case Page::ridesName:
+                case Page::ridesAppearance:
                 case Page::ridesMusic:
                 case Page::ridesDispatch:
                 case Page::ridesOperations:
                 case Page::ridesMaintenance:
+                case Page::ridesCustomers:
+                case Page::ridesEarnings:
                 case Page::ridesStats:
                 case Page::ridesPrice:
                 case Page::ridesConfirm:
@@ -501,7 +534,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::researchConfirm:
                     return researchPresentation().rows;
                 case Page::shop:
-                    return { "Status", "Prices", "Demolish" };
+                    return { "Status", "Prices", "Demolish", "Rename" };
                 case Page::shopPrices:
                 {
                     std::vector<std::string> result;
@@ -875,8 +908,9 @@ namespace OpenRCT2::Ui::Windows
             return _page == Page::dashboard || _page == Page::overview || _page == Page::finances || _page == Page::staff
                 || _page == Page::staffInspect || _page == Page::staffStats || _page == Page::research
                 || _page == Page::marketing || _page == Page::marketingActive || guestManagement() || _page == Page::ridesRoster
-                || _page == Page::ridesInspect || _page == Page::ridesAccess || _page == Page::ridesStats
-                || _page == Page::ridesVehicles || _page == Page::ridesMusic || _page == Page::ridesDispatch
+                || _page == Page::ridesInspect || _page == Page::ridesAccess || _page == Page::ridesCustomers
+                || _page == Page::ridesEarnings || _page == Page::ridesStats || _page == Page::ridesVehicles
+                || _page == Page::ridesAppearance || _page == Page::ridesMusic || _page == Page::ridesDispatch
                 || _page == Page::ridesOperations || _page == Page::ridesMaintenance;
         }
         void enterDashboardContent()
@@ -958,6 +992,13 @@ namespace OpenRCT2::Ui::Windows
                     _status.clear();
                     invalidate();
                 }
+            }
+            else if (_page == Page::ridesName)
+            {
+                const auto current = _focus.index();
+                const auto next = _nameEntry.Move(current, x, y);
+                _focus.move(static_cast<int>(next) - static_cast<int>(current), rows().size());
+                invalidate();
             }
             else if (_page == Page::ridesPrice)
             {
@@ -1111,8 +1152,12 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ridesInspect:
                     page(Page::ridesRoster);
                     break;
+                case Page::ridesName:
+                    page(_ridesTarget && _ridesTarget->shop ? Page::shop : Page::ridesInspect);
+                    break;
                 case Page::ridesAccess:
                 case Page::ridesVehicles:
+                case Page::ridesAppearance:
                 case Page::ridesMusic:
                 case Page::ridesDispatch:
                 case Page::ridesOperations:
@@ -1120,13 +1165,19 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ridesPrice:
                     page(ridesDraftParent());
                     break;
+                case Page::ridesCustomers:
+                case Page::ridesEarnings:
+                    page(Page::ridesStats);
+                    break;
                 case Page::ridesStats:
                     page(
                         _ridesTarget && Handheld::RideManagement::Resolve(*_ridesTarget) ? Page::ridesInspect
                                                                                          : Page::ridesRoster);
                     break;
                 case Page::ridesConfirm:
-                    if (_ridesDraft && !_ridesDraft->status && !_ridesDraft->demolition)
+                    if (_ridesDraft && (_ridesDraft->renaming || _ridesDraft->refurbishment))
+                        page(ridesDraftParent());
+                    else if (_ridesDraft && !_ridesDraft->status && !_ridesDraft->demolition)
                         page(Page::ridesPrice);
                     else
                         page(
@@ -1666,6 +1717,21 @@ namespace OpenRCT2::Ui::Windows
                         break;
                     }
                     const auto rows = ridesPresentationFor(Page::ridesInspect, choice).rows;
+                    if (choice == rows.size() - 8)
+                    {
+                        _ridesDraft = Handheld::RideManagement::BeginName(*_ridesTarget);
+                        if (_ridesDraft)
+                        {
+                            _nameEntry = { _ridesDraft->name };
+                            page(Page::ridesName);
+                        }
+                        break;
+                    }
+                    if (choice == rows.size() - 7)
+                    {
+                        page(Page::ridesAppearance);
+                        break;
+                    }
                     if (choice == rows.size() - 6)
                     {
                         page(Page::ridesMusic);
@@ -1785,6 +1851,7 @@ namespace OpenRCT2::Ui::Windows
                         page(Page::ridesInspect);
                     break;
                 case Page::ridesVehicles:
+                case Page::ridesAppearance:
                 case Page::ridesMusic:
                 case Page::ridesDispatch:
                 case Page::ridesOperations:
@@ -1792,7 +1859,8 @@ namespace OpenRCT2::Ui::Windows
                 {
                     const auto* ride = _ridesTarget ? Handheld::RideManagement::Resolve(*_ridesTarget) : nullptr;
                     const auto settings = ride
-                        ? (_page == Page::ridesMusic          ? Handheld::RideManagement::MusicSettings(*ride)
+                        ? (_page == Page::ridesAppearance     ? Handheld::RideManagement::AppearanceSettings(*ride)
+                               : _page == Page::ridesMusic    ? Handheld::RideManagement::MusicSettings(*ride)
                                : _page == Page::ridesVehicles ? Handheld::RideManagement::VehicleSettings(*ride)
                                : _page == Page::ridesDispatch
                                ? Handheld::RideManagement::DispatchSettings(*ride)
@@ -1834,10 +1902,30 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 }
+                case Page::ridesCustomers:
+                case Page::ridesEarnings:
+                    page(Page::ridesStats);
+                    break;
                 case Page::ridesStats:
                     page(
-                        _ridesTarget && Handheld::RideManagement::Resolve(*_ridesTarget) ? Page::ridesInspect
-                                                                                         : Page::ridesRoster);
+                        choice == 0                                                            ? Page::ridesCustomers
+                            : choice == 1                                                      ? Page::ridesEarnings
+                            : _ridesTarget && Handheld::RideManagement::Resolve(*_ridesTarget) ? Page::ridesInspect
+                                                                                               : Page::ridesRoster);
+                    break;
+                case Page::ridesName:
+                    if (choice == 47)
+                        page(_ridesTarget && _ridesTarget->shop ? Page::shop : Page::ridesInspect);
+                    else if (choice == 46 && _ridesDraft)
+                    {
+                        _ridesDraft->name = _nameEntry.text;
+                        page(Page::ridesConfirm);
+                    }
+                    else
+                    {
+                        _nameEntry.Press(choice);
+                        invalidate();
+                    }
                     break;
                 case Page::ridesPrice:
                     if (!_ridesDraft)
@@ -1890,7 +1978,9 @@ namespace OpenRCT2::Ui::Windows
                                         _ridesTarget = Handheld::RideManagement::Identify(_ridesDraft->target.id);
                                     if (_ridesDraft && _ridesDraft->refurbishment)
                                         _ridesTarget = Handheld::RideManagement::Identify(_ridesDraft->target.id);
-                                    const auto destination = ridesDraftParent();
+                                    const auto destination = _ridesDraft && _ridesDraft->renaming
+                                        ? (_ridesTarget && _ridesTarget->shop ? Page::shop : Page::ridesInspect)
+                                        : ridesDraftParent();
                                     page(demolished ? Page::ridesRoster : destination);
                                     _status = demolished ? "Ride demolished" : "Ride updated";
                                 }
@@ -2167,6 +2257,17 @@ namespace OpenRCT2::Ui::Windows
                         if (!getGameState().park.flags.has(ParkFlag::noMoney)
                             && !Handheld::ShopManagement::Prices(*_shop).empty())
                             page(Page::shopPrices);
+                    }
+                    else if (choice == 3)
+                    {
+                        _ridesTarget = Handheld::RideManagement::Identify(_shop->id, true);
+                        if (_ridesTarget)
+                            _ridesDraft = Handheld::RideManagement::BeginName(*_ridesTarget);
+                        if (_ridesDraft)
+                        {
+                            _nameEntry = { _ridesDraft->name };
+                            page(Page::ridesName);
+                        }
                     }
                     else if (choice == 2)
                         page(Page::shopDemolish);

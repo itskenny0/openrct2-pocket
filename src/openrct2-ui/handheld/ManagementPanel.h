@@ -20,6 +20,7 @@ namespace OpenRCT2::Ui::Handheld
         bool editing{};
         bool confirmation{};
         std::vector<std::string> bodyLines; // Optional native wrapped read-only detail; section controls paging.
+        size_t columns = 1;                 // Controller text entry uses the same content shell.
     };
     inline void DrawManagementContent(
         Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const ManagementPresentation& model, bool focused = true)
@@ -28,10 +29,13 @@ namespace OpenRCT2::Ui::Handheld
         const int width = size.width;
         const int valueX = 14 + (width - 30) * 45 / 100;
         const int rowStart = 70 + static_cast<int>(model.stats.size()) * 24 + static_cast<int>(model.bodyLines.size()) * 16;
-        const size_t capacity = std::max(1, (size.height - rowStart - 30) / 30);
+        const auto columns = std::max<size_t>(1, model.columns);
+        const int rowHeight = columns > 1 ? 24 : 30;
+        const size_t capacity = std::max(1, (size.height - rowStart - 30) / rowHeight) * columns;
         const size_t first = model.selected / capacity * capacity;
         const size_t visible = std::min(capacity, model.rows.size() - std::min(first, model.rows.size()));
-        const int height = std::min(size.height, rowStart + static_cast<int>(visible) * 30 + 30);
+        const int height = std::min(
+            size.height, rowStart + static_cast<int>((visible + columns - 1) / columns) * rowHeight + 30);
         Box(rt, p, { width, height });
         DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, 12 }, width - 20, "{MUTED}" + model.breadcrumb);
         DrawStrongText(
@@ -55,15 +59,18 @@ namespace OpenRCT2::Ui::Handheld
                 width - 20, "{WHITE}" + model.bodyLines[i]);
         for (size_t i = first; i < first + visible; ++i)
         {
-            const int y = rowStart + static_cast<int>(i - first) * 30;
+            const int y = rowStart + static_cast<int>((i - first) / columns) * rowHeight;
+            const int cellWidth = (width - 16) / columns;
+            const int x = 8 + static_cast<int>((i - first) % columns) * cellWidth;
             const bool selected = focused && i == model.selected;
             if (selected)
-                Box(rt, p + ScreenCoordsXY{ 8, y }, { width - 16, 28 }, true);
+                Box(rt, p + ScreenCoordsXY{ x, y }, { cellWidth, rowHeight - 2 }, true);
             const auto& label = model.rows[i];
             const bool unavailable = label.find("unavailable") != std::string::npos
                 || label.find("Unavailable") != std::string::npos;
             DrawModernEllipsised(
-                rt, p + ScreenCoordsXY{ 15, y + 9 }, width - 30,
+                rt, p + ScreenCoordsXY{ x + (columns > 1 ? 3 : 7), y + (columns > 1 ? 6 : 9) },
+                cellWidth - (columns > 1 ? 6 : 14),
                 std::string(
                     selected          ? "{BLACK}"
                         : unavailable ? "{MUTED}"

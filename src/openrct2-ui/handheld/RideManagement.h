@@ -4,6 +4,7 @@
 #include "ManagementPanel.h"
 
 #include <openrct2/actions/GameActionRunner.h>
+#include <openrct2/actions/ride/RideSetAppearanceAction.h>
 #include <openrct2/actions/ride/RideSetSettingAction.h>
 #include <openrct2/actions/ride/RideSetVehicleAction.h>
 #include <openrct2/ride/Ride.h>
@@ -18,6 +19,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         int32_t buildDate;
         CoordsXY location;
         uint64_t generation;
+        bool shop{};
         bool operator==(const Target&) const = default;
     };
     enum class View
@@ -25,11 +27,14 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         roster,
         inspection,
         statistics,
+        customers,
+        earnings,
         operations,
         maintenance,
         vehicles,
         dispatch,
         music,
+        appearance,
         price,
         confirmation
     };
@@ -43,11 +48,14 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         std::optional<GameActions::RideSetVehicleType> vehicle{};
         View section = View::operations;
         uint8_t step = 1;
+        std::optional<GameActions::RideSetAppearanceType> appearance{};
+        uint32_t index{};
     };
     std::vector<Setting> Settings(const Ride& ride, bool maintenance = false);
     std::vector<Setting> VehicleSettings(const Ride& ride);
     std::vector<Setting> DispatchSettings(const Ride& ride);
     std::vector<Setting> MusicSettings(const Ride& ride);
+    std::vector<Setting> AppearanceSettings(const Ride& ride);
     struct Draft
     {
         Target target;
@@ -64,10 +72,14 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         bool demolition{};
         money64 refund{};
         bool refurbishment{};
+        std::vector<uint16_t> baselineAppearance{};
+        bool renaming{};
+        std::string baselineName{};
+        std::string name{};
     };
     void Invalidate(RideId id);
     void InvalidateAll();
-    std::optional<Target> Identify(RideId id);
+    std::optional<Target> Identify(RideId id, bool includeShops = false);
     const Ride* Resolve(const Target& target);
     std::vector<Target> Roster();
     std::optional<CoordsXYZ> Location(const Target& target);
@@ -76,6 +88,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
     std::optional<Draft> Begin(const Target& target, std::optional<RideStatus> status = {});
     std::optional<Draft> BeginSetting(const Target& target, const Setting& setting);
     std::optional<Draft> BeginDemolition(const Target& target);
+    std::optional<Draft> BeginName(const Target& target);
     std::optional<Draft> BeginRefurbishment(const Target& target);
     bool LocateMechanic(const Target& target);
     void AdjustPrice(Draft& draft, int direction);

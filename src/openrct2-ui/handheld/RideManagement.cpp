@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "RideManagement.h"
 
+#include "../interface/Dropdown.h"
 #include "CustomTracks.h"
 #include "Finances.h"
 #include "FlatRides.h"
 #include "RideAccess.h"
+#include "TextEntry.h"
 
 #include <iomanip>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
 #include <openrct2/actions/ride/RideDemolishAction.h>
+#include <openrct2/actions/ride/RideSetNameAction.h>
 #include <openrct2/actions/ride/RideSetPriceAction.h>
 #include <openrct2/actions/ride/RideSetStatusAction.h>
 #include <openrct2/entity/Staff.h>
@@ -18,6 +21,7 @@
 #include <openrct2/management/Research.h>
 #include <openrct2/object/MusicObject.h>
 #include <openrct2/object/ObjectManager.h>
+#include <openrct2/object/StationObject.h>
 #include <openrct2/ride/RideData.h>
 #include <openrct2/ride/RideManager.hpp>
 #include <openrct2/ride/ShopItem.h>
@@ -40,16 +44,23 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         for (auto& [id, generation] : removedRides)
             ++generation;
     }
-    std::optional<Target> Identify(RideId id)
+    std::optional<Target> Identify(RideId id, bool includeShops)
     {
         const auto* ride = GetRide(id);
-        if (!ride || ride->type == kRideTypeNull || ride->getRideTypeDescriptor().flags.has(RtdFlag::isShopOrFacility))
+        if (!ride || ride->type == kRideTypeNull
+            || (!includeShops && ride->getRideTypeDescriptor().flags.has(RtdFlag::isShopOrFacility)))
             return {};
-        return Target{ id, ride->type, ride->subtype, ride->buildDate, ride->overallView, removedRides[id.ToUnderlying()] };
+        return Target{ id,
+                       ride->type,
+                       ride->subtype,
+                       ride->buildDate,
+                       ride->overallView,
+                       removedRides[id.ToUnderlying()],
+                       ride->getRideTypeDescriptor().flags.has(RtdFlag::isShopOrFacility) };
     }
     const Ride* Resolve(const Target& target)
     {
-        const auto now = Identify(target.id);
+        const auto now = Identify(target.id, target.shop);
         return now && *now == target ? GetRide(target.id) : nullptr;
     }
     std::vector<Target> Roster()
@@ -440,12 +451,148 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             result.push_back(std::move(style));
         return result;
     }
+    static std::vector<uint16_t> AppearanceSnapshot(const Ride& ride)
+    {
+        std::vector<uint16_t> snapshot{ ride.entranceStyle, static_cast<uint16_t>(ride.vehicleColourSettings) };
+        for (const auto& colour : ride.trackColours)
+        {
+            snapshot.push_back(static_cast<uint16_t>(colour.main));
+            snapshot.push_back(static_cast<uint16_t>(colour.additional));
+            snapshot.push_back(static_cast<uint16_t>(colour.supports));
+        }
+        for (const auto& colour : ride.vehicleColours)
+        {
+            snapshot.push_back(static_cast<uint16_t>(colour.Body));
+            snapshot.push_back(static_cast<uint16_t>(colour.Trim));
+            snapshot.push_back(static_cast<uint16_t>(colour.Tertiary));
+        }
+        return snapshot;
+    }
+    std::vector<Setting> AppearanceSettings(const Ride& ride)
+    {
+        using A = GameActions::RideSetAppearanceType;
+        const auto* entry = ride.getRideEntry();
+        const auto& type = ride.getRideTypeDescriptor();
+        if (!entry || entry->flags.has(RideEntryFlag::disableColourTab))
+            return {};
+        std::vector<Setting> result;
+        auto add = [&](A key, std::string name, uint16_t current, uint32_t index) -> Setting& {
+            Setting setting{ GameActions::RideSetSetting::mode, std::move(name), {}, {}, current };
+            setting.section = View::appearance;
+            setting.appearance = key;
+            setting.index = index;
+            result.push_back(std::move(setting));
+            return result.back();
+        };
+        auto colour = [&](A key, std::string name, Drawing::Colour current, uint32_t index) {
+            auto& setting = add(key, std::move(name), static_cast<uint16_t>(current), index);
+            for (uint8_t i = 0; i < Drawing::kColourNumNormal; ++i)
+            {
+                setting.values.push_back(static_cast<uint16_t>(Windows::ColourDropDownIndexToColour(i)));
+                setting.labels.push_back(
+                    FmtString(FormatStringID(Windows::ColourDropDownIndexToName(i))).WithoutFormatTokens());
+            }
+        };
+        const auto* station = ride.getStationObject();
+        const bool main = type.flags.has(RtdFlag::hasTrackColourMain)
+            || (station && station->Flags.has(StationObjectFlag::hasPrimaryColour));
+        const bool additional = type.flags.has(RtdFlag::hasTrackColourAdditional)
+            || (station && station->Flags.has(StationObjectFlag::hasSecondaryColour));
+        const bool supports = type.flags.has(RtdFlag::hasTrackColourSupports);
+        const int schemes = type.flags.has(RtdFlag::supportsMultipleColourSchemes) ? kNumRideColourSchemes : 1;
+        for (int i = 0; i < schemes; ++i)
+        {
+            const auto prefix = schemes > 1 ? "Track " + std::to_string(i + 1) + " / " : "Entrance / ";
+            if (main)
+                colour(A::trackColourMain, prefix + "Main", ride.trackColours[i].main, i);
+            if (additional)
+                colour(A::trackColourAdditional, prefix + "Additional", ride.trackColours[i].additional, i);
+            if (supports)
+            {
+                if (type.specialType == RtdSpecialType::maze)
+                {
+                    auto& style = add(A::mazeStyle, "Maze style", static_cast<uint16_t>(ride.trackColours[i].supports), i);
+                    style.values = { 0, 1, 2, 3 };
+                    style.labels = { "Brick walls", "Hedges", "Ice blocks", "Wooden fences" };
+                }
+                else
+                    colour(A::trackColourSupports, prefix + "Supports", ride.trackColours[i].supports, i);
+            }
+        }
+        if (type.flags.has(RtdFlag::hasEntranceAndExit))
+        {
+            auto& style = add(A::entranceStyle, "Entrance style", ride.entranceStyle, 0);
+            auto& manager = GetContext()->GetObjectManager();
+            for (ObjectEntryIndex i = 0; i < kMaxStationObjects; ++i)
+                if (const auto* object = manager.GetLoadedObject<StationObject>(i))
+                {
+                    style.values.push_back(i);
+                    style.labels.push_back(FmtString(FormatStringID(object->NameStringId)).WithoutFormatTokens());
+                }
+            if (style.values.empty())
+                result.pop_back();
+        }
+        if (!type.flags.has(RtdFlag::noVehicles) && type.flags.has(RtdFlag::hasVehicleColours))
+        {
+            bool body = false, trim = false, tertiary = false;
+            std::vector<uint32_t> visible;
+            for (int i = 0; i < ride.numCarsPerTrain; ++i)
+            {
+                const auto& car = entry->Cars[RideEntryGetVehicleAtPosition(ride.subtype, ride.numCarsPerTrain, i)];
+                body |= car.flags.has(CarEntryFlag::enableBodyColour);
+                trim |= car.flags.has(CarEntryFlag::enableTrimColour);
+                tertiary |= car.flags.has(CarEntryFlag::enableTertiaryColour);
+                if (car.isVisible())
+                    visible.push_back(i);
+            }
+            if ((body || trim || tertiary) && !type.flags.has(RtdFlag::vehicleIsIntegral)
+                && (ride.numCarsPerTrain | ride.numTrains) > 1)
+            {
+                auto& scheme = add(
+                    A::vehicleColourScheme, "Vehicle colour scheme", static_cast<uint16_t>(ride.vehicleColourSettings), 0);
+                scheme.values = { 0, 1 };
+                scheme.labels = { "Same colours", "Per train" };
+                if (visible.size() > 1)
+                {
+                    scheme.values.push_back(2);
+                    scheme.labels.push_back("Per car");
+                }
+            }
+            std::vector<uint32_t> indices{ 0 };
+            if (ride.vehicleColourSettings == VehicleColourSettings::perTrain)
+            {
+                indices.clear();
+                for (uint32_t i = 0; i < ride.numTrains && i < std::size(ride.vehicleColours); ++i)
+                    indices.push_back(i);
+            }
+            else if (ride.vehicleColourSettings == VehicleColourSettings::perCar)
+                indices = visible;
+            for (size_t n = 0; n < indices.size(); ++n)
+            {
+                const auto i = indices[n];
+                if (i >= std::size(ride.vehicleColours))
+                    continue;
+                const auto prefix = ride.vehicleColourSettings == VehicleColourSettings::same
+                    ? std::string("Vehicle / ")
+                    : (ride.vehicleColourSettings == VehicleColourSettings::perTrain ? "Train " : "Car ")
+                        + std::to_string(n + 1) + " / ";
+                if (body)
+                    colour(A::vehicleColourBody, prefix + "Body", ride.vehicleColours[i].Body, i);
+                if (trim)
+                    colour(A::vehicleColourTrim, prefix + "Trim", ride.vehicleColours[i].Trim, i);
+                if (tertiary)
+                    colour(A::vehicleColourTertiary, prefix + "Tertiary", ride.vehicleColours[i].Tertiary, i);
+            }
+        }
+        return result;
+    }
     static std::vector<Setting> SectionSettings(const Ride& ride, View section)
     {
-        return section == View::music   ? MusicSettings(ride)
-            : section == View::vehicles ? VehicleSettings(ride)
-            : section == View::dispatch ? DispatchSettings(ride)
-                                        : Settings(ride, section == View::maintenance);
+        return section == View::appearance ? AppearanceSettings(ride)
+            : section == View::music       ? MusicSettings(ride)
+            : section == View::vehicles    ? VehicleSettings(ride)
+            : section == View::dispatch    ? DispatchSettings(ride)
+                                           : Settings(ride, section == View::maintenance);
     }
     std::optional<Draft> BeginSetting(const Target& target, const Setting& selected)
     {
@@ -453,13 +600,16 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         if (!ride)
             return {};
         const auto section = selected.vehicle                                 ? View::vehicles
+            : selected.section == View::appearance                            ? View::appearance
             : selected.section == View::music                                 ? View::music
             : selected.section == View::dispatch                              ? View::dispatch
             : selected.key == GameActions::RideSetSetting::inspectionInterval ? View::maintenance
                                                                               : View::operations;
         auto settings = SectionSettings(*ride, section);
         const auto found = std::find_if(settings.begin(), settings.end(), [&](const auto& setting) {
-            return setting.key == selected.key && setting.vehicle == selected.vehicle && setting.name == selected.name;
+            return setting.key == selected.key && setting.vehicle == selected.vehicle
+                && setting.appearance == selected.appearance && setting.index == selected.index
+                && setting.name == selected.name;
         });
         if (found == settings.end())
             return {};
@@ -483,6 +633,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         if (!found->values.empty() && std::find(found->values.begin(), found->values.end(), draft.value) == found->values.end())
             draft.value = found->values.front(); // Honest unavailable current value; draft starts at a native legal value.
         draft.baselineSettings = Snapshot(*ride);
+        if (found->appearance)
+            draft.baselineAppearance = AppearanceSnapshot(*ride);
         if (found->vehicle)
         {
             const auto preview = VehicleCalculation(*ride, &*found, draft.value);
@@ -511,6 +663,18 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                      0 };
         draft.demolition = true;
         draft.refund = RideGetRefundPrice(*ride);
+        return draft;
+    }
+    std::optional<Draft> BeginName(const Target& target)
+    {
+        auto draft = BeginDemolition(target);
+        const auto* ride = Resolve(target);
+        if (!draft || !ride)
+            return {};
+        draft->demolition = false;
+        draft->renaming = true;
+        draft->baselineName = ride->getName();
+        draft->name = draft->baselineName;
         return draft;
     }
     std::optional<Draft> BeginRefurbishment(const Target& target)
@@ -565,7 +729,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 }
             return;
         }
-        if (!draft.status && !draft.demolition && !draft.refurbishment)
+        if (!draft.status && !draft.demolition && !draft.refurbishment && !draft.renaming)
             draft.price = std::clamp<money64>(
                 draft.price
                     + (direction > 0       ? 1
@@ -589,6 +753,18 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             || Park::RidePricesUnlocked(getGameState().park) != draft.pricesUnlocked
             || getGameState().park.flags.has(ParkFlag::noMoney) != draft.noMoney)
             return Invalid("Ride/settings changed; reopen review");
+        if (draft.renaming)
+        {
+            if (ride->getName() != draft.baselineName)
+                return Invalid("Name changed; reopen editor");
+            if (TextEntry{ draft.name }.Length() > TextEntry::limit)
+                return Invalid("Name exceeds 32 characters");
+            if (draft.name == draft.baselineName)
+                return Invalid("Name unchanged");
+            GameActions::RideSetNameAction action(draft.target.id, draft.name);
+            action.SetCallback(std::move(callback));
+            return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+        }
         if (draft.refurbishment)
         {
             GameActions::RideDemolishAction action(draft.target.id, GameActions::RideModifyType::renew);
@@ -622,13 +798,22 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             const auto current = SectionSettings(*ride, draft.setting->section);
             const auto found = std::find_if(current.begin(), current.end(), [&](const auto& setting) {
                 return setting.key == draft.setting->key && setting.vehicle == draft.setting->vehicle
+                    && setting.appearance == draft.setting->appearance && setting.index == draft.setting->index
                     && setting.name == draft.setting->name;
             });
-            if (found == current.end() || found->values != draft.setting->values
+            if (found == current.end() || found->values != draft.setting->values || found->labels != draft.setting->labels
                 || std::find(found->values.begin(), found->values.end(), draft.value) == found->values.end())
                 return Invalid("Setting unavailable or outside native limits");
             if (draft.value == found->current)
                 return Invalid("Setting unchanged");
+            if (found->appearance)
+            {
+                if (AppearanceSnapshot(*ride) != draft.baselineAppearance)
+                    return Invalid("Appearance changed; reopen review");
+                GameActions::RideSetAppearanceAction action(draft.target.id, *found->appearance, draft.value, found->index);
+                action.SetCallback(std::move(callback));
+                return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+            }
             if (found->vehicle)
             {
                 const auto preview = VehicleCalculation(*ride, &*found, draft.value);
@@ -725,6 +910,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.rows.push_back("Access / paths...");
             if (CustomTracks::CanResume(*target))
                 model.rows.push_back("Continue track...");
+            model.rows.push_back("Rename...");
+            model.rows.push_back("Appearance...");
             model.rows.push_back("Music...");
             model.rows.push_back("Vehicles...");
             model.rows.push_back("Dispatch...");
@@ -734,7 +921,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         }
         else if (
             view == View::operations || view == View::maintenance || view == View::vehicles || view == View::dispatch
-            || view == View::music)
+            || view == View::music || view == View::appearance)
         {
             model.breadcrumb = view == View::maintenance ? "Rides / Maintenance" : "Rides / Operations";
             if (view == View::maintenance)
@@ -769,6 +956,11 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             {
                 model.breadcrumb = "Rides / Dispatch";
                 model.stats = { { "Mode", FormatStringID(kRideModeNames[static_cast<uint8_t>(ride->mode)]) } };
+            }
+            if (view == View::appearance)
+            {
+                model.breadcrumb = "Rides / Appearance";
+                model.stats = { { "Changes", "Native colours and entrance styles" } };
             }
             if (view == View::music)
             {
@@ -807,7 +999,37 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                             { "Customers", std::to_string(ride->totalCustomers) },
                             { "Income / hour", money(ride->incomePerHour) },
                             { "Profit / hour", money(ride->profit) } };
-            model.rows = { "Back to ride" };
+            model.rows = { "Customers...", "Finances...", "Back to ride" };
+        }
+        else if (view == View::customers)
+        {
+            model.breadcrumb = "Rides / Customers";
+            model.stats = {
+                { "Total customers", std::to_string(ride->totalCustomers) },
+                { "Customers / hour", std::to_string(RideCustomersPerHour(*ride)) },
+                { "Riders now", std::to_string(ride->numRiders) },
+                { "In queue", std::to_string(ride->getTotalQueueLength()) },
+                { "Longest wait", std::to_string(ride->getMaxQueueTime()) + " minutes" },
+                { "Popularity", ride->popularity == 255 ? "Unavailable" : std::to_string(ride->popularity * 4) + "%" },
+                { "Satisfaction", ride->satisfaction == 255 ? "Unavailable" : std::to_string(ride->satisfaction * 5) + "%" }
+            };
+            model.rows = { "Back to statistics" };
+        }
+        else if (view == View::earnings)
+        {
+            model.breadcrumb = "Rides / Finances";
+            auto money = [](money64 value) {
+                return getGameState().park.flags.has(ParkFlag::noMoney) ? std::string("Not applicable")
+                    : value == kMoney64Undefined                        ? std::string("Unavailable")
+                                                                        : FormatMoney(value);
+            };
+            model.stats = { { "Admission", money(RideGetPrice(*ride)) },
+                            { "Income / hour", money(ride->incomePerHour) },
+                            { "Running cost / hour",
+                              money(ride->upkeepCost == kMoney64Undefined ? kMoney64Undefined : ride->upkeepCost * 16) },
+                            { "Profit / hour", money(ride->profit) },
+                            { "Total profit", money(ride->totalProfit) } };
+            model.rows = { "Back to statistics" };
         }
         else if (draft)
         {
@@ -829,6 +1051,12 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                     draft->noMoney                                 ? "Not applicable"
                         : queried.error == GameActions::Status::ok ? FormatMoney(-queried.cost)
                                                                    : "Unavailable");
+            }
+            else if (draft->renaming)
+            {
+                model.breadcrumb = "Rides / Rename";
+                model.stats.emplace_back("Current", draft->baselineName);
+                model.stats.emplace_back("New name", draft->name.empty() ? "Reset to default" : draft->name);
             }
             else if (draft->refurbishment)
             {

@@ -213,9 +213,51 @@ static void TestVehicleDispatch(IContext& context, const std::string& profile, R
     R::AdjustPrice(stale, stale.value == stale.setting->values.back() ? -1 : 1);
     SaveFlags flags{};
     flags.set(SaveFlag::exportObjects);
+    // Real native station/vehicle colours; no render or operating coaster is fabricated.
+    auto appearance = R::AppearanceSettings(*ride);
+    Require(!appearance.empty(), "Native appearance settings absent");
+    std::vector<R::Setting> colours;
+    for (const auto& item : appearance)
+        if (item.appearance != GameActions::RideSetAppearanceType::vehicleColourScheme)
+            colours.push_back(item);
+    for (const auto& item : colours)
+    {
+        auto appearanceEdit = *R::BeginSetting(target, item);
+        if (appearanceEdit.setting->values.size() < 2)
+            continue;
+        R::AdjustPrice(appearanceEdit, appearanceEdit.value == appearanceEdit.setting->values.back() ? -1 : 1);
+        GameActions::RideSetAppearanceAction nativeAppearance(
+            target.id, *appearanceEdit.setting->appearance, appearanceEdit.value, appearanceEdit.setting->index);
+        const auto appearanceQuery = GameActions::Query(&nativeAppearance, state);
+        const auto appearancePocket = R::Action(appearanceEdit, false);
+        Require(
+            appearanceQuery.error == appearancePocket.error && appearanceQuery.cost == appearancePocket.cost
+                && state.park.cash == cash,
+            "Appearance query differs/spends");
+        Require(R::Action(appearanceEdit, true).error == GameActions::Status::ok, "Native appearance update failed");
+        GameActions::ProcessQueue(state);
+        Require(R::Action(appearanceEdit, true).error != GameActions::Status::ok, "Repeated appearance accepted");
+        auto current = R::AppearanceSettings(*ride);
+        const auto changed = std::find_if(current.begin(), current.end(), [&](const auto& s) {
+            return s.appearance == appearanceEdit.setting->appearance && s.index == appearanceEdit.setting->index;
+        });
+        Require(
+            changed != current.end() && changed->current == appearanceEdit.value && state.park.cash == cash,
+            "Native appearance value/accounting differs");
+    }
+    const auto savedAppearance = R::AppearanceSettings(*ride);
+    auto badAppearance = *R::BeginSetting(target, savedAppearance.front());
+    badAppearance.value = 255;
+    Require(R::Action(badAppearance, true).error != GameActions::Status::ok, "Invalid appearance accepted");
     const auto save = profile + "/vehicles-dispatch.park";
     Require(ScenarioSave(state, save, flags) && context.LoadParkFromFile(save), "Vehicle/dispatch save/reload failed");
     ride = GetRide(target.id);
+    const auto reloadedAppearance = R::AppearanceSettings(*ride);
+    Require(savedAppearance.size() == reloadedAppearance.size(), "Appearance serialization size differs");
+    for (size_t i = 0; i < savedAppearance.size(); ++i)
+        Require(savedAppearance[i].current == reloadedAppearance[i].current, "Native appearance not serialized");
+    std::cout << "Native Appearance / indexed track-vehicle-entrance / query-cancel-repeat-bounds / zero cash / serialization "
+                 "passed\n";
     Require(
         GetRide(dodgTarget.id) && GetRide(dodgTarget.id)->numTrains == countDraft.value
             && GetRide(dodgTarget.id)->operationOption == durationDraft.value,

@@ -43,12 +43,12 @@ physical Brick readability are not claimed by metadata/component fixtures.
 
 | Feature | State | Native references / dependency |
 | --- | --- | --- |
-| Appearance, track/vehicle schemes and entrance styles | Missing | Ride.cpp colour page; RideSetAppearanceAction / RideSetColourSchemeAction |
+| Appearance, track/vehicle schemes and entrance styles | Complete in Phase 4 (painting/randomization below) | Ride.cpp colour page; RideSetAppearanceAction / RideSetColourSchemeAction |
 | Music enable/style | Complete in Phase 2 | Ride.cpp music page; MusicObject::SupportsRideType; RideSetSettingAction |
-| Ride/shop rename and reusable keyboard | Missing | RideSetNameAction; native UTF-8 constraints; reusable controller text entry |
+| Ride/shop rename and reusable keyboard | Complete in Phase 5 | RideSetNameAction; native UTF-8 constraints; reusable controller text entry |
 | Refurbishment and mechanic locate | Complete in Phase 3 | RideDemolishAction renew; RideGetAssignedMechanic / RideFindClosestMechanic |
 | Existing maintenance interval/information | Complete in prior scope | RIDE-DEPTH-CHECKPOINT.md |
-| Customer/financial information depth | Partial | Ride totals, rolling data, queue/stations, undefined-value guards |
+| Customer/financial information depth | Complete in Phase 6 summaries; per-station drilldown pending | Ride totals, rolling data, queue/stations, undefined-value guards |
 | Ride graphs | Missing | RideMeasurement samples and native desktop graph conversions |
 | Track colour scheme painting / random vehicle colours / other small parity | Missing | Native actions, map targeting, per-car/train scheme semantics |
 | No-vehicle maximum-rider Operations fallback | Complete in Phase 2 | Desktop operating mode fallback, RideSetSettingAction |
@@ -97,3 +97,53 @@ Validation includes native query/cancel, exact renewal cost, zero age, retained
 name/music, repeat rejection and original demolition regression; real SDL review
 handoff and Cancel-first pause/parent restoration. Complete operating scenarios
 and physical Brick input/readability are still not claimed by public fixtures.
+
+## Phase 4: Appearance configuration
+
+Appearance exposes native supported main/additional/support colours for each
+supported track scheme; maze styles; loaded entrance objects; permitted vehicle
+body/trim/tertiary channels and same/per-train/per-car schemes. Descriptor,
+RideEntry and CarEntry checks mirror desktop. Invisible cars are skipped but
+native car indices are retained. Each setting uses the bounded typed draft and
+RideSetAppearanceAction with its native index. A full appearance snapshot rejects
+external colour changes; object availability and legal channels are rederived.
+Native execution updates vehicle sprites and scheme resets, never direct mutation.
+The existing native dropdown palette/name ordering is reused by a read-only name
+accessor. Track painting and randomizing vehicle colours are separate outstanding
+controls; changing a secondary scheme does not assign track pieces to it.
+
+Validation: native wooden station fixture exercises indexed colour channels,
+query/cancel, repeat/invalid rejection, zero cost and native park serialization.
+512x384 production-component appearance capture and SDL section route/back checks.
+No original world sprites or complete operating coaster are fabricated.
+
+## Phase 5: Ride and shop naming
+
+A reusable eight-column controller keyboard offers upper/lowercase, digits,
+common punctuation, space, UTF-8-safe erase, clear, review and cancel. Limit is
+32 characters, matching desktop ride name entry. Existing Unicode names are
+retained; new input is the labelled ASCII alphabet. D-pad selects keys, A types,
+B cancels, Review enters the shared Cancel-first native name review. Rail switching
+is blocked inside the keyboard. Empty input explicitly means reset to default.
+
+RideSetNameAction owns uniqueness, native default names, cash and serialization.
+The retained target includes a shop marker so shops share generation/reset/object
+identity protection without appearing in the non-shop roster. External name
+changes and repeated drafts are rejected. Successful review returns to the ride
+or shop inspector; review cancel returns to the keyboard with typed text retained.
+
+Validation: native ride and shop rename, duplicate shop rejection, zero cash,
+Unicode persistence; keyboard code-point limit/erase/case/bounds; real SDL
+keyboard route, duplicate-A boundary, modal rail guard, Cancel-first review and
+B return. Production-component 512x384 keyboard capture.
+
+## Phase 6: Information depth
+
+Statistics now links Customers and Finances. Customers reports native lifetime
+and hourly counts, riders now, total queue, maximum wait, popularity and
+satisfaction using desktop scaling and undefined sentinels. Finances reports
+admission, income, native upkeep times 16 per hour, hourly profit and total profit,
+with no-money/undefined guards. These read-only pages return to Statistics and
+retain rail/resume behavior. Native scenario data is displayed without estimating
+missing values or inventing customers. Graphs and per-station drilldown remain
+separate remaining work.
