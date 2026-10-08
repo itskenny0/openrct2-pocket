@@ -329,6 +329,16 @@ namespace OpenRCT2::Ui::Handheld
             "{MUTED}Rotation " + std::string(std::array{ "NW", "SW", "SE", "NE" }[direction & 3]));
     }
 
+    inline void DrawTrackColourOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, uint8_t scheme, bool target)
+    {
+        using namespace Concept;
+        Box(rt, pos, { kRailWidth, 146 });
+        Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, "Track colours");
+        Section(rt, pos + ScreenCoordsXY{ 10, 35 }, "Scheme");
+        Row(rt, pos + ScreenCoordsXY{ 8, 54 }, "Scheme " + std::to_string(scheme + 1), Icon::path, target);
+        Rule(rt, pos + ScreenCoordsXY{ 8, 99 }, 148);
+        DrawModernText(rt, pos + ScreenCoordsXY{ 12, 116 }, "{MUTED}One track piece");
+    }
     inline void DrawSceneryRemovalOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& name, bool target)
     {
         using namespace Concept;
@@ -377,6 +387,15 @@ namespace OpenRCT2::Ui::Handheld
         DrawCommand(rt, { 396, y }, 17, "B", "Back");
     }
 
+    inline void DrawTrackColourFooter(Drawing::RenderTarget& rt, ScreenSize screen)
+    {
+        DrawActionStrip(rt, screen);
+        const auto y = screen.height - 21;
+        DrawCommand(rt, { 12, y }, 38, "D-pad", "Move");
+        DrawCommand(rt, { 140, y }, 17, "A", "Paint");
+        DrawCommand(rt, { 268, y }, 17, "Y", "Scheme");
+        DrawCommand(rt, { 396, y }, 17, "B", "Back");
+    }
     inline void DrawGameplayFooter(
         Drawing::RenderTarget& rt, ScreenSize screen, const std::string&, bool terrain, bool surface = false)
     {

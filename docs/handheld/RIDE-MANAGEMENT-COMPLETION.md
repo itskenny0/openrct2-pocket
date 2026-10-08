@@ -1,4 +1,4 @@
-# Ride Management completion — incremental checkpoint
+# Ride Management completion — delivered checkpoint
 
 Continues published 02e40f70382555577799890d5541a631c27a13ca. The existing
 local starting aab02e0 has the same source tree; both histories are preserved.
@@ -39,7 +39,7 @@ lightweight CTest protect confirmation, held input, routing and unrelated tools.
 Private scenario assets remain unavailable; real complete coaster operation and
 physical Brick readability are not claimed by metadata/component fixtures.
 
-## Remaining phases / parity
+## Delivered milestone / parity
 
 | Feature | State | Native references / dependency |
 | --- | --- | --- |
@@ -48,13 +48,13 @@ physical Brick readability are not claimed by metadata/component fixtures.
 | Ride/shop rename and reusable keyboard | Complete in Phase 5 | RideSetNameAction; native UTF-8 constraints; reusable controller text entry |
 | Refurbishment and mechanic locate | Complete in Phase 3 | RideDemolishAction renew; RideGetAssignedMechanic / RideFindClosestMechanic |
 | Existing maintenance interval/information | Complete in prior scope | RIDE-DEPTH-CHECKPOINT.md |
-| Customer/financial information depth | Complete in Phase 6 summaries; per-station drilldown pending | Ride totals, rolling data, queue/stations, undefined-value guards |
-| Ride graphs | Missing | RideMeasurement samples and native desktop graph conversions |
-| Track colour scheme painting / random vehicle colours / other small parity | Missing | Native actions, map targeting, per-car/train scheme semantics |
+| Customer/financial information depth | Complete in Phases 6 and 8 | Ride totals, rolling data, queue/stations, undefined-value guards |
+| Ride graphs | Complete in Phase 7 | RideMeasurement samples and native desktop graph conversions |
+| Track colour scheme painting / random vehicle colours | Complete in Phase 8 | Native actions, map targeting, per-car/train scheme semantics |
 | No-vehicle maximum-rider Operations fallback | Complete in Phase 2 | Desktop operating mode fallback, RideSetSettingAction |
 
-No naming/appearance/graph/maintenance action is implied working by this Phase 1
-checkpoint. Follow subsequent phase entries in this document for current state.
+The eight phases below are delivered within their stated scope. This milestone
+does not imply unrestricted desktop construction or hardware validation.
 
 ## Phase 2: Music and no-vehicle Operations
 
@@ -109,8 +109,8 @@ RideSetAppearanceAction with its native index. A full appearance snapshot reject
 external colour changes; object availability and legal channels are rederived.
 Native execution updates vehicle sprites and scheme resets, never direct mutation.
 The existing native dropdown palette/name ordering is reused by a read-only name
-accessor. Track painting and randomizing vehicle colours are separate outstanding
-controls; changing a secondary scheme does not assign track pieces to it.
+accessor. Track painting and randomizing vehicle colours are delivered in Phase 8;
+changing a secondary scheme alone does not assign track pieces to it.
 
 Validation: native wooden station fixture exercises indexed colour channels,
 query/cancel, repeat/invalid rejection, zero cost and native park serialization.
@@ -145,5 +145,48 @@ satisfaction using desktop scaling and undefined sentinels. Finances reports
 admission, income, native upkeep times 16 per hour, hourly profit and total profit,
 with no-money/undefined guards. These read-only pages return to Statistics and
 retain rail/resume behavior. Native scenario data is displayed without estimating
-missing values or inventing customers. Graphs and per-station drilldown remain
-separate remaining work.
+missing values or inventing customers. Graphs and per-station drilldown are delivered below.
+
+
+## Phase 7: Native ride graphs
+
+Statistics opens a bounded graph page for speed, altitude and supported vertical/
+lateral G force. Entering the page requests native Ride::getMeasurement; the native
+engine owns sampling, eligibility and measurement eviction. Missing, waiting and
+unsupported measurements remain visible states. Each window shows at most 240
+native samples; Left/Right scrolls 120 samples with bounds derived from native
+num_items. The displayed time range uses native 16 samples per second. Speed,
+altitude and G values use desktop conversion and configured native unit strings.
+Metric selection and Back return through Statistics without changing ride settings.
+
+Validation: native registration/waiting and real SDL routing, bounded scrolling
+and conversion assertions. The 512x384 graph capture uses an explicitly labelled
+synthetic measurement fixture for rendering and conversion only. It does not prove
+live sampling of a fully operating coaster with original vehicle/world assets.
+
+## Phase 8: Painting, random colours and station detail
+
+Appearance offers a scoped track colour tool for rides supporting multiple schemes.
+It retains the inspected ride identity and targets an actual non-ghost track piece
+at the viewport centre. Y cycles four native schemes, A paints one native piece,
+B exits; camera/zoom controls retain the existing Explorer behavior. Native
+RideSetColourSchemeAction owns validation, track mutation and serialization. Target
+identity, ride, direction, sequence, track type and baseline scheme are rechecked;
+no-op, stale and other-ride targets are rejected. There is no brush or whole-ride
+painting claim.
+
+Per-train/per-car vehicle schemes offer random colours using native permitted
+palette entries and CarEntry channel support. Proposals are fixed before review,
+shown individually and Cancel-first. All proposals are queried before the native
+appearance actions are queued, using desktop's per-channel execution semantics.
+Fresh appearance/operation snapshots and legal channels are revalidated. Normal
+and existing special-colour cheat palettes are respected without enabling cheats.
+Customers also opens a read-only per-station queue/wait and entrance/exit summary.
+
+Validation: native painting and random-colour query/cancel/execute, repeat and
+wrong-ride rejection, exact zero cash, native save/reload; shared SDL lifecycle,
+shop keyboard focus/typing/cancel, station/graph routes and held-input protection.
+Production-component 512x384 graph, station, painting and keyboard captures were
+inspected. Release GUI/CLI build, full native driver, SDL driver and lightweight
+CTest (3/3) passed. Physical Brick readability/input, live complete-coaster graphs
+and target audio playback remain validation follow-ups, not claimed fixture results.

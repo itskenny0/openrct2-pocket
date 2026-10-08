@@ -245,6 +245,8 @@ int main(int argc, char** argv)
             : page == "ride-depth-appearance"        ? R::View::appearance
             : page == "ride-depth-music"             ? R::View::music
             : page == "ride-depth-customers"         ? R::View::customers
+            : page.starts_with("ride-depth-graph")   ? R::View::graphs
+            : page == "ride-depth-stations"          ? R::View::stations
             : page == "ride-depth-finances"          ? R::View::earnings
             : page == "ride-depth-dispatch"          ? R::View::dispatch
                                                      : R::View::operations;
@@ -288,6 +290,16 @@ int main(int argc, char** argv)
                 selected = view == R::View::confirmation ? 1 : 0;
             }
         }
+        if (page == "ride-depth-graph-fixture")
+        {
+            // Explicitly synthetic render fixture for plotting bounds, not native ride telemetry.
+            ride->measurement = std::make_unique<RideMeasurement>();
+            ride->measurement->flags.set(RideMeasurementFlag::running);
+            ride->measurement->num_items = 240;
+            for (size_t i = 0; i < 240; ++i)
+                ride->measurement->velocity[i] = i < 120 ? i : 240 - i;
+            ride->customName = "Synthetic graph rendering fixture";
+        }
         auto content = R::Presentation(view, selected, {}, target, draft);
         if (page == "ride-depth-keyboard")
         {
@@ -306,6 +318,11 @@ int main(int argc, char** argv)
         H::Dashboard::Draw(
             rt, { 512, 384 }, dashboard, content,
             page != "ride-depth-keyboard" && view != R::View::confirmation && view != R::View::price);
+    }
+    else if (page == "track-paint")
+    {
+        H::DrawTrackColourOverlay(rt, H::Concept::kOrigin, 2, true);
+        H::DrawTrackColourFooter(rt, { 512, 384 });
     }
     else if (page == "dashboard" || page == "inspection" || page == "confirmation")
     {

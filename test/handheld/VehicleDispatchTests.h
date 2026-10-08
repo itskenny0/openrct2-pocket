@@ -245,6 +245,58 @@ static void TestVehicleDispatch(IContext& context, const std::string& profile, R
             changed != current.end() && changed->current == appearanceEdit.value && state.park.cash == cash,
             "Native appearance value/accounting differs");
     }
+    const auto stationTile = ride->getStation(StationIndex::FromUnderlying(0)).start;
+    const auto stationInfo = R::Presentation(R::View::stations, 0, {}, target);
+    Require(
+        !stationInfo.bodyLines.empty() && stationInfo.bodyLines.front().find("Station 1 / queue ") == 0,
+        "Placed native station summary missing");
+    auto* paintTrack = *TileElementsView<TrackElement>(stationTile).begin();
+    Require(paintTrack && paintTrack->getRideIndex() == target.id, "Paint station track absent");
+    InteractionInfo paintInfo{};
+    paintInfo.Loc = stationTile;
+    paintInfo.Element = reinterpret_cast<TileElement*>(paintTrack);
+    const auto paintTarget = R::CapturePaint(target, paintInfo);
+    Require(paintTarget.has_value() && !R::CapturePaint(dodgTarget, paintInfo), "Paint ride targeting differs");
+    const uint8_t paintScheme = (paintTarget->baseline + 1) % kNumRideColourSchemes;
+    Require(
+        R::Paint(*paintTarget, paintScheme, false).error == GameActions::Status::ok
+            && paintTrack->getColourScheme() == paintTarget->baseline && state.park.cash == cash,
+        "Paint query changed track/cash");
+    Require(R::Paint(*paintTarget, paintScheme, true).error == GameActions::Status::ok, "Native track painting failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        paintTrack->getColourScheme() == paintScheme && state.park.cash == cash
+            && R::Paint(*paintTarget, paintScheme, true).error != GameActions::Status::ok,
+        "Paint repeat/accounting differs");
+    auto nativeScheme = GameActions::RideSetAppearanceAction(
+        target.id, GameActions::RideSetAppearanceType::vehicleColourScheme,
+        static_cast<uint16_t>(VehicleColourSettings::perTrain), 0);
+    Require(
+        GameActions::Execute(&nativeScheme, state).error == GameActions::Status::ok,
+        "Native random-colour scheme fixture failed");
+    GameActions::ProcessQueue(state);
+    const auto randomDraft = R::BeginRandomColours(target);
+    Require(randomDraft.has_value(), "Native multi-vehicle random colours absent");
+    const auto beforeRandom = R::AppearanceSettings(*ride);
+    Require(
+        R::Action(*randomDraft, false).error == GameActions::Status::ok && state.park.cash == cash,
+        "Random colour query failed/spends");
+    const auto afterQueryRandom = R::AppearanceSettings(*ride);
+    for (size_t i = 0; i < beforeRandom.size(); ++i)
+        Require(beforeRandom[i].current == afterQueryRandom[i].current, "Random cancellation changed colours");
+    Require(R::Action(*randomDraft, true).error == GameActions::Status::ok, "Native random colours failed");
+    GameActions::ProcessQueue(state);
+    const auto randomApplied = R::AppearanceSettings(*ride);
+    for (const auto& [setting, value] : randomDraft->randomColours)
+    {
+        const auto foundRandom = std::find_if(randomApplied.begin(), randomApplied.end(), [&](const auto& s) {
+            return s.appearance == setting.appearance && s.index == setting.index;
+        });
+        Require(foundRandom != randomApplied.end() && foundRandom->current == value, "Random proposed colour not applied");
+    }
+    Require(
+        state.park.cash == cash && R::Action(*randomDraft, true).error != GameActions::Status::ok,
+        "Random colours charged money or accepted repeated draft");
     const auto savedAppearance = R::AppearanceSettings(*ride);
     auto badAppearance = *R::BeginSetting(target, savedAppearance.front());
     badAppearance.value = 255;
@@ -252,6 +304,8 @@ static void TestVehicleDispatch(IContext& context, const std::string& profile, R
     const auto save = profile + "/vehicles-dispatch.park";
     Require(ScenarioSave(state, save, flags) && context.LoadParkFromFile(save), "Vehicle/dispatch save/reload failed");
     ride = GetRide(target.id);
+    auto* reloadedTrack = *TileElementsView<TrackElement>(stationTile).begin();
+    Require(reloadedTrack && reloadedTrack->getColourScheme() == paintScheme, "Native painted scheme not serialized");
     const auto reloadedAppearance = R::AppearanceSettings(*ride);
     Require(savedAppearance.size() == reloadedAppearance.size(), "Appearance serialization size differs");
     for (size_t i = 0; i < savedAppearance.size(); ++i)

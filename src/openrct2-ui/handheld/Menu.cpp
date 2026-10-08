@@ -88,7 +88,9 @@ namespace OpenRCT2::Ui::Windows
         ridesAccess,
         ridesStats,
         ridesCustomers,
+        ridesStations,
         ridesEarnings,
+        ridesGraphs,
         ridesOperations,
         ridesMaintenance,
         ridesVehicles,
@@ -190,11 +192,14 @@ namespace OpenRCT2::Ui::Windows
         size_t _ridesRosterFocus{};
         bool _ridesBusy{};
         Handheld::TextEntry _nameEntry;
+        size_t _rideGraphMetric{}, _rideGraphOffset{};
         bool _ridesReviewResumed{};
         uint64_t _ridesRequest{};
         std::shared_ptr<int> _ridesLifetime = std::make_shared<int>(0);
         Page ridesDraftParent() const
         {
+            if (_ridesDraft && !_ridesDraft->randomColours.empty())
+                return Page::ridesAppearance;
             if (_ridesDraft && _ridesDraft->renaming)
                 return Page::ridesName;
             if (_ridesDraft && _ridesDraft->setting
@@ -217,11 +222,12 @@ namespace OpenRCT2::Ui::Windows
         }
         bool ridesManagement() const
         {
-            return _page == Page::ridesRoster || _page == Page::ridesInspect || _page == Page::ridesCustomers
-                || _page == Page::ridesEarnings || _page == Page::ridesStats || _page == Page::ridesVehicles
-                || _page == Page::ridesName || _page == Page::ridesAppearance || _page == Page::ridesMusic
-                || _page == Page::ridesDispatch || _page == Page::ridesOperations || _page == Page::ridesMaintenance
-                || _page == Page::ridesAccess || _page == Page::ridesPrice || _page == Page::ridesConfirm;
+            return _page == Page::ridesRoster || _page == Page::ridesInspect || _page == Page::ridesGraphs
+                || _page == Page::ridesStations || _page == Page::ridesCustomers || _page == Page::ridesEarnings
+                || _page == Page::ridesStats || _page == Page::ridesVehicles || _page == Page::ridesName
+                || _page == Page::ridesAppearance || _page == Page::ridesMusic || _page == Page::ridesDispatch
+                || _page == Page::ridesOperations || _page == Page::ridesMaintenance || _page == Page::ridesAccess
+                || _page == Page::ridesPrice || _page == Page::ridesConfirm;
         }
         Handheld::ManagementPresentation ridesPresentationFor(Page current, size_t selected) const
         {
@@ -245,6 +251,8 @@ namespace OpenRCT2::Ui::Windows
             return Handheld::RideManagement::Presentation(
                 current == Page::ridesRoster            ? View::roster
                     : current == Page::ridesInspect     ? View::inspection
+                    : current == Page::ridesGraphs      ? View::graphs
+                    : current == Page::ridesStations    ? View::stations
                     : current == Page::ridesCustomers   ? View::customers
                     : current == Page::ridesEarnings    ? View::earnings
                     : current == Page::ridesStats       ? View::statistics
@@ -256,7 +264,7 @@ namespace OpenRCT2::Ui::Windows
                     : current == Page::ridesDispatch    ? View::dispatch
                     : current == Page::ridesPrice       ? View::price
                                                         : View::confirmation,
-                selected, _ridesRoster, _ridesTarget, _ridesDraft, _status);
+                selected, _ridesRoster, _ridesTarget, _ridesDraft, _status, _rideGraphMetric, _rideGraphOffset);
         }
         std::vector<Handheld::StaffManagement::Target> _staffRoster;
         std::optional<Handheld::StaffManagement::Target> _staffTarget;
@@ -433,6 +441,11 @@ namespace OpenRCT2::Ui::Windows
             if (next != Page::marketingEditor && next != Page::marketingTargets && next != Page::marketingConfirm)
                 _marketingDraft.reset();
             _page = next;
+            if (next == Page::ridesName)
+            {
+                _dashboard.focus = Handheld::Dashboard::Focus::content;
+                _dashboard.section = Handheld::Dashboard::Section::rides;
+            }
             if (next == Page::dashboard)
                 _dashboard.focus = Handheld::Dashboard::Focus::rail;
             else if (next == Page::staff)
@@ -507,6 +520,8 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ridesDispatch:
                 case Page::ridesOperations:
                 case Page::ridesMaintenance:
+                case Page::ridesGraphs:
+                case Page::ridesStations:
                 case Page::ridesCustomers:
                 case Page::ridesEarnings:
                 case Page::ridesStats:
@@ -908,10 +923,11 @@ namespace OpenRCT2::Ui::Windows
             return _page == Page::dashboard || _page == Page::overview || _page == Page::finances || _page == Page::staff
                 || _page == Page::staffInspect || _page == Page::staffStats || _page == Page::research
                 || _page == Page::marketing || _page == Page::marketingActive || guestManagement() || _page == Page::ridesRoster
-                || _page == Page::ridesInspect || _page == Page::ridesAccess || _page == Page::ridesCustomers
-                || _page == Page::ridesEarnings || _page == Page::ridesStats || _page == Page::ridesVehicles
-                || _page == Page::ridesAppearance || _page == Page::ridesMusic || _page == Page::ridesDispatch
-                || _page == Page::ridesOperations || _page == Page::ridesMaintenance;
+                || _page == Page::ridesInspect || _page == Page::ridesAccess || _page == Page::ridesGraphs
+                || _page == Page::ridesStations || _page == Page::ridesCustomers || _page == Page::ridesEarnings
+                || _page == Page::ridesStats || _page == Page::ridesVehicles || _page == Page::ridesAppearance
+                || _page == Page::ridesMusic || _page == Page::ridesDispatch || _page == Page::ridesOperations
+                || _page == Page::ridesMaintenance;
         }
         void enterDashboardContent()
         {
@@ -990,6 +1006,20 @@ namespace OpenRCT2::Ui::Windows
                 {
                     Handheld::ResearchManagement::AdjustFunding(*_researchDraft, x);
                     _status.clear();
+                    invalidate();
+                }
+            }
+            else if (_page == Page::ridesGraphs)
+            {
+                if (y)
+                    move(y);
+                if (x)
+                {
+                    const auto* ride = _ridesTarget ? Handheld::RideManagement::Resolve(*_ridesTarget) : nullptr;
+                    const auto max = ride && ride->measurement && ride->measurement->num_items
+                        ? ride->measurement->num_items - 1
+                        : 0;
+                    _rideGraphOffset = std::clamp<int>(static_cast<int>(_rideGraphOffset) + x * 120, 0, max);
                     invalidate();
                 }
             }
@@ -1165,6 +1195,10 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ridesPrice:
                     page(ridesDraftParent());
                     break;
+                case Page::ridesStations:
+                    page(Page::ridesCustomers);
+                    break;
+                case Page::ridesGraphs:
                 case Page::ridesCustomers:
                 case Page::ridesEarnings:
                     page(Page::ridesStats);
@@ -1175,7 +1209,8 @@ namespace OpenRCT2::Ui::Windows
                                                                                          : Page::ridesRoster);
                     break;
                 case Page::ridesConfirm:
-                    if (_ridesDraft && (_ridesDraft->renaming || _ridesDraft->refurbishment))
+                    if (_ridesDraft
+                        && (_ridesDraft->renaming || _ridesDraft->refurbishment || !_ridesDraft->randomColours.empty()))
                         page(ridesDraftParent());
                     else if (_ridesDraft && !_ridesDraft->status && !_ridesDraft->demolition)
                         page(Page::ridesPrice);
@@ -1866,7 +1901,25 @@ namespace OpenRCT2::Ui::Windows
                                ? Handheld::RideManagement::DispatchSettings(*ride)
                                : Handheld::RideManagement::Settings(*ride, _page == Page::ridesMaintenance))
                         : std::vector<Handheld::RideManagement::Setting>{};
-                    if (ride && _page == Page::ridesMaintenance && !ride->getRideTypeDescriptor().availableBreakdowns.isEmpty()
+                    const auto appearanceRows = _page == Page::ridesAppearance ? ridesPresentationFor(_page, choice).rows
+                                                                               : std::vector<std::string>{};
+                    if (_page == Page::ridesAppearance && choice < appearanceRows.size()
+                        && appearanceRows[choice] == "Randomize vehicle colours...")
+                    {
+                        _ridesDraft = Handheld::RideManagement::BeginRandomColours(*_ridesTarget);
+                        if (_ridesDraft)
+                            page(Page::ridesConfirm);
+                    }
+                    else if (
+                        ride && _page == Page::ridesAppearance && choice < appearanceRows.size()
+                        && appearanceRows[choice] == "Paint track scheme...")
+                    {
+                        const auto target = *_ridesTarget;
+                        close();
+                        Handheld::BeginTrackColour(target);
+                    }
+                    else if (
+                        ride && _page == Page::ridesMaintenance && !ride->getRideTypeDescriptor().availableBreakdowns.isEmpty()
                         && choice == settings.size())
                     {
                         if (Handheld::RideManagement::LocateMechanic(*_ridesTarget))
@@ -1902,14 +1955,34 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 }
+                case Page::ridesGraphs:
+                    if (choice == 4)
+                        page(Page::ridesStats);
+                    else
+                    {
+                        _rideGraphMetric = choice;
+                        invalidate();
+                    }
+                    break;
+                case Page::ridesStations:
+                    page(Page::ridesCustomers);
+                    break;
                 case Page::ridesCustomers:
+                    page(choice == 0 ? Page::ridesStations : Page::ridesStats);
+                    break;
                 case Page::ridesEarnings:
                     page(Page::ridesStats);
                     break;
                 case Page::ridesStats:
+                    if (choice == 2 && _ridesTarget)
+                    {
+                        Handheld::RideManagement::BeginGraphs(*_ridesTarget);
+                        _rideGraphOffset = _rideGraphMetric = 0;
+                    }
                     page(
                         choice == 0                                                            ? Page::ridesCustomers
                             : choice == 1                                                      ? Page::ridesEarnings
+                            : choice == 2                                                      ? Page::ridesGraphs
                             : _ridesTarget && Handheld::RideManagement::Resolve(*_ridesTarget) ? Page::ridesInspect
                                                                                                : Page::ridesRoster);
                     break;

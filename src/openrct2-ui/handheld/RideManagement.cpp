@@ -12,9 +12,11 @@
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
 #include <openrct2/actions/ride/RideDemolishAction.h>
+#include <openrct2/actions/ride/RideSetColourSchemeAction.h>
 #include <openrct2/actions/ride/RideSetNameAction.h>
 #include <openrct2/actions/ride/RideSetPriceAction.h>
 #include <openrct2/actions/ride/RideSetStatusAction.h>
+#include <openrct2/core/UnitConversion.h>
 #include <openrct2/entity/Staff.h>
 #include <openrct2/interface/Window.h>
 #include <openrct2/localisation/Formatting.h>
@@ -28,12 +30,14 @@
 #include <openrct2/ride/ted/TrackGroup.h>
 #include <openrct2/world/Map.h>
 #include <openrct2/world/Park.h>
+#include <openrct2/world/tile_element/TrackElement.h>
 #include <sstream>
 #include <unordered_map>
 
 namespace OpenRCT2::Ui::Handheld::RideManagement
 {
     static std::unordered_map<uint16_t, uint64_t> removedRides;
+    static GameActions::Result Invalid(const char* text);
     void Invalidate(RideId id)
     {
         if (auto it = removedRides.find(id.ToUnderlying()); it != removedRides.end())
@@ -486,7 +490,9 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         };
         auto colour = [&](A key, std::string name, Drawing::Colour current, uint32_t index) {
             auto& setting = add(key, std::move(name), static_cast<uint16_t>(current), index);
-            for (uint8_t i = 0; i < Drawing::kColourNumNormal; ++i)
+            const auto colourCount = getGameState().cheats.allowSpecialColourSchemes ? Drawing::kColourNumTotal
+                                                                                     : Drawing::kColourNumNormal;
+            for (uint8_t i = 0; i < colourCount; ++i)
             {
                 setting.values.push_back(static_cast<uint16_t>(Windows::ColourDropDownIndexToColour(i)));
                 setting.labels.push_back(
@@ -689,6 +695,72 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         draft->refund = query.cost;
         return draft;
     }
+    std::optional<PaintTarget> CapturePaint(const Target& target, const InteractionInfo& info)
+    {
+        const auto* ride = Resolve(target);
+        if (!ride || !ride->getRideTypeDescriptor().flags.has(RtdFlag::supportsMultipleColourSchemes) || !info.Element
+            || info.Element->isGhost() || info.Element->getType() != TileElementType::track)
+            return {};
+        const auto* track = info.Element->asTrack();
+        if (track->getRideIndex() != target.id)
+            return {};
+        return PaintTarget{ target, CoordsXYZD{ info.Loc.x & ~31, info.Loc.y & ~31, track->getBaseZ(), track->getDirection() },
+                            track->getTrackType(), track->getSequenceIndex(), track->getColourScheme() };
+    }
+    GameActions::Result Paint(const PaintTarget& target, uint8_t scheme, bool execute)
+    {
+        const auto* ride = Resolve(target.ride);
+        const auto* track = MapGetTrackElementAtOfTypeSeq(target.location, target.type, target.sequence);
+        if (!ride || !ride->getRideTypeDescriptor().flags.has(RtdFlag::supportsMultipleColourSchemes) || !track
+            || track->isGhost() || track->getRideIndex() != target.ride.id || track->getDirection() != target.location.direction
+            || track->getColourScheme() != target.baseline || scheme >= kNumRideColourSchemes)
+            return Invalid("Track changed or paint target unavailable");
+        if (target.baseline == scheme)
+            return Invalid("Track already uses this colour scheme");
+        GameActions::RideSetColourSchemeAction action(target.location, target.type, scheme);
+        return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+    }
+    std::optional<Draft> BeginRandomColours(const Target& target)
+    {
+        const auto* ride = Resolve(target);
+        if (!ride || ride->vehicleColourSettings == VehicleColourSettings::same)
+            return {};
+        auto draft = BeginDemolition(target);
+        if (!draft)
+            return {};
+        draft->demolition = false;
+        draft->baselineSettings = Snapshot(*ride);
+        draft->baselineAppearance = AppearanceSnapshot(*ride);
+        for (const auto& setting : AppearanceSettings(*ride))
+            if (setting.appearance == GameActions::RideSetAppearanceType::vehicleColourBody
+                || setting.appearance == GameActions::RideSetAppearanceType::vehicleColourTrim
+                || setting.appearance == GameActions::RideSetAppearanceType::vehicleColourTertiary)
+            {
+                const auto value = static_cast<uint16_t>(Drawing::getRandomColour());
+                draft->randomColours.emplace_back(setting, value);
+            }
+        if (!draft->randomColours.empty()
+            && std::all_of(draft->randomColours.begin(), draft->randomColours.end(), [](const auto& item) {
+                   return item.first.current == item.second;
+               }))
+        {
+            auto& [setting, value] = draft->randomColours.front();
+            const auto different = std::find_if(
+                setting.values.begin(), setting.values.end(), [&](auto c) { return c != setting.current; });
+            if (different != setting.values.end())
+                value = *different;
+        }
+        return draft->randomColours.empty() ? std::optional<Draft>{} : draft;
+    }
+    bool BeginGraphs(const Target& target)
+    {
+        if (!Resolve(target))
+            return false;
+        auto* ride = GetRide(target.id);
+        // Native registration schedules measurement at the next departure and owns eviction.
+        ride->getMeasurement();
+        return true;
+    }
     bool LocateMechanic(const Target& target)
     {
         const auto* ride = Resolve(target);
@@ -753,6 +825,41 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             || Park::RidePricesUnlocked(getGameState().park) != draft.pricesUnlocked
             || getGameState().park.flags.has(ParkFlag::noMoney) != draft.noMoney)
             return Invalid("Ride/settings changed; reopen review");
+        if (!draft.randomColours.empty())
+        {
+            if (Snapshot(*ride) != draft.baselineSettings || AppearanceSnapshot(*ride) != draft.baselineAppearance)
+                return Invalid("Vehicle colours/configuration changed; reopen review");
+            const auto current = AppearanceSettings(*ride);
+            GameActions::Result result;
+            for (const auto& [setting, value] : draft.randomColours)
+            {
+                const auto found = std::find_if(current.begin(), current.end(), [&](const auto& s) {
+                    return s.appearance == setting.appearance && s.index == setting.index;
+                });
+                if (found == current.end() || found->values != setting.values
+                    || std::find(found->values.begin(), found->values.end(), value) == found->values.end())
+                    return Invalid("Vehicle colour channel unavailable");
+                GameActions::RideSetAppearanceAction action(draft.target.id, *setting.appearance, value, setting.index);
+                result = GameActions::Query(&action, getGameState());
+                if (result.error != GameActions::Status::ok)
+                    return result;
+            }
+            if (!execute)
+                return result;
+            // Desktop randomization also submits one native action per channel. Query
+            // all first, then retain the single UI completion callback on the final action.
+            for (size_t i = 0; i < draft.randomColours.size(); ++i)
+            {
+                const auto& [setting, value] = draft.randomColours[i];
+                GameActions::RideSetAppearanceAction action(draft.target.id, *setting.appearance, value, setting.index);
+                if (i + 1 == draft.randomColours.size())
+                    action.SetCallback(std::move(callback));
+                result = GameActions::Execute(&action, getGameState());
+                if (result.error != GameActions::Status::ok)
+                    return result;
+            }
+            return result;
+        }
         if (draft.renaming)
         {
             if (ride->getName() != draft.baselineName)
@@ -863,7 +970,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
     }
     ManagementPresentation Presentation(
         View view, size_t selected, const std::vector<Target>& roster, const std::optional<Target>& target,
-        const std::optional<Draft>& draft, const std::string& feedback)
+        const std::optional<Draft>& draft, const std::string& feedback, size_t graphMetric, size_t graphOffset)
     {
         ManagementPresentation model;
         model.breadcrumb = "Park dashboard / Rides";
@@ -971,6 +1078,18 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             }
             for (const auto& setting : SectionSettings(*ride, view))
                 model.rows.push_back(setting.name + ": " + SettingValue(setting, setting.current));
+            if (view == View::appearance && ride->vehicleColourSettings != VehicleColourSettings::same)
+            {
+                const auto appearance = AppearanceSettings(*ride);
+                if (std::any_of(appearance.begin(), appearance.end(), [](const auto& setting) {
+                        return setting.appearance == GameActions::RideSetAppearanceType::vehicleColourBody
+                            || setting.appearance == GameActions::RideSetAppearanceType::vehicleColourTrim
+                            || setting.appearance == GameActions::RideSetAppearanceType::vehicleColourTertiary;
+                    }))
+                    model.rows.push_back("Randomize vehicle colours...");
+            }
+            if (view == View::appearance && ride->getRideTypeDescriptor().flags.has(RtdFlag::supportsMultipleColourSchemes))
+                model.rows.push_back("Paint track scheme...");
             if (view == View::maintenance && !ride->getRideTypeDescriptor().availableBreakdowns.isEmpty())
             {
                 model.rows.push_back("Locate mechanic");
@@ -999,7 +1118,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                             { "Customers", std::to_string(ride->totalCustomers) },
                             { "Income / hour", money(ride->incomePerHour) },
                             { "Profit / hour", money(ride->profit) } };
-            model.rows = { "Customers...", "Finances...", "Back to ride" };
+            model.rows = { "Customers...", "Finances...", "Graphs...", "Back to ride" };
         }
         else if (view == View::customers)
         {
@@ -1013,7 +1132,27 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 { "Popularity", ride->popularity == 255 ? "Unavailable" : std::to_string(ride->popularity * 4) + "%" },
                 { "Satisfaction", ride->satisfaction == 255 ? "Unavailable" : std::to_string(ride->satisfaction * 5) + "%" }
             };
-            model.rows = { "Back to statistics" };
+            model.rows = { "Stations...", "Back to statistics" };
+        }
+        else if (view == View::stations)
+        {
+            model.breadcrumb = "Rides / Stations";
+            size_t index = 0;
+            for (const auto& station : ride->getStations())
+            {
+                ++index;
+                if (station.start.isNull())
+                    continue;
+                model.bodyLines.push_back(
+                    "Station " + std::to_string(index) + " / queue " + std::to_string(station.queueLength) + " / "
+                    + std::to_string(station.queueTime) + " min");
+                model.bodyLines.push_back(
+                    std::string("Entrance ") + (station.entrance.isNull() ? "missing" : "placed") + " / exit "
+                    + (station.exit.isNull() ? "missing" : "placed"));
+            }
+            if (model.bodyLines.empty())
+                model.bodyLines.push_back("No placed stations");
+            model.rows = { "Back to customers" };
         }
         else if (view == View::earnings)
         {
@@ -1030,6 +1169,50 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                             { "Profit / hour", money(ride->profit) },
                             { "Total profit", money(ride->totalProfit) } };
             model.rows = { "Back to statistics" };
+        }
+        else if (view == View::graphs)
+        {
+            model.breadcrumb = "Rides / Graphs";
+            model.rows = { "Speed", "Altitude", "Vertical G", "Lateral G", "Back to statistics" };
+            const auto* measurement = ride->measurement.get();
+            const bool supports = ride->getRideTypeDescriptor().flags.has(RtdFlag::hasDataLogging);
+            if (!supports)
+                model.status = "Data logging unavailable for this ride";
+            else if (!measurement || !measurement->flags.has(RideMeasurementFlag::running) || measurement->num_items == 0)
+                model.status = "Waiting for a native vehicle departure";
+            else if (graphMetric > 3 || (graphMetric >= 2 && !measurement->flags.has(RideMeasurementFlag::gForces)))
+                model.status = "G-force logging unavailable";
+            else
+            {
+                const size_t count = std::min<size_t>(measurement->num_items, RideMeasurement::kMaxItems);
+                const size_t first = std::min(graphOffset, count - 1);
+                const size_t end = std::min(first + 240, count);
+                for (size_t i = first; i < end; ++i)
+                {
+                    int value = graphMetric == 0 ? ToHumanReadableSpeed(int(measurement->velocity[i]) * 65536 / 5)
+                        : graphMetric == 1       ? BaseZToMetres(measurement->altitude[i])
+                        : graphMetric == 2       ? int(measurement->vertical[i]) * 8
+                                                 : int(measurement->lateral[i]) * 8;
+                    model.graph.push_back(value);
+                }
+                auto label = [&](int value) {
+                    if (graphMetric < 2)
+                        return FmtString(FormatStringID(
+                                             graphMetric == 0 ? static_cast<StringId>(STR_VELOCITY)
+                                                              : static_cast<StringId>(STR_RIDE_STATS_ALTITUDE_FORMAT),
+                                             static_cast<int16_t>(value)))
+                            .WithoutFormatTokens();
+                    std::ostringstream text;
+                    text << (value < 0 ? "-" : "") << std::abs(value) / 100 << '.' << std::setw(2) << std::setfill('0')
+                         << std::abs(value) % 100 << "g";
+                    return text.str();
+                };
+                const auto [low, high] = std::minmax_element(model.graph.begin(), model.graph.end());
+                model.graphRange = label(*low) + " to " + label(*high);
+                model.stats = { { model.rows[graphMetric],
+                                  std::to_string(first / 16) + "-" + std::to_string((end + 15) / 16) + " seconds" } };
+                model.status = "Left / Right: scroll time";
+            }
         }
         else if (draft)
         {
@@ -1051,6 +1234,13 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                     draft->noMoney                                 ? "Not applicable"
                         : queried.error == GameActions::Status::ok ? FormatMoney(-queried.cost)
                                                                    : "Unavailable");
+            }
+            else if (!draft->randomColours.empty())
+            {
+                model.breadcrumb = "Rides / Randomize vehicle colours";
+                model.stats.emplace_back("Channels", std::to_string(draft->randomColours.size()));
+                model.stats.emplace_back("Cost", "No charge");
+                model.status = "Apply proposed random colours to current scheme";
             }
             else if (draft->renaming)
             {

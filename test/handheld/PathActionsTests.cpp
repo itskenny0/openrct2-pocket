@@ -2940,6 +2940,20 @@ static void TestRideManagement(IContext& context, const std::string& profile, bo
     ride->totalCustomers = 1234;
     ride->incomePerHour = 100.00_GBP;
     ride->profit = 75.00_GBP;
+    const bool wasNoMoney = park.flags.has(ParkFlag::noMoney);
+    park.flags.unset(ParkFlag::noMoney);
+    ride->upkeepCost = 2.00_GBP;
+    const auto earnings = R::Presentation(R::View::earnings, 0, {}, target);
+    Require(earnings.stats[2].second == Ui::Handheld::FormatMoney(32.00_GBP), "Native hourly running-cost conversion wrong");
+    park.flags.set(ParkFlag::noMoney);
+    const auto freeEarnings = R::Presentation(R::View::earnings, 0, {}, target);
+    for (const auto& field : freeEarnings.stats)
+        Require(field.second == "Not applicable", "No-money financial information exposed prices");
+    park.flags.set(ParkFlag::noMoney, wasNoMoney);
+    const auto customers = R::Presentation(R::View::customers, 0, {}, target);
+    Require(
+        customers.stats[0].second == "1234" && customers.stats[1].second == std::to_string(RideCustomersPerHour(*ride)),
+        "Native customer counts differ");
     Require(R::Presentation(R::View::statistics, 0, {}, target).stats[0].second == "6.50", "Native rating scaled incorrectly");
     Require(
         R::Location(target) && !R::Location({ RideId::GetNull(), target.type, target.object, 0, {}, 0 }),

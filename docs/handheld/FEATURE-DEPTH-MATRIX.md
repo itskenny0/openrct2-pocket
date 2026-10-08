@@ -40,12 +40,12 @@ Complexity refers to implementation, not the number of desktop controls.
 | Ride demolition COMPLETE | DemolishRidePrompt.cpp; RideDemolishAction; RideGetRefundPrice uses native track query calculations | Shop confirmation pattern and ride stale identity | medium / high | Delivered named destructive Cancel-first review, native prompt refund calculator and stale quote validation; see RIDE-DEPTH-CHECKPOINT.md. |
 | Vehicles PARTIAL | Ride.cpp vehicle page; RideSetVehicleAction; Ride::updateMaxVehicles, loaded vehicle object limits, proposedNumTrains/proposedNumCarsPerTrain | Ride drafts/identity available | medium / high | Train/car counts and requested/effective review delivered in Vehicles/Dispatch checkpoint. Native station/object limits, closure and clamping apply. Loaded researched alternative vehicle selection and descriptor-supported reversed trains delivered in RIDE-MANAGEMENT-COMPLETION.md; native query/review/effective bounds apply. |
 | Mode-specific options PARTIAL | Ride.cpp launch/time/laps/swings/rotations/circuits; load mask/synchronization now represented; RideSetSettingAction | Operations setting model | medium / high | Delivered duration/laps/swings/rotations/launch/speed/circuits and native dispatch controls with typed labels/units and descriptor visibility. No-vehicle maximum-rider fallback is delivered in Ride Management Phase 2. |
-| Ride finance/customer depth PARTIAL | Ride.cpp income/customer pages; Ride totalProfit, popularity, satisfaction, queue/station information | Existing read-only stats | small / medium | Split Finance/Customers when enough useful content; respect undefined values and rolling windows. |
-| Ride music/appearance/naming MISSING | Ride.cpp music/colour/name; RideSetSettingAction, RideSetAppearanceAction, RideSetNameAction | Picker/draft architecture | medium / medium | Native music objects and colour choices; keyboard dependency for naming. Defer in first operations package. |
-| Ride graphs DEFERRED | Ride.cpp graph page; RideMeasurement sampling and scrolling | No controller graph view | medium / low | Optional fixed-size native graph later; unavailable sampling honest, cursor/time scale require additional interaction. |
+| Ride finance/customer depth COMPLETE within summaries/station scope | Ride.cpp income/customer pages; Ride totalProfit, popularity, satisfaction, queue/station information | Existing read-only stats | small / medium | Delivered separate Finance/Customers pages and per-station queue/access summaries; native undefined values, scaling and rolling windows are respected. |
+| Ride music/appearance/naming COMPLETE within milestone scope | Ride.cpp music/colour/name; RideSetSettingAction, RideSetAppearanceAction, RideSetNameAction | Picker/draft architecture | medium / medium | Delivered native music toggle/style, indexed appearance/entrances, track painting, random vehicle colours and reusable ride/shop naming keyboard. See RIDE-MANAGEMENT-COMPLETION.md. |
+| Ride graphs COMPLETE within native sample-view scope | Ride.cpp graph page; RideMeasurement sampling and scrolling | Native bounded controller graph view | medium / low | Delivered bounded native speed/altitude/G-force graphs, time ranges and scrolling; waiting/unsupported sampling states remain explicit. |
 | Other ride types / special construction MISSING | NewRide.cpp, RideConstruction.cpp; RideCreateAction, TrackPlaceAction, MazeSetTrackAction, TrackDesignAction | Flat/custom/saved adapters | architectural / high | Extend one complete category at a time; special geometry, vehicles and station rules differ. |
 | Custom editing breadth PARTIAL | RideConstruction.cpp backward/selected-block editing, special tracks, brake speeds, design export | Forward native wooden editor | architectural / medium | Endpoint selection and recovery before other coaster types; track metadata and native removal remain authoritative. |
-| Shop appearance/naming PARTIAL | Ride.cpp colours/music/name and item stats; appearance/name actions | Shop management/picker | medium / medium | Shared ride-depth framework where semantic settings apply; no generic coaster options for shops. |
+| Shop appearance/naming PARTIAL | Ride.cpp colours/music/name and item stats; appearance/name actions | Shop management/picker | medium / medium | Shared reusable naming keyboard delivered; broader shop appearance remains outside this ride milestone. |
 | Connected path builder PARTIAL | Footpath.cpp bridge/tunnel next-endpoint building; FootpathPlaceAction | Elevated single-tile tool and geometry | medium / high | Recoverable endpoint route context; native slopes/heights/clearance, never automatic paths. |
 | Path furniture MISSING | Footpath.cpp additions; FootpathAdditionPlaceAction/RemoveAction | Shared object picker/targeting | medium / medium | Loaded eligible lamps/bins/benches picker, native path hit testing and maintenance rules. |
 | Terrain brush/edges MISSING | Land.cpp, Water.cpp, LandRights.cpp; LandRaise/Lower/SmoothAction, SurfaceSetStyleAction, LandSetRightsAction | Existing one-tile tools | medium / high | Bounded brush options and native selection rectangle; ownership and mixed-height pricing tests. |
@@ -76,10 +76,10 @@ contracts. Public component captures do not prove asset-backed coaster operation
 RideManagement.cpp now supplies descriptor-filtered mode, wait limits/toggles and
 lift-speed drafts, maintenance interval and native information, total queue length
 and confirmed native demolition. These named tasks are COMPLETE within their
-current supported native setting scope; Rides remains PARTIAL for vehicle, full
+current supported native setting scope; at this earlier checkpoint Rides remained PARTIAL for vehicle, full
 dispatch/mode-specific options, appearance/music, refurbishment and graphs. See
 RIDE-DEPTH-CHECKPOINT.md for exact tests and missing asset-backed validation.
-Next recommended depth package is vehicle/dispatch configuration, not a new UI
+The next package at that checkpoint was vehicle/dispatch configuration, not a new UI
 shell. Refurbishment and mechanic locating use RideDemolishAction renew and native
 RideGetAssignedMechanic/RideFindClosestMechanic; medium complexity, medium player
 value, reuse Maintenance with closure/empty-ride checks and staff identity safety.
@@ -96,10 +96,9 @@ Counts/dispatch are COMPLETE within this named scope; Named train/car, loaded ve
 shell or save format. See VEHICLES-DISPATCH-CHECKPOINT.md for validation and
 public-fixture limitations.
 
-Recommended next package: descriptor-driven mode-specific operating parameters
-within Operations, preserving these new vehicle/dispatch workflows. Keep vehicle
-object selection, appearance/music and graphs deferred until that package is
-validated.
+The next package at that checkpoint was descriptor-driven mode-specific operating parameters
+within Operations, preserving the vehicle/dispatch workflows. Vehicle object
+selection, appearance/music and graphs followed in the completion milestone.
 
 ## Mode-specific Operations package delivered
 
@@ -111,21 +110,24 @@ Circuit counts use Ride::canHaveMultipleCircuits; native cable-lift multi-circui
 restrictions are respected. Typed drafts use RideSetSettingAction and revalidate
 mode/operation/vehicle state. No raw generic operationOption is exposed.
 
-Mode-specific Operations remains PARTIAL for no-vehicle maximum-rider capacity
+At that checkpoint, Mode-specific Operations remained PARTIAL for no-vehicle maximum-rider capacity
 (the desktop fallback), other niche settings and track-piece brake parameters.
-Refurbishment/mechanic assistance,
-appearance/music and richer finance/customer information remain open.
+Refurbishment/mechanic assistance, appearance/music and richer finance/customer
+information were still open at that checkpoint; they are delivered below.
 See MODE-OPERATIONS-CHECKPOINT.md for scope, native sources, tests and limits.
 
-Next recommended coherent depth workflow: Maintenance → review native breakdown/
+The next workflow at that checkpoint was Maintenance → review native breakdown/
 inspection state → locate assigned/nearest available mechanic → native queried
 refurbishment review → Cancel-first confirmation → return/save/reload. Reuse
 Maintenance, Staff identities and existing demolition/renew action machinery;
 no patrol editing or new staff roles.
 
-## Ride Management completion: Phase 1
+## Ride Management completion: delivered milestone
 
 Vehicle-object selection and reversed trains delivered through native typed drafts;
-loaded/research filtering, closure and effective counts remain native. Naming,
-appearance/music, refurbishment and graphs remain explicitly open; see
-RIDE-MANAGEMENT-COMPLETION.md. No prior gameplay phase was redone.
+loaded/research filtering, closure and effective counts remain native. All eight
+requested phases are now delivered: music, maintenance actions, appearance,
+ride/shop naming, customer/financial summaries, graphs, scoped track painting,
+random vehicle colours and station detail. See RIDE-MANAGEMENT-COMPLETION.md
+for exact scope and validation limits. The domain remains PARTIAL for broader
+construction and desktop parity; no prior gameplay phase was redone.

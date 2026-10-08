@@ -44,6 +44,7 @@ namespace OpenRCT2::Ui::Handheld
     ObjectEntryIndex TreeSelection();
     bool SetTreeSelection(ObjectEntryIndex index);
     void BeginSceneryRemoval();
+    void BeginTrackColour(const RideManagement::Target& ride);
     void DrawExplorer(Drawing::RenderTarget& rt);
 } // namespace OpenRCT2::Ui::Handheld
 

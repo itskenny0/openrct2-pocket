@@ -7,6 +7,7 @@
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/Hud.h>
 #include <openrct2-ui/handheld/RideManagement.h>
+#include <openrct2-ui/handheld/Shops.h>
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
@@ -18,11 +19,16 @@
 #include <openrct2/audio/AudioContext.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/drawing/Drawing.h>
+#include <openrct2/management/Research.h>
 #include <openrct2/object/ObjectManager.h>
 #include <openrct2/ride/RideData.h>
 #include <openrct2/scenario/Scenario.h>
 #include <openrct2/ui/UiContext.h>
 #include <openrct2/ui/WindowManager.h>
+#include <openrct2/world/Map.h>
+#include <openrct2/world/TileElementsView.h>
+#include <openrct2/world/tile_element/SurfaceElement.h>
+#include <openrct2/world/tile_element/TrackElement.h>
 #include <stdexcept>
 
 using namespace OpenRCT2;
@@ -172,6 +178,34 @@ int main(int argc, char** argv)
         press(H::Action::confirm);
         press(H::Action::confirm);
         auto model = W::HandheldRidesPresentation();
+        W::HandheldDashboardMove(0, 1);
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(0, 2);
+        press(H::Action::confirm);
+        Require(
+            W::HandheldRidesPresentation().breadcrumb == "Rides / Graphs" && ride->measurement
+                && W::HandheldRidesPresentation().graph.empty(),
+            "Native graph registration/waiting route absent");
+        // Isolated conversion/render fixture, explicitly synthetic, not an operating coaster.
+        auto nativeMeasurement = std::move(ride->measurement);
+        ride->measurement = std::make_unique<RideMeasurement>();
+        ride->measurement->flags.set(RideMeasurementFlag::running, RideMeasurementFlag::gForces);
+        ride->measurement->num_items = 2;
+        ride->measurement->velocity[0] = 20;
+        ride->measurement->altitude[0] = 28;
+        ride->measurement->vertical[0] = -10;
+        const auto graphSpeed = R::Presentation(R::View::graphs, 0, {}, target, {}, {}, 0);
+        const auto graphAltitude = R::Presentation(R::View::graphs, 0, {}, target, {}, {}, 1);
+        const auto graphForce = R::Presentation(R::View::graphs, 0, {}, target, {}, {}, 2);
+        Require(
+            graphSpeed.graph.front() == 9 && graphAltitude.graph.front() == 10 && graphForce.graph.front() == -80,
+            "Native graph unit conversions differ");
+        Require(
+            R::Presentation(R::View::graphs, 0, {}, target, {}, {}, 0, 99999).graph.size() == 1,
+            "Graph scroll reads beyond samples");
+        ride->measurement = std::move(nativeMeasurement);
+        press(H::Action::back);
+        press(H::Action::back);
         W::HandheldDashboardMove(0, model.rows.size() - 8);
         press(H::Action::confirm);
         const auto beforeName = ride->getName();
@@ -458,6 +492,43 @@ int main(int argc, char** argv)
         GameActions::ProcessQueue(state);
         state.park.flags.set(ParkFlag::noMoney, originalNoMoney);
         std::cout << "Native stale ride / cleanup passed" << std::endl;
+        // A shop enters naming outside Dashboard; the keyboard must take content focus.
+        state.park.flags.set(ParkFlag::noMoney);
+        auto& objects = context->GetObjectManager();
+        auto* shopObject = objects.LoadObject("rct2.ride.burgb");
+        Require(shopObject, "Shop keyboard fixture object missing");
+        const auto shopIndex = objects.GetLoadedObjectEntryIndex(shopObject);
+        ResearchInsertRideEntry(shopIndex, true);
+        RideEntrySetInvented(shopIndex);
+        RideTypeSetInvented(ShopPlacement::Type(shopIndex));
+        const CoordsXY shopTile{ 64, 352 };
+        MapGetSurfaceElementAt(shopTile)->setOwnership({ OwnershipFlag::landOwned });
+        Require(
+            H::Shops::Action(shopTile, shopIndex, 0, true).error == GameActions::Status::ok, "Shop keyboard placement failed");
+        GameActions::ProcessQueue(state);
+        const auto shopId = (*TileElementsView<TrackElement>(shopTile).begin())->getRideIndex();
+        W::HandheldDashboardOpen();
+        Require(W::HandheldDashboardRailFocused(), "Shop keyboard rail fixture missing");
+        W::HandheldRideOpen(shopId);
+        W::HandheldMenuMove(3);
+        press(H::Action::confirm);
+        Require(
+            W::HandheldRidesPresentation().columns == 8 && !W::HandheldDashboardRailFocused(),
+            "Shop Rename failed to take keyboard content focus");
+        const auto shopName = GetRide(shopId)->getName();
+        press(H::Action::confirm);
+        Require(
+            W::HandheldRidesPresentation().title == shopName + "A" && GetRide(shopId)->getName() == shopName,
+            "Shop keyboard A did not type exactly once into its draft");
+        press(H::Action::back);
+        Require(W::HandheldRidesPresentation().columns != 8, "Shop keyboard B failed to return");
+        press(H::Action::back);
+        GameActions::RideDemolishAction removeShop(shopId, GameActions::RideModifyType::demolish);
+        Require(GameActions::Execute(&removeShop, state).error == GameActions::Status::ok, "Shop keyboard cleanup failed");
+        GameActions::ProcessQueue(state);
+        state.park.flags.set(ParkFlag::noMoney, originalNoMoney);
+        Require(state.park.cash == cash, "Shop keyboard fixture changed accounting");
+        std::cout << "SDL shop keyboard / rail handoff / typing-cancel passed" << std::endl;
         SaveFlags flags{};
         const auto save = std::string(argv[2]) + "/hud-lifecycle.park";
         Require(ScenarioSave(state, save, flags), "HUD fixture save failed");

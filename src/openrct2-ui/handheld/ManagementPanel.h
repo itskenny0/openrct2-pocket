@@ -20,7 +20,9 @@ namespace OpenRCT2::Ui::Handheld
         bool editing{};
         bool confirmation{};
         std::vector<std::string> bodyLines; // Optional native wrapped read-only detail; section controls paging.
-        size_t columns = 1;                 // Controller text entry uses the same content shell.
+        std::vector<int32_t> graph{};
+        std::string graphRange;
+        size_t columns = 1; // Controller text entry uses the same content shell.
     };
     inline void DrawManagementContent(
         Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const ManagementPresentation& model, bool focused = true)
@@ -28,7 +30,9 @@ namespace OpenRCT2::Ui::Handheld
         using namespace Concept;
         const int width = size.width;
         const int valueX = 14 + (width - 30) * 45 / 100;
-        const int rowStart = 70 + static_cast<int>(model.stats.size()) * 24 + static_cast<int>(model.bodyLines.size()) * 16;
+        const int graphHeight = model.graph.empty() ? 0 : 110;
+        const int rowStart = graphHeight + 70 + static_cast<int>(model.stats.size()) * 24
+            + static_cast<int>(model.bodyLines.size()) * 16;
         const auto columns = std::max<size_t>(1, model.columns);
         const int rowHeight = columns > 1 ? 24 : 30;
         const size_t capacity = std::max(1, (size.height - rowStart - 30) / rowHeight) * columns;
@@ -57,6 +61,27 @@ namespace OpenRCT2::Ui::Handheld
             DrawModernEllipsised(
                 rt, p + ScreenCoordsXY{ 10, 67 + static_cast<int>(model.stats.size()) * 24 + static_cast<int>(i) * 16 },
                 width - 20, "{WHITE}" + model.bodyLines[i]);
+        if (!model.graph.empty())
+        {
+            const auto [low, high] = std::minmax_element(model.graph.begin(), model.graph.end());
+            const int range = std::max(1, *high - *low);
+            const int plotTop = rowStart - graphHeight;
+            const int plotBottom = plotTop + 80;
+            const int plotWidth = width - 24;
+            GfxDrawLine(
+                rt, { p + ScreenCoordsXY{ 10, plotBottom }, p + ScreenCoordsXY{ width - 10, plotBottom } },
+                static_cast<Drawing::PaletteIndex>(PocketPalette::separator));
+            for (size_t i = 1; i < model.graph.size(); ++i)
+            {
+                auto point = [&](size_t n) {
+                    return p
+                        + ScreenCoordsXY{ 12 + static_cast<int>(n * plotWidth / (model.graph.size() - 1)),
+                                          plotBottom - (model.graph[n] - *low) * 76 / range };
+                };
+                GfxDrawLine(rt, { point(i - 1), point(i) }, static_cast<Drawing::PaletteIndex>(PocketPalette::selection));
+            }
+            DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, plotBottom + 7 }, width - 20, "{MUTED}" + model.graphRange);
+        }
         for (size_t i = first; i < first + visible; ++i)
         {
             const int y = rowStart + static_cast<int>((i - first) / columns) * rowHeight;

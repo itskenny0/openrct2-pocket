@@ -7,6 +7,7 @@
 #include <openrct2/actions/ride/RideSetAppearanceAction.h>
 #include <openrct2/actions/ride/RideSetSettingAction.h>
 #include <openrct2/actions/ride/RideSetVehicleAction.h>
+#include <openrct2/interface/Viewport.h>
 #include <openrct2/ride/Ride.h>
 
 namespace OpenRCT2::Ui::Handheld::RideManagement
@@ -28,7 +29,9 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         inspection,
         statistics,
         customers,
+        stations,
         earnings,
+        graphs,
         operations,
         maintenance,
         vehicles,
@@ -76,6 +79,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         bool renaming{};
         std::string baselineName{};
         std::string name{};
+        std::vector<std::pair<Setting, uint16_t>> randomColours{};
     };
     void Invalidate(RideId id);
     void InvalidateAll();
@@ -90,10 +94,23 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
     std::optional<Draft> BeginDemolition(const Target& target);
     std::optional<Draft> BeginName(const Target& target);
     std::optional<Draft> BeginRefurbishment(const Target& target);
+    struct PaintTarget
+    {
+        Target ride;
+        CoordsXYZD location;
+        TrackElemType type;
+        uint8_t sequence;
+        uint8_t baseline;
+    };
+    std::optional<PaintTarget> CapturePaint(const Target& target, const InteractionInfo& info);
+    GameActions::Result Paint(const PaintTarget& target, uint8_t scheme, bool execute);
+    std::optional<Draft> BeginRandomColours(const Target& target);
+    bool BeginGraphs(const Target& target);
     bool LocateMechanic(const Target& target);
     void AdjustPrice(Draft& draft, int direction);
     GameActions::Result Action(const Draft& draft, bool execute, GameActions::GameAction::Callback_t callback = {});
     ManagementPresentation Presentation(
         View view, size_t selected, const std::vector<Target>& roster = {}, const std::optional<Target>& target = {},
-        const std::optional<Draft>& draft = {}, const std::string& feedback = {});
+        const std::optional<Draft>& draft = {}, const std::string& feedback = {}, size_t graphMetric = 0,
+        size_t graphOffset = 0);
 } // namespace OpenRCT2::Ui::Handheld::RideManagement
