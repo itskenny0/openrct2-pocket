@@ -101,6 +101,8 @@ namespace OpenRCT2
         setRestrictedScenery,
         setRideVisibility,
         placeShop,
+        placeFlatRide,
+        placeFlatRideEntrance,
         count,
     };
 } // namespace OpenRCT2

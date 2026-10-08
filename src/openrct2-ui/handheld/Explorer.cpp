@@ -7,6 +7,7 @@
 
 #include "ControllerInput.h"
 #include "Currency.h"
+#include "FlatRides.h"
 #include "Panel.h"
 #include "Paths.h"
 #include "SceneryRemoval.h"
@@ -67,6 +68,7 @@ namespace OpenRCT2::Ui::Handheld
         Paths::End();
         Trees::ClearPreview();
         Shops::ClearPreview();
+        FlatRides::End();
         _terrainActive = true;
         _waterTool = false;
         _surfaceTool = false;
@@ -101,6 +103,21 @@ namespace OpenRCT2::Ui::Handheld
         _treeIndex = Trees::Next(kObjectEntryIndexNull);
     }
 
+    bool BeginFlatRide(ObjectEntryIndex index)
+    {
+        if (!FlatRides::Eligible(index))
+            return false;
+        BeginTerrain(true);
+        return FlatRides::Begin(index);
+    }
+    bool ResumeFlatRide(RideId id)
+    {
+        auto target = RideManagement::Identify(id);
+        if (!target || !FlatRides::CanResume(*target))
+            return false;
+        BeginTerrain(true);
+        return FlatRides::Resume(*target);
+    }
     bool IsShopToolActive()
     {
         return _shopTool;
@@ -124,6 +141,7 @@ namespace OpenRCT2::Ui::Handheld
             _shopDirection = 0;
         }
         Shops::ClearPreview();
+        FlatRides::ClearPreview();
         _shopIndex = index;
         _terrainStatus.clear();
         return true;
@@ -133,6 +151,7 @@ namespace OpenRCT2::Ui::Handheld
         if (!_shopTool)
             return;
         Shops::ClearPreview();
+        FlatRides::ClearPreview();
         _shopDirection = (_shopDirection + 1) & 3;
         _terrainStatus.clear();
     }
@@ -151,6 +170,7 @@ namespace OpenRCT2::Ui::Handheld
             return false;
         Trees::ClearPreview();
         Shops::ClearPreview();
+        FlatRides::ClearPreview();
         _treeIndex = index;
         _terrainStatus.clear();
         return true;
@@ -168,6 +188,7 @@ namespace OpenRCT2::Ui::Handheld
         {
             MapSelection::invalidate();
             gMapSelectFlags.unset(MapSelectFlag::enable);
+            gMapSelectFlags.unset(MapSelectFlag::enableArrow);
             MapSelection::invalidate();
             _selectionOwned = false;
         }
@@ -179,6 +200,7 @@ namespace OpenRCT2::Ui::Handheld
     {
         Trees::ClearPreview();
         Shops::ClearPreview();
+        FlatRides::End();
         _terrainActive = false;
         _waterTool = false;
         _surfaceTool = false;
@@ -196,6 +218,8 @@ namespace OpenRCT2::Ui::Handheld
 
     static GameActions::Result TerrainAction(bool execute)
     {
+        if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
+            return FlatRides::Action(_terrainTile, execute);
         if (_sceneryRemovalTool)
             return SceneryRemoval::Action(_sceneryTarget, execute);
         if (_shopTool)
@@ -397,6 +421,8 @@ namespace OpenRCT2::Ui::Handheld
         {
             EndTerrain();
         }
+        if (_terrainActive && FlatRides::CurrentStage() == FlatRides::Stage::inactive && FlatRides::Target())
+            EndTerrain();
         ClearTerrainSelection();
         if ((_terrainActive || Paths::IsActive()) && CanExplore() && ContextHasFocus())
         {
@@ -428,6 +454,27 @@ namespace OpenRCT2::Ui::Handheld
                 MapSelection::invalidate();
             }
         }
+        if (FlatRides::CurrentStage() != FlatRides::Stage::inactive && CanExplore() && ContextHasFocus())
+        {
+            FlatRides::UpdatePreview(_terrainTile);
+            if (FlatRides::CurrentStage() != FlatRides::Stage::ride)
+            {
+                const auto location = FlatRides::EntranceLocation(_terrainTile);
+                const auto result = FlatRides::Action(_terrainTile, false);
+                if (location && result.error == GameActions::Status::ok)
+                {
+                    gMapSelectArrowPosition = *location;
+                    gMapSelectArrowDirection = location->direction;
+                    gMapSelectFlags.set(MapSelectFlag::enableArrow);
+                    MapSelection::invalidate();
+                }
+                else
+                {
+                    gMapSelectFlags.unset(MapSelectFlag::enable);
+                    _selectionOwned = false;
+                }
+            }
+        }
         if (_shopTool && CanExplore() && ContextHasFocus())
             Shops::UpdatePreview(_terrainTile, _shopIndex, _shopDirection);
         if (_treeTool && CanExplore() && ContextHasFocus())
@@ -437,6 +484,7 @@ namespace OpenRCT2::Ui::Handheld
             Paths::ClearPreview();
             Trees::ClearPreview();
             Shops::ClearPreview();
+            FlatRides::ClearPreview();
         }
         SyncFocusWindow();
         auto frame = input.update(ContextHasFocus(), SDL_GetTicks());
@@ -507,6 +555,11 @@ namespace OpenRCT2::Ui::Handheld
         }
         for (const auto action : frame.actions)
         {
+            if (FlatRides::Busy())
+            {
+                input.suspend();
+                return;
+            }
             if (action == Action::back)
             {
                 if (wm->FindByClass(WindowClass::error) != nullptr || gInputFlags.has(InputFlag::toolActive))
@@ -526,7 +579,9 @@ namespace OpenRCT2::Ui::Handheld
             }
             else if (action == Action::openBuild && CanExplore())
             {
-                if (_shopTool)
+                if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
+                    FlatRides::Rotate();
+                else if (_shopTool)
                     RotateShop();
                 else if (Paths::IsActive())
                     Windows::HandheldPathOptionsOpen();
@@ -553,12 +608,13 @@ namespace OpenRCT2::Ui::Handheld
                             {
                                 const auto result = TerrainAction(true);
                                 _terrainStatus = result.error == GameActions::Status::ok
-                                    ? (_shopTool                 ? "Shop placement requested."
-                                           : _treeTool           ? "Tree placement requested."
-                                           : _sceneryRemovalTool ? "Removal requested."
-                                           : _surfaceTool        ? "Surface change requested."
-                                           : _waterTool          ? "Water change requested."
-                                                                 : "Land changed.")
+                                    ? (FlatRides::CurrentStage() != FlatRides::Stage::inactive ? ""
+                                           : _shopTool                                         ? "Shop placement requested."
+                                           : _treeTool                                         ? "Tree placement requested."
+                                           : _sceneryRemovalTool                               ? "Removal requested."
+                                           : _surfaceTool                                      ? "Surface change requested."
+                                           : _waterTool                                        ? "Water change requested."
+                                                                                               : "Land changed.")
                                     : result.getErrorMessage();
                             }
                         }
@@ -601,7 +657,11 @@ namespace OpenRCT2::Ui::Handheld
                         }
                         if (_terrainActive)
                         {
-                            if (_shopTool)
+                            if (FlatRides::CurrentStage() == FlatRides::Stage::ride && !FlatRides::Busy())
+                                Windows::HandheldRidePickerOpen();
+                            else if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
+                                break;
+                            else if (_shopTool)
                                 Windows::HandheldShopPickerOpen();
                             else if (_treeTool)
                             {
@@ -641,16 +701,25 @@ namespace OpenRCT2::Ui::Handheld
         using namespace Drawing;
         const auto c = Centre();
         const auto height = ContextGetHeight();
+        // Completion can arrive after UpdateExplorer but before this frame is drawn.
+        // Never fall through to terrain controls while waiting for the next update to end the tool.
+        if (_terrainActive && FlatRides::CurrentStage() == FlatRides::Stage::inactive && FlatRides::Target())
+        {
+            DrawGameplayFooter(rt, { ContextGetWidth(), height }, "", false, false);
+            DrawMapFocus(rt, c);
+            return;
+        }
         std::string status = "L/R: Zoom   X: Rotate";
         std::string costAmount;
         if (_terrainActive)
         {
-            status = _shopTool        ? "PLACE SHOP"
-                : _treeTool           ? "PLACE TREE"
-                : _sceneryRemovalTool ? "REMOVE SCENERY"
-                : _surfaceTool        ? "PAINT SURFACE"
-                : _waterTool          ? (_raiseLand ? "RAISE WATER" : "LOWER WATER")
-                                      : (_raiseLand ? "RAISE LAND" : "LOWER LAND");
+            status = FlatRides::CurrentStage() != FlatRides::Stage::inactive ? "PLACE RIDE"
+                : _shopTool                                                  ? "PLACE SHOP"
+                : _treeTool                                                  ? "PLACE TREE"
+                : _sceneryRemovalTool                                        ? "REMOVE SCENERY"
+                : _surfaceTool                                               ? "PAINT SURFACE"
+                : _waterTool                                                 ? (_raiseLand ? "RAISE WATER" : "LOWER WATER")
+                                                                             : (_raiseLand ? "RAISE LAND" : "LOWER LAND");
             if (_terrainTile)
             {
                 const auto result = TerrainAction(false);
@@ -686,7 +755,9 @@ namespace OpenRCT2::Ui::Handheld
         {
             if (_terrainActive)
             {
-                if (_shopTool)
+                if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
+                    FlatRides::DrawPanel(rt, { ContextGetWidth(), height });
+                else if (_shopTool)
                     DrawShopOverlay(rt, Concept::kOrigin, Shops::Name(_shopIndex), Shops::Eligible(_shopIndex), _shopDirection);
                 else if (_treeTool)
                     DrawTreeOverlay(rt, Concept::kOrigin, Trees::Name(_treeIndex), Trees::Eligible(_treeIndex));
@@ -698,7 +769,10 @@ namespace OpenRCT2::Ui::Handheld
                 else
                     DrawTerrainOverlay(rt, Concept::kOrigin, _raiseLand, _waterTool);
             }
-            if (_shopTool)
+            if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
+            { /* The shared ride panel owns its action strip. */
+            }
+            else if (_shopTool)
                 DrawShopFooter(rt, { ContextGetWidth(), height });
             else if (_treeTool)
                 DrawTreeFooter(rt, { ContextGetWidth(), height });

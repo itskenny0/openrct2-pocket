@@ -26,6 +26,8 @@ namespace OpenRCT2::Ui::Handheld
     void BeginWater(bool raise = true);
     void BeginSurface();
     void BeginTrees();
+    bool BeginFlatRide(ObjectEntryIndex index);
+    bool ResumeFlatRide(RideId id);
     bool IsShopToolActive();
     ObjectEntryIndex ShopSelection();
     Direction ShopDirection();
@@ -67,6 +69,7 @@ namespace OpenRCT2::Ui::Windows
     void HandheldPathOptionsOpen();
     void HandheldTreePickerOpen();
     void HandheldShopPickerOpen();
+    void HandheldRidePickerOpen();
     bool HandheldObjectPickerIsOpen();
     void HandheldObjectPickerMove(int x, int y);
     void HandheldObjectPickerPause();

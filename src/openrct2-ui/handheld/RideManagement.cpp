@@ -2,6 +2,7 @@
 #include "RideManagement.h"
 
 #include "Finances.h"
+#include "FlatRides.h"
 
 #include <iomanip>
 #include <openrct2/GameState.h>
@@ -182,6 +183,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                            ride->supportsStatus(RideStatus::testing) ? "Test..." : "Test unavailable",
                            PricePermitted(*ride) ? "Admission price..." : "Price unavailable",
                            "Back to roster" };
+            if (FlatRides::CanResume(*target))
+                model.rows.push_back("Finish entrances/exits...");
         }
         else if (view == View::statistics)
         {

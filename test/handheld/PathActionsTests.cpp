@@ -3675,6 +3675,8 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
                  "passed\n";
 }
 
+#include "FlatRideWorkflowTests.h"
+
 int main(int argc, char** argv)
 {
     try
@@ -3991,6 +3993,7 @@ int main(int argc, char** argv)
         TestGuests(*context, argv[2], argc == 4);
         TestRideManagement(*context, argv[2], argc == 4);
         TestOverview(*context, argv[2], argc == 4);
+        TestFlatRides(*context, argv[2], argc == 4);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;

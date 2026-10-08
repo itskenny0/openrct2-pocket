@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "Shops.h"
 
+#include "TrackPreview.h"
+
 #include <openrct2/actions/ride/ShopPlaceAction.h>
 #include <openrct2/actions/track/TrackPlaceAction.h>
 #include <openrct2/actions/track/TrackRemoveAction.h>
@@ -15,30 +17,16 @@ namespace OpenRCT2::Ui::Handheld::Shops
         bool operator==(const Request&) const = default;
     };
     static std::optional<Request> requested, ghost;
-    static std::unique_ptr<ShopPlacement::PreviewRide> previewRide;
+    static TrackPreview preview;
     static uint32_t suspensionDepth{};
     static bool Exists()
     {
-        if (!ghost || !previewRide)
-            return false;
-        for (const auto* e : TileElementsView<TrackElement>(ghost->origin))
-            if (e->isGhost() && e->getRideIndex() == previewRide->id())
-                return true;
-        return false;
+        return preview.exists();
     }
     static void RemoveGhost()
     {
-        if (ghost && previewRide && Exists())
-        {
-            auto action = GameActions::TrackRemoveAction(
-                GetRide(previewRide->id())->getRideTypeDescriptor().StartTrackPiece, 0, ghost->origin);
-            action.SetFlags(
-                { GameActions::CommandFlag::ghost, GameActions::CommandFlag::noSpend,
-                  GameActions::CommandFlag::allowDuringPaused });
-            GameActions::Execute(&action, getGameState());
-        }
+        preview.clear();
         ghost.reset();
-        previewRide.reset();
     }
     void ClearPreview()
     {
@@ -56,11 +44,11 @@ namespace OpenRCT2::Ui::Handheld::Shops
     }
     static GameActions::Result Query(const Request& request)
     {
-        if (previewRide && ghost && ghost->index == request.index)
+        if (!preview.id().IsNull() && ghost && ghost->index == request.index)
         {
             const auto type = ShopPlacement::Type(request.index);
             auto action = GameActions::TrackPlaceAction(
-                previewRide->id(), GetRideTypeDescriptor(type).StartTrackPiece, type, request.origin, 0, 0, 0, {}, false);
+                preview.id(), GetRideTypeDescriptor(type).StartTrackPiece, type, request.origin, 0, 0, 0, {}, false);
             return GameActions::Query(&action, getGameState());
         }
         auto action = GameActions::ShopPlaceAction(request.index, request.origin);
@@ -103,22 +91,8 @@ namespace OpenRCT2::Ui::Handheld::Shops
         if (ghost == request && Exists())
             return;
         RemoveGhost();
-        previewRide = std::make_unique<ShopPlacement::PreviewRide>(index);
-        if (previewRide->id().IsNull())
-        {
-            previewRide.reset();
-            return;
-        }
-        const auto type = ShopPlacement::Type(index);
-        auto action = GameActions::TrackPlaceAction(
-            previewRide->id(), GetRideTypeDescriptor(type).StartTrackPiece, type, request->origin, 0, 0, 0, {}, false);
-        action.SetFlags(
-            { GameActions::CommandFlag::ghost, GameActions::CommandFlag::noSpend,
-              GameActions::CommandFlag::allowDuringPaused });
-        if (GameActions::Execute(&action, getGameState()).error == GameActions::Status::ok)
+        if (preview.place(index, ShopPlacement::Type(index), request->origin))
             ghost = request;
-        else
-            previewRide.reset();
     }
     void RemovePreviewTemporarily()
     {

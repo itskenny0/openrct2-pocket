@@ -10,6 +10,7 @@
 #include "WindowManager.h"
 
 #include "handheld/Explorer.h"
+#include "handheld/FlatRides.h"
 #include "handheld/GuestManagement.h"
 #include "handheld/MarketingManagement.h"
 #include "handheld/Paths.h"
@@ -579,9 +580,11 @@ public:
 
             case INTENT_ACTION_SUSPEND_SHOP_PREVIEW:
                 Handheld::Shops::RemovePreviewTemporarily();
+                Handheld::FlatRides::RemovePreviewTemporarily();
                 break;
             case INTENT_ACTION_RESUME_SHOP_PREVIEW:
                 Handheld::Shops::RestorePreview();
+                Handheld::FlatRides::RestorePreview();
                 break;
             case INTENT_ACTION_REMOVE_PROVISIONAL_ELEMENTS:
                 ProvisionalElementsRemove();
@@ -1152,6 +1155,7 @@ public:
         Handheld::Paths::ClearPreview();
         Handheld::Trees::ClearPreview();
         Handheld::Shops::ClearPreview();
+        Handheld::FlatRides::ClearPreview();
         CloseByClass(WindowClass::rideConstruction);
         CloseByClass(WindowClass::footpath);
         CloseByClass(WindowClass::trackDesignList);

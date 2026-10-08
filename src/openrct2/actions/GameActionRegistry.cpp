@@ -49,6 +49,8 @@
 #include "peep/StaffSetNameAction.h"
 #include "peep/StaffSetOrdersAction.h"
 #include "peep/StaffSetPatrolAreaAction.h"
+#include "ride/FlatRideEntrancePlaceAction.h"
+#include "ride/FlatRidePlaceAction.h"
 #include "ride/MazePlaceTrackAction.h"
 #include "ride/MazeSetTrackAction.h"
 #include "ride/RideCreateAction.h"
@@ -159,6 +161,8 @@ namespace OpenRCT2::GameActions
         REGISTER_ACTION(PlayerSetGroupAction);
         REGISTER_ACTION(RideCreateAction);
         REGISTER_ACTION(ShopPlaceAction);
+        REGISTER_ACTION(FlatRidePlaceAction);
+        REGISTER_ACTION(FlatRideEntrancePlaceAction);
         REGISTER_ACTION(RideDemolishAction);
         REGISTER_ACTION(RideEntranceExitPlaceAction);
         REGISTER_ACTION(RideEntranceExitRemoveAction);

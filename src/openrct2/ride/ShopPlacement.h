@@ -41,15 +41,19 @@ namespace OpenRCT2::ShopPlacement
 
     public:
         explicit PreviewRide(ObjectEntryIndex index)
+            : PreviewRide(index, Type(index))
+        {
+        }
+        PreviewRide(ObjectEntryIndex index, ride_type_t type)
         {
             _id = GetNextFreeRideId();
             if (_id.IsNull())
                 return;
             _previous = std::move(getGameState().rides[_id.ToUnderlying()]);
             auto* ride = RideAllocateAtIndex(_id);
-            ride->type = Type(index);
+            ride->type = type;
             ride->subtype = index;
-            ride->mode = RideMode::shopStall;
+            ride->mode = GetRideTypeDescriptor(type).DefaultMode;
             ride->overallView.setNull();
             for (auto& station : ride->getStations())
             {

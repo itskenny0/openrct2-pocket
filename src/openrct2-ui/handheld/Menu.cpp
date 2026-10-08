@@ -3,6 +3,7 @@
 #include "Dashboard.h"
 #include "Explorer.h"
 #include "Finances.h"
+#include "FlatRides.h"
 #include "GuestManagement.h"
 #include "ListFocus.h"
 #include "MarketingManagement.h"
@@ -52,6 +53,7 @@ namespace OpenRCT2::Ui::Windows
         pathOptions,
         treePicker,
         shopPicker,
+        ridePicker,
         dashboard,
         overview,
         overviewConfirm,
@@ -121,6 +123,7 @@ namespace OpenRCT2::Ui::Windows
         Handheld::ObjectPicker _picker;
         bool _pausedHere{};
         bool _shopPickerFromBuild{};
+        bool _ridePickerFromBuild{};
         bool _exitAfterSave{};
         size_t _slot{};
         Handheld::Dashboard::State _dashboard;
@@ -454,10 +457,11 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ride:
                     return { "Open ride", "Close ride", "Back to park" };
                 case Page::build:
-                    return { "Raise land", "Lower land",         "Paths",       "Water", "Surface", "Remove scenery",
-                             "Trees",      "Shops / Facilities", "Back to park" };
+                    return { "Raise land", "Lower land",         "Paths", "Water",       "Surface", "Remove scenery",
+                             "Trees",      "Shops / Facilities", "Rides", "Back to park" };
                 case Page::treePicker:
                 case Page::shopPicker:
+                case Page::ridePicker:
                     return {};
                 case Page::paths:
                     return { "Normal path", "Queue path", "Remove path", "Back to build" };
@@ -554,6 +558,7 @@ namespace OpenRCT2::Ui::Windows
             Handheld::Paths::ClearPreview();
             Handheld::Trees::ClearPreview();
             Handheld::Shops::ClearPreview();
+            Handheld::FlatRides::ClearPreview();
             setWidgets(kWidgets);
             layout();
             colours[0] = ColourWithFlags{ Colour::darkBlue };
@@ -578,7 +583,10 @@ namespace OpenRCT2::Ui::Windows
         void refreshPicker(std::optional<Handheld::PickerIdentity> preferred = {})
         {
             _picker.setEntries(
-                _page == Page::shopPicker ? Handheld::Shops::Entries() : Handheld::TreePickerEntries(), preferred);
+                _page == Page::ridePicker       ? Handheld::FlatRides::Entries()
+                    : _page == Page::shopPicker ? Handheld::Shops::Entries()
+                                                : Handheld::TreePickerEntries(),
+                preferred);
         }
         void openTreePicker()
         {
@@ -588,13 +596,21 @@ namespace OpenRCT2::Ui::Windows
         void openShopPicker(bool fromBuild = false)
         {
             Handheld::Shops::ClearPreview();
+            Handheld::FlatRides::ClearPreview();
             _shopPickerFromBuild = fromBuild;
             page(Page::shopPicker);
             refreshPicker(Handheld::PickerIdentity{ ObjectType::ride, Handheld::ShopSelection() });
         }
+        void openRidePicker(bool fromBuild = false)
+        {
+            Handheld::FlatRides::ClearPreview();
+            _ridePickerFromBuild = fromBuild;
+            page(Page::ridePicker);
+            refreshPicker(Handheld::PickerIdentity{ ObjectType::ride, Handheld::FlatRides::Selection() });
+        }
         bool picker() const
         {
-            return _page == Page::treePicker || _page == Page::shopPicker;
+            return _page == Page::treePicker || _page == Page::shopPicker || _page == Page::ridePicker;
         }
         bool treePicker() const
         {
@@ -689,7 +705,9 @@ namespace OpenRCT2::Ui::Windows
                 invalidate();
             }
             if ((treePicker() && !Handheld::IsTreeToolActive())
-                || (_page == Page::shopPicker && !_shopPickerFromBuild && !Handheld::IsShopToolActive()))
+                || (_page == Page::shopPicker && !_shopPickerFromBuild && !Handheld::IsShopToolActive())
+                || (_page == Page::ridePicker && !_ridePickerFromBuild
+                    && Handheld::FlatRides::CurrentStage() != Handheld::FlatRides::Stage::ride))
                 close();
         }
         void openRide(RideId id)
@@ -924,6 +942,12 @@ namespace OpenRCT2::Ui::Windows
                 case Page::dashboard:
                     close();
                     break;
+                case Page::ridePicker:
+                    if (_ridePickerFromBuild)
+                        page(Page::build);
+                    else
+                        close();
+                    break;
                 case Page::shopPicker:
                     if (_shopPickerFromBuild)
                         page(Page::build);
@@ -1063,6 +1087,16 @@ namespace OpenRCT2::Ui::Windows
             const auto choice = _focus.index();
             switch (_page)
             {
+                case Page::ridePicker:
+                    if (_picker.selected() && Handheld::BeginFlatRide(_picker.selected()->identity.index))
+                        close();
+                    else
+                    {
+                        refreshPicker();
+                        _status = "Ride unavailable";
+                        invalidate();
+                    }
+                    break;
                 case Page::shopPicker:
                     if (_picker.selected() && Handheld::SetShopSelection(_picker.selected()->identity.index))
                         close();
@@ -1112,7 +1146,9 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::build:
-                    if (choice == 7)
+                    if (choice == 8)
+                        openRidePicker(true);
+                    else if (choice == 7)
                         openShopPicker(true);
                     else if (choice == 2)
                         page(Page::paths);
@@ -1429,6 +1465,13 @@ namespace OpenRCT2::Ui::Windows
                         page(Page::ridesStats);
                     else if (choice == 6)
                         page(Page::ridesRoster);
+                    else if (choice == 7 && Handheld::FlatRides::CanResume(*_ridesTarget))
+                    {
+                        const auto target = *_ridesTarget;
+                        close();
+                        Handheld::ResumeFlatRide(target.id);
+                        Handheld::RideManagement::Locate(target);
+                    }
                     else
                     {
                         const auto status = choice == 2 ? std::optional<RideStatus>{ RideStatus::open }
@@ -1964,6 +2007,12 @@ namespace OpenRCT2::Ui::Windows
                     _focus.index(), _priceDraft, _status);
                 return;
             }
+            if (_page == Page::ridePicker)
+            {
+                Handheld::DrawObjectPicker(
+                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Flat rides", _status, "No rides available");
+                return;
+            }
             if (_page == Page::shopPicker)
             {
                 Handheld::DrawObjectPicker(
@@ -2196,6 +2245,11 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->shopPause();
+    }
+    void HandheldRidePickerOpen()
+    {
+        if (auto* window = OpenPanel())
+            window->openRidePicker(Handheld::FlatRides::CurrentStage() != Handheld::FlatRides::Stage::ride);
     }
     void HandheldShopPickerOpen()
     {
