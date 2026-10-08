@@ -30,6 +30,11 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         if (auto it = removedRides.find(id.ToUnderlying()); it != removedRides.end())
             ++it->second;
     }
+    void InvalidateAll()
+    {
+        for (auto& [id, generation] : removedRides)
+            ++generation;
+    }
     std::optional<Target> Identify(RideId id)
     {
         const auto* ride = GetRide(id);
@@ -93,17 +98,25 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                       {},
                       0,
                       {},
+                      {},
                       false,
                       0 };
     }
-    static std::array<uint8_t, 6> Snapshot(const Ride& ride)
+    static std::array<uint8_t, 13> Snapshot(const Ride& ride)
     {
         return { static_cast<uint8_t>(ride.mode),
                  ride.minWaitingTime,
                  ride.maxWaitingTime,
                  ride.departFlags,
                  ride.liftHillSpeed,
-                 static_cast<uint8_t>(ride.inspectionInterval) };
+                 static_cast<uint8_t>(ride.inspectionInterval),
+                 ride.proposedNumTrains,
+                 ride.proposedNumCarsPerTrain,
+                 ride.numTrains,
+                 ride.numCarsPerTrain,
+                 ride.numStations,
+                 ride.numBlockBrakes,
+                 ride.numCircuits };
     }
     std::vector<Setting> Settings(const Ride& ride, bool maintenance)
     {
@@ -170,14 +183,119 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         }
         return result;
     }
+    static Ride VehicleCalculation(const Ride& ride, const Setting* setting = nullptr, uint8_t value = 0)
+    {
+        // Use the native calculation on a detached copy, never the live ride as query scratch storage.
+        Ride preview{};
+        preview.id = ride.id;
+        preview.type = ride.type;
+        preview.subtype = ride.subtype;
+        preview.mode = ride.mode;
+        std::copy(ride.getStations().begin(), ride.getStations().end(), preview.getStations().begin());
+        preview.numStations = ride.numStations;
+        preview.numBlockBrakes = ride.numBlockBrakes;
+        preview.numTrains = ride.numTrains;
+        preview.numCarsPerTrain = ride.numCarsPerTrain;
+        preview.proposedNumTrains = ride.proposedNumTrains;
+        preview.proposedNumCarsPerTrain = ride.proposedNumCarsPerTrain;
+        preview.maxTrains = ride.maxTrains;
+        preview.minCarsPerTrain = ride.minCarsPerTrain;
+        preview.maxCarsPerTrain = ride.maxCarsPerTrain;
+        if (setting && setting->vehicle)
+        {
+            if (*setting->vehicle == GameActions::RideSetVehicleType::numTrains)
+                preview.proposedNumTrains = value;
+            else
+                preview.proposedNumCarsPerTrain = value;
+        }
+        preview.updateMaxVehicles();
+        return preview;
+    }
+    std::vector<Setting> VehicleSettings(const Ride& ride)
+    {
+        std::vector<Setting> result;
+        const auto* entry = ride.getRideEntry();
+        if (!entry || ride.getRideTypeDescriptor().flags.has(RtdFlag::noVehicles) || ride.numStations == 0)
+            return result;
+        const auto calculated = VehicleCalculation(ride);
+        auto add = [&](GameActions::RideSetVehicleType key, const char* name, uint8_t current, int min, int max, int zero) {
+            Setting setting{ GameActions::RideSetSetting::departure, name, {}, {}, current };
+            setting.vehicle = key;
+            setting.section = View::vehicles;
+            for (int value = min; value <= max; ++value)
+            {
+                setting.values.push_back(value);
+                setting.labels.push_back(std::to_string(std::max(0, value - zero)));
+            }
+            if (setting.values.size() > 1)
+                result.push_back(std::move(setting));
+        };
+        // Mirror native vehicle widget visibility and native station/object limits.
+        if (entry->cars_per_flat_ride > 1 || getGameState().cheats.disableTrainLengthLimit)
+            add(GameActions::RideSetVehicleType::numTrains, "Trains / vehicles", ride.proposedNumTrains, 1,
+                getGameState().cheats.disableTrainLengthLimit ? Limits::kMaxTrainsPerRide : calculated.maxTrains, 0);
+        if (entry->zero_cars + 1 < entry->max_cars_in_train || getGameState().cheats.disableTrainLengthLimit)
+            add(GameActions::RideSetVehicleType::numCarsPerTrain, "Cars per train", ride.proposedNumCarsPerTrain,
+                getGameState().cheats.disableTrainLengthLimit ? 1 : entry->min_cars_in_train,
+                getGameState().cheats.disableTrainLengthLimit ? Limits::kMaxCarsPerTrain : entry->max_cars_in_train,
+                entry->zero_cars);
+        return result;
+    }
+    std::vector<Setting> DispatchSettings(const Ride& ride)
+    {
+        std::vector<Setting> result;
+        if (!ride.getRideEntry())
+            return result;
+        const auto& type = ride.getRideTypeDescriptor();
+        auto toggle = [&](const char* name, int bit) {
+            Setting setting{ GameActions::RideSetSetting::departure,
+                             name,
+                             { static_cast<uint8_t>(ride.departFlags & ~bit), static_cast<uint8_t>(ride.departFlags | bit) },
+                             { "Off", "On" },
+                             ride.departFlags };
+            setting.section = View::dispatch;
+            result.push_back(std::move(setting));
+        };
+        if (type.flags.has(RtdFlag::hasLoadOptions))
+        {
+            toggle("Wait for load", RIDE_DEPART_WAIT_FOR_LOAD);
+            Setting load{ GameActions::RideSetSetting::departure, "Required load", {}, {}, ride.departFlags };
+            constexpr StringId names[] = { STR_QUARTER_LOAD, STR_HALF_LOAD, STR_THREE_QUARTER_LOAD, STR_FULL_LOAD,
+                                           STR_ANY_LOAD };
+            static_assert(std::size(names) == WAIT_FOR_LOAD_COUNT);
+            for (int i = 0; i < WAIT_FOR_LOAD_COUNT; ++i)
+            {
+                load.values.push_back((ride.departFlags & ~RIDE_DEPART_WAIT_FOR_LOAD_MASK) | i);
+                load.labels.push_back(FormatStringID(names[i]));
+            }
+            load.section = View::dispatch;
+            result.push_back(std::move(load));
+        }
+        if (type.flags.has(RtdFlag::hasLeaveWhenAnotherVehicleArrivesAtStation) && ride.numTrains > 1
+            && !ride.isBlockSectioned())
+            toggle("Leave when another arrives", RIDE_DEPART_LEAVE_WHEN_ANOTHER_ARRIVES);
+        if (type.flags.has(RtdFlag::canSynchroniseWithAdjacentStations))
+            toggle("Synchronise stations", RIDE_DEPART_SYNCHRONISE_WITH_ADJACENT_STATIONS);
+        return result;
+    }
+    static std::vector<Setting> SectionSettings(const Ride& ride, View section)
+    {
+        return section == View::vehicles ? VehicleSettings(ride)
+            : section == View::dispatch  ? DispatchSettings(ride)
+                                         : Settings(ride, section == View::maintenance);
+    }
     std::optional<Draft> BeginSetting(const Target& target, const Setting& selected)
     {
         const auto* ride = Resolve(target);
         if (!ride)
             return {};
-        auto settings = Settings(*ride, selected.key == GameActions::RideSetSetting::inspectionInterval);
+        const auto section = selected.vehicle                                 ? View::vehicles
+            : selected.section == View::dispatch                              ? View::dispatch
+            : selected.key == GameActions::RideSetSetting::inspectionInterval ? View::maintenance
+                                                                              : View::operations;
+        auto settings = SectionSettings(*ride, section);
         const auto found = std::find_if(settings.begin(), settings.end(), [&](const auto& setting) {
-            return setting.key == selected.key && setting.name == selected.name;
+            return setting.key == selected.key && setting.vehicle == selected.vehicle && setting.name == selected.name;
         });
         if (found == settings.end())
             return {};
@@ -192,13 +310,20 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                      {},
                      0,
                      {},
+                     {},
                      false,
                      0 };
         draft.setting = *found;
+        draft.setting->section = section;
         draft.value = found->current;
         if (!found->values.empty() && std::find(found->values.begin(), found->values.end(), draft.value) == found->values.end())
             draft.value = found->values.front(); // Honest unavailable current value; draft starts at a native legal value.
         draft.baselineSettings = Snapshot(*ride);
+        if (found->vehicle)
+        {
+            const auto preview = VehicleCalculation(*ride, &*found, draft.value);
+            draft.effectiveVehicles = { preview.numTrains, preview.numCarsPerTrain };
+        }
         return draft;
     }
     std::optional<Draft> BeginDemolition(const Target& target)
@@ -216,6 +341,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                      ride->price[0],
                      {},
                      0,
+                     {},
                      {},
                      false,
                      0 };
@@ -241,6 +367,12 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                                : direction < 0 ? -1
                                                : 0),
                     0, values.size() - 1)];
+            if (draft.setting->vehicle)
+                if (const auto* ride = Resolve(draft.target))
+                {
+                    const auto preview = VehicleCalculation(*ride, &*draft.setting, draft.value);
+                    draft.effectiveVehicles = { preview.numTrains, preview.numCarsPerTrain };
+                }
             return;
         }
         if (!draft.status && !draft.demolition)
@@ -286,15 +418,25 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         {
             if (Snapshot(*ride) != draft.baselineSettings)
                 return Invalid("Operations changed; reopen review");
-            const auto current = Settings(*ride, draft.setting->key == GameActions::RideSetSetting::inspectionInterval);
+            const auto current = SectionSettings(*ride, draft.setting->section);
             const auto found = std::find_if(current.begin(), current.end(), [&](const auto& setting) {
-                return setting.key == draft.setting->key && setting.name == draft.setting->name;
+                return setting.key == draft.setting->key && setting.vehicle == draft.setting->vehicle
+                    && setting.name == draft.setting->name;
             });
             if (found == current.end() || found->values != draft.setting->values
                 || std::find(found->values.begin(), found->values.end(), draft.value) == found->values.end())
                 return Invalid("Setting unavailable or outside native limits");
             if (draft.value == found->current)
                 return Invalid("Setting unchanged");
+            if (found->vehicle)
+            {
+                const auto preview = VehicleCalculation(*ride, &*found, draft.value);
+                if (draft.effectiveVehicles != std::array<uint8_t, 2>{ preview.numTrains, preview.numCarsPerTrain })
+                    return Invalid("Track/vehicle limits changed; reopen draft");
+                GameActions::RideSetVehicleAction action(draft.target.id, *found->vehicle, draft.value);
+                action.SetCallback(std::move(callback));
+                return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+            }
             GameActions::RideSetSettingAction action(draft.target.id, found->key, draft.value);
             action.SetCallback(std::move(callback));
             return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
@@ -382,11 +524,13 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.rows.push_back("Access / paths...");
             if (CustomTracks::CanResume(*target))
                 model.rows.push_back("Continue track...");
+            model.rows.push_back("Vehicles...");
+            model.rows.push_back("Dispatch...");
             model.rows.push_back("Operations...");
             model.rows.push_back("Maintenance...");
             model.rows.push_back("Demolish...");
         }
-        else if (view == View::operations || view == View::maintenance)
+        else if (view == View::operations || view == View::maintenance || view == View::vehicles || view == View::dispatch)
         {
             model.breadcrumb = view == View::maintenance ? "Rides / Maintenance" : "Rides / Operations";
             if (view == View::maintenance)
@@ -405,7 +549,24 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.stats = { { "Mode", FormatStringID(kRideModeNames[static_cast<uint8_t>(ride->mode)]) },
                                 { "Trains / cars",
                                   std::to_string(ride->numTrains) + " / " + std::to_string(ride->numCarsPerTrain) } };
-            for (const auto& setting : Settings(*ride, view == View::maintenance))
+            if (view == View::vehicles)
+            {
+                model.breadcrumb = "Rides / Vehicles";
+                const auto* entry = ride->getRideEntry();
+                const int zero = entry ? entry->zero_cars : 0;
+                model.stats = { { "Current vehicles", std::to_string(ride->numTrains) },
+                                { "Current cars / train", std::to_string(std::max(0, ride->numCarsPerTrain - zero)) },
+                                { "Requested vehicles", std::to_string(ride->proposedNumTrains) },
+                                { "Requested cars / train",
+                                  std::to_string(std::max(0, ride->proposedNumCarsPerTrain - zero)) } };
+                model.status = "Native limits / close before changing";
+            }
+            if (view == View::dispatch)
+            {
+                model.breadcrumb = "Rides / Dispatch";
+                model.stats = { { "Mode", FormatStringID(kRideModeNames[static_cast<uint8_t>(ride->mode)]) } };
+            }
+            for (const auto& setting : SectionSettings(*ride, view))
                 model.rows.push_back(setting.name + ": " + SettingValue(setting, setting.current));
             model.rows.push_back("Back to ride");
         }
@@ -458,6 +619,15 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.breadcrumb = "Rides / " + draft->setting->name;
                 model.stats.emplace_back("Current", SettingValue(*draft->setting, draft->setting->current));
                 model.stats.emplace_back("Draft", SettingValue(*draft->setting, draft->value));
+                if (draft->setting->vehicle)
+                {
+                    const auto* entry = ride->getRideEntry();
+                    model.stats.emplace_back(
+                        "Effective trains / cars",
+                        std::to_string(draft->effectiveVehicles[0]) + " / "
+                            + std::to_string(std::max(0, draft->effectiveVehicles[1] - (entry ? entry->zero_cars : 0))));
+                    model.status = "Native limits may clamp requested counts";
+                }
                 if (queried.error == GameActions::Status::ok
                     && draft->setting->key == GameActions::RideSetSetting::minWaitingTime)
                     model.status = "Native maximum wait increases if needed";
@@ -481,7 +651,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                     "Action cost", queried.error == GameActions::Status::ok ? FormatMoney(queried.cost) : "Unavailable");
             model.rows = view == View::price ? std::vector<std::string>{ "Decrease", "Increase", "Review...", "Cancel" }
                                              : std::vector<std::string>{ "Confirm", "Cancel" };
-            if (model.status.empty() && queried.error != GameActions::Status::ok)
+            if (queried.error != GameActions::Status::ok && feedback.empty())
                 model.status = Finances::Feedback(queried);
         }
         return model;

@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Operates on the native flat ride constructed by FlatRideWorkflowTests; no direct gameplay mutation.
+#include "VehicleDispatchTests.h"
+
 #include <openrct2-ui/handheld/FlatRides.h>
 #include <openrct2/actions/ride/RideDemolishAction.h>
 #include <openrct2/actions/ride/RideSetSettingAction.h>
-static void TestRideDepth(IContext& context, const std::string& profile, Ui::Handheld::RideManagement::Target target)
+static void TestRideDepth(
+    IContext& context, const std::string& profile, Ui::Handheld::RideManagement::Target target, bool realUi)
 {
     namespace R = Ui::Handheld::RideManagement;
     auto& state = getGameState();
+    TestVehicleDispatch(context, profile, target.id, realUi);
+    target = *R::Identify(target.id);
     const auto cash = state.park.cash;
     auto* ride = GetRide(target.id);
     Require(ride, "Ride depth native placement missing");

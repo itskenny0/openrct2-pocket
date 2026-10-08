@@ -1130,6 +1130,9 @@ public:
      */
     void CloseAllExceptFlags(WindowFlags flags) override
     {
+        // WindowInitAll resets the native UI on park load; pre-load Pocket drafts must not survive.
+        if (flags.isEmpty())
+            Handheld::RideManagement::InvalidateAll();
         CloseByCondition([flags](WindowBase* w) -> bool { return !w->flags.hasAny(flags); });
     }
 

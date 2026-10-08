@@ -17,7 +17,7 @@ parser.add_argument("--ninja", default="ninja")
 parser.add_argument("--background", type=Path, help="Optional park image for an explicitly labelled layout composite")
 parser.add_argument("--frames-dir", type=Path, help="Also save individual unscaled 512 x 384 PNG captures")
 parser.add_argument("--pages", nargs="+", default=["terrain", "paths", "path-options"],
-                    choices=["terrain", "terrain-lower", "paths", "paths-queue", "paths-remove", "paths-ground", "paths-error", "path-options", "path-options-last", "exploration", "construction", "picker", "inspection", "dashboard", "confirmation", "hud-stress", "ride-depth-summary", "ride-depth-operations", "ride-depth-maintenance", "ride-depth-demolition", "ride-depth-draft", "ride-depth-dense"],
+                    choices=["terrain", "terrain-lower", "paths", "paths-queue", "paths-remove", "paths-ground", "paths-error", "path-options", "path-options-last", "exploration", "construction", "picker", "inspection", "dashboard", "confirmation", "hud-stress", "ride-depth-summary", "ride-depth-operations", "ride-depth-maintenance", "ride-depth-demolition", "ride-depth-draft", "ride-depth-dense", "ride-depth-vehicles", "ride-depth-dispatch", "ride-depth-vehicle-draft", "ride-depth-vehicle-confirm"],
                     help="Native UI states to capture")
 args = parser.parse_args()
 if args.frames_dir:

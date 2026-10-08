@@ -11,6 +11,7 @@
 #include <openrct2/GameState.h>
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/SpriteIds.h>
+#include <openrct2/actions/track/TrackPlaceAction.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/drawing/Drawing.Sprite.h>
 #include <openrct2/drawing/Drawing.h>
@@ -20,6 +21,8 @@
 #include <openrct2/drawing/X8DrawingEngine.h>
 #include <openrct2/object/ObjectManager.h>
 #include <openrct2/ride/RideData.h>
+#include <openrct2/world/Map.h>
+#include <openrct2/world/tile_element/SurfaceElement.h>
 
 using namespace OpenRCT2;
 using namespace OpenRCT2::Drawing;
@@ -185,11 +188,25 @@ int main(int argc, char** argv)
         ride->status = RideStatus::closed;
         ride->inspectionInterval = RideInspection::every30Minutes;
         ride->liftHillSpeed = ride->getRideTypeDescriptor().LiftData.minimum_speed;
+        if (page.starts_with("ride-depth-vehicle"))
+        {
+            // Real native station piece in an owned component map; not a complete operating coaster.
+            auto* surface = MapGetSurfaceElementAt(CoordsXY{ 256, 256 });
+            surface->setOwnership({ OwnershipFlag::landOwned });
+            GameActions::TrackPlaceAction station(
+                ride->id, TrackElemType::endStation, ride->type, CoordsXYZD{ 256, 256, surface->getBaseZ(), 0 }, 0, 0, 0, {},
+                false);
+            if (GameActions::Execute(&station, getGameState()).error != GameActions::Status::ok)
+                return 10;
+            GameActions::ProcessQueue(getGameState());
+        }
         const auto target = R::Identify(ride->id);
         std::optional<R::Draft> draft;
-        auto view = page == "ride-depth-summary" ? R::View::inspection
-            : page == "ride-depth-maintenance"   ? R::View::maintenance
-                                                 : R::View::operations;
+        auto view = page == "ride-depth-summary"     ? R::View::inspection
+            : page == "ride-depth-maintenance"       ? R::View::maintenance
+            : page.starts_with("ride-depth-vehicle") ? R::View::vehicles
+            : page == "ride-depth-dispatch"          ? R::View::dispatch
+                                                     : R::View::operations;
         size_t selected = page == "ride-depth-dense" ? R::Settings(*ride).size() - 1 : 0;
         if (page == "ride-depth-demolition")
         {
@@ -202,6 +219,16 @@ int main(int argc, char** argv)
             view = R::View::price;
             draft = R::BeginSetting(*target, R::Settings(*ride).front());
             R::AdjustPrice(*draft, 1);
+        }
+        if (page == "ride-depth-vehicle-draft" || page == "ride-depth-vehicle-confirm")
+        {
+            const auto settings = R::VehicleSettings(*ride);
+            if (settings.empty())
+                return 11;
+            draft = R::BeginSetting(*target, settings.back());
+            R::AdjustPrice(*draft, -1);
+            view = page == "ride-depth-vehicle-draft" ? R::View::price : R::View::confirmation;
+            selected = view == R::View::confirmation ? 1 : 0;
         }
         auto content = R::Presentation(view, selected, {}, target, draft);
         H::Dashboard::State dashboard;

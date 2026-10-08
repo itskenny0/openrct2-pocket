@@ -277,7 +277,7 @@ static void TestFlatRides(IContext& context, const std::string& profile, bool re
         W::HandheldMenuBack();
         W::HandheldMenuBack();
     }
-    TestRideDepth(context, profile, *H::RideManagement::Identify(identity->id));
+    TestRideDepth(context, profile, *H::RideManagement::Identify(identity->id), realUi);
     std::cout << "Native flat rides / eligibility-picker / footprint-rotation-ghost / exact cash / entrance-exit-resume / "
                  "native-open-roster / input-save-reload passed\n";
 }

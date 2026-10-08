@@ -5,6 +5,7 @@
 
 #include <openrct2/actions/GameActionRunner.h>
 #include <openrct2/actions/ride/RideSetSettingAction.h>
+#include <openrct2/actions/ride/RideSetVehicleAction.h>
 #include <openrct2/ride/Ride.h>
 
 namespace OpenRCT2::Ui::Handheld::RideManagement
@@ -26,6 +27,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         statistics,
         operations,
         maintenance,
+        vehicles,
+        dispatch,
         price,
         confirmation
     };
@@ -36,8 +39,12 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         std::vector<uint8_t> values;
         std::vector<std::string> labels;
         uint8_t current;
+        std::optional<GameActions::RideSetVehicleType> vehicle{};
+        View section = View::operations;
     };
     std::vector<Setting> Settings(const Ride& ride, bool maintenance = false);
+    std::vector<Setting> VehicleSettings(const Ride& ride);
+    std::vector<Setting> DispatchSettings(const Ride& ride);
     struct Draft
     {
         Target target;
@@ -49,11 +56,13 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         money64 price;
         std::optional<Setting> setting;
         uint8_t value{};
-        std::array<uint8_t, 6> baselineSettings{};
+        std::array<uint8_t, 13> baselineSettings{};
+        std::array<uint8_t, 2> effectiveVehicles{};
         bool demolition{};
         money64 refund{};
     };
     void Invalidate(RideId id);
+    void InvalidateAll();
     std::optional<Target> Identify(RideId id);
     const Ride* Resolve(const Target& target);
     std::vector<Target> Roster();

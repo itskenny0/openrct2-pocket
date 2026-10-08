@@ -104,7 +104,7 @@ int main(int argc, char** argv)
         ride->type = RIDE_TYPE_WOODEN_ROLLER_COASTER;
         ride->subtype = context->GetObjectManager().GetLoadedObjectEntryIndex(object);
         ride->status = RideStatus::closed;
-        const auto target = *R::Identify(ride->id);
+        auto target = *R::Identify(ride->id);
         auto settings = R::Settings(*ride);
         auto lift = std::find_if(settings.begin(), settings.end(), [](const auto& s) {
             return s.key == GameActions::RideSetSetting::liftHillSpeed;
@@ -149,6 +149,17 @@ int main(int argc, char** argv)
         GameActions::ProcessQueue(state);
         Require(
             static_cast<uint8_t>(ride->mode) == modeDraft.value && state.park.cash == settingsCash, "Native mode not applied");
+        auto beforeLoad = *R::BeginSetting(target, R::DispatchSettings(*ride).front());
+        R::AdjustPrice(beforeLoad, beforeLoad.value == beforeLoad.setting->values.back() ? -1 : 1);
+        // Exercise the actual WindowInitAll reset hook on this metadata-only fixture.
+        // Save/reload of real native placements is covered by VehicleDispatchTests.
+        wm->CloseAllExceptFlags({});
+        Require(
+            !R::Resolve(target) && R::Action(beforeLoad, true).error != GameActions::Status::ok,
+            "Real WindowInitAll allowed pre-load ride draft");
+        Require(W::MainOpen(), "Reset fixture viewport missing");
+        ride = GetRide(target.id);
+        target = *R::Identify(target.id);
         // Controller paths reuse the real menu handler and duplicate-action boundary.
         auto press = [&](H::Action action) {
             H::Frame frame;
@@ -161,6 +172,68 @@ int main(int argc, char** argv)
         press(H::Action::confirm);
         press(H::Action::confirm);
         auto model = W::HandheldRidesPresentation();
+        W::HandheldDashboardMove(0, model.rows.size() - 4);
+        press(H::Action::confirm);
+        Require(W::HandheldRidesPresentation().breadcrumb == "Rides / Dispatch", "Dispatch route lost");
+        press(H::Action::openBuild);
+        Require(W::HandheldDashboardRailFocused(), "Dispatch Select failed");
+        press(H::Action::openBuild);
+        Require(W::HandheldRidesPresentation().breadcrumb == "Rides / Dispatch", "Dispatch resume lost");
+        const auto dispatchBefore = ride->departFlags;
+        Require(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) == 0, "Dispatch SDL init failed");
+        {
+            H::ControllerInput controller;
+            controller.update(true, 9000);
+            const auto device = SDL_JoystickAttachVirtual(
+                SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);
+            auto* joystick = SDL_JoystickOpen(device);
+            Require(joystick, "Dispatch virtual controller missing");
+            auto pump = [&] {
+                SDL_Event event;
+                while (SDL_PollEvent(&event))
+                    controller.handleEvent(event);
+            };
+            pump();
+            controller.update(true, 9010);
+            pump();
+            controller.update(true, 9020);
+            SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, true);
+            SDL_JoystickUpdate();
+            pump();
+            const auto frame = controller.update(true, 9030);
+            Require(frame.actions.size() == 1 && H::HandleMenuInput(controller, frame), "Dispatch selecting A lost");
+            Require(
+                controller.update(true, 9040).actions.empty() && controller.update(true, 10040).actions.empty()
+                    && W::HandheldRidesPresentation().editing && ride->departFlags == dispatchBefore,
+                "Held selecting A adjusted/applied dispatch");
+            SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, false);
+            SDL_JoystickUpdate();
+            pump();
+            Require(controller.update(true, 10050).actions.empty(), "Dispatch release acted");
+            SDL_JoystickClose(joystick);
+            SDL_JoystickDetachVirtual(device);
+        }
+        Require(W::HandheldRidesPresentation().editing, "Dispatch selecting A spilled into action");
+        W::HandheldDashboardMove(1, 0);
+        W::HandheldDashboardMove(0, 2);
+        press(H::Action::confirm);
+        Require(
+            W::HandheldRidesPresentation().confirmation && W::HandheldRidesPresentation().selected == 1,
+            "Dispatch review not Cancel-first");
+        press(H::Action::confirm);
+        Require(
+            ride->departFlags == dispatchBefore && state.park.cash == settingsCash
+                && W::HandheldRidesPresentation().breadcrumb == "Rides / Dispatch",
+            "Cancel changed dispatch/parent");
+        press(H::Action::back);
+        model = W::HandheldRidesPresentation();
+        W::HandheldDashboardMove(0, model.rows.size() - 5);
+        press(H::Action::confirm);
+        Require(
+            W::HandheldRidesPresentation().breadcrumb == "Rides / Vehicles" && W::HandheldRidesPresentation().rows.size() == 1,
+            "Trackless vehicle page fabricated editable counts");
+        press(H::Action::back);
+        model = W::HandheldRidesPresentation();
         W::HandheldDashboardMove(0, model.rows.size() - 3);
         press(H::Action::confirm);
         Require(W::HandheldRidesPresentation().breadcrumb == "Rides / Operations", "Operations route lost");

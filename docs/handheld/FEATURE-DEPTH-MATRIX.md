@@ -38,8 +38,8 @@ Complexity refers to implementation, not the number of desktop controls.
 | Ride operations PARTIAL | Ride.cpp operating page; RideSetSettingAction; Ride::getAvailableModes, type flags, LiftData | Existing ride identity, drafts, confirmation, Dashboard | medium / high | Operations list, one bounded native setting draft at a time; mode changes can reset test/vehicle state, waits couple minimum/maximum. First depth package. |
 | Ride maintenance PARTIAL | Ride.cpp maintenance; Ride inspectionInterval, lastInspection, downtime, dueInspection, availableBreakdowns | Existing stats and native setting action | small / high | Maintenance page with interval draft; distinguish rides without breakdowns. |
 | Ride demolition MISSING | DemolishRidePrompt.cpp; RideDemolishAction; RideGetRefundPrice uses native track query calculations | Shop confirmation pattern and ride stale identity | medium / high | Named destructive Cancel-first review; action Query omits refund, use native prompt calculator; changed layout/quote must invalidate review. |
-| Vehicles MISSING | Ride.cpp vehicle page; RideSetVehicleAction; Ride::updateMaxVehicles, loaded vehicle object limits, proposedNumTrains/proposedNumCarsPerTrain | Ride drafts/identity available | medium / high | Separate vehicle configuration page; closure, block sections, station length, vehicle research and action clamping need dedicated integration. |
-| Mode-specific options PARTIAL | Ride.cpp launch/time/laps/swings/rotations/circuits, load mask and synchronization; RideSetSettingAction | Operations setting model | medium / high | Typed labels/units and descriptor visibility; do not show raw operationOption as a universal setting. |
+| Vehicles PARTIAL | Ride.cpp vehicle page; RideSetVehicleAction; Ride::updateMaxVehicles, loaded vehicle object limits, proposedNumTrains/proposedNumCarsPerTrain | Ride drafts/identity available | medium / high | Train/car counts and requested/effective review delivered in Vehicles/Dispatch checkpoint. Native station/object limits, closure and clamping apply. Vehicle-object selection and reverse trains remain deferred. |
+| Mode-specific options PARTIAL | Ride.cpp launch/time/laps/swings/rotations/circuits; load mask/synchronization now represented; RideSetSettingAction | Operations setting model | medium / high | Typed labels/units and descriptor visibility; do not show raw operationOption as a universal setting. |
 | Ride finance/customer depth PARTIAL | Ride.cpp income/customer pages; Ride totalProfit, popularity, satisfaction, queue/station information | Existing read-only stats | small / medium | Split Finance/Customers when enough useful content; respect undefined values and rolling windows. |
 | Ride music/appearance/naming MISSING | Ride.cpp music/colour/name; RideSetSettingAction, RideSetAppearanceAction, RideSetNameAction | Picker/draft architecture | medium / medium | Native music objects and colour choices; keyboard dependency for naming. Defer in first operations package. |
 | Ride graphs DEFERRED | Ride.cpp graph page; RideMeasurement sampling and scrolling | No controller graph view | medium / low | Optional fixed-size native graph later; unavailable sampling honest, cursor/time scale require additional interaction. |
@@ -83,3 +83,22 @@ Next recommended depth package is vehicle/dispatch configuration, not a new UI
 shell. Refurbishment and mechanic locating use RideDemolishAction renew and native
 RideGetAssignedMechanic/RideFindClosestMechanic; medium complexity, medium player
 value, reuse Maintenance with closure/empty-ride checks and staff identity safety.
+
+## Vehicles / Dispatch package delivered
+
+Vehicles provides descriptor/object-filtered train and car-count drafts through
+RideSetVehicleAction. The native updateMaxVehicles calculation supplies station,
+mode/block and loaded-object limits and the effective count shown in review.
+Dispatch adds native load threshold, wait-for-load, supported adjacent-station
+synchronization and conditional leave-on-another-arrival. Unrelated departure
+bits are preserved. Existing wait-time controls remain in Operations.
+Counts/dispatch are COMPLETE within this named scope; Vehicles remains PARTIAL
+for vehicle-object selection and reversed trains. Mode-specific options still
+need typed time/laps/launch/rotations/circuits support. No new construction, UI
+shell or save format. See VEHICLES-DISPATCH-CHECKPOINT.md for validation and
+public-fixture limitations.
+
+Recommended next package: descriptor-driven mode-specific operating parameters
+within Operations, preserving these new vehicle/dispatch workflows. Keep vehicle
+object selection, appearance/music and graphs deferred until that package is
+validated.

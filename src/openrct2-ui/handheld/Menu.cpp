@@ -88,6 +88,8 @@ namespace OpenRCT2::Ui::Windows
         ridesStats,
         ridesOperations,
         ridesMaintenance,
+        ridesVehicles,
+        ridesDispatch,
         ridesPrice,
         ridesConfirm,
         research,
@@ -186,6 +188,12 @@ namespace OpenRCT2::Ui::Windows
         std::shared_ptr<int> _ridesLifetime = std::make_shared<int>(0);
         Page ridesDraftParent() const
         {
+            if (_ridesDraft && _ridesDraft->setting
+                && _ridesDraft->setting->section == Handheld::RideManagement::View::vehicles)
+                return Page::ridesVehicles;
+            if (_ridesDraft && _ridesDraft->setting
+                && _ridesDraft->setting->section == Handheld::RideManagement::View::dispatch)
+                return Page::ridesDispatch;
             if (_ridesDraft && _ridesDraft->setting)
                 return _ridesDraft->setting->key == GameActions::RideSetSetting::inspectionInterval ? Page::ridesMaintenance
                                                                                                     : Page::ridesOperations;
@@ -194,8 +202,9 @@ namespace OpenRCT2::Ui::Windows
         bool ridesManagement() const
         {
             return _page == Page::ridesRoster || _page == Page::ridesInspect || _page == Page::ridesStats
-                || _page == Page::ridesOperations || _page == Page::ridesMaintenance || _page == Page::ridesAccess
-                || _page == Page::ridesPrice || _page == Page::ridesConfirm;
+                || _page == Page::ridesVehicles || _page == Page::ridesDispatch || _page == Page::ridesOperations
+                || _page == Page::ridesMaintenance || _page == Page::ridesAccess || _page == Page::ridesPrice
+                || _page == Page::ridesConfirm;
         }
         Handheld::ManagementPresentation ridesPresentationFor(Page current, size_t selected) const
         {
@@ -208,6 +217,8 @@ namespace OpenRCT2::Ui::Windows
                     : current == Page::ridesStats       ? View::statistics
                     : current == Page::ridesOperations  ? View::operations
                     : current == Page::ridesMaintenance ? View::maintenance
+                    : current == Page::ridesVehicles    ? View::vehicles
+                    : current == Page::ridesDispatch    ? View::dispatch
                     : current == Page::ridesPrice       ? View::price
                                                         : View::confirmation,
                 selected, _ridesRoster, _ridesTarget, _ridesDraft, _status);
@@ -454,6 +465,8 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ridesRoster:
                 case Page::ridesInspect:
                 case Page::ridesAccess:
+                case Page::ridesVehicles:
+                case Page::ridesDispatch:
                 case Page::ridesOperations:
                 case Page::ridesMaintenance:
                 case Page::ridesStats:
@@ -856,7 +869,8 @@ namespace OpenRCT2::Ui::Windows
                 || _page == Page::staffInspect || _page == Page::staffStats || _page == Page::research
                 || _page == Page::marketing || _page == Page::marketingActive || guestManagement() || _page == Page::ridesRoster
                 || _page == Page::ridesInspect || _page == Page::ridesAccess || _page == Page::ridesStats
-                || _page == Page::ridesOperations || _page == Page::ridesMaintenance;
+                || _page == Page::ridesVehicles || _page == Page::ridesDispatch || _page == Page::ridesOperations
+                || _page == Page::ridesMaintenance;
         }
         void enterDashboardContent()
         {
@@ -1091,6 +1105,8 @@ namespace OpenRCT2::Ui::Windows
                     page(Page::ridesRoster);
                     break;
                 case Page::ridesAccess:
+                case Page::ridesVehicles:
+                case Page::ridesDispatch:
                 case Page::ridesOperations:
                 case Page::ridesMaintenance:
                 case Page::ridesPrice:
@@ -1642,6 +1658,16 @@ namespace OpenRCT2::Ui::Windows
                         break;
                     }
                     const auto rows = ridesPresentationFor(Page::ridesInspect, choice).rows;
+                    if (choice == rows.size() - 5)
+                    {
+                        page(Page::ridesVehicles);
+                        break;
+                    }
+                    if (choice == rows.size() - 4)
+                    {
+                        page(Page::ridesDispatch);
+                        break;
+                    }
                     if (choice == rows.size() - 3)
                     {
                         page(Page::ridesOperations);
@@ -1745,12 +1771,18 @@ namespace OpenRCT2::Ui::Windows
                     else if (choice == 4)
                         page(Page::ridesInspect);
                     break;
+                case Page::ridesVehicles:
+                case Page::ridesDispatch:
                 case Page::ridesOperations:
                 case Page::ridesMaintenance:
                 {
                     const auto* ride = _ridesTarget ? Handheld::RideManagement::Resolve(*_ridesTarget) : nullptr;
-                    const auto settings = ride ? Handheld::RideManagement::Settings(*ride, _page == Page::ridesMaintenance)
-                                               : std::vector<Handheld::RideManagement::Setting>{};
+                    const auto settings = ride
+                        ? (_page == Page::ridesVehicles ? Handheld::RideManagement::VehicleSettings(*ride)
+                               : _page == Page::ridesDispatch
+                               ? Handheld::RideManagement::DispatchSettings(*ride)
+                               : Handheld::RideManagement::Settings(*ride, _page == Page::ridesMaintenance))
+                        : std::vector<Handheld::RideManagement::Setting>{};
                     if (choice >= settings.size())
                         page(ride ? Page::ridesInspect : Page::ridesRoster);
                     else
@@ -1810,13 +1842,8 @@ namespace OpenRCT2::Ui::Windows
                                 if (outcome->error == GameActions::Status::ok)
                                 {
                                     const bool demolished = _ridesDraft && _ridesDraft->demolition;
-                                    const bool setting = _ridesDraft && _ridesDraft->setting.has_value();
-                                    const bool maintenance = setting
-                                        && _ridesDraft->setting->key == GameActions::RideSetSetting::inspectionInterval;
-                                    page(
-                                        demolished    ? Page::ridesRoster
-                                            : setting ? (maintenance ? Page::ridesMaintenance : Page::ridesOperations)
-                                                      : Page::ridesInspect);
+                                    const auto destination = ridesDraftParent();
+                                    page(demolished ? Page::ridesRoster : destination);
                                     _status = demolished ? "Ride demolished" : "Ride updated";
                                 }
                                 else
