@@ -78,7 +78,8 @@ fixture tests reject incomplete coaster opening honestly; existing complete flat
 ride/access tests continue to validate native opening. Asset-backed complete
 coaster operation and physical Brick readability are follow-up validation.
 Captures are 512×384 production-component fixtures, not native scenario captures.
-The vehicle capture's station is placed by native TrackPlaceAction; the world is
+Capture rides are initialized by native RideCreateAction, and the vehicle
+capture's station is placed by native TrackPlaceAction; the world is
 not rendered. No fabricated ratings, guests or operation statistics.
 
 ## Changed files
@@ -94,3 +95,7 @@ not rendered. No fabricated ratings, guests or operation statistics.
 Deferred: vehicle-object/reversed-train controls, mode-specific launch/time/laps/
 rotations/circuits, music/appearance, graphs. No gameplay rules, save formats,
 construction or Pocket palette/layout are changed.
+
+Five verified 512×384 component captures: Summary, Vehicles, Dispatch, car-count
+draft and Cancel-first vehicle review. Requested/effective clamping remains
+visible; no original RCT world assets or private scenario files are included.

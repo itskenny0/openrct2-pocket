@@ -11,6 +11,7 @@
 #include <openrct2/GameState.h>
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/SpriteIds.h>
+#include <openrct2/actions/ride/RideCreateAction.h>
 #include <openrct2/actions/track/TrackPlaceAction.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/drawing/Drawing.Sprite.h>
@@ -178,12 +179,16 @@ int main(int argc, char** argv)
         if (!object)
             return 8;
         gOpenRCT2NoGraphics = false;
-        auto* ride = RideAllocateAtIndex(RideId::FromUnderlying(0));
+        const auto objectIndex = context->GetObjectManager().GetLoadedObjectEntryIndex(object);
+        GameActions::RideCreateAction create(
+            RIDE_TYPE_WOODEN_ROLLER_COASTER, objectIndex, 0, 0, kObjectEntryIndexNull, RideInspection::every30Minutes);
+        const auto created = GameActions::Execute(&create, getGameState());
+        if (created.error != GameActions::Status::ok)
+            return 9;
+        GameActions::ProcessQueue(getGameState());
+        auto* ride = GetRide(created.getData<RideId>());
         if (!ride)
             return 9;
-        ride->type = RIDE_TYPE_WOODEN_ROLLER_COASTER;
-        ride->subtype = context->GetObjectManager().GetLoadedObjectEntryIndex(object);
-        ride->mode = RideMode::continuousCircuit;
         ride->customName = "Wooden Coaster / component fixture";
         ride->status = RideStatus::closed;
         ride->inspectionInterval = RideInspection::every30Minutes;
