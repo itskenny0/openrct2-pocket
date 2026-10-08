@@ -7,6 +7,7 @@
 #include "ListFocus.h"
 #include "MarketingManagement.h"
 #include "Panel.h"
+#include "ParkOverview.h"
 #include "Paths.h"
 #include "ResearchManagement.h"
 #include "RideManagement.h"
@@ -53,6 +54,7 @@ namespace OpenRCT2::Ui::Windows
         shopPicker,
         dashboard,
         overview,
+        overviewConfirm,
         finances,
         financeEditor,
         financeConfirm,
@@ -133,6 +135,18 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::ShopManagement::Target> _shop;
         std::optional<money64> _priceDraft;
         std::optional<Handheld::Finances::Draft> _financeDraft;
+        std::optional<Handheld::ParkOverview::Draft> _overviewDraft;
+        bool _overviewBusy{};
+        uint64_t _overviewRequest{};
+        std::shared_ptr<int> _overviewLifetime = std::make_shared<int>(0);
+        bool overviewManagement() const
+        {
+            return _page == Page::overview || _page == Page::overviewConfirm;
+        }
+        Handheld::ManagementPresentation overviewPresentation() const
+        {
+            return Handheld::ParkOverview::Presentation(_focus.index(), _overviewDraft, _status);
+        }
         std::optional<Handheld::ResearchManagement::Draft> _researchDraft;
         std::optional<Handheld::MarketingManagement::Draft> _marketingDraft;
         std::vector<int> _marketingTypes, _marketingActiveTypes;
@@ -256,7 +270,7 @@ namespace OpenRCT2::Ui::Windows
         bool managementShell() const
         {
             return _page == Page::dashboard || financeManagement() || staffManagement() || researchManagement()
-                || marketingManagement() || guestManagement() || ridesManagement();
+                || marketingManagement() || guestManagement() || ridesManagement() || overviewManagement();
         }
         bool shopManagement() const
         {
@@ -304,6 +318,10 @@ namespace OpenRCT2::Ui::Windows
 
         void page(Page next)
         {
+            if (next != Page::overviewConfirm)
+                _overviewDraft.reset();
+            _overviewBusy = false;
+            ++_overviewRequest;
             if (_page == Page::ridesRoster)
                 _ridesRosterFocus = _focus.index();
             if (next == Page::ridesRoster)
@@ -337,6 +355,8 @@ namespace OpenRCT2::Ui::Windows
                 _dashboard.section = Handheld::Dashboard::Section::staff;
             else if (next == Page::finances)
                 _dashboard.section = Handheld::Dashboard::Section::finances;
+            if (next == Page::overview)
+                _dashboard.section = Handheld::Dashboard::Section::overview;
             if (next == Page::ridesRoster)
                 _dashboard.section = Handheld::Dashboard::Section::rides;
             if (next == Page::guests)
@@ -361,8 +381,8 @@ namespace OpenRCT2::Ui::Windows
             if (next == Page::guestRoster)
                 _focus.move(static_cast<int32_t>(std::min(_guestRosterFocus, rows().size() - 1)), rows().size());
             if (next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish
-                || next == Page::ridesConfirm || next == Page::financeConfirm || next == Page::marketingConfirm
-                || next == Page::staffHire || next == Page::staffDismiss)
+                || next == Page::overviewConfirm || next == Page::ridesConfirm || next == Page::financeConfirm
+                || next == Page::marketingConfirm || next == Page::staffHire || next == Page::staffDismiss)
                 _focus.move(1, 2); // destructive confirmations default to Cancel
             if (next == Page::researchConfirm)
                 _focus.move(static_cast<int32_t>(rows().size() - 1), rows().size());
@@ -391,7 +411,8 @@ namespace OpenRCT2::Ui::Windows
                 case Page::financeConfirm:
                     return { "Apply", "Cancel" };
                 case Page::overview:
-                    return { "Back to dashboard" };
+                case Page::overviewConfirm:
+                    return overviewPresentation().rows;
                 case Page::ridesRoster:
                 case Page::ridesInspect:
                 case Page::ridesStats:
@@ -500,6 +521,18 @@ namespace OpenRCT2::Ui::Windows
         }
 
     public:
+        size_t dashboardSectionIndex() const
+        {
+            return _dashboard.index();
+        }
+        bool overviewIsOpen() const
+        {
+            return overviewManagement();
+        }
+        Handheld::ManagementPresentation overviewModel() const
+        {
+            return overviewPresentation();
+        }
         bool ridesIsOpen() const
         {
             return ridesManagement();
@@ -604,7 +637,7 @@ namespace OpenRCT2::Ui::Windows
                     _focus.move(static_cast<int32_t>(row), rows().size());
                 }
             }
-            if (ridesManagement())
+            if (ridesManagement() || overviewManagement())
                 invalidate();
             if (_page == Page::guestRoster)
             {
@@ -698,9 +731,9 @@ namespace OpenRCT2::Ui::Windows
         }
         bool dashboardCanSwitch() const
         {
-            return _page == Page::dashboard || _page == Page::finances || _page == Page::staff || _page == Page::staffInspect
-                || _page == Page::staffStats || _page == Page::research || _page == Page::marketing
-                || _page == Page::marketingActive || guestManagement() || _page == Page::ridesRoster
+            return _page == Page::dashboard || _page == Page::overview || _page == Page::finances || _page == Page::staff
+                || _page == Page::staffInspect || _page == Page::staffStats || _page == Page::research
+                || _page == Page::marketing || _page == Page::marketingActive || guestManagement() || _page == Page::ridesRoster
                 || _page == Page::ridesInspect || _page == Page::ridesStats;
         }
         void enterDashboardContent()
@@ -712,6 +745,7 @@ namespace OpenRCT2::Ui::Windows
                 : _dashboard.section == Section::marketing         ? std::optional<Page>{ Page::marketing }
                 : _dashboard.section == Section::guests            ? std::optional<Page>{ Page::guests }
                 : _dashboard.section == Section::rides             ? std::optional<Page>{ Page::ridesRoster }
+                : _dashboard.section == Section::overview          ? std::optional<Page>{ Page::overview }
                                                                    : std::nullopt;
             if (!root || !_dashboard.enter())
                 return;
@@ -983,6 +1017,9 @@ namespace OpenRCT2::Ui::Windows
                 case Page::financeEditor:
                     page(Page::finances);
                     break;
+                case Page::overviewConfirm:
+                    page(Page::overview);
+                    break;
                 case Page::overview:
                 case Page::finances:
                 case Page::guests:
@@ -1014,7 +1051,8 @@ namespace OpenRCT2::Ui::Windows
         }
         void confirm()
         {
-            if ((ridesManagement() && _ridesBusy) || (marketingManagement() && _marketingBusy))
+            if ((overviewManagement() && _overviewBusy) || (ridesManagement() && _ridesBusy)
+                || (marketingManagement() && _marketingBusy))
                 return;
             if (ridesManagement() && _page != Page::ridesRoster
                 && (!_ridesTarget || !Handheld::RideManagement::Resolve(*_ridesTarget)))
@@ -1287,7 +1325,70 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::overview:
-                    page(Page::dashboard);
+                    if (choice == 0)
+                    {
+                        _overviewDraft = Handheld::ParkOverview::Begin();
+                        if (_overviewDraft)
+                            page(Page::overviewConfirm);
+                        else
+                        {
+                            _status = "Park status locked by objective";
+                            invalidate();
+                        }
+                    }
+                    else if (Handheld::Finances::Available(Handheld::Finances::Field::admission))
+                    {
+                        _dashboard.section = Handheld::Dashboard::Section::finances;
+                        _dashboard.focus = Handheld::Dashboard::Focus::content;
+                        page(Page::finances);
+                        _focus.move(1, rows().size()); // existing Finances admission row; no editor/action spill
+                    }
+                    else
+                    {
+                        _status = "Admission pricing unavailable";
+                        invalidate();
+                    }
+                    break;
+                case Page::overviewConfirm:
+                    if (choice == 1)
+                    {
+                        page(Page::overview);
+                        break;
+                    }
+                    if (_overviewDraft)
+                    {
+                        const auto query = Handheld::ParkOverview::Action(*_overviewDraft, false);
+                        if (query.error != GameActions::Status::ok)
+                        {
+                            _status = Handheld::Finances::Feedback(query);
+                            invalidate();
+                            break;
+                        }
+                        _overviewBusy = true;
+                        const auto request = ++_overviewRequest;
+                        const auto result = Handheld::ParkOverview::Action(
+                            *_overviewDraft, true,
+                            [this, request, lifetime = std::weak_ptr<int>(_overviewLifetime)](
+                                const GameActions::GameAction*, const GameActions::Result* outcome) {
+                                if (lifetime.expired() || request != _overviewRequest || _page != Page::overviewConfirm)
+                                    return;
+                                _overviewBusy = false;
+                                if (outcome->error == GameActions::Status::ok)
+                                {
+                                    page(Page::overview);
+                                    _status = "Park status updated";
+                                }
+                                else
+                                    _status = Handheld::Finances::Feedback(*outcome);
+                                invalidate();
+                            });
+                        if (result.error != GameActions::Status::ok)
+                        {
+                            _overviewBusy = false;
+                            _status = Handheld::Finances::Feedback(result);
+                        }
+                        invalidate();
+                    }
                     break;
                 case Page::ridesRoster:
                     _ridesRosterFocus = choice;
@@ -1783,7 +1884,9 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::ManagementPresentation model;
                 if (_page == Page::dashboard)
                 {
-                    if (_dashboard.section == Handheld::Dashboard::Section::staff)
+                    if (_dashboard.section == Handheld::Dashboard::Section::overview)
+                        model = Handheld::ParkOverview::Presentation(0);
+                    else if (_dashboard.section == Handheld::Dashboard::Section::staff)
                     {
                         const auto resume = _sectionResume[_dashboard.index()];
                         if (resume.page && *resume.page != Page::staff)
@@ -1825,6 +1928,8 @@ namespace OpenRCT2::Ui::Windows
                     if (!_status.empty())
                         model.status = _status;
                 }
+                else if (overviewManagement())
+                    model = overviewPresentation();
                 else if (ridesManagement())
                     model = ridesPresentationFor(_page, _focus.index());
                 else if (guestManagement())
@@ -2223,6 +2328,21 @@ namespace OpenRCT2::Ui::Windows
 
 namespace OpenRCT2::Ui::Windows
 {
+    size_t HandheldDashboardSectionIndex()
+    {
+        auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window ? static_cast<const HandheldMenuWindow*>(window)->dashboardSectionIndex() : 0;
+    }
+    bool HandheldOverviewIsOpen()
+    {
+        auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window && static_cast<const HandheldMenuWindow*>(window)->overviewIsOpen();
+    }
+    Handheld::ManagementPresentation HandheldOverviewPresentation()
+    {
+        auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window ? static_cast<const HandheldMenuWindow*>(window)->overviewModel() : Handheld::ManagementPresentation{};
+    }
     bool HandheldRidesIsOpen()
     {
         auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);

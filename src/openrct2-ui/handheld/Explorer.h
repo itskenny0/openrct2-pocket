@@ -4,6 +4,7 @@
  *****************************************************************************/
 
 #pragma once
+#include <cstddef>
 #include <openrct2/Identifiers.h>
 #include <openrct2/object/ObjectTypes.h>
 #include <openrct2/world/Location.hpp>
@@ -47,6 +48,9 @@ namespace OpenRCT2::Ui::Windows
     bool HandheldDashboardRailFocused();
     void HandheldDashboardMove(int x, int y);
     void HandheldDashboardSwitchPane();
+    size_t HandheldDashboardSectionIndex();
+    bool HandheldOverviewIsOpen();
+    Handheld::ManagementPresentation HandheldOverviewPresentation();
     bool HandheldRidesIsOpen();
     Handheld::ManagementPresentation HandheldRidesPresentation();
     bool HandheldGuestsIsOpen();

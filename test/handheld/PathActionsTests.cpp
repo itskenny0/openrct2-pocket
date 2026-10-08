@@ -11,6 +11,7 @@
 #include <openrct2-ui/handheld/Finances.h>
 #include <openrct2-ui/handheld/GuestManagement.h>
 #include <openrct2-ui/handheld/MarketingManagement.h>
+#include <openrct2-ui/handheld/ParkOverview.h>
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/ResearchManagement.h>
 #include <openrct2-ui/handheld/RideManagement.h>
@@ -33,6 +34,7 @@
 #include <openrct2/actions/park/ParkMarketingAction.h>
 #include <openrct2/actions/park/ParkSetEntranceFeeAction.h>
 #include <openrct2/actions/park/ParkSetLoanAction.h>
+#include <openrct2/actions/park/ParkSetParameterAction.h>
 #include <openrct2/actions/park/ParkSetResearchFundingAction.h>
 #include <openrct2/actions/peep/StaffFireAction.h>
 #include <openrct2/actions/peep/StaffHireNewAction.h>
@@ -1483,6 +1485,13 @@ static void TestShopManagement(IContext& context, const std::string& profile, bo
                  "stale-pause / save-reload passed\n";
 }
 
+static void OpenFinancesDashboard()
+{
+    namespace W = Ui::Windows;
+    W::HandheldDashboardOpen();
+    W::HandheldDashboardMove(0, 4 - static_cast<int>(W::HandheldDashboardSectionIndex()));
+}
+
 static void TestFinances(IContext& context, const std::string& profile, bool realUi)
 {
     namespace H = Ui::Handheld;
@@ -1626,7 +1635,7 @@ static void TestFinances(IContext& context, const std::string& profile, bool rea
         H::ControllerInput input;
         H::Frame frame;
         auto open = [&]() {
-            W::HandheldDashboardOpen();
+            OpenFinancesDashboard();
             W::HandheldMenuConfirm();
             Require(W::HandheldFinancesIsOpen() && gGamePaused, "Dashboard finance navigation failed");
         };
@@ -1730,7 +1739,7 @@ static void TestFinances(IContext& context, const std::string& profile, bool rea
     {
         const auto cash = park.cash, loanValue = park.bankLoan, feeValue = park.entranceFee;
         park.flags.set(ParkFlag::noMoney);
-        W::HandheldDashboardOpen();
+        OpenFinancesDashboard();
         W::HandheldMenuConfirm();
         W::HandheldMenuConfirm();
         W::HandheldFinancesMove(1, 0);
@@ -1746,7 +1755,7 @@ static void TestFinances(IContext& context, const std::string& profile, bool rea
         W::HandheldMenuBack();
         park.flags.unset(ParkFlag::noMoney);
         gGamePaused = 1;
-        W::HandheldDashboardOpen();
+        OpenFinancesDashboard();
         W::HandheldMenuConfirm();
         W::HandheldMenuBack();
         W::HandheldMenuBack();
@@ -1761,7 +1770,7 @@ static void TestFinances(IContext& context, const std::string& profile, bool rea
     Require(ScenarioSave(state, save, flags) != 0, "Finance save failed");
     if (realUi)
     {
-        W::HandheldDashboardOpen();
+        OpenFinancesDashboard();
         W::HandheldMenuConfirm();
         W::HandheldMenuConfirm();
         W::HandheldFinancesMove(1, 0);
@@ -1879,7 +1888,7 @@ static void TestStaff(IContext& context, const std::string& profile, bool realUi
     if (realUi)
     {
         auto open = [&] {
-            W::HandheldDashboardOpen();
+            OpenFinancesDashboard();
             W::HandheldMenuMove(-1);
             W::HandheldMenuConfirm();
             Require(W::HandheldStaffIsOpen() && gGamePaused, "Dashboard Staff route failed");
@@ -2059,7 +2068,7 @@ static void TestStaff(IContext& context, const std::string& profile, bool realUi
     Require(ScenarioSave(state, save, flags) != 0, "Staff save failed");
     if (realUi)
     {
-        W::HandheldDashboardOpen();
+        OpenFinancesDashboard();
         W::HandheldMenuMove(-1);
         W::HandheldMenuConfirm();
     }
@@ -2178,7 +2187,7 @@ static void TestResearchManagement(IContext& context, const std::string& profile
             frame.actions = { value, value }; // One semantic action only, never spill into new page.
             Require(H::HandleMenuInput(input, frame), "Research input unhandled");
         };
-        W::HandheldDashboardOpen();
+        OpenFinancesDashboard();
         W::HandheldDashboardMove(0, 1);
         press(H::Action::confirm);
         Require(!W::HandheldDashboardRailFocused(), "Research rail did not enter content");
@@ -2247,7 +2256,7 @@ static void TestResearchManagement(IContext& context, const std::string& profile
     Require(ScenarioSave(state, activeSave, flags) != 0, "Active research save failed");
     if (realUi)
     {
-        W::HandheldDashboardOpen();
+        OpenFinancesDashboard();
         W::HandheldDashboardMove(0, 1);
         W::HandheldMenuConfirm();
         W::HandheldMenuConfirm();
@@ -2285,7 +2294,7 @@ static void TestResearchManagement(IContext& context, const std::string& profile
     Require(ScenarioSave(state, roundtrip, flags) != 0, "Research save failed");
     if (realUi)
     {
-        W::HandheldDashboardOpen();
+        OpenFinancesDashboard();
         W::HandheldDashboardMove(0, 1);
         W::HandheldMenuConfirm();
         W::HandheldMenuConfirm(); // Completed research cannot open an unavailable editor.
@@ -2429,7 +2438,7 @@ static void TestMarketingManagement(IContext& context, const std::string& profil
             frame.actions = { value, value };
             Require(H::HandleMenuInput(input, frame), "Marketing semantic input unhandled");
         };
-        W::HandheldDashboardOpen();
+        OpenFinancesDashboard();
         W::HandheldDashboardMove(0, 2);
         press(H::Action::confirm);
         Require(!W::HandheldDashboardRailFocused(), "Marketing did not enter content");
@@ -2528,7 +2537,7 @@ static void TestMarketingManagement(IContext& context, const std::string& profil
     Require(ScenarioSave(state, saved, saveFlags) != 0, "Marketing save failed");
     if (realUi)
     {
-        W::HandheldDashboardOpen();
+        OpenFinancesDashboard();
         W::HandheldDashboardMove(0, 2);
         W::HandheldMenuConfirm();
         W::HandheldMenuConfirm();
@@ -2687,7 +2696,7 @@ static void TestGuests(IContext& context, const std::string& profile, bool realU
             Require(H::HandleMenuInput(input, frame), "Guest semantic input lost");
         };
         auto open = [&] {
-            W::HandheldDashboardOpen();
+            OpenFinancesDashboard();
             W::HandheldDashboardMove(0, -2);
             press(H::Action::confirm);
             Require(W::HandheldGuestsIsOpen() && !W::HandheldDashboardRailFocused(), "Guests route unavailable");
@@ -2800,7 +2809,7 @@ static void TestGuests(IContext& context, const std::string& profile, bool realU
     const auto oldEntry = target.entryTime;
     if (realUi)
     {
-        W::HandheldDashboardOpen();
+        OpenFinancesDashboard();
         W::HandheldDashboardMove(0, -2);
         W::HandheldMenuConfirm();
         W::HandheldMenuConfirm();
@@ -2841,7 +2850,7 @@ static void TestGuests(IContext& context, const std::string& profile, bool realU
     Require(ScenarioSave(state, save, flags) != 0, "Guest roundtrip save failed");
     if (realUi)
     {
-        W::HandheldDashboardOpen();
+        OpenFinancesDashboard();
         W::HandheldDashboardMove(0, -2);
         W::HandheldMenuConfirm();
         W::HandheldMenuConfirm();
@@ -3014,7 +3023,7 @@ static void TestRideManagement(IContext& context, const std::string& profile, bo
             Require(H::HandleMenuInput(input, frame), "Rides input lost");
         };
         auto openMenu = [&] {
-            W::HandheldDashboardOpen();
+            OpenFinancesDashboard();
             W::HandheldDashboardMove(0, -3);
             press(H::Action::confirm);
         };
@@ -3218,6 +3227,238 @@ static void TestRideManagement(IContext& context, const std::string& profile, bo
                  "cancel-stale-focus / save-reload passed\n";
 }
 
+static void TestOverview(IContext& context, const std::string& profile, bool realUi)
+{
+    namespace O = Ui::Handheld::ParkOverview;
+    namespace H = Ui::Handheld;
+    namespace W = Ui::Windows;
+    namespace F = H::Finances;
+    auto& state = getGameState();
+    auto& park = state.park;
+    const auto original = profile + "/overview-original.park";
+    SaveFlags flags{};
+    flags.set(SaveFlag::exportObjects);
+    Require(ScenarioSave(state, original, flags), "Overview original save failed");
+    state.scenarioOptions.objective = {};
+    state.scenarioOptions.objective.Type = Scenario::ObjectiveType::haveFun;
+    state.scenarioCompletedCompanyValue = kMoney64Undefined;
+    park.flags.unset(ParkFlag::parkOpen, ParkFlag::noMoney, ParkFlag::freeEntry);
+    park.rating = 733;
+    park.numGuestsInPark = 321;
+    park.value = 125000.00_GBP;
+    const auto cash = park.cash, loan = park.bankLoan, fee = park.entranceFee;
+    const auto ledger = park.expenditureTable;
+    const auto commonPrices = park.samePriceThroughoutPark;
+    auto model = O::Presentation(0);
+    Require(model.title == park.name && model.stats.size() == 4 && model.rows.size() == 2, "Overview is not a concise summary");
+    Require(
+        model.stats[0].second == "Closed" && model.stats[1].second == "321" && model.stats[2].second == "733 / 999"
+            && model.stats[3].second == H::FormatMoney(park.value),
+        "Native overview information incorrect");
+    Require(O::Outcome() == "No completion target" && !O::ObjectiveText().empty(), "Sandbox objective fabricated");
+    state.scenarioOptions.objective.Type = Scenario::ObjectiveType::guestsBy;
+    state.scenarioOptions.objective.Year = 4;
+    state.scenarioOptions.objective.NumGuests = 1500;
+    Require(
+        O::Outcome() == "In progress" && O::ObjectiveText().find("1,500") != std::string::npos,
+        "Native objective arguments missing");
+    state.scenarioCompletedCompanyValue = kCompanyValueOnFailedObjective;
+    Require(O::Outcome() == "Failed", "Failed outcome hidden");
+    state.scenarioCompletedCompanyValue = 100.00_GBP;
+    Require(O::Outcome() == "Completed", "Completed outcome hidden");
+    state.scenarioCompletedCompanyValue = kMoney64Undefined;
+    state.scenarioOptions.objective.Type = Scenario::ObjectiveType::count;
+    Require(O::ObjectiveText() == "Objective unavailable" && O::Outcome() == "Unavailable", "Unsupported objective fabricated");
+    state.scenarioOptions.objective.Type = Scenario::ObjectiveType::guestsAndRating;
+    Require(
+        !O::StatusPermitted() && !O::Begin() && O::Presentation(0).rows[0] == "Park status locked",
+        "Native forced-open UI restriction bypassed");
+    state.scenarioOptions.objective.Type = Scenario::ObjectiveType::haveFun;
+    auto draft = *O::Begin();
+    gGamePaused = 1;
+    GameActions::ParkSetParameterAction native(GameActions::ParkParameter::open);
+    const auto query = O::Action(draft, false);
+    Require(
+        query.error == GameActions::Query(&native, state).error && query.error == GameActions::Status::ok && query.cost == 0,
+        "Park query differs from native");
+    Require(
+        !park.flags.has(ParkFlag::parkOpen) && park.cash == cash && park.expenditureTable == ledger,
+        "Status review mutated park");
+    Require(O::Action(draft, true).error == GameActions::Status::ok, "Native open failed while paused");
+    GameActions::ProcessQueue(state);
+    Require(
+        park.flags.has(ParkFlag::parkOpen) && park.cash == cash && park.bankLoan == loan && park.entranceFee == fee
+            && park.expenditureTable == ledger && park.samePriceThroughoutPark == commonPrices,
+        "Open changed native accounting/settings");
+    Require(O::Action(draft, true).error != GameActions::Status::ok, "Stale/repeated park open accepted");
+    draft = *O::Begin();
+    auto bad = draft;
+    bad.open = bad.baselineOpen;
+    Require(O::Action(bad, true).error != GameActions::Status::ok, "Unchanged status request accepted");
+    ++state.scenarioOptions.objective.NumGuests;
+    Require(O::Action(draft, true).error != GameActions::Status::ok, "Changed objective accepted stale review");
+    --state.scenarioOptions.objective.NumGuests;
+    state.scenarioCompletedCompanyValue = kCompanyValueOnFailedObjective;
+    Require(O::Action(draft, true).error != GameActions::Status::ok, "Changed outcome accepted stale review");
+    state.scenarioCompletedCompanyValue = kMoney64Undefined;
+    state.scenarioOptions.objective.Type = Scenario::ObjectiveType::guestsAndRating;
+    Require(O::Action(draft, true).error != GameActions::Status::ok, "New forced-open objective ignored");
+    state.scenarioOptions.objective.Type = Scenario::ObjectiveType::haveFun;
+    park.flags.set(ParkFlag::noMoney);
+    Require(
+        O::Action(draft, true).error != GameActions::Status::ok && O::Presentation(0).stats[3].second == "Not applicable",
+        "Changed no-money settings accepted / financial data fabricated");
+    draft = *O::Begin();
+    Require(O::Action(draft, true).error == GameActions::Status::ok, "No-money native close failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        !park.flags.has(ParkFlag::parkOpen) && park.cash == cash && park.expenditureTable == ledger,
+        "No-money close charged cash");
+    park.flags.unset(ParkFlag::noMoney);
+    park.value = kMoney64Undefined;
+    Require(O::Presentation(0).stats[3].second == "Unavailable", "Undefined park value fabricated");
+    park.value = 125000.00_GBP;
+    if (realUi)
+    {
+        H::EndTerrain();
+        gGamePaused = 0;
+        H::ControllerInput input;
+        auto press = [&](H::Action action) {
+            H::Frame frame;
+            frame.actions = { action, action };
+            Require(H::HandleMenuInput(input, frame), "Overview input lost");
+        };
+        W::HandheldDashboardOpen();
+        Require(
+            W::HandheldDashboardRailFocused() && W::HandheldDashboardSectionIndex() == 0 && gGamePaused,
+            "Fresh Dashboard does not land on Overview");
+        press(H::Action::confirm);
+        Require(
+            W::HandheldOverviewIsOpen() && !W::HandheldOverviewPresentation().confirmation,
+            "Overview selecting A spilled into review");
+        press(H::Action::confirm);
+        Require(
+            W::HandheldOverviewPresentation().confirmation && W::HandheldOverviewPresentation().selected == 1,
+            "Park review not Cancel-first");
+        press(H::Action::openBuild);
+        Require(!W::HandheldDashboardRailFocused(), "Select escaped status review");
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Require(W::HandheldOverviewIsOpen() && !park.flags.has(ParkFlag::parkOpen), "Cancel changed park status");
+        press(H::Action::confirm);
+        press(H::Action::back);
+        Require(
+            !W::HandheldOverviewPresentation().confirmation && !park.flags.has(ParkFlag::parkOpen), "B applied status review");
+        W::HandheldDashboardMove(0, 1);
+        press(H::Action::openBuild);
+        press(H::Action::openBuild);
+        Require(W::HandheldOverviewPresentation().selected == 1, "Overview row resume lost");
+        Require(F::Available(F::Field::admission), "Admission fixture not permitted");
+        press(H::Action::confirm);
+        Require(
+            W::HandheldFinancesIsOpen() && W::HandheldDashboardSectionIndex() == 4 && park.entranceFee == fee,
+            "Overview admission link bypassed Finances / applied action");
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(1, 0);
+        press(H::Action::back);
+        Require(park.entranceFee == fee && park.cash == cash, "Linked admission cancellation changed park");
+        press(H::Action::back);
+        W::HandheldDashboardMove(0, -4);
+        press(H::Action::confirm);
+        Require(W::HandheldOverviewPresentation().selected == 1, "Returning from Finances lost Overview resume");
+        park.flags.set(ParkFlag::noMoney);
+        press(H::Action::confirm);
+        Require(W::HandheldOverviewIsOpen() && park.entranceFee == fee, "Unavailable admission link changed page/state");
+        park.flags.unset(ParkFlag::noMoney);
+        W::HandheldDashboardMove(0, -1);
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(0, -1);
+        press(H::Action::confirm);
+        press(H::Action::confirm); // queued duplicate cannot submit another status change
+        GameActions::ProcessQueue(state);
+        Require(
+            park.flags.has(ParkFlag::parkOpen) && !W::HandheldOverviewPresentation().confirmation && park.cash == cash
+                && park.expenditureTable == ledger,
+            "One status confirmation did not apply exactly once");
+        // Actual mapped held A must not confirm or leave review until release and a fresh press.
+        SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+        Require(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) == 0, "Overview SDL init failed");
+        {
+            H::ControllerInput controller;
+            controller.update(true, 10000);
+            const auto device = SDL_JoystickAttachVirtual(
+                SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);
+            auto* joystick = SDL_JoystickOpen(device);
+            Require(joystick, "Overview virtual controller missing");
+            auto pump = [&] {
+                SDL_Event e;
+                while (SDL_PollEvent(&e))
+                    controller.handleEvent(e);
+            };
+            pump();
+            controller.update(true, 10010);
+            pump();
+            controller.update(true, 10020);
+            auto button = [&](bool down) {
+                SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, down);
+                SDL_JoystickUpdate();
+                pump();
+            };
+            button(true);
+            auto frame = controller.update(true, 10030);
+            Require(frame.actions.size() == 1 && H::HandleMenuInput(controller, frame), "Mapped overview A lost");
+            Require(
+                W::HandheldOverviewPresentation().confirmation && controller.update(true, 10040).actions.empty(),
+                "Held selecting A applied park change");
+            button(false);
+            Require(controller.update(true, 10050).actions.empty(), "A release changed status");
+            button(true);
+            frame = controller.update(true, 10060);
+            Require(
+                frame.actions.size() == 1 && H::HandleMenuInput(controller, frame)
+                    && !W::HandheldOverviewPresentation().confirmation,
+                "Fresh A did not Cancel park review");
+            Require(
+                controller.update(true, 10070).actions.empty() && park.flags.has(ParkFlag::parkOpen),
+                "Cancel A spilled into overview");
+            button(false);
+            controller.update(true, 10080);
+            SDL_JoystickClose(joystick);
+            SDL_JoystickDetachVirtual(device);
+        }
+        press(H::Action::confirm);
+        GameActions::ParkSetParameterAction external(GameActions::ParkParameter::close);
+        Require(GameActions::Execute(&external, state).error == GameActions::Status::ok, "External status fixture failed");
+        GameActions::ProcessQueue(state);
+        W::HandheldDashboardMove(0, -1);
+        press(H::Action::confirm);
+        Require(
+            !park.flags.has(ParkFlag::parkOpen) && W::HandheldOverviewPresentation().confirmation,
+            "Stale UI status review applied");
+        press(H::Action::openMenu);
+        Require(!W::HandheldDashboardIsOpen(), "Start did not discard Overview review");
+        press(H::Action::back);
+        Require(!gGamePaused && park.cash == cash && park.expenditureTable == ledger, "Overview pause/input ownership leaked");
+    }
+    const auto save = profile + "/overview-management.park";
+    Require(ScenarioSave(state, save, flags), "Overview save failed");
+    if (realUi)
+    {
+        W::HandheldDashboardOpen();
+        W::HandheldMenuConfirm();
+        W::HandheldMenuConfirm();
+    }
+    Require(context.LoadParkFromFile(save, false, true), "Overview reload failed");
+    Require(
+        !W::HandheldDashboardIsOpen() && !park.flags.has(ParkFlag::parkOpen) && park.cash == cash && park.bankLoan == loan
+            && park.entranceFee == fee && park.expenditureTable == ledger
+            && state.scenarioOptions.objective.Type == Scenario::ObjectiveType::haveFun,
+        "Overview status/accounting/objective save-reload changed");
+    Require(context.LoadParkFromFile(original, false, true), "Overview fixture cleanup failed");
+    std::cout << "Native Overview / summary-objective-outcomes / default-focus-admission-link / native-status-zero-cash / "
+                 "cancel-stale-input / save-reload passed\n";
+}
+
 static void TestDashboard(IContext& context, const std::string& profile, bool realUi)
 {
     namespace D = Ui::Handheld::Dashboard;
@@ -3227,12 +3468,9 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
     namespace S = H::StaffManagement;
     D::State navigation;
     Require(
-        navigation.section == D::Section::finances && navigation.focus == D::Focus::rail,
+        navigation.section == D::Section::overview && navigation.focus == D::Focus::rail,
         "Dashboard default section/focus wrong");
-    navigation.move(-4);
-    Require(
-        navigation.section == D::Section::overview && !navigation.enter() && navigation.focus == D::Focus::rail,
-        "Unavailable section entered");
+    Require(navigation.enter() && navigation.focus == D::Focus::content, "Overview landing cannot enter");
     navigation.move(3);
     Require(navigation.section == D::Section::staff && navigation.enter(), "Staff rail route missing");
     navigation.move(7);
@@ -3252,17 +3490,16 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
         frame.actions = { value, value };
         Require(H::HandleMenuInput(input, frame), "Dashboard semantic input lost");
     };
-    W::HandheldDashboardOpen();
+    OpenFinancesDashboard();
     Require(
         W::HandheldDashboardIsOpen() && W::HandheldDashboardRailFocused() && gGamePaused,
         "Dashboard open did not own pause/rail");
-    W::HandheldDashboardMove(0, -4); // Overview is explicitly unavailable
+    W::HandheldDashboardMove(0, -4); // Overview is now available
     action(H::Action::confirm);
+    Require(W::HandheldOverviewIsOpen(), "Overview category did not acquire content focus");
     action(H::Action::openBuild);
-    Require(
-        W::HandheldDashboardRailFocused() && !W::HandheldFinancesIsOpen() && !W::HandheldStaffIsOpen(),
-        "Unavailable category acquired content focus");
-    Require(park.cash == cash && S::Roster() == roster, "Unavailable category changed native state");
+    Require(W::HandheldDashboardRailFocused(), "Overview could not return to rail");
+    Require(park.cash == cash && S::Roster() == roster, "Overview navigation changed native state");
     W::HandheldDashboardMove(0, 4);
     action(H::Action::openBuild); // Select enters Finances
     Require(!W::HandheldDashboardRailFocused() && W::HandheldFinancesIsOpen(), "Rail -> Finances focus failed");
@@ -3337,7 +3574,7 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
             SDL_JoystickUpdate();
             pump();
         };
-        W::HandheldDashboardOpen();
+        OpenFinancesDashboard();
         press(SDL_CONTROLLER_BUTTON_BACK, true);
         auto f = controller.update(true, 5030);
         Require(
@@ -3373,7 +3610,7 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
         SDL_JoystickDetachVirtual(device);
     }
     // Native disappearance is still authoritative while a detail/modal lives in the right pane.
-    W::HandheldDashboardOpen();
+    OpenFinancesDashboard();
     W::HandheldDashboardMove(0, -1);
     W::HandheldMenuConfirm();
     W::HandheldMenuMove(2);
@@ -3405,7 +3642,7 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
     for (auto* path : TileElementsView<PathElement>(tile))
         ghost |= path->isGhost();
     Require(ghost, "Dashboard path preview fixture missing");
-    W::HandheldDashboardOpen();
+    OpenFinancesDashboard();
     for (auto* path : TileElementsView<PathElement>(tile))
         Require(!path->isGhost(), "Dashboard retained construction ghost");
     W::HandheldMenuBack();
@@ -3420,7 +3657,7 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
     flags.set(SaveFlag::exportObjects);
     const auto save = profile + "/dashboard-roundtrip.park";
     Require(ScenarioSave(state, save, flags) != 0, "Dashboard save failed");
-    W::HandheldDashboardOpen();
+    OpenFinancesDashboard();
     W::HandheldMenuConfirm();
     W::HandheldMenuConfirm();
     W::HandheldDashboardMove(1, 0);
@@ -3430,7 +3667,7 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
             && S::Roster() == remaining,
         "Dashboard draft/save/load leaked changes or retained shell");
     gGamePaused = 1;
-    W::HandheldDashboardOpen();
+    OpenFinancesDashboard();
     W::HandheldMenuBack();
     Require(gGamePaused == 1, "Dashboard exit unpaused externally paused park");
     gGamePaused = 0;
@@ -3753,6 +3990,7 @@ int main(int argc, char** argv)
         TestMarketingManagement(*context, argv[2], argc == 4);
         TestGuests(*context, argv[2], argc == 4);
         TestRideManagement(*context, argv[2], argc == 4);
+        TestOverview(*context, argv[2], argc == 4);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;

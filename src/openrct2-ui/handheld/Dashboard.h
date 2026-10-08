@@ -23,7 +23,7 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         bool available;
     };
     inline constexpr std::array kCategories{
-        Category{ Section::overview, "Overview", false }, Category{ Section::rides, "Rides", true },
+        Category{ Section::overview, "Overview", true },  Category{ Section::rides, "Rides", true },
         Category{ Section::guests, "Guests", true },      Category{ Section::staff, "Staff", true },
         Category{ Section::finances, "Finances", true },  Category{ Section::research, "Research", true },
         Category{ Section::marketing, "Marketing", true }
@@ -36,7 +36,7 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
     // Navigation only. Section drafts/targets and native actions belong to their adapters/menu.
     struct State
     {
-        Section section = Section::finances;
+        Section section = Section::overview;
         Focus focus = Focus::rail;
         size_t index() const
         {
@@ -63,7 +63,8 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
     {
         ManagementPresentation model;
         model.breadcrumb = "Park management";
-        model.title = kCategories[static_cast<size_t>(section)].name;
+        const auto index = static_cast<size_t>(section);
+        model.title = index < kCategories.size() ? kCategories[index].name : "Unavailable";
         model.stats = { { "Availability", "Not implemented" } };
         model.status = "Choose an available section";
         return model;
