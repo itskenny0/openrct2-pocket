@@ -3676,6 +3676,7 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
 }
 
 #include "FlatRideWorkflowTests.h"
+#include "PresentationTests.h"
 
 int main(int argc, char** argv)
 {
@@ -3712,6 +3713,7 @@ int main(int argc, char** argv)
         Require(objects.LoadObject("rct2.footpath_railings.wood") != nullptr, "Railings missing");
         auto& state = getGameState();
         gameStateInitAll(state, { 16, 16 });
+        TestPocketPresentation();
         state.park.cash = 1000000;
         state.park.flags.unset(ParkFlag::noMoney, ParkFlag::noMoneyScenario);
         gLegacyScene = LegacyScene::playing;

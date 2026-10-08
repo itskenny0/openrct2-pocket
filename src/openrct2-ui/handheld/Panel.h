@@ -274,7 +274,7 @@ namespace OpenRCT2::Ui::Handheld
         DrawOverlayCommands(rt, w);
     }
 
-    inline constexpr int kActionStripHeight = 28;
+    inline constexpr int kActionStripHeight = Layout::actionHeight;
     inline constexpr ScreenSize kTerrainOverlaySize{ 164, 278 };
     inline constexpr ScreenSize kContextSize{ 160, 42 };
 
@@ -442,9 +442,9 @@ namespace OpenRCT2::Ui::Handheld
 
     inline void DrawCostBadge(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& amount)
     {
-        Concept::Box(rt, pos, { 110, 26 });
+        Concept::Box(rt, pos, { 160, 26 });
         DrawModernText(rt, pos + ScreenCoordsXY{ 8, 8 }, "{MUTED}Cost:");
-        DrawStrongText(rt, pos + ScreenCoordsXY{ 43, 8 }, "{POSITIVE}" + amount, 60);
+        DrawStrongText(rt, pos + ScreenCoordsXY{ 43, 8 }, "{POSITIVE}" + amount, 109);
     }
 
     inline void DrawContextMessage(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& text)
@@ -470,8 +470,8 @@ namespace OpenRCT2::Ui::Handheld
         const std::string& status)
     {
         using namespace Concept;
-        const auto p = kOrigin;
-        Box(rt, p, { kRailWidth, 338 });
+        const auto p = kMenuOrigin;
+        Box(rt, p, { kRailWidth, Layout::ContentHeight(screen) });
         Heading(rt, p + ScreenCoordsXY{ 10, 12 }, "Path options");
         DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, 32 }, 144, "{MUTED}" + status);
         const int rowY[] = { 52, 108, 136, 164, 220, 248, 304 };

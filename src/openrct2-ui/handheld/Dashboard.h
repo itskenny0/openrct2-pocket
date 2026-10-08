@@ -74,8 +74,10 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
     {
         using namespace Concept;
         constexpr int railWidth = 138;
-        const ScreenCoordsXY rail{ 8, 8 }, content{ 152, 8 };
-        Box(rt, rail, { railWidth, 338 });
+        const auto rail = Layout::menuOrigin;
+        const auto content = rail + ScreenCoordsXY{ railWidth + Layout::gutter, 0 };
+        const int height = Layout::ContentHeight(screen);
+        Box(rt, rail, { railWidth, height });
         DrawStrongText(rt, rail + ScreenCoordsXY{ 10, 14 }, "{WHITE}Dashboard", railWidth - 20);
         Rule(rt, rail + ScreenCoordsXY{ 10, 42 }, railWidth - 20);
         for (size_t i = 0; i < kCategories.size(); ++i)
@@ -106,7 +108,8 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
                     rt, rail + ScreenCoordsXY{ 14, y + 22 }, railWidth - 24,
                     std::string(focused ? "{BLACK}" : "{MUTED}") + "Unavailable");
         }
-        DrawManagementContent(rt, content, { screen.width - 160, 338 }, model, state.focus == Focus::content);
+        DrawManagementContent(
+            rt, content, { screen.width - content.x - Layout::margin, height }, model, state.focus == Focus::content);
         DrawActionStrip(rt, screen);
         const int y = screen.height - 21;
         DrawCommand(rt, { 10, y }, 38, "D-pad", model.editing && state.focus == Focus::content ? "Adjust" : "Choose");

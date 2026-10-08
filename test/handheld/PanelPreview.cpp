@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Native 512x384 overlay capture; optional backdrop is an explicitly labelled layout composite.
 #include <fstream>
+#include <openrct2-ui/handheld/CustomTracks.h>
+#include <openrct2-ui/handheld/Dashboard.h>
+#include <openrct2-ui/handheld/Hud.h>
+#include <openrct2-ui/handheld/ObjectPicker.h>
 #include <openrct2-ui/handheld/Panel.h>
 #include <openrct2/Context.h>
 #include <openrct2/OpenRCT2.h>
@@ -75,6 +79,24 @@ int main(int argc, char** argv)
     model.icons = { Ui::Handheld::PanelIcon::play, Ui::Handheld::PanelIcon::terrain, Ui::Handheld::PanelIcon::save,
                     Ui::Handheld::PanelIcon::exit, Ui::Handheld::PanelIcon::folder,  Ui::Handheld::PanelIcon::exit };
     model.selected = 1;
+    namespace H = Ui::Handheld;
+    const std::string page = argv[3];
+    // Explicit component fixtures: no scenario, object unlock or guest simulation is represented.
+    if (page == "exploration" || page.starts_with("paths") || page.starts_with("terrain") || page == "construction"
+        || page == "hud-stress")
+    {
+        std::vector<PaletteIndex> before(rt.bits, rt.bits + rt.LineStride() * rt.height);
+        H::DrawHud(
+            rt, { 512, 384 },
+            page == "hud-stress" ? H::HudPresentation{ "-$1,234,567.80", "31 Oct Y8192", "100000", true, true, false, 4 }
+                                 : H::HudPresentation{ "$12,456.00", "15 Mar Y3", "812", false, false, false, 1 });
+        for (int y = 0; y < rt.height; ++y)
+            for (int x = 0; x < rt.width; ++x)
+                if ((y < H::Layout::hudTop || y >= H::Layout::hudTop + H::Layout::hudHeight || x < H::Layout::margin
+                     || x >= rt.width - H::Layout::margin)
+                    && rt.bits[y * rt.LineStride() + x] != before[y * rt.LineStride() + x])
+                    return 6; // HUD text/icons must not escape the reserved native rectangle.
+    }
     if (std::string(argv[3]) == "terrain" || std::string(argv[3]) == "terrain-lower")
     {
         Ui::Handheld::DrawTerrainOverlay(rt, Ui::Handheld::Concept::kOrigin, std::string(argv[3]) != "terrain-lower");
@@ -100,6 +122,79 @@ int main(int argc, char** argv)
             rt, { 512, 384 },
             { "Resume", "Follow ground", "Raise height", "Lower height", "Flat / slope", "Rotate slope", "Change surface" },
             std::string(argv[3]) == "path-options-last" ? 6 : 2, "Height 6 / Rise NE");
+    }
+    else if (page == "exploration" || page == "hud-stress")
+    {
+        H::DrawGameplayFooter(rt, { 512, 384 }, "", false);
+        H::DrawMapFocus(rt, { 256, 192 });
+    }
+    else if (page == "construction")
+    {
+        H::CustomTracks::DrawPanel(rt, { 512, 384 });
+        H::DrawMapFocus(rt, { 256, 192 });
+    }
+    else if (page == "picker")
+    {
+        H::ObjectPicker picker;
+        std::vector<H::PickerEntry> entries;
+        const std::vector<std::pair<TrackElemType, std::string>> pieces{ { TrackElemType::flat, "Straight" },
+                                                                         { TrackElemType::endStation, "Station" },
+                                                                         { TrackElemType::leftQuarterTurn5Tiles, "Left turn" },
+                                                                         { TrackElemType::rightQuarterTurn5Tiles,
+                                                                           "Right turn" },
+                                                                         { TrackElemType::flatToUp25, "Level to climb" },
+                                                                         { TrackElemType::up25, "Climb" },
+                                                                         { TrackElemType::up25ToFlat, "Climb to level" } };
+        for (const auto& [type, name] : pieces)
+            entries.push_back(
+                { { ObjectType::ride, kObjectEntryIndexNull, name }, name, ZoomLevel{ 0 }, [type](RenderTarget& target) {
+                     H::CustomTracks::DrawPiecePreview(target, type);
+                 } });
+        picker.setEntries(std::move(entries));
+        H::DrawObjectPicker(rt, { 512, 384 }, picker, "Track pieces");
+    }
+    else if (page == "dashboard" || page == "inspection" || page == "confirmation")
+    {
+        H::Dashboard::State dashboard;
+        dashboard.section = page == "dashboard" ? H::Dashboard::Section::finances : H::Dashboard::Section::rides;
+        dashboard.focus = H::Dashboard::Focus::content;
+        H::ManagementPresentation content;
+        content.breadcrumb = "Park dashboard / " + std::string(page == "dashboard" ? "Finances" : "Rides");
+        content.title = page == "dashboard" ? "Finances" : "The incredibly long wooden roller coaster name";
+        if (page == "dashboard")
+        {
+            content.stats = { { "Cash", "$12,456.00" },
+                              { "Bank loan", "$10,000.00" },
+                              { "Income", "$5,432.00" },
+                              { "Expenditure", "$971.30" },
+                              { "Current profit", "$3,210.00" } };
+            content.rows = { "Loan...", "Admission...", "Back to dashboard" };
+        }
+        else if (page == "inspection")
+        {
+            content.stats = { { "Status", "Closed" }, { "Admission", "$2.00" } };
+            content.rows = { "Locate",
+                             "Statistics...",
+                             "Open...",
+                             "Close...",
+                             "Test...",
+                             "Admission price...",
+                             "Back to roster",
+                             "Finish entrances/exits...",
+                             "Access / paths...",
+                             "Continue track..." };
+            content.selected = 8;
+        }
+        else
+        {
+            content.confirmation = true;
+            content.title = "Review ride opening";
+            content.stats = { { "Current status", "Closed" }, { "Requested", "Open" }, { "Action cost", "$0.00" } };
+            content.rows = { "Confirm", "Cancel" };
+            content.selected = 1;
+            content.primaryAction = "Cancel";
+        }
+        H::Dashboard::Draw(rt, { 512, 384 }, dashboard, content, page != "confirmation");
     }
     else if (std::string(argv[3]) == "finances")
     {

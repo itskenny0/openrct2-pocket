@@ -34,7 +34,8 @@ namespace OpenRCT2::Ui::Handheld
         const int height = std::min(size.height, rowStart + static_cast<int>(visible) * 30 + 30);
         Box(rt, p, { width, height });
         DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, 12 }, width - 20, "{MUTED}" + model.breadcrumb);
-        DrawStrongText(rt, p + ScreenCoordsXY{ 10, 32 }, "{WHITE}" + model.title, width - 20);
+        DrawStrongText(
+            rt, p + ScreenCoordsXY{ 10, 32 }, std::string(model.confirmation ? "{GOLD}" : "{WHITE}") + model.title, width - 20);
         Rule(rt, p + ScreenCoordsXY{ 10, 54 }, width - 20);
         for (size_t i = 0; i < model.stats.size(); ++i)
         {
@@ -49,17 +50,25 @@ namespace OpenRCT2::Ui::Handheld
                 std::string(highlight ? "{BLACK}" : "{WHITE}") + model.stats[i].second);
         }
         for (size_t i = 0; i < model.bodyLines.size(); ++i)
-            drawText(
+            DrawModernEllipsised(
                 rt, p + ScreenCoordsXY{ 10, 67 + static_cast<int>(model.stats.size()) * 24 + static_cast<int>(i) * 16 },
-                "{WHITE}" + model.bodyLines[i]);
+                width - 20, "{WHITE}" + model.bodyLines[i]);
         for (size_t i = first; i < first + visible; ++i)
         {
             const int y = rowStart + static_cast<int>(i - first) * 30;
             const bool selected = focused && i == model.selected;
             if (selected)
                 Box(rt, p + ScreenCoordsXY{ 8, y }, { width - 16, 28 }, true);
+            const auto& label = model.rows[i];
+            const bool unavailable = label.find("unavailable") != std::string::npos
+                || label.find("Unavailable") != std::string::npos;
             DrawModernEllipsised(
-                rt, p + ScreenCoordsXY{ 15, y + 9 }, width - 30, std::string(selected ? "{BLACK}" : "{WHITE}") + model.rows[i]);
+                rt, p + ScreenCoordsXY{ 15, y + 9 }, width - 30,
+                std::string(
+                    selected          ? "{BLACK}"
+                        : unavailable ? "{MUTED}"
+                                      : "{WHITE}")
+                    + label);
         }
         const auto status = model.status.empty() && model.rows.size() > capacity ? "Page "
                 + std::to_string(first / capacity + 1) + " / " + std::to_string((model.rows.size() + capacity - 1) / capacity)
@@ -70,7 +79,7 @@ namespace OpenRCT2::Ui::Handheld
     // Compatibility wrapper for construction-era captures; Dashboard uses the content region directly.
     inline void DrawManagementPanel(Drawing::RenderTarget& rt, ScreenSize screen, const ManagementPresentation& model)
     {
-        DrawManagementContent(rt, Concept::kOrigin, { 244, 338 }, model);
+        DrawManagementContent(rt, Concept::kMenuOrigin, { 244, Layout::ContentHeight(screen) }, model);
         DrawActionStrip(rt, screen);
         const int y = screen.height - 21;
         DrawCommand(rt, { 12, y }, 38, "D-pad", model.editing ? "Adjust" : "Choose");

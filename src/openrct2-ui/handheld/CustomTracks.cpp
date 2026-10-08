@@ -268,6 +268,28 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             return slopeName(d.pitchEnd);
         return (ted.coordinates.rotationBegin & 4) ? "Diagonal straight" : "Straight";
     }
+    // Shared native-metadata preview: live picker and component validation use the same renderer.
+    void DrawPiecePreview(Drawing::RenderTarget& rt, TrackElemType type)
+    {
+        const auto& ted = GetTrackElementDescriptor(type);
+        int minX = 0, maxX = 0, minY = 0, maxY = 0;
+        for (int n = 0; n < ted.sequenceData.numSequences; ++n)
+        {
+            auto c = ted.sequenceData.sequences[n].clearance;
+            minX = std::min<int>(minX, c.x);
+            maxX = std::max<int>(maxX, c.x);
+            minY = std::min<int>(minY, c.y);
+            maxY = std::max<int>(maxY, c.y);
+        }
+        const int scale = std::max(32, std::max(maxX - minX, maxY - minY) + 32);
+        for (int n = 0; n < ted.sequenceData.numSequences; ++n)
+        {
+            auto c = ted.sequenceData.sequences[n].clearance;
+            Concept::DrawIcon(
+                rt, { rt.x + 4 + (c.x - minX) * 40 / scale, rt.y + 12 + (c.y - minY) * 40 / scale }, Concept::Icon::path);
+        }
+        DrawModernText(rt, { rt.x + 4, rt.y + 48 }, "{MUTED}" + std::to_string(ted.sequenceData.numSequences) + " tiles");
+    }
     std::vector<PickerEntry> Pieces()
     {
         std::vector<PickerEntry> result;
@@ -277,29 +299,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             if (!Supported(type) || type == TrackElemType::beginStation || type == TrackElemType::middleStation)
                 continue;
             PickerEntry entry{ { ObjectType::ride, kObjectEntryIndexNull, std::to_string(i) }, Name(type), ZoomLevel{ 0 } };
-            // Geometric footprint comes directly from the native sequence clearance table.
-            entry.drawPreview = [type](Drawing::RenderTarget& rt) {
-                const auto& ted = GetTrackElementDescriptor(type);
-                int minX = 0, maxX = 0, minY = 0, maxY = 0;
-                for (int n = 0; n < ted.sequenceData.numSequences; ++n)
-                {
-                    auto c = ted.sequenceData.sequences[n].clearance;
-                    minX = std::min<int>(minX, c.x);
-                    maxX = std::max<int>(maxX, c.x);
-                    minY = std::min<int>(minY, c.y);
-                    maxY = std::max<int>(maxY, c.y);
-                }
-                const int scale = std::max(32, std::max(maxX - minX, maxY - minY) + 32);
-                for (int n = 0; n < ted.sequenceData.numSequences; ++n)
-                {
-                    auto c = ted.sequenceData.sequences[n].clearance;
-                    Concept::DrawIcon(
-                        rt, { rt.x + 4 + (c.x - minX) * 40 / scale, rt.y + 12 + (c.y - minY) * 40 / scale },
-                        Concept::Icon::path);
-                }
-                DrawModernText(
-                    rt, { rt.x + 4, rt.y + 48 }, "{MUTED}" + std::to_string(ted.sequenceData.numSequences) + " tiles");
-            };
+            entry.drawPreview = [type](Drawing::RenderTarget& rt) { DrawPiecePreview(rt, type); };
             result.push_back(std::move(entry));
         }
         result.push_back(
@@ -734,9 +734,9 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         DrawCommand(rt, { 411, y }, 17, "Y", StationPlacement() ? "Turn" : "Chain");
         const auto q = Action(false);
         if (q.error == GA::Status::ok)
-            DrawCostBadge(rt, { screen.width - 126, screen.height - 62 }, FormatMoney(q.cost));
+            DrawCostBadge(rt, Layout::ContextAnchor(screen, kContextSize, true), FormatMoney(q.cost));
         else
             DrawContextMessage(
-                rt, { screen.width - 210, screen.height - 62 }, feedback.empty() ? q.getErrorMessage() : feedback);
+                rt, Layout::ContextAnchor(screen, kContextSize, true), feedback.empty() ? q.getErrorMessage() : feedback);
     }
 } // namespace OpenRCT2::Ui::Handheld::CustomTracks

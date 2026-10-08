@@ -89,14 +89,14 @@ namespace OpenRCT2::Ui::Handheld
     {
         Ink ink = paint.colour.colour == Drawing::Colour::yellow ? Ink::gold : Ink::light;
         for (const auto& prefix : { std::string("{BLACK}"), std::string("{WHITE}"), std::string("{YELLOW}"),
-                                    std::string("{MUTED}"), std::string("{POSITIVE}") })
+                                    std::string("{MUTED}"), std::string("{POSITIVE}"), std::string("{GOLD}") })
             if (text.starts_with(prefix))
             {
-                ink = prefix == "{POSITIVE}" ? Ink::positive
-                    : prefix == "{BLACK}"    ? Ink::dark
-                    : prefix == "{YELLOW}"   ? Ink::gold
-                    : prefix == "{MUTED}"    ? Ink::muted
-                                             : Ink::light;
+                ink = prefix == "{POSITIVE}"                     ? Ink::positive
+                    : prefix == "{BLACK}"                        ? Ink::dark
+                    : prefix == "{YELLOW}" || prefix == "{GOLD}" ? Ink::gold
+                    : prefix == "{MUTED}"                        ? Ink::muted
+                                                                 : Ink::light;
                 text.erase(0, prefix.size());
                 break;
             }

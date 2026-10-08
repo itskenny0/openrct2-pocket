@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
+#include "Layout.h"
 #include "ModernText.h"
 
 #include <openrct2/drawing/Line.h>
@@ -10,7 +11,8 @@ namespace OpenRCT2::Ui::Handheld::Concept
     // Solid palette surfaces keep the park and current selection dominant.
     inline constexpr int kRailWidth = 164;
     inline constexpr int kRowHeight = 28;
-    inline constexpr ScreenCoordsXY kOrigin{ 8, 8 };
+    inline constexpr auto kOrigin = Layout::toolOrigin;
+    inline constexpr auto kMenuOrigin = Layout::menuOrigin;
     inline constexpr int kInset = 8;
     inline constexpr int kTextInset = 10;
 

@@ -10,6 +10,7 @@
 #include "CustomTracks.h"
 #include "Designs.h"
 #include "FlatRides.h"
+#include "Hud.h"
 #include "Panel.h"
 #include "Paths.h"
 #include "RideAccess.h"
@@ -384,6 +385,22 @@ namespace OpenRCT2::Ui::Handheld
             hud->width = ContextGetWidth();
             hud->invalidate();
         }
+        auto* top = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 3 });
+        if (top == nullptr)
+        {
+            top = wm->Create<FocusWindow>(
+                WindowClass::handheldHud, { Layout::margin, Layout::hudTop },
+                { ContextGetWidth() - 2 * Layout::margin, Layout::hudHeight },
+                { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
+            if (top != nullptr)
+                top->number = 3;
+        }
+        if (top != nullptr)
+        {
+            top->invalidate();
+            top->width = ContextGetWidth() - 2 * Layout::margin;
+            top->invalidate();
+        }
         // A separate small input-transparent window redraws only the tool panel,
         // rather than placing a full-screen overlay over the scrolling viewport.
         auto* tools = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 1 });
@@ -408,7 +425,9 @@ namespace OpenRCT2::Ui::Handheld
             if (cost == nullptr)
             {
                 cost = wm->Create<FocusWindow>(
-                    WindowClass::handheldHud, Centre() + ScreenCoordsXY{ 32, 32 }, kContextSize,
+                    WindowClass::handheldHud,
+                    Layout::ContextAnchor({ ContextGetWidth(), ContextGetHeight() }, kContextSize, CustomTracks::Active()),
+                    kContextSize,
                     { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
                 if (cost != nullptr)
                     cost->number = 2;
@@ -416,7 +435,8 @@ namespace OpenRCT2::Ui::Handheld
             if (cost != nullptr)
             {
                 cost->invalidate();
-                cost->windowPos = Centre() + ScreenCoordsXY{ 32, 32 };
+                cost->windowPos = Layout::ContextAnchor(
+                    { ContextGetWidth(), ContextGetHeight() }, kContextSize, CustomTracks::Active());
                 cost->invalidate();
             }
         }
@@ -876,6 +896,9 @@ namespace OpenRCT2::Ui::Handheld
         using namespace Drawing;
         const auto c = Centre();
         const auto height = ContextGetHeight();
+        const auto context = _terrainActive || Paths::IsActive() ? Layout::Context::construction : Layout::Context::park;
+        if (Layout::ShowsHud(context) && rt.y < Layout::hudTop + Layout::hudHeight && rt.y + rt.height > Layout::hudTop)
+            DrawHud(rt, { ContextGetWidth(), height }, NativeHud());
         // Completion can arrive after UpdateExplorer but before this frame is drawn.
         // Never fall through to terrain controls while waiting for the next update to end the tool.
         if (Designs::Completed()
@@ -968,9 +991,9 @@ namespace OpenRCT2::Ui::Handheld
         }
         const bool feedback = !_terrainStatus.empty();
         if ((_terrainActive || Paths::IsActive()) && (feedback || costAmount.empty()))
-            DrawContextMessage(rt, c + ScreenCoordsXY{ 32, 32 }, status);
+            DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), status);
         else if (!costAmount.empty())
-            DrawCostBadge(rt, c + ScreenCoordsXY{ 32, 32 }, costAmount);
+            DrawCostBadge(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), costAmount);
         // High contrast, fixed map focus; this does not move the desktop pointer.
         DrawMapFocus(rt, c);
     }

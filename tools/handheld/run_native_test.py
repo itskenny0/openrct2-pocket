@@ -11,6 +11,7 @@ parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--build',type=Path,required=True)
 parser.add_argument('--data',type=Path,required=True)
 parser.add_argument('--ninja',default='ninja')
+parser.add_argument('--source', type=Path, help='Alternative native integration driver (default: PathActionsTests.cpp)')
 parser.add_argument('--assets',type=Path,help='Optional local RCT installation; enables real UI lifecycle testing with SDL dummy drivers')
 args=parser.parse_args()
 repo=Path(__file__).resolve().parents[2]
@@ -32,7 +33,7 @@ link=[v for v in link[start:end] if not v.endswith('/Ui.cpp.o')]
 with tempfile.TemporaryDirectory(prefix='pocket-native-test-') as directory:
     root=Path(directory)
     i=link.index('-o'); link[i+1]=str(root/'test')
-    link.insert(i,str(repo/'test/handheld/PathActionsTests.cpp'))
+    link.insert(i,str(args.source.resolve() if args.source else repo/'test/handheld/PathActionsTests.cpp'))
     link[1:1]=['-std=c++20',*definitions,*includes,f'-I{repo / "src"}',f'-I{repo / "src/thirdparty"}']
     subprocess.run(link,cwd=build,check=True)
     test_args=[str(root/'test'),str(args.data.resolve()),str(root/'profile')]

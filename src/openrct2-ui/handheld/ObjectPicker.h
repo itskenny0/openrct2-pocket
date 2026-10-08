@@ -101,7 +101,7 @@ namespace OpenRCT2::Ui::Handheld
         const std::string& status = {}, const std::string& emptyLabel = "No objects available")
     {
         using namespace Concept;
-        const auto p = kOrigin;
+        const auto p = kMenuOrigin;
         const auto& entries = picker.entries();
         const auto start = picker.page() * ObjectPicker::pageSize;
         const auto visible = std::min(ObjectPicker::pageSize, entries.size() - start);
