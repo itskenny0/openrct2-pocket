@@ -4,6 +4,7 @@
 #include "ManagementPanel.h"
 
 #include <openrct2/actions/GameActionRunner.h>
+#include <openrct2/actions/ride/RideSetSettingAction.h>
 #include <openrct2/ride/Ride.h>
 
 namespace OpenRCT2::Ui::Handheld::RideManagement
@@ -23,9 +24,20 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         roster,
         inspection,
         statistics,
+        operations,
+        maintenance,
         price,
         confirmation
     };
+    struct Setting
+    {
+        GameActions::RideSetSetting key;
+        std::string name;
+        std::vector<uint8_t> values;
+        std::vector<std::string> labels;
+        uint8_t current;
+    };
+    std::vector<Setting> Settings(const Ride& ride, bool maintenance = false);
     struct Draft
     {
         Target target;
@@ -35,6 +47,11 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         bool noMoney;
         std::optional<RideStatus> status;
         money64 price;
+        std::optional<Setting> setting;
+        uint8_t value{};
+        std::array<uint8_t, 6> baselineSettings{};
+        bool demolition{};
+        money64 refund{};
     };
     void Invalidate(RideId id);
     std::optional<Target> Identify(RideId id);
@@ -44,6 +61,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
     bool Locate(const Target& target);
     bool PricePermitted(const Ride& ride);
     std::optional<Draft> Begin(const Target& target, std::optional<RideStatus> status = {});
+    std::optional<Draft> BeginSetting(const Target& target, const Setting& setting);
+    std::optional<Draft> BeginDemolition(const Target& target);
     void AdjustPrice(Draft& draft, int direction);
     GameActions::Result Action(const Draft& draft, bool execute, GameActions::GameAction::Callback_t callback = {});
     ManagementPresentation Presentation(

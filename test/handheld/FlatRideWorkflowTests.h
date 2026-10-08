@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Fixture objects and research setup are confined to integration tests.
 #include "RideAccessWorkflowTests.h"
+#include "RideDepthTests.h"
 
 #include <openrct2-ui/handheld/FlatRides.h>
 #include <openrct2/actions/ride/FlatRideEntrancePlaceAction.h>
@@ -276,6 +277,7 @@ static void TestFlatRides(IContext& context, const std::string& profile, bool re
         W::HandheldMenuBack();
         W::HandheldMenuBack();
     }
+    TestRideDepth(context, profile, *H::RideManagement::Identify(identity->id));
     std::cout << "Native flat rides / eligibility-picker / footprint-rotation-ghost / exact cash / entrance-exit-resume / "
                  "native-open-roster / input-save-reload passed\n";
 }

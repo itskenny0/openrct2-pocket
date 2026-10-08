@@ -6,7 +6,9 @@
 #include <openrct2-ui/handheld/Hud.h>
 #include <openrct2-ui/handheld/ObjectPicker.h>
 #include <openrct2-ui/handheld/Panel.h>
+#include <openrct2-ui/handheld/RideManagement.h>
 #include <openrct2/Context.h>
+#include <openrct2/GameState.h>
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/SpriteIds.h>
 #include <openrct2/config/Config.h>
@@ -16,6 +18,8 @@
 #include <openrct2/drawing/Palette.h>
 #include <openrct2/drawing/RenderTarget.h>
 #include <openrct2/drawing/X8DrawingEngine.h>
+#include <openrct2/object/ObjectManager.h>
+#include <openrct2/ride/RideData.h>
 
 using namespace OpenRCT2;
 using namespace OpenRCT2::Drawing;
@@ -26,6 +30,15 @@ int main(int argc, char** argv)
     gCustomOpenRCT2DataPath = argv[1];
     auto context = CreateContext();
     Config::SetDefaults();
+    if (std::string(argv[3]).starts_with("ride-depth"))
+    {
+        gOpenRCT2Headless = true;
+        gOpenRCT2NoGraphics = true;
+        if (!context->Initialise())
+            return 7;
+        gameStateInitAll(getGameState(), { 16, 16 });
+        gOpenRCT2NoGraphics = false;
+    }
     GfxLoadG2PalettesFontsTracks();
     initColourMaps();
     FontSpriteInitialiseCharacters();
@@ -152,6 +165,49 @@ int main(int argc, char** argv)
                  } });
         picker.setEntries(std::move(entries));
         H::DrawObjectPicker(rt, { 512, 384 }, picker, "Track pieces");
+    }
+    else if (page.starts_with("ride-depth"))
+    {
+        namespace R = H::RideManagement;
+        // Native public object metadata, trackless component fixture; no live park or simulated guests.
+        gOpenRCT2NoGraphics = true;
+        auto* object = context->GetObjectManager().LoadObject("rct2.ride.ptct1");
+        if (!object)
+            return 8;
+        gOpenRCT2NoGraphics = false;
+        auto* ride = RideAllocateAtIndex(RideId::FromUnderlying(0));
+        if (!ride)
+            return 9;
+        ride->type = RIDE_TYPE_WOODEN_ROLLER_COASTER;
+        ride->subtype = context->GetObjectManager().GetLoadedObjectEntryIndex(object);
+        ride->mode = RideMode::continuousCircuit;
+        ride->customName = "Wooden Coaster / component fixture";
+        ride->status = RideStatus::closed;
+        ride->inspectionInterval = RideInspection::every30Minutes;
+        ride->liftHillSpeed = ride->getRideTypeDescriptor().LiftData.minimum_speed;
+        const auto target = R::Identify(ride->id);
+        std::optional<R::Draft> draft;
+        auto view = page == "ride-depth-summary" ? R::View::inspection
+            : page == "ride-depth-maintenance"   ? R::View::maintenance
+                                                 : R::View::operations;
+        size_t selected = page == "ride-depth-dense" ? R::Settings(*ride).size() - 1 : 0;
+        if (page == "ride-depth-demolition")
+        {
+            view = R::View::confirmation;
+            draft = R::BeginDemolition(*target);
+            selected = 1;
+        }
+        if (page == "ride-depth-draft")
+        {
+            view = R::View::price;
+            draft = R::BeginSetting(*target, R::Settings(*ride).front());
+            R::AdjustPrice(*draft, 1);
+        }
+        auto content = R::Presentation(view, selected, {}, target, draft);
+        H::Dashboard::State dashboard;
+        dashboard.section = H::Dashboard::Section::rides;
+        dashboard.focus = H::Dashboard::Focus::content;
+        H::Dashboard::Draw(rt, { 512, 384 }, dashboard, content, view != R::View::confirmation && view != R::View::price);
     }
     else if (page == "dashboard" || page == "inspection" || page == "confirmation")
     {

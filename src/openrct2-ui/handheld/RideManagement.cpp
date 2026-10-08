@@ -8,12 +8,15 @@
 
 #include <iomanip>
 #include <openrct2/GameState.h>
+#include <openrct2/actions/ride/RideDemolishAction.h>
 #include <openrct2/actions/ride/RideSetPriceAction.h>
 #include <openrct2/actions/ride/RideSetStatusAction.h>
 #include <openrct2/interface/Window.h>
+#include <openrct2/localisation/Formatting.h>
 #include <openrct2/ride/RideData.h>
 #include <openrct2/ride/RideManager.hpp>
 #include <openrct2/ride/ShopItem.h>
+#include <openrct2/ride/ted/TrackGroup.h>
 #include <openrct2/world/Map.h>
 #include <openrct2/world/Park.h>
 #include <sstream>
@@ -80,12 +83,167 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             || (!status && !PricePermitted(*ride)))
             return {};
         const auto& park = getGameState().park;
-        return Draft{ target, ride->status,  ride->price[0], Park::RidePricesUnlocked(park), park.flags.has(ParkFlag::noMoney),
-                      status, ride->price[0] };
+        return Draft{ target,
+                      ride->status,
+                      ride->price[0],
+                      Park::RidePricesUnlocked(park),
+                      park.flags.has(ParkFlag::noMoney),
+                      status,
+                      ride->price[0],
+                      {},
+                      0,
+                      {},
+                      false,
+                      0 };
+    }
+    static std::array<uint8_t, 6> Snapshot(const Ride& ride)
+    {
+        return { static_cast<uint8_t>(ride.mode),
+                 ride.minWaitingTime,
+                 ride.maxWaitingTime,
+                 ride.departFlags,
+                 ride.liftHillSpeed,
+                 static_cast<uint8_t>(ride.inspectionInterval) };
+    }
+    std::vector<Setting> Settings(const Ride& ride, bool maintenance)
+    {
+        using GameActions::RideSetSetting;
+        std::vector<Setting> result;
+        const auto& type = ride.getRideTypeDescriptor();
+        if (!ride.getRideEntry())
+            return result;
+        auto add = [&](RideSetSetting key, const char* name, uint8_t current, int min, int max) {
+            Setting setting{ key, name, {}, {}, current };
+            for (int value = min; value <= max; ++value)
+            {
+                setting.values.push_back(value);
+                setting.labels.push_back(std::to_string(value));
+            }
+            result.push_back(std::move(setting));
+        };
+        if (maintenance)
+        {
+            if (!type.availableBreakdowns.isEmpty())
+            {
+                add(RideSetSetting::inspectionInterval, "Inspection interval", static_cast<uint8_t>(ride.inspectionInterval), 0,
+                    static_cast<uint8_t>(RideInspection::never));
+                auto& setting = result.back();
+                for (size_t i = 0; i < setting.labels.size(); ++i)
+                    setting.labels[i] = FormatStringID(kRideInspectionIntervalNames[i]);
+            }
+            return result;
+        }
+        Setting mode{ RideSetSetting::mode, "Operating mode", {}, {}, static_cast<uint8_t>(ride.mode) };
+        const auto modes = ride.getAvailableModes();
+        for (int i = 0; i < static_cast<int>(RideMode::count); ++i)
+            if (modes.has(static_cast<RideMode>(i)))
+            {
+                mode.values.push_back(i);
+                mode.labels.push_back(FormatStringID(kRideModeNames[i]));
+            }
+        if (mode.values.size() > 1)
+            result.push_back(std::move(mode));
+        if (type.flags.has(RtdFlag::hasLoadOptions))
+        {
+            add(RideSetSetting::minWaitingTime, "Minimum wait / seconds", ride.minWaitingTime, 0, Limits::kMaxWaitingTime);
+            add(RideSetSetting::maxWaitingTime, "Maximum wait / seconds", ride.maxWaitingTime, 0, Limits::kMaxWaitingTime);
+            for (const auto bit : { RIDE_DEPART_WAIT_FOR_MINIMUM_LENGTH, RIDE_DEPART_WAIT_FOR_MAXIMUM_LENGTH })
+            {
+                result.push_back(
+                    { RideSetSetting::departure,
+                      bit == RIDE_DEPART_WAIT_FOR_MINIMUM_LENGTH ? "Use minimum wait" : "Use maximum wait",
+                      { static_cast<uint8_t>(ride.departFlags & ~bit), static_cast<uint8_t>(ride.departFlags | bit) },
+                      { "Off", "On" },
+                      ride.departFlags });
+            }
+        }
+        const bool lift = type.TrackPaintFunctions.Regular.SupportsTrackGroup(TrackGroup::liftHill)
+            || (type.flags.has(RtdFlag::hasInvertedVariant)
+                && type.InvertedTrackPaintFunctions.Regular.SupportsTrackGroup(TrackGroup::liftHill));
+        if (lift)
+        {
+            add(RideSetSetting::liftHillSpeed, "Lift speed", ride.liftHillSpeed, type.LiftData.minimum_speed,
+                type.LiftData.maximum_speed);
+            auto& setting = result.back();
+            for (size_t i = 0; i < setting.values.size(); ++i)
+                setting.labels[i] = FormatStringID(STR_VELOCITY, static_cast<uint16_t>(setting.values[i]));
+        }
+        return result;
+    }
+    std::optional<Draft> BeginSetting(const Target& target, const Setting& selected)
+    {
+        const auto* ride = Resolve(target);
+        if (!ride)
+            return {};
+        auto settings = Settings(*ride, selected.key == GameActions::RideSetSetting::inspectionInterval);
+        const auto found = std::find_if(settings.begin(), settings.end(), [&](const auto& setting) {
+            return setting.key == selected.key && setting.name == selected.name;
+        });
+        if (found == settings.end())
+            return {};
+        const auto& park = getGameState().park;
+        Draft draft{ target,
+                     ride->status,
+                     ride->price[0],
+                     Park::RidePricesUnlocked(park),
+                     park.flags.has(ParkFlag::noMoney),
+                     {},
+                     ride->price[0],
+                     {},
+                     0,
+                     {},
+                     false,
+                     0 };
+        draft.setting = *found;
+        draft.value = found->current;
+        if (!found->values.empty() && std::find(found->values.begin(), found->values.end(), draft.value) == found->values.end())
+            draft.value = found->values.front(); // Honest unavailable current value; draft starts at a native legal value.
+        draft.baselineSettings = Snapshot(*ride);
+        return draft;
+    }
+    std::optional<Draft> BeginDemolition(const Target& target)
+    {
+        const auto* ride = Resolve(target);
+        if (!ride)
+            return {};
+        const auto& park = getGameState().park;
+        Draft draft{ target,
+                     ride->status,
+                     ride->price[0],
+                     Park::RidePricesUnlocked(park),
+                     park.flags.has(ParkFlag::noMoney),
+                     {},
+                     ride->price[0],
+                     {},
+                     0,
+                     {},
+                     false,
+                     0 };
+        draft.demolition = true;
+        draft.refund = RideGetRefundPrice(*ride);
+        return draft;
+    }
+    static std::string SettingValue(const Setting& setting, uint8_t value)
+    {
+        auto found = std::find(setting.values.begin(), setting.values.end(), value);
+        return found == setting.values.end() ? "Unavailable" : setting.labels[found - setting.values.begin()];
     }
     void AdjustPrice(Draft& draft, int direction)
     {
-        if (!draft.status)
+        if (draft.setting)
+        {
+            const auto& values = draft.setting->values;
+            const auto found = std::find(values.begin(), values.end(), draft.value);
+            if (found != values.end() && !values.empty())
+                draft.value = values[std::clamp<int>(
+                    found - values.begin()
+                        + (direction > 0       ? 1
+                               : direction < 0 ? -1
+                                               : 0),
+                    0, values.size() - 1)];
+            return;
+        }
+        if (!draft.status && !draft.demolition)
             draft.price = std::clamp<money64>(
                 draft.price
                     + (direction > 0       ? 1
@@ -109,6 +267,38 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             || Park::RidePricesUnlocked(getGameState().park) != draft.pricesUnlocked
             || getGameState().park.flags.has(ParkFlag::noMoney) != draft.noMoney)
             return Invalid("Ride/settings changed; reopen review");
+        if (draft.demolition)
+        {
+            // Native demolition Query validates rules but its cost is populated only by Execute.
+            // Match the desktop demolition prompt's native TrackRemove-query refund calculator.
+            if (RideGetRefundPrice(*ride) != draft.refund)
+                return Invalid("Ride layout/refund changed; reopen review");
+            GameActions::RideDemolishAction action(draft.target.id, GameActions::RideModifyType::demolish);
+            action.SetCallback(std::move(callback));
+            if (execute)
+                return GameActions::Execute(&action, getGameState());
+            auto result = GameActions::Query(&action, getGameState());
+            if (result.error == GameActions::Status::ok)
+                result.cost = getGameState().park.flags.has(ParkFlag::noMoney) ? 0 : draft.refund;
+            return result;
+        }
+        if (draft.setting)
+        {
+            if (Snapshot(*ride) != draft.baselineSettings)
+                return Invalid("Operations changed; reopen review");
+            const auto current = Settings(*ride, draft.setting->key == GameActions::RideSetSetting::inspectionInterval);
+            const auto found = std::find_if(current.begin(), current.end(), [&](const auto& setting) {
+                return setting.key == draft.setting->key && setting.name == draft.setting->name;
+            });
+            if (found == current.end() || found->values != draft.setting->values
+                || std::find(found->values.begin(), found->values.end(), draft.value) == found->values.end())
+                return Invalid("Setting unavailable or outside native limits");
+            if (draft.value == found->current)
+                return Invalid("Setting unchanged");
+            GameActions::RideSetSettingAction action(draft.target.id, found->key, draft.value);
+            action.SetCallback(std::move(callback));
+            return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+        }
         if (draft.status)
         {
             if (*draft.status != RideStatus::closed && *draft.status != RideStatus::open
@@ -178,6 +368,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                             { "Admission",
                               getGameState().park.flags.has(ParkFlag::noMoney) ? "Not applicable"
                                                                                : FormatMoney(RideGetPrice(*ride)) } };
+            model.stats.emplace_back("Queue", std::to_string(ride->getTotalQueueLength()));
             model.rows = { "Locate",
                            "Statistics...",
                            "Open...",
@@ -191,6 +382,32 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.rows.push_back("Access / paths...");
             if (CustomTracks::CanResume(*target))
                 model.rows.push_back("Continue track...");
+            model.rows.push_back("Operations...");
+            model.rows.push_back("Maintenance...");
+            model.rows.push_back("Demolish...");
+        }
+        else if (view == View::operations || view == View::maintenance)
+        {
+            model.breadcrumb = view == View::maintenance ? "Rides / Maintenance" : "Rides / Operations";
+            if (view == View::maintenance)
+            {
+                model.stats = { { "Reliability", std::to_string(ride->reliabilityPercentage) + "%" },
+                                { "Downtime", std::to_string(ride->downtime) + "%" },
+                                { "Last inspection",
+                                  ride->lastInspection <= 240 ? std::to_string(ride->lastInspection) + " min ago"
+                                                              : "Over 4 hours" },
+                                { "Inspection", ride->flags.has(RideFlag::dueInspection) ? "Due" : "Not due" } };
+                model.stats.emplace_back("Age / months", std::to_string(ride->getAge()));
+                if (ride->getRideTypeDescriptor().availableBreakdowns.isEmpty())
+                    model.stats = { { "Maintenance", "Not applicable" }, { "Age / months", std::to_string(ride->getAge()) } };
+            }
+            else
+                model.stats = { { "Mode", FormatStringID(kRideModeNames[static_cast<uint8_t>(ride->mode)]) },
+                                { "Trains / cars",
+                                  std::to_string(ride->numTrains) + " / " + std::to_string(ride->numCarsPerTrain) } };
+            for (const auto& setting : Settings(*ride, view == View::maintenance))
+                model.rows.push_back(setting.name + ": " + SettingValue(setting, setting.current));
+            model.rows.push_back("Back to ride");
         }
         else if (view == View::statistics)
         {
@@ -226,7 +443,29 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             model.breadcrumb = view == View::price ? "Rides / Admission" : "Rides / Review";
             const auto queried = Action(*draft, false);
             model.stats = { { "Current status", Status(*ride) } };
-            if (draft->status)
+            if (draft->demolition)
+            {
+                model.breadcrumb = "Rides / Demolish permanently";
+                model.stats.emplace_back("Removal", "Ride, track, entrances/exits");
+                model.stats.emplace_back(
+                    "Refund",
+                    draft->noMoney                                 ? "Not applicable"
+                        : queried.error == GameActions::Status::ok ? FormatMoney(-queried.cost)
+                                                                   : "Unavailable");
+            }
+            else if (draft->setting)
+            {
+                model.breadcrumb = "Rides / " + draft->setting->name;
+                model.stats.emplace_back("Current", SettingValue(*draft->setting, draft->setting->current));
+                model.stats.emplace_back("Draft", SettingValue(*draft->setting, draft->value));
+                if (queried.error == GameActions::Status::ok
+                    && draft->setting->key == GameActions::RideSetSetting::minWaitingTime)
+                    model.status = "Native maximum wait increases if needed";
+                if (queried.error == GameActions::Status::ok
+                    && draft->setting->key == GameActions::RideSetSetting::maxWaitingTime)
+                    model.status = "Native minimum wait decreases if needed";
+            }
+            else if (draft->status)
                 model.stats.emplace_back(
                     "Requested",
                     *draft->status == RideStatus::open         ? "Open"
@@ -237,8 +476,9 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.stats.emplace_back("Current price", FormatMoney(ride->price[0]));
                 model.stats.emplace_back("Draft price", FormatMoney(draft->price));
             }
-            model.stats.emplace_back(
-                "Action cost", queried.error == GameActions::Status::ok ? FormatMoney(queried.cost) : "Unavailable");
+            if (!draft->demolition)
+                model.stats.emplace_back(
+                    "Action cost", queried.error == GameActions::Status::ok ? FormatMoney(queried.cost) : "Unavailable");
             model.rows = view == View::price ? std::vector<std::string>{ "Decrease", "Increase", "Review...", "Cancel" }
                                              : std::vector<std::string>{ "Confirm", "Cancel" };
             if (model.status.empty() && queried.error != GameActions::Status::ok)
