@@ -65,10 +65,21 @@ namespace OpenRCT2::Ui::Handheld
     static std::optional<CoordsXY> _terrainTile;
     static std::string _terrainStatus;
     static std::optional<RideManagement::Target> _ridePathAccess;
+    static StationIndex _accessStation{};
+    static bool _accessExit{};
+    static CoordsXYZD _accessOutside{};
 
-    void SetRidePathAccess(const RideManagement::Target& target)
+    static bool AccessTargetValid()
+    {
+        return _ridePathAccess && RideAccess::PointValid(*_ridePathAccess, _accessStation, _accessExit, _accessOutside);
+    }
+
+    void SetRidePathAccess(const RideManagement::Target& target, StationIndex station, bool exit, CoordsXYZD outside)
     {
         _ridePathAccess = target;
+        _accessStation = station;
+        _accessExit = exit;
+        _accessOutside = outside;
     }
 
     void BeginTerrain(bool raise)
@@ -466,7 +477,7 @@ namespace OpenRCT2::Ui::Handheld
                 Windows::HandheldRideAccessOpen(target);
             input.suspend();
         }
-        if (_ridePathAccess && (!Paths::IsActive() || !RideManagement::Resolve(*_ridePathAccess)))
+        if (_ridePathAccess && (!Paths::IsActive() || !AccessTargetValid()))
         {
             EndTerrain();
             input.suspend();
@@ -553,6 +564,12 @@ namespace OpenRCT2::Ui::Handheld
                 input.suspend();
                 return;
             }
+        }
+        if (_ridePathAccess && !AccessTargetValid())
+        {
+            EndTerrain();
+            input.suspend();
+            return;
         }
         if (HandleMenuInput(input, frame))
             return;

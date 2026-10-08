@@ -2,6 +2,7 @@
 #include "Paths.h"
 
 #include <algorithm>
+#include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
 #include <openrct2/Game.h>
@@ -15,6 +16,9 @@
 #include <openrct2/object/ObjectLimits.h>
 #include <openrct2/object/ObjectManager.h>
 #include <openrct2/world/Footpath.h>
+#include <openrct2/world/Map.h>
+#include <openrct2/world/TileElementsView.h>
+#include <openrct2/world/tile_element/EntranceElement.h>
 #include <openrct2/world/tile_element/PathElement.h>
 #include <openrct2/world/tile_element/SurfaceElement.h>
 #include <openrct2/world/tile_element/TileElement.h>
@@ -25,6 +29,9 @@ namespace OpenRCT2::Ui::Handheld::Paths
     static std::optional<CoordsXYZ> target;
     static FootpathSlope slope;
     static bool targetIsPath{};
+    static bool heightPlane{};
+    static std::optional<CoordsXY> accessSource;
+    static uint64_t accessRevision{};
     static std::optional<int32_t> fixedHeight;
     static std::optional<FootpathSlope> fixedSlope;
 
@@ -34,6 +41,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
         FootpathSlope slope;
         ObjectEntryIndex surface, railings;
         PathConstructFlags flags;
+        Direction incoming;
         bool operator==(const Preview&) const = default;
     };
     static std::optional<Preview> ghost, suspendedGhost, checkedPreview;
@@ -42,6 +50,39 @@ namespace OpenRCT2::Ui::Handheld::Paths
     static money64 checkedCash{};
     static uint8_t checkedPause{};
 
+    static Direction ConnectionDirection(CoordsXYZ position, FootpathSlope selectedSlope)
+    {
+        if (!heightPlane)
+            return kInvalidDirection;
+        auto connects = [&](Direction d) {
+            if (selectedSlope.type == FootpathSlopeType::sloped && d != selectedSlope.direction
+                && DirectionReverse(d) != selectedSlope.direction)
+                return false;
+            const auto z = position.z
+                + (selectedSlope.type == FootpathSlopeType::sloped && DirectionReverse(d) == selectedSlope.direction
+                       ? kPathHeightStep
+                       : 0);
+            const CoordsXY source = CoordsXY(position) - CoordsDirectionDelta[d];
+            if (!MapIsLocationValid(source))
+                return false;
+            for (auto* path : TileElementsView<PathElement>(source))
+                if (!path->isGhost() && FootpathIsZAndDirectionValid(*path, z / kCoordsZStep, DirectionReverse(d)))
+                    return true;
+            for (auto* entrance : TileElementsView<EntranceElement>(source))
+                if (!entrance->isGhost() && entrance->getEntranceType() != EntranceType::parkEntrance
+                    && entrance->getBaseZ() == z && DirectionReverse(entrance->getDirection()) == d)
+                    return true;
+            return false;
+        };
+        if (accessSource)
+            for (Direction d : kAllDirections)
+                if (CoordsXY(position) - CoordsDirectionDelta[d] == *accessSource && connects(d))
+                    return d;
+        for (Direction d : kAllDirections)
+            if (connects(d))
+                return d;
+        return kInvalidDirection;
+    }
     static std::optional<Preview> RequestedPreview()
     {
         if (!active || removing || !target || !available)
@@ -57,7 +98,10 @@ namespace OpenRCT2::Ui::Handheld::Paths
             return {};
         auto position = *target;
         position.z = fixedHeight.value_or(target->z);
-        return Preview{ position, fixedSlope.value_or(slope), type, gFootpathSelection.railings, flags };
+        const auto selectedSlope = fixedSlope.value_or(slope);
+        return Preview{ position, selectedSlope,
+                        type,     gFootpathSelection.railings,
+                        flags,    ConnectionDirection(position, selectedSlope) };
     }
 
     static void RemoveGhost()
@@ -117,7 +161,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
         if (previewResult.error == GameActions::Status::ok)
         {
             auto action = GameActions::FootpathPlaceAction(
-                requested->position, requested->slope, requested->surface, requested->railings, kInvalidDirection,
+                requested->position, requested->slope, requested->surface, requested->railings, requested->incoming,
                 requested->flags);
             action.SetFlags(
                 { GameActions::CommandFlag::ghost, GameActions::CommandFlag::noSpend,
@@ -139,6 +183,9 @@ namespace OpenRCT2::Ui::Handheld::Paths
         available = Windows::WindowFootpathSelectDefault();
         gFootpathSelection.isQueueSelected = queue;
         active = true;
+        heightPlane = false;
+        accessSource.reset();
+        ++accessRevision;
         removing = remove;
         target.reset();
         FollowGround();
@@ -147,6 +194,9 @@ namespace OpenRCT2::Ui::Handheld::Paths
     {
         ClearPreview();
         active = false;
+        heightPlane = false;
+        accessSource.reset();
+        ++accessRevision;
         target.reset();
     }
     bool IsActive()
@@ -167,6 +217,26 @@ namespace OpenRCT2::Ui::Handheld::Paths
         removing = !removing;
     }
 
+    void UseHeightPlane(bool enabled, std::optional<CoordsXY> source)
+    {
+        ClearPreview();
+        heightPlane = enabled;
+        accessSource = source;
+        ++accessRevision;
+    }
+    static void RefocusHeight()
+    {
+        auto* main = WindowGetMain();
+        if (!heightPlane || !target || !fixedHeight || !main || !main->viewport)
+            return;
+        const CoordsXYZ centre{ target->x + 16, target->y + 16, *fixedHeight };
+        const auto cursor = ScreenCoordsXY{ ContextGetWidth() / 2, ContextGetHeight() / 2 } - main->viewport->pos;
+        main->savedViewPos = Translate3DTo2DWithZ(main->viewport->rotation, centre)
+            - ScreenCoordsXY{ main->viewport->zoom.ApplyTo(cursor.x), main->viewport->zoom.ApplyTo(cursor.y) };
+        main->viewport->viewPos = main->savedViewPos;
+        main->flags.unset(WindowFlag::scrollingToLocation);
+        main->invalidate();
+    }
     void FollowGround()
     {
         ClearPreview();
@@ -192,6 +262,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
             return false;
         ClearPreview();
         fixedHeight = next;
+        RefocusHeight();
         if (!fixedSlope)
             fixedSlope = slope;
         return true;
@@ -268,6 +339,31 @@ namespace OpenRCT2::Ui::Handheld::Paths
 
     void UpdateTarget(ScreenCoordsXY cursor)
     {
+        if (heightPlane && fixedHeight)
+        {
+            const auto xy = ScreenGetMapXYWithZ(cursor, *fixedHeight);
+            if (!xy)
+            {
+                target.reset();
+                ClearPreview();
+                return;
+            }
+            const CoordsXY tile{ xy->x & ~31, xy->y & ~31 };
+            InteractionInfo info;
+            info.Loc = tile;
+            info.Element = reinterpret_cast<TileElement*>(MapGetSurfaceElementAt(tile));
+            info.interactionType = ViewportInteractionItem::terrain;
+            if (removing)
+                for (auto* path : TileElementsView<PathElement>(tile))
+                    if (!path->isGhost() && path->getBaseZ() == *fixedHeight)
+                    {
+                        info.Element = reinterpret_cast<TileElement*>(path);
+                        info.interactionType = ViewportInteractionItem::footpath;
+                        break;
+                    }
+            UpdateTargetFromInfo(info);
+            return;
+        }
         UpdateTargetFromInfo(
             GetMapCoordinatesFromPos(cursor, { ViewportInteractionItem::terrain, ViewportInteractionItem::footpath }));
     }
@@ -344,7 +440,16 @@ namespace OpenRCT2::Ui::Handheld::Paths
         auto placement = *target;
         placement.z = fixedHeight.value_or(target->z);
         auto action = GameActions::FootpathPlaceAction(
-            placement, fixedSlope.value_or(slope), type, gFootpathSelection.railings, kInvalidDirection, flags);
+            placement, fixedSlope.value_or(slope), type, gFootpathSelection.railings,
+            ConnectionDirection(placement, fixedSlope.value_or(slope)), flags);
+        if (execute && heightPlane)
+        {
+            const auto revision = accessRevision;
+            action.SetCallback([revision, placement](const auto*, const GameActions::Result* result) {
+                if (active && heightPlane && revision == accessRevision && result->error == GameActions::Status::ok)
+                    accessSource = placement;
+            });
+        }
         return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
     }
     std::string SurfaceName()

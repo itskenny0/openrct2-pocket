@@ -32,7 +32,7 @@ namespace OpenRCT2::Ui::Handheld
     bool BeginFlatRide(ObjectEntryIndex index);
     bool BeginSavedDesign(const std::string& path);
     bool ResumeFlatRide(RideId id);
-    void SetRidePathAccess(const RideManagement::Target& target);
+    void SetRidePathAccess(const RideManagement::Target& target, StationIndex station, bool exit, CoordsXYZD outside);
     bool IsShopToolActive();
     ObjectEntryIndex ShopSelection();
     Direction ShopDirection();

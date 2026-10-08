@@ -9,6 +9,7 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
         bool attached{};
         bool reachesNormalPath{};
         StationIndex station{ StationIndex::FromUnderlying(0) };
+        bool reachesParkEntrance{};
     };
     struct State
     {
@@ -18,5 +19,7 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
     std::optional<State> Inspect(const RideManagement::Target& target);
     ManagementPresentation Presentation(
         const RideManagement::Target& target, size_t selected, const std::string& feedback = {});
+    bool NormalPathReachesParkEntrance(CoordsXYZ position);
+    bool PointValid(const RideManagement::Target& target, StationIndex station, bool exit, CoordsXYZD outside);
     bool BeginPaths(const RideManagement::Target& target, bool exit);
 } // namespace OpenRCT2::Ui::Handheld::RideAccess
