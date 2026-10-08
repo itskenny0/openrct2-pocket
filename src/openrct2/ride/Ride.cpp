@@ -3695,6 +3695,10 @@ namespace OpenRCT2
      */
     void Ride::constructMissingEntranceOrExit() const
     {
+        // Handheld management reports native validation errors without entering mouse-driven construction.
+        // This also prevents a read-only status query from queuing RideModify's repeated-close action.
+        if (Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            return;
         auto* w = WindowGetMain();
         if (w == nullptr)
             return;
@@ -3754,6 +3758,8 @@ namespace OpenRCT2
      */
     static void RideScrollToTrackError(const CoordsXYE& trackElement)
     {
+        if (Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            return;
         if (trackElement.element == nullptr)
             return;
 

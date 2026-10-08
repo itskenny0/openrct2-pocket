@@ -23,7 +23,7 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         bool available;
     };
     inline constexpr std::array kCategories{
-        Category{ Section::overview, "Overview", false }, Category{ Section::rides, "Rides", false },
+        Category{ Section::overview, "Overview", false }, Category{ Section::rides, "Rides", true },
         Category{ Section::guests, "Guests", true },      Category{ Section::staff, "Staff", true },
         Category{ Section::finances, "Finances", true },  Category{ Section::research, "Research", true },
         Category{ Section::marketing, "Marketing", true }

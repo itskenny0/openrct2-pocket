@@ -13,6 +13,7 @@
 #include "handheld/GuestManagement.h"
 #include "handheld/MarketingManagement.h"
 #include "handheld/Paths.h"
+#include "handheld/RideManagement.h"
 #include "handheld/Shops.h"
 #include "handheld/Trees.h"
 #include "interface/Chat.h"
@@ -1064,7 +1065,10 @@ public:
     void CloseByNumber(WindowClass cls, WindowNumber number) override
     {
         if (cls == WindowClass::ride)
+        {
             Handheld::MarketingManagement::RideRemoved(RideId::FromUnderlying(number));
+            Handheld::RideManagement::Invalidate(RideId::FromUnderlying(number));
+        }
         CloseByCondition([cls, number](WindowBase* w) -> bool { return w->classification == cls && w->number == number; });
     }
 

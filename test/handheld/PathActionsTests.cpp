@@ -13,6 +13,7 @@
 #include <openrct2-ui/handheld/MarketingManagement.h>
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/ResearchManagement.h>
+#include <openrct2-ui/handheld/RideManagement.h>
 #include <openrct2-ui/handheld/SceneryRemoval.h>
 #include <openrct2-ui/handheld/ShopManagement.h>
 #include <openrct2-ui/handheld/Shops.h>
@@ -35,6 +36,8 @@
 #include <openrct2/actions/park/ParkSetResearchFundingAction.h>
 #include <openrct2/actions/peep/StaffFireAction.h>
 #include <openrct2/actions/peep/StaffHireNewAction.h>
+#include <openrct2/actions/ride/RideSetPriceAction.h>
+#include <openrct2/actions/ride/RideSetStatusAction.h>
 #include <openrct2/audio/AudioContext.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/entity/EntityList.h>
@@ -2861,6 +2864,360 @@ static void TestGuests(IContext& context, const std::string& profile, bool realU
                  "/ readonly-save-reload passed\n";
 }
 
+static void TestRideManagement(IContext& context, const std::string& profile, bool realUi)
+{
+    namespace R = Ui::Handheld::RideManagement;
+    namespace H = Ui::Handheld;
+    namespace W = Ui::Windows;
+    auto& state = getGameState();
+    auto& park = state.park;
+    const auto original = profile + "/rides-original.park";
+    SaveFlags flags{};
+    flags.set(SaveFlag::exportObjects);
+    Require(ScenarioSave(state, original, flags), "Ride original save failed");
+    auto& objects = context.GetObjectManager();
+    auto* object = objects.LoadObject("rct2.ride.mgr1");
+    auto* shopObject = objects.LoadObject("rct2.ride.burgb");
+    Require(object && shopObject, "Ride test objects missing");
+    const auto index = objects.GetLoadedObjectEntryIndex(object);
+    std::vector<RideId> ids;
+    // Fixture records test full roster and invalid prerequisites; scenario captures use real rides.
+    for (uint16_t i = 160; ids.size() < 20; ++i)
+        if (!GetRide(RideId::FromUnderlying(i)))
+        {
+            auto* ride = RideAllocateAtIndex(RideId::FromUnderlying(i));
+            ride->type = RIDE_TYPE_MERRY_GO_ROUND;
+            ride->subtype = index;
+            ride->buildDate = 42;
+            ride->overallView = { 320, 320 };
+            ride->customName = "Ride workflow fixture " + std::to_string(i);
+            ride->status = RideStatus::closed;
+            ride->price[0] = 2.00_GBP;
+            ride->incomePerHour = kMoney64Undefined;
+            ride->profit = kMoney64Undefined;
+            ride->ratings.setNull();
+            ids.push_back(ride->id);
+        }
+    auto* shop = RideAllocateAtIndex(RideId::FromUnderlying(200));
+    Require(shop, "Shop exclusion fixture failed");
+    shop->type = ShopPlacement::Type(objects.GetLoadedObjectEntryIndex(shopObject));
+    shop->subtype = objects.GetLoadedObjectEntryIndex(shopObject);
+    Require(!R::Identify(shop->id), "Shop included in non-shop workflow");
+    const auto roster = R::Roster();
+    Require(
+        roster.size() >= 20 && R::Presentation(R::View::roster, roster.size() - 1, roster).rows.size() == roster.size() + 1,
+        "Ride roster truncated");
+    const auto target = *R::Identify(ids.back());
+    auto* ride = GetRide(target.id);
+    const auto statistics = R::Presentation(R::View::statistics, 0, {}, target);
+    Require(
+        statistics.stats[0].second == "Unavailable" && statistics.stats[5].second == "Unavailable",
+        "Unknown statistics fabricated");
+    ride->ratings = { 650, 520, 310 };
+    ride->flags.set(RideFlag::tested);
+    ride->reliabilityPercentage = 93;
+    ride->totalCustomers = 1234;
+    ride->incomePerHour = 100.00_GBP;
+    ride->profit = 75.00_GBP;
+    Require(R::Presentation(R::View::statistics, 0, {}, target).stats[0].second == "6.50", "Native rating scaled incorrectly");
+    Require(
+        R::Location(target) && !R::Location({ RideId::GetNull(), target.type, target.object, 0, {}, 0 }),
+        "Ride locate validity wrong");
+    gGamePaused = 1;
+    park.flags.unset(ParkFlag::noMoney, ParkFlag::freeEntry, ParkFlag::unlockAllPrices);
+    Require(!R::Begin(target) && !R::PricePermitted(*ride), "Pay-for-entry admission restriction bypassed");
+    park.flags.set(ParkFlag::freeEntry);
+    auto draft = *R::Begin(target);
+    for (int i = 0; i < 1000; ++i)
+        R::AdjustPrice(draft, 1);
+    Require(draft.price == kRideMaxPrice, "Ride price upper bound failed");
+    for (int i = 0; i < 1000; ++i)
+        R::AdjustPrice(draft, -1);
+    Require(draft.price == kRideMinPrice, "Ride price lower bound failed");
+    draft = *R::Begin(target);
+    R::AdjustPrice(draft, 1);
+    auto invalid = draft;
+    invalid.price = kRideMaxPrice + 1;
+    Require(R::Action(invalid, true).error != GameActions::Status::ok, "Out-of-range price accepted");
+    const auto cash = park.cash, loan = park.bankLoan;
+    const auto ledger = park.expenditureTable;
+    GameActions::RideSetPriceAction nativePrice(target.id, draft.price, true);
+    const auto nativeQuery = GameActions::Query(&nativePrice, state);
+    const auto query = R::Action(draft, false);
+    Require(
+        query.error == nativeQuery.error && query.error == GameActions::Status::ok && query.cost == 0,
+        "Native price query differs");
+    Require(ride->price[0] == draft.baselinePrice && park.cash == cash, "Query applied price/cash");
+    Require(R::Action(draft, true).error == GameActions::Status::ok, "Permitted price action failed while paused");
+    GameActions::ProcessQueue(state);
+    Require(
+        ride->price[0] == draft.price && park.cash == cash && park.bankLoan == loan && park.expenditureTable == ledger,
+        "Price changed park accounting");
+    Require(R::Action(draft, true).error != GameActions::Status::ok, "Stale/duplicate price accepted");
+    draft = *R::Begin(target);
+    R::AdjustPrice(draft, 1);
+    park.flags.set(ParkFlag::noMoney);
+    Require(!R::Begin(target) && R::Action(draft, true).error != GameActions::Status::ok, "No-money price allowed");
+    park.flags.unset(ParkFlag::noMoney);
+    park.flags.unset(ParkFlag::freeEntry);
+    Require(R::Action(draft, true).error != GameActions::Status::ok, "Changed park pricing rule accepted");
+    park.flags.set(ParkFlag::freeEntry);
+    auto open = *R::Begin(target, RideStatus::open);
+    GameActions::RideSetStatusAction nativeOpen(target.id, RideStatus::open);
+    const auto nativeOpenQuery = GameActions::Query(&nativeOpen, state);
+    Require(
+        R::Action(open, false).error == nativeOpenQuery.error && nativeOpenQuery.error != GameActions::Status::ok,
+        "Incomplete ride bypassed native opening prerequisites");
+    Require(
+        R::Action(open, true).error != GameActions::Status::ok && ride->status == RideStatus::closed,
+        "Invalid opening mutated ride");
+    if (ride->supportsStatus(RideStatus::testing))
+    {
+        auto testing = *R::Begin(target, RideStatus::testing);
+        GameActions::RideSetStatusAction nativeTest(target.id, RideStatus::testing);
+        Require(
+            R::Action(testing, false).error == GameActions::Query(&nativeTest, state).error,
+            "Testing prerequisites differ from native");
+    }
+    Require(!R::Begin(target, RideStatus::simulating), "Simulation status offered");
+    ride->status = RideStatus::open;
+    auto closing = *R::Begin(target, RideStatus::closed);
+    Require(
+        R::Action(closing, false).error == GameActions::Status::ok && R::Action(closing, true).error == GameActions::Status::ok,
+        "Native close failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        ride->status == RideStatus::closed && park.cash == cash && park.expenditureTable == ledger, "Close changed accounting");
+    Require(R::Action(closing, true).error != GameActions::Status::ok, "Repeated close allowed construction side effect");
+    const auto originalType = ride->type;
+    ride->type = RIDE_TYPE_MAZE;
+    const auto mazeTarget = *R::Identify(ride->id);
+    Require(!R::Begin(mazeTarget, RideStatus::testing), "No-test ride offered testing");
+    ride->type = originalType;
+    park.flags.set(ParkFlag::noMoney);
+    ride->status = RideStatus::open;
+    auto freeClose = *R::Begin(target, RideStatus::closed);
+    Require(R::Action(freeClose, true).error == GameActions::Status::ok, "No-money native close failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        ride->status == RideStatus::closed && park.cash == cash && park.expenditureTable == ledger,
+        "No-money status changed cash");
+    park.flags.unset(ParkFlag::noMoney);
+    if (realUi)
+    {
+        H::EndTerrain();
+        gGamePaused = 0;
+        H::ControllerInput input;
+        auto press = [&](H::Action action) {
+            H::Frame frame;
+            frame.actions = { action, action };
+            Require(H::HandleMenuInput(input, frame), "Rides input lost");
+        };
+        auto openMenu = [&] {
+            W::HandheldDashboardOpen();
+            W::HandheldDashboardMove(0, -3);
+            press(H::Action::confirm);
+        };
+        // A native missing-entrance query must report the error without changing viewport/tool/ride state.
+        ride->numStations = 1;
+        ride->mode = RideMode::rotation;
+        ride->getStation(StationIndex::FromUnderlying(0)).start = target.location;
+        ride->getStation(StationIndex::FromUnderlying(0)).entrance.setNull();
+        ride->getStation(StationIndex::FromUnderlying(0)).exit.setNull();
+        openMenu();
+        Require(W::HandheldRidesIsOpen() && !W::HandheldDashboardRailFocused(), "Rides route failed");
+        auto* main = WindowGetMain();
+        const auto savedView = main->savedViewPos;
+        const auto guardedOpen = *R::Begin(target, RideStatus::open);
+        Require(R::Action(guardedOpen, false).error != GameActions::Status::ok, "Missing entrance accepted");
+        GameActions::ProcessQueue(state);
+        Require(
+            main->savedViewPos == savedView && !Ui::GetWindowManager()->FindByClass(WindowClass::rideConstruction)
+                && ride->status == RideStatus::closed && W::HandheldRidesIsOpen(),
+            "Native error query entered desktop construction");
+        const auto row = std::find(roster.begin(), roster.end(), target) - roster.begin();
+        W::HandheldDashboardMove(0, static_cast<int>(row));
+        SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+        Require(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) == 0, "Ride SDL init failed");
+        {
+            H::ControllerInput controller;
+            controller.update(true, 8000);
+            const auto device = SDL_JoystickAttachVirtual(
+                SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);
+            auto* joystick = SDL_JoystickOpen(device);
+            Require(joystick, "Ride virtual controller missing");
+            auto pump = [&] {
+                SDL_Event event;
+                while (SDL_PollEvent(&event))
+                    controller.handleEvent(event);
+            };
+            pump();
+            controller.update(true, 8010);
+            pump();
+            controller.update(true, 8020);
+            auto button = [&](bool down) {
+                SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, down);
+                SDL_JoystickUpdate();
+                pump();
+            };
+            button(true);
+            auto frame = controller.update(true, 8030);
+            Require(frame.actions.size() == 1 && H::HandleMenuInput(controller, frame), "Ride mapped selecting A lost");
+            Require(controller.update(true, 8040).actions.empty() && W::HandheldRidesIsOpen(), "Held selecting A located ride");
+            button(false);
+            Require(controller.update(true, 8050).actions.empty(), "Ride A release acted");
+            button(true);
+            frame = controller.update(true, 8060);
+            Require(
+                frame.actions.size() == 1 && H::HandleMenuInput(controller, frame) && !W::HandheldDashboardIsOpen(),
+                "Fresh A did not locate ride");
+            Require(controller.update(true, 8070).actions.empty(), "Locate A spilled into park");
+            button(false);
+            controller.update(true, 8080);
+            SDL_JoystickClose(joystick);
+            SDL_JoystickDetachVirtual(device);
+        }
+        openMenu();
+        W::HandheldDashboardMove(0, static_cast<int>(row));
+        press(H::Action::confirm);
+        Require(W::HandheldRidesPresentation().title == ride->getName(), "Ride roster selection wrong");
+        press(H::Action::openBuild);
+        Require(W::HandheldDashboardRailFocused(), "Ride content -> rail failed");
+        press(H::Action::openBuild);
+        Require(W::HandheldRidesPresentation().title == ride->getName(), "Ride inspection resume lost");
+        W::HandheldDashboardMove(0, 1);
+        press(H::Action::confirm);
+        Require(W::HandheldRidesPresentation().stats[0].second == "6.50", "Ride statistics route failed");
+        press(H::Action::back);
+        ride->status = RideStatus::open; // isolated fixture baseline for UI close review
+        W::HandheldDashboardMove(0, 3);
+        press(H::Action::confirm);
+        Require(
+            W::HandheldRidesPresentation().confirmation && W::HandheldRidesPresentation().selected == 1,
+            "Status review not Cancel-first");
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Require(ride->status == RideStatus::open && park.cash == cash, "Status cancellation applied close");
+        W::HandheldDashboardMove(0, 3);
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(0, -1);
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Require(
+            ride->status == RideStatus::closed && park.cash == cash && park.expenditureTable == ledger,
+            "Status UI confirmation did not apply one native close");
+        W::HandheldDashboardMove(0, 5);
+        press(H::Action::confirm);
+        Require(W::HandheldRidesPresentation().editing, "Ride price route failed");
+        const auto price = ride->price[0];
+        W::HandheldDashboardMove(1, 0);
+        press(H::Action::openBuild);
+        Require(!W::HandheldDashboardRailFocused(), "Select escaped ride draft");
+        W::HandheldDashboardMove(0, 2);
+        press(H::Action::confirm);
+        Require(
+            W::HandheldRidesPresentation().confirmation && W::HandheldRidesPresentation().selected == 1,
+            "Ride review did not default Cancel / input spilled");
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Require(ride->price[0] == price && park.cash == cash, "Cancel applied ride price");
+        W::HandheldDashboardMove(0, 5);
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(1, 0);
+        W::HandheldDashboardMove(0, 2);
+        press(H::Action::confirm);
+        press(H::Action::back);
+        Require(W::HandheldRidesPresentation().editing, "B review did not restore draft");
+        press(H::Action::confirm); // price editor selects Decrease; still no real action
+        press(H::Action::back);
+        Require(ride->price[0] == price, "B draft applied price");
+        W::HandheldDashboardMove(0, 5);
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(1, 0);
+        W::HandheldDashboardMove(0, 2);
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(0, -1);
+        press(H::Action::confirm);
+        press(H::Action::confirm); // while queued / after page transition cannot repeat charge
+        GameActions::ProcessQueue(state);
+        Require(
+            ride->price[0] == price + 1 && park.cash == cash && park.expenditureTable == ledger,
+            "Ride confirm did not execute exactly once");
+        Require(!W::HandheldRidesPresentation().confirmation, "Completed ride confirmation not returned to inspection");
+        press(H::Action::back);
+        Require(W::HandheldRidesPresentation().selected == static_cast<size_t>(row), "Roster return lost selection");
+        press(H::Action::confirm);
+        press(H::Action::confirm); // locate
+        Require(!W::HandheldDashboardIsOpen() && !gGamePaused, "Ride locating failed to return to park");
+        Require(R::Locate(target), "Native viewport locating failed");
+        openMenu();
+        W::HandheldDashboardMove(0, static_cast<int>(row));
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(0, 5);
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(1, 0);
+        W::HandheldDashboardMove(0, 2);
+        press(H::Action::confirm);
+        ++ride->price[0]; // native settings changed externally while review open
+        const auto changed = ride->price[0];
+        W::HandheldDashboardMove(0, -1);
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Require(ride->price[0] == changed && W::HandheldRidesPresentation().confirmation, "Stale UI review applied");
+        press(H::Action::back);
+        press(H::Action::back);
+        press(H::Action::back);
+        press(H::Action::back);
+        press(H::Action::back);
+    }
+    // Native close-by-number invalidation also catches reused IDs with identical identifying fields.
+    draft = *R::Begin(target);
+    R::AdjustPrice(draft, 1);
+    if (realUi)
+        Ui::GetWindowManager()->CloseByNumber(WindowClass::ride, target.id.ToUnderlying());
+    else
+        R::Invalidate(target.id); // dummy WindowManager deliberately has no native UI callbacks
+    Require(
+        !R::Resolve(target) && R::Action(draft, true).error != GameActions::Status::ok,
+        "Ride removal generation not invalidated");
+    const auto reusedId = target.id;
+    const auto oldPrice = ride->price[0];
+    const auto oldName = ride->customName;
+    RideDelete(reusedId);
+    ride = RideAllocateAtIndex(reusedId);
+    Require(ride, "Reused ride allocation failed");
+    ride->type = target.type;
+    ride->subtype = target.object;
+    ride->buildDate = target.buildDate;
+    ride->overallView = target.location;
+    ride->status = RideStatus::closed;
+    ride->price[0] = oldPrice;
+    ride->customName = oldName;
+    Require(
+        !R::Resolve(target) && R::Action(draft, true).error != GameActions::Status::ok,
+        "Reused identical ride accepted stale draft");
+    // Native save intentionally omits trackless construction records. Give this save-only fixture a track element.
+    auto* track = TileElementInsert<TrackElement>({ target.location, MapGetSurfaceElementAt(target.location)->getBaseZ() }, 15);
+    Require(track, "Save fixture track allocation failed");
+    track->setRideIndex(reusedId);
+    const auto current = *R::Identify(reusedId);
+    const auto savedPrice = ride->price[0];
+    const auto savedName = ride->getName();
+    const auto save = profile + "/rides-management.park";
+    Require(ScenarioSave(state, save, flags), "Ride management save failed");
+    Require(context.LoadParkFromFile(save, false, true), "Ride management reload failed");
+    Require(!W::HandheldDashboardIsOpen(), "Reload retained Dashboard");
+    const auto loaded = R::Identify(current.id);
+    Require(
+        loaded && R::Resolve(*loaded)->price[0] == savedPrice && R::Resolve(*loaded)->getName() == savedName
+            && R::Resolve(*loaded)->status == RideStatus::closed && getGameState().park.cash == cash
+            && getGameState().park.expenditureTable == ledger,
+        "Ride management save/reload changed native state");
+    Require(context.LoadParkFromFile(original, false, true), "Ride fixture cleanup reload failed");
+    std::cout << "Native Rides roster / information / locate / status-prerequisites / price-restrictions-accounting / "
+                 "cancel-stale-focus / save-reload passed\n";
+}
+
 static void TestDashboard(IContext& context, const std::string& profile, bool realUi)
 {
     namespace D = Ui::Handheld::Dashboard;
@@ -2872,11 +3229,11 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
     Require(
         navigation.section == D::Section::finances && navigation.focus == D::Focus::rail,
         "Dashboard default section/focus wrong");
-    navigation.move(-3);
+    navigation.move(-4);
     Require(
-        navigation.section == D::Section::rides && !navigation.enter() && navigation.focus == D::Focus::rail,
+        navigation.section == D::Section::overview && !navigation.enter() && navigation.focus == D::Focus::rail,
         "Unavailable section entered");
-    navigation.move(2);
+    navigation.move(3);
     Require(navigation.section == D::Section::staff && navigation.enter(), "Staff rail route missing");
     navigation.move(7);
     Require(navigation.section == D::Section::staff, "Rail wrap failed");
@@ -2899,14 +3256,14 @@ static void TestDashboard(IContext& context, const std::string& profile, bool re
     Require(
         W::HandheldDashboardIsOpen() && W::HandheldDashboardRailFocused() && gGamePaused,
         "Dashboard open did not own pause/rail");
-    W::HandheldDashboardMove(0, -3); // Rides is explicitly unavailable
+    W::HandheldDashboardMove(0, -4); // Overview is explicitly unavailable
     action(H::Action::confirm);
     action(H::Action::openBuild);
     Require(
         W::HandheldDashboardRailFocused() && !W::HandheldFinancesIsOpen() && !W::HandheldStaffIsOpen(),
         "Unavailable category acquired content focus");
     Require(park.cash == cash && S::Roster() == roster, "Unavailable category changed native state");
-    W::HandheldDashboardMove(0, 3);
+    W::HandheldDashboardMove(0, 4);
     action(H::Action::openBuild); // Select enters Finances
     Require(!W::HandheldDashboardRailFocused() && W::HandheldFinancesIsOpen(), "Rail -> Finances focus failed");
     action(H::Action::openBuild);
@@ -3395,6 +3752,7 @@ int main(int argc, char** argv)
         TestResearchManagement(*context, argv[2], argc == 4);
         TestMarketingManagement(*context, argv[2], argc == 4);
         TestGuests(*context, argv[2], argc == 4);
+        TestRideManagement(*context, argv[2], argc == 4);
         std::cout << "Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height "
                      "persistence / save / reload / remove / ownership / pause and research checks passed\n";
         return 0;
