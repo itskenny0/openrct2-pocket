@@ -102,7 +102,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                       false,
                       0 };
     }
-    static std::array<uint8_t, 13> Snapshot(const Ride& ride)
+    static std::array<uint8_t, 14> Snapshot(const Ride& ride)
     {
         return { static_cast<uint8_t>(ride.mode),
                  ride.minWaitingTime,
@@ -116,7 +116,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                  ride.numCarsPerTrain,
                  ride.numStations,
                  ride.numBlockBrakes,
-                 ride.numCircuits };
+                 ride.numCircuits,
+                 ride.operationOption };
     }
     std::vector<Setting> Settings(const Ride& ride, bool maintenance)
     {
@@ -180,6 +181,64 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             auto& setting = result.back();
             for (size_t i = 0; i < setting.values.size(); ++i)
                 setting.labels[i] = FormatStringID(STR_VELOCITY, static_cast<uint16_t>(setting.values[i]));
+        }
+        // Mirror the desktop operating-page semantics; never expose the union byte as a generic option.
+        if (ride.getAvailableModes().has(ride.mode))
+        {
+            StringId caption = kStringIdEmpty;
+            StringId format = STR_COMMA16;
+            int multiplier = type.OperatingSettings.OperatingSettingMultiplier;
+            bool velocity = false;
+            switch (ride.mode)
+            {
+                case RideMode::poweredLaunchPassthrough:
+                case RideMode::poweredLaunch:
+                case RideMode::upwardLaunch:
+                case RideMode::poweredLaunchBlockSectioned:
+                    caption = STR_LAUNCH_SPEED;
+                    velocity = true;
+                    break;
+                case RideMode::stationToStation:
+                    caption = STR_SPEED;
+                    velocity = true;
+                    break;
+                case RideMode::race:
+                    caption = STR_NUMBER_OF_LAPS;
+                    multiplier = 1;
+                    break;
+                case RideMode::dodgems:
+                    caption = STR_TIME_LIMIT;
+                    format = STR_RIDE_TIME_ENTRY;
+                    break;
+                case RideMode::swing:
+                    caption = STR_NUMBER_OF_SWINGS;
+                    break;
+                case RideMode::rotation:
+                case RideMode::forwardRotation:
+                case RideMode::backwardRotation:
+                    caption = STR_NUMBER_OF_ROTATIONS;
+                    break;
+                default:
+                    break;
+            }
+            const auto& options = type.OperatingSettings;
+            const bool unlimited = getGameState().cheats.unlockOperatingLimits;
+            const int minimum = unlimited ? 0 : options.MinValue;
+            const int maximum = unlimited ? Limits::kCheatsMaxOperatingLimit : options.MaxValue;
+            if (caption != kStringIdEmpty && maximum > minimum)
+            {
+                const auto name = FormatStringID(caption);
+                add(RideSetSetting::operation, name.c_str(), ride.operationOption, minimum, maximum);
+                auto& setting = result.back();
+                setting.step = ride.mode == RideMode::dodgems ? 10 : 1;
+                for (size_t i = 0; i < setting.values.size(); ++i)
+                    setting.labels[i] = FormatStringID(
+                        velocity ? static_cast<StringId>(STR_VELOCITY) : format,
+                        static_cast<uint16_t>(velocity ? (setting.values[i] * 9) / 4 : setting.values[i] * multiplier));
+            }
+            if (ride.canHaveMultipleCircuits() && !ride.flags.has(RideFlag::cableLift))
+                add(RideSetSetting::numCircuits, "Number of circuits", ride.numCircuits, 1,
+                    unlimited ? 255 : Limits::kMaxCircuitsPerRide);
         }
         return result;
     }
@@ -363,8 +422,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             if (found != values.end() && !values.empty())
                 draft.value = values[std::clamp<int>(
                     found - values.begin()
-                        + (direction > 0       ? 1
-                               : direction < 0 ? -1
+                        + (direction > 0       ? draft.setting->step
+                               : direction < 0 ? -draft.setting->step
                                                : 0),
                     0, values.size() - 1)];
             if (draft.setting->vehicle)

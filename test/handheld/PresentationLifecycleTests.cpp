@@ -255,6 +255,77 @@ int main(int argc, char** argv)
         Require(W::HandheldRidesPresentation().editing, "Review B did not restore settings draft");
         press(H::Action::back);
         Require(W::HandheldRidesPresentation().breadcrumb == "Rides / Operations", "Draft B did not return to Operations");
+        GameActions::RideSetSettingAction continuousMode(
+            target.id, GameActions::RideSetSetting::mode, static_cast<uint8_t>(RideMode::continuousCircuit));
+        Require(GameActions::Execute(&continuousMode, state).error == GameActions::Status::ok, "Circuit UI native mode failed");
+        GameActions::ProcessQueue(state);
+        GameActions::RideSetSettingAction initialCircuits(target.id, GameActions::RideSetSetting::numCircuits, 1);
+        Require(GameActions::Execute(&initialCircuits, state).error == GameActions::Status::ok, "Circuit UI baseline failed");
+        GameActions::ProcessQueue(state);
+        const auto operationSettings = R::Settings(*ride);
+        const auto circuitSetting = std::find_if(operationSettings.begin(), operationSettings.end(), [](const auto& s) {
+            return s.key == GameActions::RideSetSetting::numCircuits;
+        });
+        Require(circuitSetting != operationSettings.end(), "Circuit controller setting absent");
+        const auto circuitRow = circuitSetting - operationSettings.begin();
+        W::HandheldDashboardMove(0, circuitRow);
+        {
+            H::ControllerInput controller;
+            controller.update(true, 11000);
+            const auto device = SDL_JoystickAttachVirtual(
+                SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);
+            auto* joystick = SDL_JoystickOpen(device);
+            Require(joystick, "Mode virtual controller missing");
+            auto pump = [&] {
+                SDL_Event event;
+                while (SDL_PollEvent(&event))
+                    controller.handleEvent(event);
+            };
+            pump();
+            controller.update(true, 11010);
+            pump();
+            controller.update(true, 11020);
+            SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, true);
+            SDL_JoystickUpdate();
+            pump();
+            const auto frame = controller.update(true, 11030);
+            Require(frame.actions.size() == 1 && H::HandleMenuInput(controller, frame), "Mode selecting A lost");
+            Require(
+                controller.update(true, 11040).actions.empty() && controller.update(true, 12040).actions.empty()
+                    && W::HandheldRidesPresentation().editing && ride->numCircuits == 1,
+                "Held mode selecting A changed/applied setting");
+            SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, false);
+            SDL_JoystickUpdate();
+            pump();
+            Require(controller.update(true, 12050).actions.empty(), "Mode A release acted");
+            SDL_JoystickClose(joystick);
+            SDL_JoystickDetachVirtual(device);
+        }
+        W::HandheldDashboardMove(1, 0);
+        W::HandheldDashboardMove(0, 2);
+        press(H::Action::confirm);
+        Require(
+            W::HandheldRidesPresentation().confirmation && W::HandheldRidesPresentation().selected == 1,
+            "Mode parameter review not Cancel-first");
+        press(H::Action::confirm);
+        Require(
+            ride->numCircuits == 1 && state.park.cash == settingsCash
+                && W::HandheldRidesPresentation().breadcrumb == "Rides / Operations",
+            "Mode cancellation changed state/parent");
+        W::HandheldDashboardMove(0, circuitRow);
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(1, 0);
+        W::HandheldDashboardMove(0, 2);
+        press(H::Action::confirm);
+        W::HandheldDashboardMove(0, -1);
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Require(
+            ride->numCircuits == 2 && state.park.cash == settingsCash
+                && W::HandheldRidesPresentation().breadcrumb == "Rides / Operations",
+            "Circuit confirm/input return failed");
+        std::cout << "SDL mode-specific Operations / held select / Cancel-first / one native confirm / parent return passed"
+                  << std::endl;
         press(H::Action::back);
         model = W::HandheldRidesPresentation();
         W::HandheldDashboardMove(0, model.rows.size() - 1);

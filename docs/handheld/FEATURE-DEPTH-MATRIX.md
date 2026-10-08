@@ -37,9 +37,9 @@ Complexity refers to implementation, not the number of desktop controls.
 | --- | --- | --- | --- | --- |
 | Ride operations PARTIAL | Ride.cpp operating page; RideSetSettingAction; Ride::getAvailableModes, type flags, LiftData | Existing ride identity, drafts, confirmation, Dashboard | medium / high | Operations list, one bounded native setting draft at a time; mode changes can reset test/vehicle state, waits couple minimum/maximum. First depth package. |
 | Ride maintenance PARTIAL | Ride.cpp maintenance; Ride inspectionInterval, lastInspection, downtime, dueInspection, availableBreakdowns | Existing stats and native setting action | small / high | Maintenance page with interval draft; distinguish rides without breakdowns. |
-| Ride demolition MISSING | DemolishRidePrompt.cpp; RideDemolishAction; RideGetRefundPrice uses native track query calculations | Shop confirmation pattern and ride stale identity | medium / high | Named destructive Cancel-first review; action Query omits refund, use native prompt calculator; changed layout/quote must invalidate review. |
+| Ride demolition COMPLETE | DemolishRidePrompt.cpp; RideDemolishAction; RideGetRefundPrice uses native track query calculations | Shop confirmation pattern and ride stale identity | medium / high | Delivered named destructive Cancel-first review, native prompt refund calculator and stale quote validation; see RIDE-DEPTH-CHECKPOINT.md. |
 | Vehicles PARTIAL | Ride.cpp vehicle page; RideSetVehicleAction; Ride::updateMaxVehicles, loaded vehicle object limits, proposedNumTrains/proposedNumCarsPerTrain | Ride drafts/identity available | medium / high | Train/car counts and requested/effective review delivered in Vehicles/Dispatch checkpoint. Native station/object limits, closure and clamping apply. Vehicle-object selection and reverse trains remain deferred. |
-| Mode-specific options PARTIAL | Ride.cpp launch/time/laps/swings/rotations/circuits; load mask/synchronization now represented; RideSetSettingAction | Operations setting model | medium / high | Typed labels/units and descriptor visibility; do not show raw operationOption as a universal setting. |
+| Mode-specific options PARTIAL | Ride.cpp launch/time/laps/swings/rotations/circuits; load mask/synchronization now represented; RideSetSettingAction | Operations setting model | medium / high | Delivered duration/laps/swings/rotations/launch/speed/circuits and native dispatch controls with typed labels/units and descriptor visibility. No-vehicle maximum-rider fallback remains deferred. |
 | Ride finance/customer depth PARTIAL | Ride.cpp income/customer pages; Ride totalProfit, popularity, satisfaction, queue/station information | Existing read-only stats | small / medium | Split Finance/Customers when enough useful content; respect undefined values and rolling windows. |
 | Ride music/appearance/naming MISSING | Ride.cpp music/colour/name; RideSetSettingAction, RideSetAppearanceAction, RideSetNameAction | Picker/draft architecture | medium / medium | Native music objects and colour choices; keyboard dependency for naming. Defer in first operations package. |
 | Ride graphs DEFERRED | Ride.cpp graph page; RideMeasurement sampling and scrolling | No controller graph view | medium / low | Optional fixed-size native graph later; unavailable sampling honest, cursor/time scale require additional interaction. |
@@ -93,8 +93,7 @@ Dispatch adds native load threshold, wait-for-load, supported adjacent-station
 synchronization and conditional leave-on-another-arrival. Unrelated departure
 bits are preserved. Existing wait-time controls remain in Operations.
 Counts/dispatch are COMPLETE within this named scope; Vehicles remains PARTIAL
-for vehicle-object selection and reversed trains. Mode-specific options still
-need typed time/laps/launch/rotations/circuits support. No new construction, UI
+for vehicle-object selection and reversed trains. Mode-specific options are extended by the next package documented below. No new construction, UI
 shell or save format. See VEHICLES-DISPATCH-CHECKPOINT.md for validation and
 public-fixture limitations.
 
@@ -102,3 +101,25 @@ Recommended next package: descriptor-driven mode-specific operating parameters
 within Operations, preserving these new vehicle/dispatch workflows. Keep vehicle
 object selection, appearance/music and graphs deferred until that package is
 validated.
+
+## Mode-specific Operations package delivered
+
+COMPLETE within the desktop mode-tweak vocabulary requested for Pocket: native
+Dodgems duration, race laps, swings, forward/backward/plain rotations, supported
+launch modes and station-to-station speed. Descriptor bounds, native multipliers,
+velocity formatting and the Dodgems ten-second spinner increment apply.
+Circuit counts use Ride::canHaveMultipleCircuits; native cable-lift multi-circuit
+restrictions are respected. Typed drafts use RideSetSettingAction and revalidate
+mode/operation/vehicle state. No raw generic operationOption is exposed.
+
+Mode-specific Operations remains PARTIAL for no-vehicle maximum-rider capacity
+(the desktop fallback), other niche settings and track-piece brake parameters.
+Vehicle-object selection/reversed trains, refurbishment/mechanic assistance,
+appearance/music and richer finance/customer information remain open.
+See MODE-OPERATIONS-CHECKPOINT.md for scope, native sources, tests and limits.
+
+Next recommended coherent depth workflow: Maintenance → review native breakdown/
+inspection state → locate assigned/nearest available mechanic → native queried
+refurbishment review → Cancel-first confirmation → return/save/reload. Reuse
+Maintenance, Staff identities and existing demolition/renew action machinery;
+no patrol editing or new staff roles.

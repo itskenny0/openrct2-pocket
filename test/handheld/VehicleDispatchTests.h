@@ -119,6 +119,25 @@ static void TestVehicleDispatch(IContext& context, const std::string& profile, R
                 && R::Action(statusDraft, false).error != GameActions::Status::ok,
             "Incomplete coaster bypassed native Test/Open");
     }
+    const auto dodgOperations = R::Settings(*GetRide(dodgTarget.id));
+    const auto duration = std::find_if(dodgOperations.begin(), dodgOperations.end(), [](const auto& s) {
+        return s.key == GameActions::RideSetSetting::operation;
+    });
+    Require(duration != dodgOperations.end(), "Placed Dodgems duration absent");
+    auto durationDraft = *R::BeginSetting(dodgTarget, *duration);
+    R::AdjustPrice(durationDraft, 1);
+    Require(R::Action(durationDraft, true).error == GameActions::Status::ok, "Placed Dodgems duration failed");
+    GameActions::ProcessQueue(state);
+    const auto operationSettings = R::Settings(*ride);
+    const auto circuits = std::find_if(operationSettings.begin(), operationSettings.end(), [](const auto& s) {
+        return s.key == GameActions::RideSetSetting::numCircuits;
+    });
+    Require(circuits != operationSettings.end(), "Native station circuit capability absent");
+    auto circuitDraft = *R::BeginSetting(target, *circuits);
+    R::AdjustPrice(circuitDraft, 1);
+    Require(R::Action(circuitDraft, true).error == GameActions::Status::ok, "Native station circuits action failed");
+    GameActions::ProcessQueue(state);
+    const auto circuitCount = ride->numCircuits;
     const auto proposed = ride->proposedNumCarsPerTrain;
     const auto effective = ride->numCarsPerTrain;
     const auto flagsValue = ride->departFlags;
@@ -130,8 +149,12 @@ static void TestVehicleDispatch(IContext& context, const std::string& profile, R
     Require(ScenarioSave(state, save, flags) && context.LoadParkFromFile(save), "Vehicle/dispatch save/reload failed");
     ride = GetRide(target.id);
     Require(
+        GetRide(dodgTarget.id) && GetRide(dodgTarget.id)->numTrains == countDraft.value
+            && GetRide(dodgTarget.id)->operationOption == durationDraft.value,
+        "Placed Dodgems duration/vehicle count not serialized");
+    Require(
         ride && ride->proposedNumCarsPerTrain == proposed && ride->numCarsPerTrain == effective
-            && ride->departFlags == flagsValue && state.park.cash == cash,
+            && ride->departFlags == flagsValue && ride->numCircuits == circuitCount && state.park.cash == cash,
         "Native configuration serialization differs");
     if (!realUi)
         R::InvalidateAll(); // DummyWindowManager deliberately omits WindowInitAll UI callbacks.
