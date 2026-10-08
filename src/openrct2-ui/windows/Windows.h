@@ -415,3 +415,5 @@ namespace OpenRCT2::Ui::Windows
     WindowBase* WaterOpen();
     void ToggleWaterWindow();
 } // namespace OpenRCT2::Ui::Windows
+
+namespace OpenRCT2::Ui::Windows { void HandheldTrackPiecePickerOpen(); }

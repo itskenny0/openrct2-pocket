@@ -3,6 +3,8 @@
 
 #include <openrct2/actions/track/TrackPlaceAction.h>
 #include <openrct2/actions/track/TrackRemoveAction.h>
+#include <openrct2/ride/TrackData.h>
+#include <openrct2/ride/ted/TrackElementDescriptor.h>
 #include <openrct2/world/TileElementsView.h>
 #include <openrct2/world/tile_element/TrackElement.h>
 namespace OpenRCT2::Ui::Handheld
@@ -11,7 +13,9 @@ namespace OpenRCT2::Ui::Handheld
     {
         if (!_origin || !_ride)
             return false;
-        for (auto* e : TileElementsView<TrackElement>(*_origin))
+        const auto& c = TrackMetadata::GetTrackElementDescriptor(_type).sequenceData.sequences[0].clearance;
+        const auto xy = CoordsXY(*_origin) + CoordsXY{ c.x, c.y }.rotate(_origin->direction);
+        for (auto* e : TileElementsView<TrackElement>(xy))
             if (e->isGhost() && e->getRideIndex() == id())
                 return true;
         return false;
@@ -20,16 +24,21 @@ namespace OpenRCT2::Ui::Handheld
     {
         if (exists())
         {
-            auto remove = GameActions::TrackRemoveAction(GetRide(id())->getRideTypeDescriptor().StartTrackPiece, 0, *_origin);
+            const auto& c = TrackMetadata::GetTrackElementDescriptor(_type).sequenceData.sequences[0].clearance;
+            const auto xy = CoordsXY(*_origin) + CoordsXY{ c.x, c.y }.rotate(_origin->direction);
+            auto remove = GameActions::TrackRemoveAction(_type, 0, { xy, _origin->z + c.z, _origin->direction });
             remove.SetFlags(
                 { GameActions::CommandFlag::ghost, GameActions::CommandFlag::noSpend,
                   GameActions::CommandFlag::allowDuringPaused });
-            GameActions::Execute(&remove, getGameState());
+            const auto result = GameActions::Execute(&remove, getGameState());
+            if (result.error == GameActions::Status::notOwned)
+                remove.Execute(getGameState(), getGameState().park);
         }
         _origin.reset();
         _ride.reset();
     }
-    bool TrackPreview::place(ObjectEntryIndex index, ride_type_t type, CoordsXYZD origin)
+    bool TrackPreview::place(
+        ObjectEntryIndex index, ride_type_t type, CoordsXYZD origin, TrackElemType piece, SelectedLiftAndInverted flags)
     {
         clear();
         _ride = std::make_unique<ShopPlacement::PreviewRide>(index, type);
@@ -38,8 +47,8 @@ namespace OpenRCT2::Ui::Handheld
             clear();
             return false;
         }
-        auto place = GameActions::TrackPlaceAction(
-            id(), GetRideTypeDescriptor(type).StartTrackPiece, type, origin, 0, 0, 0, {}, false);
+        _type = piece == TrackElemType::none ? GetRideTypeDescriptor(type).StartTrackPiece : piece;
+        auto place = GameActions::TrackPlaceAction(id(), _type, type, origin, 6, 0, 0, flags, false);
         place.SetFlags(
             { GameActions::CommandFlag::ghost, GameActions::CommandFlag::noSpend,
               GameActions::CommandFlag::allowDuringPaused });

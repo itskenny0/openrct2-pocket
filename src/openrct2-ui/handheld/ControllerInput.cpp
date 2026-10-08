@@ -123,6 +123,9 @@ namespace OpenRCT2::Ui::Handheld
                         case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:
                             _actions.push_back(Action::nextOption);
                             break;
+                        case SDL_CONTROLLER_BUTTON_LEFTSTICK:
+                            _actions.push_back(Action::cameraMode);
+                            break;
                         case SDL_CONTROLLER_BUTTON_START:
                             _actions.push_back(Action::openMenu);
                             break;
@@ -135,7 +138,20 @@ namespace OpenRCT2::Ui::Handheld
                 }
                 return true;
             case SDL_CONTROLLERBUTTONUP:
+                return true;
             case SDL_CONTROLLERAXISMOTION:
+                if (event.caxis.which == _instance
+                    && (event.caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT
+                        || event.caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT))
+                {
+                    auto& held = event.caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT ? _leftTrigger : _rightTrigger;
+                    const bool pressed = event.caxis.value > 16000;
+                    if (_armed && pressed && !held)
+                        _actions.push_back(
+                            event.caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT ? Action::slopeDown : Action::slopeUp);
+                    held = pressed;
+                }
+                return true;
             case SDL_JOYBUTTONDOWN:
             case SDL_JOYBUTTONUP:
             case SDL_JOYHATMOTION:
@@ -174,6 +190,8 @@ namespace OpenRCT2::Ui::Handheld
             bool any = false;
             for (int i = 0; i < SDL_CONTROLLER_BUTTON_MAX; ++i)
                 any |= held(static_cast<SDL_GameControllerButton>(i));
+            any |= SDL_GameControllerGetAxis(_controller, SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 16000
+                || SDL_GameControllerGetAxis(_controller, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 16000;
             _armed = !any;
             _lastTick = now;
             return result;

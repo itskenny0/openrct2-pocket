@@ -29,6 +29,8 @@ namespace OpenRCT2::Ui::Handheld
     void BeginWater(bool raise = true);
     void BeginSurface();
     void BeginTrees();
+    bool BeginCustomTrack(ObjectEntryIndex index);
+    bool ResumeCustomTrack(RideId id);
     bool BeginFlatRide(ObjectEntryIndex index);
     bool BeginSavedDesign(const std::string& path);
     bool ResumeFlatRide(RideId id);

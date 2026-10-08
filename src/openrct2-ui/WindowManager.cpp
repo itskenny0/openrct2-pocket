@@ -1164,6 +1164,8 @@ public:
 
     void Cleanup() override
     {
+        // Release native tool ghosts while the context and loaded objects still exist.
+        Handheld::EndTerrain();
         CloseByCondition([](WindowBase* w) { return true; });
         WindowCullDead();
     }

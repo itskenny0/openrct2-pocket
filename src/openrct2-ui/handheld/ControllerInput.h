@@ -26,6 +26,9 @@ namespace OpenRCT2::Ui::Handheld
         openMenu,
         openBuild,
         quit,
+        slopeDown,
+        slopeUp,
+        cameraMode,
     };
 
     struct Frame
@@ -57,6 +60,7 @@ namespace OpenRCT2::Ui::Handheld
         bool _scan{ true };
         bool _armed{};
         bool _quitHeld{};
+        bool _leftTrigger{}, _rightTrigger{};
         uint32_t _lastTick{};
         float _panX{};
         float _panY{};

@@ -104,6 +104,7 @@ namespace OpenRCT2
         placeFlatRide,
         placeFlatRideEntrance,
         placeSavedTrackDesign,
+        placeSequentialTrack,
         count,
     };
 } // namespace OpenRCT2

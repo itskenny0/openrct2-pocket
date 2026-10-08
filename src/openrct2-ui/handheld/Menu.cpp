@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "Currency.h"
+#include "CustomTracks.h"
 #include "Dashboard.h"
 #include "Designs.h"
 #include "Explorer.h"
@@ -58,6 +59,8 @@ namespace OpenRCT2::Ui::Windows
         shopPicker,
         ridePicker,
         designPicker,
+        customChoice,
+        trackPiecePicker,
         designConfirm,
         dashboard,
         overview,
@@ -131,6 +134,7 @@ namespace OpenRCT2::Ui::Windows
         bool _shopPickerFromBuild{};
         bool _ridePickerFromBuild{};
         bool _designPickerFromBuild{};
+        ObjectEntryIndex _customObject = kObjectEntryIndexNull;
         bool _exitAfterSave{};
         size_t _slot{};
         Handheld::Dashboard::State _dashboard;
@@ -471,13 +475,18 @@ namespace OpenRCT2::Ui::Windows
                     std::vector<std::string> result{ "Open ride", "Close ride", "Back to park" };
                     if (_ridesTarget && Handheld::RideAccess::Supported(*_ridesTarget))
                         result.push_back("Access / paths...");
+                    if (_ridesTarget && Handheld::CustomTracks::CanResume(*_ridesTarget))
+                        result.push_back("Continue track...");
                     return result;
                 }
+                case Page::customChoice:
+                    return { "Custom build", "Saved designs...", "Back" };
                 case Page::build:
                     return { "Raise land", "Lower land",         "Paths", "Water",          "Surface",     "Remove scenery",
                              "Trees",      "Shops / Facilities", "Rides", "Wooden designs", "Back to park" };
                 case Page::designConfirm:
                     return { "Cancel", "Place design" };
+                case Page::trackPiecePicker:
                 case Page::designPicker:
                 case Page::treePicker:
                 case Page::shopPicker:
@@ -580,6 +589,7 @@ namespace OpenRCT2::Ui::Windows
             Handheld::Shops::ClearPreview();
             Handheld::FlatRides::ClearPreview();
             Handheld::Designs::ClearPreview();
+            Handheld::CustomTracks::ClearPreview();
             setWidgets(kWidgets);
             layout();
             colours[0] = ColourWithFlags{ Colour::darkBlue };
@@ -612,11 +622,15 @@ namespace OpenRCT2::Ui::Windows
         }
         void refreshPicker(std::optional<Handheld::PickerIdentity> preferred = {})
         {
+            auto rideEntries = Handheld::FlatRides::Entries();
+            auto custom = Handheld::CustomTracks::RideEntries();
+            rideEntries.insert(rideEntries.end(), custom.begin(), custom.end());
             _picker.setEntries(
-                _page == Page::designPicker     ? Handheld::Designs::Entries()
-                    : _page == Page::ridePicker ? Handheld::FlatRides::Entries()
-                    : _page == Page::shopPicker ? Handheld::Shops::Entries()
-                                                : Handheld::TreePickerEntries(),
+                _page == Page::trackPiecePicker   ? Handheld::CustomTracks::Pieces()
+                    : _page == Page::designPicker ? Handheld::Designs::Entries()
+                    : _page == Page::ridePicker   ? rideEntries
+                    : _page == Page::shopPicker   ? Handheld::Shops::Entries()
+                                                  : Handheld::TreePickerEntries(),
                 preferred);
         }
         void openTreePicker()
@@ -629,6 +643,7 @@ namespace OpenRCT2::Ui::Windows
             Handheld::Shops::ClearPreview();
             Handheld::FlatRides::ClearPreview();
             Handheld::Designs::ClearPreview();
+            Handheld::CustomTracks::ClearPreview();
             _shopPickerFromBuild = fromBuild;
             page(Page::shopPicker);
             refreshPicker(Handheld::PickerIdentity{ ObjectType::ride, Handheld::ShopSelection() });
@@ -637,6 +652,7 @@ namespace OpenRCT2::Ui::Windows
         {
             Handheld::FlatRides::ClearPreview();
             Handheld::Designs::ClearPreview();
+            Handheld::CustomTracks::ClearPreview();
             _ridePickerFromBuild = fromBuild;
             page(Page::ridePicker);
             refreshPicker(Handheld::PickerIdentity{ ObjectType::ride, Handheld::FlatRides::Selection() });
@@ -645,6 +661,7 @@ namespace OpenRCT2::Ui::Windows
         {
             TrackRepositoryScan();
             Handheld::Designs::ClearPreview();
+            Handheld::CustomTracks::ClearPreview();
             Handheld::Designs::CancelReview();
             _designPickerFromBuild = fromBuild;
             page(Page::designPicker);
@@ -660,10 +677,18 @@ namespace OpenRCT2::Ui::Windows
             page(Page::designConfirm);
             _status = "Cost " + Handheld::FormatMoney(Handheld::Designs::ReviewCost());
         }
+        void openTrackPiecePicker()
+        {
+            Handheld::CustomTracks::ClearPreview();
+            page(Page::trackPiecePicker);
+            refreshPicker(
+                Handheld::PickerIdentity{ ObjectType::ride, kObjectEntryIndexNull,
+                                          std::to_string(static_cast<int>(Handheld::CustomTracks::Selection())) });
+        }
         bool picker() const
         {
-            return _page == Page::designPicker || _page == Page::treePicker || _page == Page::shopPicker
-                || _page == Page::ridePicker;
+            return _page == Page::trackPiecePicker || _page == Page::designPicker || _page == Page::treePicker
+                || _page == Page::shopPicker || _page == Page::ridePicker;
         }
         bool treePicker() const
         {
@@ -1000,6 +1025,12 @@ namespace OpenRCT2::Ui::Windows
                     Handheld::Designs::CancelReview();
                     close();
                     break;
+                case Page::customChoice:
+                    openRidePicker(true);
+                    break;
+                case Page::trackPiecePicker:
+                    close();
+                    break;
                 case Page::designPicker:
                     if (_designPickerFromBuild)
                         page(Page::build);
@@ -1177,7 +1208,48 @@ namespace OpenRCT2::Ui::Windows
                         invalidate();
                     }
                     break;
+                case Page::customChoice:
+                    if (choice == 0)
+                    {
+                        if (Handheld::BeginCustomTrack(_customObject))
+                            close();
+                        else
+                        {
+                            _status = "Wooden coaster unavailable";
+                            invalidate();
+                        }
+                    }
+                    else if (choice == 1)
+                        openDesignPicker(true);
+                    else
+                        openRidePicker(true);
+                    break;
+                case Page::trackPiecePicker:
+                    if (_picker.selected())
+                    {
+                        const auto key = _picker.selected()->identity.key;
+                        if (key == "leave")
+                        {
+                            Handheld::EndTerrain();
+                            close();
+                        }
+                        else if (Handheld::CustomTracks::Select(static_cast<TrackElemType>(std::stoi(key))))
+                            close();
+                        else
+                        {
+                            refreshPicker();
+                            _status = "Piece unavailable";
+                            invalidate();
+                        }
+                    }
+                    break;
                 case Page::ridePicker:
+                    if (_picker.selected() && _picker.selected()->identity.key.starts_with("custom:"))
+                    {
+                        _customObject = _picker.selected()->identity.index;
+                        page(Page::customChoice);
+                        break;
+                    }
                     if (_picker.selected() && Handheld::BeginFlatRide(_picker.selected()->identity.index))
                         close();
                     else
@@ -1561,6 +1633,16 @@ namespace OpenRCT2::Ui::Windows
                         choice == (Handheld::FlatRides::CanResume(*_ridesTarget) ? 8u : 7u)
                         && Handheld::RideAccess::Supported(*_ridesTarget))
                         page(Page::ridesAccess);
+                    else if (
+                        Handheld::CustomTracks::CanResume(*_ridesTarget)
+                        && choice
+                            == 7u + (Handheld::FlatRides::CanResume(*_ridesTarget) ? 1u : 0u)
+                                + (Handheld::RideAccess::Supported(*_ridesTarget) ? 1u : 0u))
+                    {
+                        const auto target = *_ridesTarget;
+                        close();
+                        Handheld::ResumeCustomTrack(target.id);
+                    }
                     else if (choice == 7 && Handheld::FlatRides::CanResume(*_ridesTarget))
                     {
                         const auto target = *_ridesTarget;
@@ -1974,7 +2056,14 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::ride:
-                    if (choice == 3 && _ridesTarget && Handheld::RideAccess::Supported(*_ridesTarget))
+                    if (_ridesTarget && Handheld::CustomTracks::CanResume(*_ridesTarget)
+                        && choice == (Handheld::RideAccess::Supported(*_ridesTarget) ? 4u : 3u))
+                    {
+                        const auto target = *_ridesTarget;
+                        close();
+                        Handheld::ResumeCustomTrack(target.id);
+                    }
+                    else if (choice == 3 && _ridesTarget && Handheld::RideAccess::Supported(*_ridesTarget))
                         openRideAccess(*_ridesTarget);
                     else if (choice == 2)
                         close();
@@ -2128,6 +2217,12 @@ namespace OpenRCT2::Ui::Windows
                     _focus.index(), _priceDraft, _status);
                 return;
             }
+            if (_page == Page::trackPiecePicker)
+            {
+                Handheld::DrawObjectPicker(
+                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Track pieces", _status, "No compatible pieces");
+                return;
+            }
             if (_page == Page::designPicker)
             {
                 Handheld::DrawObjectPicker(
@@ -2138,7 +2233,7 @@ namespace OpenRCT2::Ui::Windows
             if (_page == Page::ridePicker)
             {
                 Handheld::DrawObjectPicker(
-                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Flat rides", _status, "No rides available");
+                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Rides", _status, "No rides available");
                 return;
             }
             if (_page == Page::shopPicker)
@@ -2187,6 +2282,9 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::pathOptions:
                     title = "PATH OPTIONS";
+                    break;
+                case Page::customChoice:
+                    title = "WOODEN COASTER";
                     break;
                 case Page::designConfirm:
                     title = "PLACE DESIGN?";
@@ -2569,5 +2667,14 @@ namespace OpenRCT2::Ui::Windows
         const auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
         return window ? static_cast<const HandheldMenuWindow*>(window)->guestsPresentation()
                       : Handheld::ManagementPresentation{};
+    }
+} // namespace OpenRCT2::Ui::Windows
+
+namespace OpenRCT2::Ui::Windows
+{
+    void HandheldTrackPiecePickerOpen()
+    {
+        if (auto* window = OpenPanel())
+            window->openTrackPiecePicker();
     }
 } // namespace OpenRCT2::Ui::Windows

@@ -7,6 +7,7 @@
 
 #include "ControllerInput.h"
 #include "Currency.h"
+#include "CustomTracks.h"
 #include "Designs.h"
 #include "FlatRides.h"
 #include "Panel.h"
@@ -90,6 +91,7 @@ namespace OpenRCT2::Ui::Handheld
         Shops::ClearPreview();
         FlatRides::End();
         Designs::End();
+        CustomTracks::End();
         _terrainActive = true;
         _waterTool = false;
         _surfaceTool = false;
@@ -124,6 +126,21 @@ namespace OpenRCT2::Ui::Handheld
         _treeIndex = Trees::Next(kObjectEntryIndexNull);
     }
 
+    bool BeginCustomTrack(ObjectEntryIndex index)
+    {
+        if (!CustomTracks::Eligible(index))
+            return false;
+        BeginTerrain(true);
+        return CustomTracks::Begin(index);
+    }
+    bool ResumeCustomTrack(RideId id)
+    {
+        auto target = RideManagement::Identify(id);
+        if (!target || !CustomTracks::CanResume(*target))
+            return false;
+        BeginTerrain(true);
+        return CustomTracks::Resume(*target);
+    }
     bool BeginFlatRide(ObjectEntryIndex index)
     {
         if (!FlatRides::Eligible(index))
@@ -235,6 +252,7 @@ namespace OpenRCT2::Ui::Handheld
         Shops::ClearPreview();
         FlatRides::End();
         Designs::End();
+        CustomTracks::End();
         _terrainActive = false;
         _waterTool = false;
         _surfaceTool = false;
@@ -252,6 +270,8 @@ namespace OpenRCT2::Ui::Handheld
 
     static GameActions::Result TerrainAction(bool execute)
     {
+        if (CustomTracks::Active())
+            return CustomTracks::Action(execute);
         if (Designs::Active())
             return Designs::Query(_terrainTile);
         if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
@@ -459,6 +479,16 @@ namespace OpenRCT2::Ui::Handheld
         {
             EndTerrain();
         }
+        if (CustomTracks::Completed())
+        {
+            const auto target = *CustomTracks::Completed();
+            EndTerrain();
+            if (FlatRides::CanResume(target))
+                ResumeFlatRide(target.id);
+            else if (RideAccess::Inspect(target))
+                Windows::HandheldRideAccessOpen(target);
+            input.suspend();
+        }
         if (Designs::Completed())
         {
             const auto target = *Designs::Completed();
@@ -534,6 +564,8 @@ namespace OpenRCT2::Ui::Handheld
                 }
             }
         }
+        if (CustomTracks::Active() && CanExplore() && ContextHasFocus())
+            CustomTracks::Update(_terrainTile);
         if (Designs::Active() && CanExplore() && ContextHasFocus())
             Designs::UpdatePreview(_terrainTile);
         if (_shopTool && CanExplore() && ContextHasFocus())
@@ -547,6 +579,7 @@ namespace OpenRCT2::Ui::Handheld
             Shops::ClearPreview();
             FlatRides::ClearPreview();
             Designs::ClearPreview();
+            CustomTracks::ClearPreview();
         }
         SyncFocusWindow();
         HandleExplorerInput(input, input.update(ContextHasFocus(), SDL_GetTicks()));
@@ -573,6 +606,58 @@ namespace OpenRCT2::Ui::Handheld
         }
         if (HandleMenuInput(input, frame))
             return;
+        if (CustomTracks::Active() && CanExplore())
+        {
+            for (const auto action : frame.actions)
+            {
+                if (action == Action::openMenu)
+                    Windows::HandheldDashboardOpen();
+                else if (action == Action::openBuild)
+                    Windows::HandheldTrackPiecePickerOpen();
+                else if (action == Action::cameraMode)
+                    CustomTracks::ToggleCamera();
+                else if (!CustomTracks::Busy())
+                {
+                    if (action == Action::confirm)
+                        CustomTracks::Action(true);
+                    else if (action == Action::back)
+                    {
+                        if (CustomTracks::StationPlacement())
+                            EndTerrain();
+                        else
+                            CustomTracks::Undo();
+                    }
+                    else if (action == Action::contextPrimary)
+                    {
+                        if (CustomTracks::CameraMode())
+                            Invoke(ShortcutId::kViewGeneralRotateClockwise);
+                        else
+                            CustomTracks::Bank();
+                    }
+                    else if (action == Action::contextSecondary)
+                    {
+                        if (CustomTracks::StationPlacement())
+                            CustomTracks::Rotate();
+                        else
+                            CustomTracks::Chain();
+                    }
+                    else if (action == Action::previousOption || action == Action::nextOption)
+                    {
+                        if (CustomTracks::CameraMode())
+                            Windows::MainWindowZoom(action == Action::nextOption, false);
+                        else
+                            CustomTracks::Cycle(action == Action::nextOption ? 1 : -1);
+                    }
+                    else if (action == Action::slopeDown || action == Action::slopeUp)
+                        CustomTracks::Slope(action == Action::slopeUp ? 1 : -1);
+                }
+                input.suspend();
+                break;
+            }
+            if (frame.panX || frame.panY)
+                InputScrollViewportSmooth({ frame.panX, frame.panY }, WindowGetMain());
+            return;
+        }
         if (gLegacyScene == LegacyScene::titleSequence)
         {
             const bool scenarios = wm->FindByClass(WindowClass::scenarioSelect) != nullptr;
@@ -765,6 +850,9 @@ namespace OpenRCT2::Ui::Handheld
                     case Action::openMenu:
                     case Action::openBuild:
                     case Action::quit:
+                    case Action::slopeDown:
+                    case Action::slopeUp:
+                    case Action::cameraMode:
                         break;
                 }
             }
@@ -794,6 +882,12 @@ namespace OpenRCT2::Ui::Handheld
             || (_terrainActive && FlatRides::CurrentStage() == FlatRides::Stage::inactive && FlatRides::Target()))
         {
             DrawGameplayFooter(rt, { ContextGetWidth(), height }, "", false, false);
+            DrawMapFocus(rt, c);
+            return;
+        }
+        if (CustomTracks::Active())
+        {
+            CustomTracks::DrawPanel(rt, { ContextGetWidth(), height });
             DrawMapFocus(rt, c);
             return;
         }

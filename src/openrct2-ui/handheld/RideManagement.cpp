@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "RideManagement.h"
 
+#include "CustomTracks.h"
 #include "Finances.h"
 #include "FlatRides.h"
 #include "RideAccess.h"
@@ -188,6 +189,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.rows.push_back("Finish entrances/exits...");
             if (RideAccess::Supported(*target))
                 model.rows.push_back("Access / paths...");
+            if (CustomTracks::CanResume(*target))
+                model.rows.push_back("Continue track...");
         }
         else if (view == View::statistics)
         {
