@@ -7,6 +7,12 @@ static void TestModeOperations(
 {
     namespace R = Ui::Handheld::RideManagement;
     auto& state = getGameState();
+    auto caption = [](StringId id) {
+        auto text = FmtString(FormatStringID(id)).WithoutFormatTokens();
+        while (!text.empty() && (text.back() == ':' || text.back() == ' '))
+            text.pop_back();
+        return text;
+    };
     auto parameter = [](const Ride& ride, GameActions::RideSetSetting key) -> std::optional<R::Setting> {
         const auto settings = R::Settings(ride);
         const auto found = std::find_if(settings.begin(), settings.end(), [key](const auto& s) { return s.key == key; });
@@ -58,8 +64,7 @@ static void TestModeOperations(
         Require(R::Action(draft, true).error != GameActions::Status::ok, "Repeated/stale mode draft accepted");
     };
     Require(
-        parameter(*GetRide(existing.id), GameActions::RideSetSetting::operation)->name
-            == FormatStringID(STR_NUMBER_OF_ROTATIONS),
+        parameter(*GetRide(existing.id), GameActions::RideSetSetting::operation)->name == caption(STR_NUMBER_OF_ROTATIONS),
         "Native rotating flat label wrong");
     const auto originalStatus = GetRide(existing.id)->status;
     exercise(existing, GameActions::RideSetSetting::operation);
@@ -83,7 +88,9 @@ static void TestModeOperations(
     const auto dodg = create("rct2.ride.dodg1", RIDE_TYPE_DODGEMS);
     auto dodgSetting = *parameter(*GetRide(dodg.id), GameActions::RideSetSetting::operation);
     Require(
-        dodgSetting.step == 10 && dodgSetting.labels.front() == FormatStringID(STR_RIDE_TIME_ENTRY, uint16_t{ 20 }),
+        dodgSetting.step == 10
+            && dodgSetting.labels.front()
+                == FmtString(FormatStringID(STR_RIDE_TIME_ENTRY, uint16_t{ 20 })).WithoutFormatTokens(),
         "Native duration units/step wrong");
     const bool noMoney = state.park.flags.has(ParkFlag::noMoney);
     state.park.flags.set(ParkFlag::noMoney); // Native no-money restriction fixture, not a gameplay shortcut.
@@ -91,7 +98,7 @@ static void TestModeOperations(
     state.park.flags.set(ParkFlag::noMoney, noMoney);
     const auto swing = create("rct2.ride.swsh1", RIDE_TYPE_SWINGING_SHIP);
     Require(
-        parameter(*GetRide(swing.id), GameActions::RideSetSetting::operation)->name == FormatStringID(STR_NUMBER_OF_SWINGS),
+        parameter(*GetRide(swing.id), GameActions::RideSetSetting::operation)->name == caption(STR_NUMBER_OF_SWINGS),
         "Swing label wrong");
     exercise(swing, GameActions::RideSetSetting::operation);
     const auto ferris = create("rct2.ride.fwh1", RIDE_TYPE_FERRIS_WHEEL);
@@ -103,7 +110,7 @@ static void TestModeOperations(
     exercise(ferris, GameActions::RideSetSetting::operation);
     const auto kart = create("rct2.ride.kart1", RIDE_TYPE_GO_KARTS);
     Require(
-        parameter(*GetRide(kart.id), GameActions::RideSetSetting::operation)->name == FormatStringID(STR_NUMBER_OF_LAPS),
+        parameter(*GetRide(kart.id), GameActions::RideSetSetting::operation)->name == caption(STR_NUMBER_OF_LAPS),
         "Race lap label wrong");
     exercise(kart, GameActions::RideSetSetting::operation);
     auto stale = *R::BeginSetting(kart, *parameter(*GetRide(kart.id), GameActions::RideSetSetting::operation));
@@ -118,7 +125,9 @@ static void TestModeOperations(
         "Irrelevant/stale laps survive mode transition");
     const auto lift = create("rct2.ride.clift1", RIDE_TYPE_CHAIRLIFT);
     auto speed = *parameter(*GetRide(lift.id), GameActions::RideSetSetting::operation);
-    Require(speed.labels.back() == FormatStringID(STR_VELOCITY, uint16_t{ 9 }), "Native speed conversion wrong");
+    Require(
+        speed.labels.back() == FmtString(FormatStringID(STR_VELOCITY, uint16_t{ 9 })).WithoutFormatTokens(),
+        "Native speed conversion wrong");
     exercise(lift, GameActions::RideSetSetting::operation);
     const auto coaster = create("rct2.ride.rckc", RIDE_TYPE_CORKSCREW_ROLLER_COASTER);
     Require(!parameter(*GetRide(coaster.id), GameActions::RideSetSetting::operation), "Continuous coaster has launch control");
@@ -129,8 +138,8 @@ static void TestModeOperations(
     GameActions::ProcessQueue(state);
     const auto launchSetting = *parameter(*GetRide(coaster.id), GameActions::RideSetSetting::operation);
     Require(
-        launchSetting.name == FormatStringID(STR_LAUNCH_SPEED)
-            && launchSetting.labels.front() == FormatStringID(STR_VELOCITY, uint16_t{ 22 })
+        launchSetting.name == caption(STR_LAUNCH_SPEED)
+            && launchSetting.labels.front() == FmtString(FormatStringID(STR_VELOCITY, uint16_t{ 22 })).WithoutFormatTokens()
             && !parameter(*GetRide(coaster.id), GameActions::RideSetSetting::numCircuits),
         "Launch units/circuit visibility wrong");
     exercise(coaster, GameActions::RideSetSetting::operation);

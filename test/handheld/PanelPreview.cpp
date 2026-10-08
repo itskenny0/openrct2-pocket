@@ -175,13 +175,35 @@ int main(int argc, char** argv)
         namespace R = H::RideManagement;
         // Native public object metadata, trackless component fixture; no live park or simulated guests.
         gOpenRCT2NoGraphics = true;
-        auto* object = context->GetObjectManager().LoadObject("rct2.ride.ptct1");
+        ride_type_t fixtureType = RIDE_TYPE_WOODEN_ROLLER_COASTER;
+        const char* fixtureObject = "rct2.ride.ptct1";
+        if (page == "ride-depth-mode-duration" || page == "ride-depth-mode-draft" || page == "ride-depth-mode-confirm")
+        {
+            fixtureType = RIDE_TYPE_DODGEMS;
+            fixtureObject = "rct2.ride.dodg1";
+        }
+        else if (page == "ride-depth-mode-rotations")
+        {
+            fixtureType = RIDE_TYPE_MERRY_GO_ROUND;
+            fixtureObject = "rct2.ride.mgr1";
+        }
+        else if (page == "ride-depth-mode-laps")
+        {
+            fixtureType = RIDE_TYPE_GO_KARTS;
+            fixtureObject = "rct2.ride.kart1";
+        }
+        else if (page == "ride-depth-mode-launch")
+        {
+            fixtureType = RIDE_TYPE_CORKSCREW_ROLLER_COASTER;
+            fixtureObject = "rct2.ride.rckc";
+        }
+        auto* object = context->GetObjectManager().LoadObject(fixtureObject);
         if (!object)
             return 8;
         gOpenRCT2NoGraphics = false;
         const auto objectIndex = context->GetObjectManager().GetLoadedObjectEntryIndex(object);
         GameActions::RideCreateAction create(
-            RIDE_TYPE_WOODEN_ROLLER_COASTER, objectIndex, 0, 0, kObjectEntryIndexNull, RideInspection::every30Minutes);
+            fixtureType, objectIndex, 0, 0, kObjectEntryIndexNull, RideInspection::every30Minutes);
         const auto created = GameActions::Execute(&create, getGameState());
         if (created.error != GameActions::Status::ok)
             return 9;
@@ -189,7 +211,16 @@ int main(int argc, char** argv)
         auto* ride = GetRide(created.getData<RideId>());
         if (!ride)
             return 9;
-        ride->customName = "Wooden Coaster / component fixture";
+        ride->customName = page.starts_with("ride-depth-mode") ? ride->getName() + " / component fixture"
+                                                               : "Wooden Coaster / component fixture";
+        if (page == "ride-depth-mode-launch")
+        {
+            GameActions::RideSetSettingAction launch(
+                ride->id, GameActions::RideSetSetting::mode, static_cast<uint8_t>(RideMode::poweredLaunch));
+            if (GameActions::Execute(&launch, getGameState()).error != GameActions::Status::ok)
+                return 12;
+            GameActions::ProcessQueue(getGameState());
+        }
         ride->status = RideStatus::closed;
         ride->inspectionInterval = RideInspection::every30Minutes;
         ride->liftHillSpeed = ride->getRideTypeDescriptor().LiftData.minimum_speed;
@@ -234,6 +265,23 @@ int main(int argc, char** argv)
             R::AdjustPrice(*draft, -1);
             view = page == "ride-depth-vehicle-draft" ? R::View::price : R::View::confirmation;
             selected = view == R::View::confirmation ? 1 : 0;
+        }
+        if (page.starts_with("ride-depth-mode"))
+        {
+            const auto settings = R::Settings(*ride);
+            const auto key = page == "ride-depth-mode-circuits" ? GameActions::RideSetSetting::numCircuits
+                                                                : GameActions::RideSetSetting::operation;
+            const auto found = std::find_if(settings.begin(), settings.end(), [key](const auto& s) { return s.key == key; });
+            if (found == settings.end())
+                return 13;
+            selected = found - settings.begin();
+            if (page == "ride-depth-mode-draft" || page == "ride-depth-mode-confirm")
+            {
+                draft = R::BeginSetting(*target, *found);
+                R::AdjustPrice(*draft, 1);
+                view = page == "ride-depth-mode-draft" ? R::View::price : R::View::confirmation;
+                selected = view == R::View::confirmation ? 1 : 0;
+            }
         }
         auto content = R::Presentation(view, selected, {}, target, draft);
         H::Dashboard::State dashboard;

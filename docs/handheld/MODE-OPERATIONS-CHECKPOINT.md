@@ -42,7 +42,9 @@ Vehicles/Dispatch, Maintenance and demolition remain unchanged.
 The existing shared setting draft gains a default step of one (Dodgems ten).
 Values remain a full legal native interval, preserving non-round values from
 existing saves while bounding increments to each endpoint. Current/draft labels
-use the correct native units. Native Action rederives the setting, availability
+use the correct native units. Native FmtString::WithoutFormatTokens removes
+desktop colour/font tokens from these new formatted values, and caption colons
+are trimmed, so existing Pocket typography/focus remains in control. Native Action rederives the setting, availability
 and legal values before query/execution. Snapshot additionally records the native
 operation byte, rejecting changed settings even when identity/mode are unchanged.
 Mode/status/vehicle/count/money and reset-generation guards remain in force.

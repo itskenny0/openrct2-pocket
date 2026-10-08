@@ -227,14 +227,19 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             const int maximum = unlimited ? Limits::kCheatsMaxOperatingLimit : options.MaxValue;
             if (caption != kStringIdEmpty && maximum > minimum)
             {
-                const auto name = FormatStringID(caption);
+                auto name = FmtString(FormatStringID(caption)).WithoutFormatTokens();
+                while (!name.empty() && (name.back() == ':' || name.back() == ' '))
+                    name.pop_back();
                 add(RideSetSetting::operation, name.c_str(), ride.operationOption, minimum, maximum);
                 auto& setting = result.back();
                 setting.step = ride.mode == RideMode::dodgems ? 10 : 1;
                 for (size_t i = 0; i < setting.values.size(); ++i)
-                    setting.labels[i] = FormatStringID(
-                        velocity ? static_cast<StringId>(STR_VELOCITY) : format,
-                        static_cast<uint16_t>(velocity ? (setting.values[i] * 9) / 4 : setting.values[i] * multiplier));
+                    setting.labels[i] = FmtString(
+                                            FormatStringID(
+                                                velocity ? static_cast<StringId>(STR_VELOCITY) : format,
+                                                static_cast<uint16_t>(
+                                                    velocity ? (setting.values[i] * 9) / 4 : setting.values[i] * multiplier)))
+                                            .WithoutFormatTokens();
             }
             if (ride.canHaveMultipleCircuits() && !ride.flags.has(RideFlag::cableLift))
                 add(RideSetSetting::numCircuits, "Number of circuits", ride.numCircuits, 1,
