@@ -4,6 +4,8 @@
  *****************************************************************************/
 
 #pragma once
+#include "RideManagement.h"
+
 #include <cstddef>
 #include <openrct2/Identifiers.h>
 #include <openrct2/object/ObjectTypes.h>
@@ -21,6 +23,7 @@ namespace OpenRCT2::Ui::Handheld
     struct Frame;
     bool HandleMenuInput(ControllerInput& input, const Frame& frame);
     void UpdateExplorer(ControllerInput& input);
+    void HandleExplorerInput(ControllerInput& input, const Frame& frame);
     void EndTerrain();
     void BeginTerrain(bool raise);
     void BeginWater(bool raise = true);
@@ -28,6 +31,7 @@ namespace OpenRCT2::Ui::Handheld
     void BeginTrees();
     bool BeginFlatRide(ObjectEntryIndex index);
     bool ResumeFlatRide(RideId id);
+    void SetRidePathAccess(const RideManagement::Target& target);
     bool IsShopToolActive();
     ObjectEntryIndex ShopSelection();
     Direction ShopDirection();
@@ -43,6 +47,7 @@ namespace OpenRCT2::Ui::Handheld
 namespace OpenRCT2::Ui::Windows
 {
     void HandheldRideOpen(RideId ride);
+    void HandheldRideAccessOpen(const Handheld::RideManagement::Target& target);
     Handheld::ManagementPresentation HandheldDashboardPresentation(size_t selected);
     void HandheldDashboardOpen();
     void HandheldDashboardPause();

@@ -3686,7 +3686,7 @@ int main(int argc, char** argv)
         gCustomOpenRCT2DataPath = argv[1];
         gCustomUserDataPath = argv[2];
         gOpenRCT2Headless = true;
-        gOpenRCT2NoGraphics = true;
+        gOpenRCT2NoGraphics = argc != 4;
         std::unique_ptr<IContext> context;
         if (argc == 4)
         {
@@ -3698,6 +3698,13 @@ int main(int argc, char** argv)
         else
             context = CreateContext();
         Config::SetDefaults();
+        if (argc == 4)
+        {
+            Config::Get().general.rct2Path = argv[3];
+            Config::Get().general.windowWidth = 512;
+            Config::Get().general.windowHeight = 384;
+            Config::Get().general.windowScale = 1;
+        }
         Require(context->Initialise(), "Context initialisation failed");
         auto& objects = context->GetObjectManager();
         Require(objects.LoadObject("rct2.footpath_surface.tarmac") != nullptr, "Normal surface missing");

@@ -3,6 +3,7 @@
 
 #include "Finances.h"
 #include "FlatRides.h"
+#include "RideAccess.h"
 
 #include <iomanip>
 #include <openrct2/GameState.h>
@@ -185,6 +186,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                            "Back to roster" };
             if (FlatRides::CanResume(*target))
                 model.rows.push_back("Finish entrances/exits...");
+            if (RideAccess::Supported(*target))
+                model.rows.push_back("Access / paths...");
         }
         else if (view == View::statistics)
         {

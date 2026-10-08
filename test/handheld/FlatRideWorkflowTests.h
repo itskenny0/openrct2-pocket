@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Fixture objects and research setup are confined to integration tests.
+#include "RideAccessWorkflowTests.h"
+
 #include <openrct2-ui/handheld/FlatRides.h>
 #include <openrct2/actions/ride/FlatRideEntrancePlaceAction.h>
 static void TestFlatRides(IContext& context, const std::string& profile, bool realUi)
@@ -238,10 +240,15 @@ static void TestFlatRides(IContext& context, const std::string& profile, bool re
             && !ride->getStation(StationIndex::FromUnderlying(0)).exit.isNull(),
         "Flat entrance/exit missing");
     Require(F::Action(locations[1], true).error != GameActions::Status::ok, "Completed exit duplicated");
+    TestRideAccess(context, profile, realUi, *identity);
+    ride = GetRide(identity->id);
+    const auto freshAfterAccess = H::RideManagement::Identify(identity->id);
+    Require(freshAfterAccess.has_value(), "Access reload lost ride");
     const auto roster = H::RideManagement::Roster();
-    Require(std::find(roster.begin(), roster.end(), *identity) != roster.end(), "New flat ride absent from native roster");
-    Require(H::RideManagement::Location(*identity).has_value(), "New flat ride locate unavailable");
-    auto status = H::RideManagement::Begin(*identity, RideStatus::open);
+    Require(
+        std::find(roster.begin(), roster.end(), *freshAfterAccess) != roster.end(), "New flat ride absent from native roster");
+    Require(H::RideManagement::Location(*freshAfterAccess).has_value(), "New flat ride locate unavailable");
+    auto status = H::RideManagement::Begin(*freshAfterAccess, RideStatus::open);
     Require(
         status && H::RideManagement::Action(*status, false).error == GameActions::Status::ok,
         "Complete flat ride cannot natively open");

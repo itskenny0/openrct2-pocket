@@ -11,6 +11,7 @@
 #include "ParkOverview.h"
 #include "Paths.h"
 #include "ResearchManagement.h"
+#include "RideAccess.h"
 #include "RideManagement.h"
 #include "SaveSlots.h"
 #include "ShopManagement.h"
@@ -76,6 +77,7 @@ namespace OpenRCT2::Ui::Windows
         guestText,
         ridesRoster,
         ridesInspect,
+        ridesAccess,
         ridesStats,
         ridesPrice,
         ridesConfirm,
@@ -173,11 +175,13 @@ namespace OpenRCT2::Ui::Windows
         bool ridesManagement() const
         {
             return _page == Page::ridesRoster || _page == Page::ridesInspect || _page == Page::ridesStats
-                || _page == Page::ridesPrice || _page == Page::ridesConfirm;
+                || _page == Page::ridesAccess || _page == Page::ridesPrice || _page == Page::ridesConfirm;
         }
         Handheld::ManagementPresentation ridesPresentationFor(Page current, size_t selected) const
         {
             using Handheld::RideManagement::View;
+            if (current == Page::ridesAccess && _ridesTarget)
+                return Handheld::RideAccess::Presentation(*_ridesTarget, selected, _status);
             return Handheld::RideManagement::Presentation(
                 current == Page::ridesRoster        ? View::roster
                     : current == Page::ridesInspect ? View::inspection
@@ -418,6 +422,7 @@ namespace OpenRCT2::Ui::Windows
                     return overviewPresentation().rows;
                 case Page::ridesRoster:
                 case Page::ridesInspect:
+                case Page::ridesAccess:
                 case Page::ridesStats:
                 case Page::ridesPrice:
                 case Page::ridesConfirm:
@@ -455,7 +460,12 @@ namespace OpenRCT2::Ui::Windows
                 case Page::shopDemolish:
                     return { "Demolish", "Cancel" };
                 case Page::ride:
-                    return { "Open ride", "Close ride", "Back to park" };
+                {
+                    std::vector<std::string> result{ "Open ride", "Close ride", "Back to park" };
+                    if (_ridesTarget && Handheld::RideAccess::Supported(*_ridesTarget))
+                        result.push_back("Access / paths...");
+                    return result;
+                }
                 case Page::build:
                     return { "Raise land", "Lower land",         "Paths", "Water",       "Surface", "Remove scenery",
                              "Trees",      "Shops / Facilities", "Rides", "Back to park" };
@@ -571,6 +581,13 @@ namespace OpenRCT2::Ui::Windows
         {
             if (_pausedHere && gLegacyScene == LegacyScene::playing && GameIsPaused())
                 PauseToggle();
+        }
+        void openRideAccess(const Handheld::RideManagement::Target& target)
+        {
+            _ridesTarget = target;
+            _dashboard.section = Handheld::Dashboard::Section::rides;
+            _dashboard.focus = Handheld::Dashboard::Focus::content;
+            page(Page::ridesAccess);
         }
         void openBuild()
         {
@@ -713,6 +730,7 @@ namespace OpenRCT2::Ui::Windows
         void openRide(RideId id)
         {
             _rideId = id;
+            _ridesTarget = Handheld::RideManagement::Identify(id);
             _shop = Handheld::ShopManagement::Capture(id);
             const auto* ride = GetRide(id);
             const bool isShop = ride && ride->getRideTypeDescriptor().flags.has(RtdFlag::isShopOrFacility);
@@ -752,7 +770,7 @@ namespace OpenRCT2::Ui::Windows
             return _page == Page::dashboard || _page == Page::overview || _page == Page::finances || _page == Page::staff
                 || _page == Page::staffInspect || _page == Page::staffStats || _page == Page::research
                 || _page == Page::marketing || _page == Page::marketingActive || guestManagement() || _page == Page::ridesRoster
-                || _page == Page::ridesInspect || _page == Page::ridesStats;
+                || _page == Page::ridesInspect || _page == Page::ridesAccess || _page == Page::ridesStats;
         }
         void enterDashboardContent()
         {
@@ -970,6 +988,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ridesInspect:
                     page(Page::ridesRoster);
                     break;
+                case Page::ridesAccess:
                 case Page::ridesStats:
                 case Page::ridesPrice:
                     page(
@@ -1465,6 +1484,10 @@ namespace OpenRCT2::Ui::Windows
                         page(Page::ridesStats);
                     else if (choice == 6)
                         page(Page::ridesRoster);
+                    else if (
+                        choice == (Handheld::FlatRides::CanResume(*_ridesTarget) ? 8u : 7u)
+                        && Handheld::RideAccess::Supported(*_ridesTarget))
+                        page(Page::ridesAccess);
                     else if (choice == 7 && Handheld::FlatRides::CanResume(*_ridesTarget))
                     {
                         const auto target = *_ridesTarget;
@@ -1487,6 +1510,29 @@ namespace OpenRCT2::Ui::Windows
                             invalidate();
                         }
                     }
+                    break;
+                case Page::ridesAccess:
+                    if (choice == 0)
+                        close();
+                    else if (!_ridesTarget || !Handheld::RideAccess::Inspect(*_ridesTarget))
+                    {
+                        _status = "Ride/access changed; return to inspection";
+                        invalidate();
+                    }
+                    else if (choice == 1 || choice == 2)
+                    {
+                        const auto target = *_ridesTarget;
+                        close();
+                        Handheld::RideAccess::BeginPaths(target, choice == 2);
+                    }
+                    else if (choice == 3)
+                    {
+                        _ridesDraft = Handheld::RideManagement::Begin(*_ridesTarget, RideStatus::open);
+                        if (_ridesDraft)
+                            page(Page::ridesConfirm);
+                    }
+                    else if (choice == 4)
+                        page(Page::ridesInspect);
                     break;
                 case Page::ridesStats:
                     page(
@@ -1855,7 +1901,9 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::ride:
-                    if (choice == 2)
+                    if (choice == 3 && _ridesTarget && Handheld::RideAccess::Supported(*_ridesTarget))
+                        openRideAccess(*_ridesTarget);
+                    else if (choice == 2)
                         close();
                     else
                     {
@@ -2196,6 +2244,11 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = OpenPanel())
             window->openBuild();
+    }
+    void HandheldRideAccessOpen(const Handheld::RideManagement::Target& target)
+    {
+        if (auto* window = OpenPanel())
+            window->openRideAccess(target);
     }
     void HandheldPathOptionsOpen()
     {

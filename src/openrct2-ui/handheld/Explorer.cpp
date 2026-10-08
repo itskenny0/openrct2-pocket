@@ -10,6 +10,7 @@
 #include "FlatRides.h"
 #include "Panel.h"
 #include "Paths.h"
+#include "RideAccess.h"
 #include "SceneryRemoval.h"
 #include "ShopManagement.h"
 #include "Shops.h"
@@ -62,9 +63,16 @@ namespace OpenRCT2::Ui::Handheld
     static bool _selectionOwned{};
     static std::optional<CoordsXY> _terrainTile;
     static std::string _terrainStatus;
+    static std::optional<RideManagement::Target> _ridePathAccess;
+
+    void SetRidePathAccess(const RideManagement::Target& target)
+    {
+        _ridePathAccess = target;
+    }
 
     void BeginTerrain(bool raise)
     {
+        _ridePathAccess.reset();
         Paths::End();
         Trees::ClearPreview();
         Shops::ClearPreview();
@@ -198,6 +206,7 @@ namespace OpenRCT2::Ui::Handheld
 
     void EndTerrain()
     {
+        _ridePathAccess.reset();
         Trees::ClearPreview();
         Shops::ClearPreview();
         FlatRides::End();
@@ -422,7 +431,18 @@ namespace OpenRCT2::Ui::Handheld
             EndTerrain();
         }
         if (_terrainActive && FlatRides::CurrentStage() == FlatRides::Stage::inactive && FlatRides::Target())
+        {
+            const auto target = *FlatRides::Target();
             EndTerrain();
+            if (RideAccess::Inspect(target))
+                Windows::HandheldRideAccessOpen(target);
+            input.suspend();
+        }
+        if (_ridePathAccess && (!Paths::IsActive() || !RideManagement::Resolve(*_ridePathAccess)))
+        {
+            EndTerrain();
+            input.suspend();
+        }
         ClearTerrainSelection();
         if ((_terrainActive || Paths::IsActive()) && CanExplore() && ContextHasFocus())
         {
@@ -487,7 +507,11 @@ namespace OpenRCT2::Ui::Handheld
             FlatRides::ClearPreview();
         }
         SyncFocusWindow();
-        auto frame = input.update(ContextHasFocus(), SDL_GetTicks());
+        HandleExplorerInput(input, input.update(ContextHasFocus(), SDL_GetTicks()));
+    }
+
+    void HandleExplorerInput(ControllerInput& input, const Frame& frame)
+    {
         auto* wm = GetWindowManager();
         for (const auto action : frame.actions)
         {
@@ -568,7 +592,10 @@ namespace OpenRCT2::Ui::Handheld
                     wm->CloseByClass(WindowClass::dropdown);
                 else if ((_terrainActive || Paths::IsActive()) && CanExplore())
                 {
+                    const auto access = _ridePathAccess;
                     EndTerrain();
+                    if (access && RideManagement::Resolve(*access))
+                        Windows::HandheldRideAccessOpen(*access);
                 }
                 else
                     wm->CloseTop();
