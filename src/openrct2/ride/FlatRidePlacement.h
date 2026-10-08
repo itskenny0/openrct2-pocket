@@ -59,19 +59,32 @@ namespace OpenRCT2::FlatRidePlacement
             && (!GetRideTypeDescriptor(type).flags.has(RtdFlag::hasEntranceAndExit) || StationObject() != kObjectEntryIndexNull)
             && (getGameState().cheats.ignoreResearchStatus || (RideTypeIsInvented(type) && RideEntryIsInvented(index)));
     }
-    // Native station sequence-side semantics; never allow a disconnected entrance.
-    inline std::optional<CoordsXYZD> EntranceLocation(const Ride& ride, CoordsXY tile)
+    // Shared regular-station recovery/access support; construction eligibility stays flat-only.
+    inline bool SupportsStation(const Ride& ride)
     {
-        if (!MapIsLocationValid(tile) || tile.x % 32 || tile.y % 32)
+        if (Type(ride.subtype) == ride.type)
+            return true;
+        if (ride.type != RIDE_TYPE_WOODEN_ROLLER_COASTER)
+            return false;
+        size_t count = 0;
+        for (const auto& station : ride.getStations())
+            count += !station.start.isNull();
+        return count > 0 && !ride.getStation(StationIndex::FromUnderlying(0)).start.isNull();
+    }
+    // Native station sequence-side semantics; never allow a disconnected entrance.
+    inline std::optional<CoordsXYZD> EntranceLocation(
+        const Ride& ride, CoordsXY tile, StationIndex index = StationIndex::FromUnderlying(0))
+    {
+        if (!MapIsLocationValid(tile) || tile.x % 32 || tile.y % 32 || index.ToUnderlying() >= ride.getStations().size())
             return {};
-        const auto& station = ride.getStation(StationIndex::FromUnderlying(0));
+        const auto& station = ride.getStation(index);
         if (ride.status != RideStatus::closed || station.start.isNull())
             return {};
         for (Direction d = 0; d < 4; ++d)
             for (auto* track : TileElementsView<TrackElement>(tile + CoordsDirectionDelta[d]))
             {
                 if (track->isGhost() || track->getRideIndex() != ride.id || track->getBaseZ() != station.getBaseZ()
-                    || track->getStationIndex() != StationIndex::FromUnderlying(0))
+                    || track->getStationIndex() != index)
                     continue;
                 const auto& ted = TrackMetadata::GetTrackElementDescriptor(track->getTrackType());
                 const auto sequence = track->getSequenceIndex();

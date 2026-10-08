@@ -103,6 +103,7 @@ namespace OpenRCT2
         placeShop,
         placeFlatRide,
         placeFlatRideEntrance,
+        placeSavedTrackDesign,
         count,
     };
 } // namespace OpenRCT2

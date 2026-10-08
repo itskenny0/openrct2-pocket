@@ -30,6 +30,7 @@ namespace OpenRCT2::Ui::Handheld
     void BeginSurface();
     void BeginTrees();
     bool BeginFlatRide(ObjectEntryIndex index);
+    bool BeginSavedDesign(const std::string& path);
     bool ResumeFlatRide(RideId id);
     void SetRidePathAccess(const RideManagement::Target& target);
     bool IsShopToolActive();
@@ -75,6 +76,9 @@ namespace OpenRCT2::Ui::Windows
     void HandheldTreePickerOpen();
     void HandheldShopPickerOpen();
     void HandheldRidePickerOpen();
+    void HandheldDesignPickerOpen();
+    void HandheldDesignReviewOpen();
+    void HandheldDesignReviewPause();
     bool HandheldObjectPickerIsOpen();
     void HandheldObjectPickerMove(int x, int y);
     void HandheldObjectPickerPause();

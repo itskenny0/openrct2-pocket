@@ -17,7 +17,7 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
     bool Supported(const RideManagement::Target& target)
     {
         const auto* ride = RideManagement::Resolve(target);
-        return ride && FlatRidePlacement::Type(ride->subtype) == ride->type
+        return ride && FlatRidePlacement::SupportsStation(*ride)
             && ride->getRideTypeDescriptor().flags.has(RtdFlag::hasEntranceAndExit)
             && !ride->getStation(StationIndex::FromUnderlying(0)).start.isNull();
     }
@@ -32,7 +32,7 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
                 return path;
         return nullptr;
     }
-    static bool QueueReachesNormal(CoordsXYZ start, const PathElement* first, RideId ride)
+    static bool QueueReachesNormal(CoordsXYZ start, const PathElement* first, RideId ride, StationIndex station)
     {
         std::vector<std::pair<CoordsXY, const PathElement*>> pending{ { start, first } };
         std::set<std::tuple<int32_t, int32_t, int32_t>> visited;
@@ -44,7 +44,7 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
                 continue;
             if (!path->isQueue())
                 return true;
-            if (path->getRideIndex() != ride || path->getStationIndex() != StationIndex::FromUnderlying(0))
+            if (path->getRideIndex() != ride || path->getStationIndex() != station)
                 continue;
             for (Direction d : kAllDirections)
             {
@@ -62,21 +62,39 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
     {
         if (!Supported(target))
             return {};
-        const auto& station = RideManagement::Resolve(target)->getStation(StationIndex::FromUnderlying(0));
-        if (station.entrance.isNull() || station.exit.isNull())
-            return {};
-        auto point = [&](const TileCoordsXYZD& entrance, bool exit) {
+        auto point = [&](const TileCoordsXYZD& entrance, bool exit, StationIndex index) {
             auto outside = entrance.toCoordsXYZD();
             outside -= CoordsDirectionDelta[outside.direction];
             const auto* path = PathAt(outside, DirectionReverse(outside.direction));
             const bool attached = path
                 && (exit ? !path->isQueue()
-                         : path->isQueue() && path->getRideIndex() == target.id
-                            && path->getStationIndex() == StationIndex::FromUnderlying(0));
-            return Point{ outside, attached, attached && (exit || QueueReachesNormal(outside, path, target.id)) };
+                         : path->isQueue() && path->getRideIndex() == target.id && path->getStationIndex() == index);
+            return Point{ outside, attached, attached && (exit || QueueReachesNormal(outside, path, target.id, index)), index };
         };
-        return State{ point(station.entrance, false), point(station.exit, true) };
+        std::optional<State> result;
+        const auto* ride = RideManagement::Resolve(target);
+        for (size_t i = 0; i < ride->getStations().size(); ++i)
+        {
+            const auto& station = ride->getStations()[i];
+            if (station.start.isNull())
+                continue;
+            if (station.entrance.isNull() || station.exit.isNull())
+                return {};
+            const auto index = StationIndex::FromUnderlying(i);
+            const auto entrance = point(station.entrance, false, index), exit = point(station.exit, true, index);
+            if (!result)
+                result = State{ entrance, exit };
+            else
+            {
+                if (result->entrance.reachesNormalPath && !entrance.reachesNormalPath)
+                    result->entrance = entrance;
+                if (result->exit.attached && !exit.attached)
+                    result->exit = exit;
+            }
+        }
+        return result;
     }
+
     ManagementPresentation Presentation(const RideManagement::Target& target, size_t selected, const std::string& feedback)
     {
         ManagementPresentation model;
@@ -88,11 +106,12 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
         model.rows = { "Back to park" }; // Optional handoff never places a path or opens a ride by default.
         if (state)
         {
-            model.stats = { { "Entrance",
+            model.stats = { { "Entrance " + std::to_string(state->entrance.station.ToUnderlying() + 1),
                               state->entrance.reachesNormalPath ? "Queue joins normal path"
                                   : state->entrance.attached    ? "Extend queue to a path"
                                                                 : "Needs queue path" },
-                            { "Exit", state->exit.attached ? "Normal path attached" : "Needs normal path" } };
+                            { "Exit " + std::to_string(state->exit.station.ToUnderlying() + 1),
+                              state->exit.attached ? "Normal path attached" : "Needs normal path" } };
             model.rows.insert(
                 model.rows.end(),
                 { state->entrance.reachesNormalPath ? "Locate entrance / queue..." : "Connect entrance queue...",
@@ -117,7 +136,18 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
         EndTerrain();
         Paths::Begin(!exit);
         SetRidePathAccess(target);
-        const CoordsXYZ focus{ point.outside.x + 16, point.outside.y + 16, point.outside.z };
+        const auto* surface = MapGetSurfaceElementAt(point.outside);
+        if (!surface)
+        {
+            EndTerrain();
+            return false;
+        }
+        const bool elevated = point.outside.z != MapGetHighestZ(point.outside);
+        // Terrain hit testing must focus the same tile even for an elevated station.
+        // Reuse the existing fixed-height Paths mode for the station landing tile.
+        const CoordsXYZ focus{ point.outside.x + 16, point.outside.y + 16,
+                               elevated ? TileElementHeight(CoordsXY{ point.outside.x + 16, point.outside.y + 16 })
+                                        : point.outside.z };
         WindowScrollToLocation(*main, focus);
         // Snap to the native located view so a fresh A cannot act on the old camera target during scrolling.
         const auto cursor = ScreenCoordsXY{ ContextGetWidth() / 2, ContextGetHeight() / 2 } - main->viewport->pos;
@@ -126,6 +156,12 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
         main->viewport->viewPos = main->savedViewPos;
         main->flags.unset(WindowFlag::scrollingToLocation);
         main->invalidate();
+        Paths::UpdateTarget({ ContextGetWidth() / 2, ContextGetHeight() / 2 });
+        if (elevated && !Paths::SetPlacementHeight(point.outside.z))
+        {
+            EndTerrain();
+            return false;
+        }
         return true;
     }
 } // namespace OpenRCT2::Ui::Handheld::RideAccess

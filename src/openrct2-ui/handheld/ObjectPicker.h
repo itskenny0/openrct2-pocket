@@ -3,6 +3,7 @@
 #include "Panel.h"
 
 #include <algorithm>
+#include <functional>
 #include <openrct2/Context.h>
 #include <openrct2/object/Object.h>
 #include <openrct2/object/ObjectManager.h>
@@ -15,13 +16,20 @@ namespace OpenRCT2::Ui::Handheld
     {
         ObjectType type;
         ObjectEntryIndex index;
-        bool operator==(const PickerIdentity&) const = default;
+        std::string key{}; // File-backed choices may share the same loaded object.
+        bool operator==(const PickerIdentity& other) const
+        {
+            if (type != other.type)
+                return false;
+            return !key.empty() || !other.key.empty() ? key == other.key : index == other.index;
+        }
     };
     struct PickerEntry
     {
         PickerIdentity identity;
         std::string name;
         ZoomLevel previewZoom{ 2 };
+        std::function<void(Drawing::RenderTarget&)> drawPreview{};
     };
     // Presentation/navigation only. Each caller supplies its eligible objects and activation.
     class ObjectPicker
@@ -111,7 +119,14 @@ namespace OpenRCT2::Ui::Handheld
             Box(rt, cell, { 68, 84 }, selected);
             // The same loaded Object::DrawPreview path as desktop object selection.
             // Native sprite minification fits tall objects without an asset pipeline.
-            if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject(
+            if (entries[index].drawPreview)
+            {
+                Drawing::RenderTarget preview;
+                if (ClipRenderTarget(preview, rt, cell + ScreenCoordsXY{ 4, 4 }, 60, 62))
+                    entries[index].drawPreview(preview);
+            }
+            else if (
+                const auto* object = GetContext()->GetObjectManager().GetLoadedObject(
                     entries[index].identity.type, entries[index].identity.index))
             {
                 Drawing::RenderTarget preview;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "Currency.h"
 #include "Dashboard.h"
+#include "Designs.h"
 #include "Explorer.h"
 #include "Finances.h"
 #include "FlatRides.h"
@@ -36,6 +37,7 @@
 #include <openrct2/config/Config.h>
 #include <openrct2/localisation/StringIds.h>
 #include <openrct2/ride/Ride.h>
+#include <openrct2/ride/TrackDesignRepository.h>
 #include <openrct2/scenario/Scenario.h>
 #include <openrct2/ui/WindowManager.h>
 #include <sstream>
@@ -55,6 +57,8 @@ namespace OpenRCT2::Ui::Windows
         treePicker,
         shopPicker,
         ridePicker,
+        designPicker,
+        designConfirm,
         dashboard,
         overview,
         overviewConfirm,
@@ -126,6 +130,7 @@ namespace OpenRCT2::Ui::Windows
         bool _pausedHere{};
         bool _shopPickerFromBuild{};
         bool _ridePickerFromBuild{};
+        bool _designPickerFromBuild{};
         bool _exitAfterSave{};
         size_t _slot{};
         Handheld::Dashboard::State _dashboard;
@@ -325,6 +330,8 @@ namespace OpenRCT2::Ui::Windows
 
         void page(Page next)
         {
+            if (next != Page::designConfirm)
+                Handheld::Designs::CancelReview();
             if (next != Page::overviewConfirm)
                 _overviewDraft.reset();
             _overviewBusy = false;
@@ -467,8 +474,11 @@ namespace OpenRCT2::Ui::Windows
                     return result;
                 }
                 case Page::build:
-                    return { "Raise land", "Lower land",         "Paths", "Water",       "Surface", "Remove scenery",
-                             "Trees",      "Shops / Facilities", "Rides", "Back to park" };
+                    return { "Raise land", "Lower land",         "Paths", "Water",          "Surface",     "Remove scenery",
+                             "Trees",      "Shops / Facilities", "Rides", "Wooden designs", "Back to park" };
+                case Page::designConfirm:
+                    return { "Cancel", "Place design" };
+                case Page::designPicker:
                 case Page::treePicker:
                 case Page::shopPicker:
                 case Page::ridePicker:
@@ -569,6 +579,7 @@ namespace OpenRCT2::Ui::Windows
             Handheld::Trees::ClearPreview();
             Handheld::Shops::ClearPreview();
             Handheld::FlatRides::ClearPreview();
+            Handheld::Designs::ClearPreview();
             setWidgets(kWidgets);
             layout();
             colours[0] = ColourWithFlags{ Colour::darkBlue };
@@ -579,6 +590,8 @@ namespace OpenRCT2::Ui::Windows
         }
         void onClose() override
         {
+            if (_page == Page::designConfirm && _focus.index() == 0)
+                Handheld::Designs::CancelReview();
             if (_pausedHere && gLegacyScene == LegacyScene::playing && GameIsPaused())
                 PauseToggle();
         }
@@ -600,7 +613,8 @@ namespace OpenRCT2::Ui::Windows
         void refreshPicker(std::optional<Handheld::PickerIdentity> preferred = {})
         {
             _picker.setEntries(
-                _page == Page::ridePicker       ? Handheld::FlatRides::Entries()
+                _page == Page::designPicker     ? Handheld::Designs::Entries()
+                    : _page == Page::ridePicker ? Handheld::FlatRides::Entries()
                     : _page == Page::shopPicker ? Handheld::Shops::Entries()
                                                 : Handheld::TreePickerEntries(),
                 preferred);
@@ -614,6 +628,7 @@ namespace OpenRCT2::Ui::Windows
         {
             Handheld::Shops::ClearPreview();
             Handheld::FlatRides::ClearPreview();
+            Handheld::Designs::ClearPreview();
             _shopPickerFromBuild = fromBuild;
             page(Page::shopPicker);
             refreshPicker(Handheld::PickerIdentity{ ObjectType::ride, Handheld::ShopSelection() });
@@ -621,13 +636,34 @@ namespace OpenRCT2::Ui::Windows
         void openRidePicker(bool fromBuild = false)
         {
             Handheld::FlatRides::ClearPreview();
+            Handheld::Designs::ClearPreview();
             _ridePickerFromBuild = fromBuild;
             page(Page::ridePicker);
             refreshPicker(Handheld::PickerIdentity{ ObjectType::ride, Handheld::FlatRides::Selection() });
         }
+        void openDesignPicker(bool fromBuild = false)
+        {
+            TrackRepositoryScan();
+            Handheld::Designs::ClearPreview();
+            Handheld::Designs::CancelReview();
+            _designPickerFromBuild = fromBuild;
+            page(Page::designPicker);
+            refreshPicker(Handheld::PickerIdentity{ ObjectType::ride, kObjectEntryIndexNull, Handheld::Designs::Selection() });
+        }
+        void pauseDesignReview()
+        {
+            Handheld::Designs::CancelReview();
+            page(Page::park);
+        }
+        void openDesignReview()
+        {
+            page(Page::designConfirm);
+            _status = "Cost " + Handheld::FormatMoney(Handheld::Designs::ReviewCost());
+        }
         bool picker() const
         {
-            return _page == Page::treePicker || _page == Page::shopPicker || _page == Page::ridePicker;
+            return _page == Page::designPicker || _page == Page::treePicker || _page == Page::shopPicker
+                || _page == Page::ridePicker;
         }
         bool treePicker() const
         {
@@ -960,6 +996,16 @@ namespace OpenRCT2::Ui::Windows
                 case Page::dashboard:
                     close();
                     break;
+                case Page::designConfirm:
+                    Handheld::Designs::CancelReview();
+                    close();
+                    break;
+                case Page::designPicker:
+                    if (_designPickerFromBuild)
+                        page(Page::build);
+                    else
+                        close();
+                    break;
                 case Page::ridePicker:
                     if (_ridePickerFromBuild)
                         page(Page::build);
@@ -1106,6 +1152,31 @@ namespace OpenRCT2::Ui::Windows
             const auto choice = _focus.index();
             switch (_page)
             {
+                case Page::designConfirm:
+                    if (choice == 0)
+                    {
+                        Handheld::Designs::CancelReview();
+                        close();
+                    }
+                    else
+                    {
+                        // Release only the pause owned by this menu before native revalidation.
+                        close();
+                        const auto result = Handheld::Designs::Confirm();
+                        if (result.error != GameActions::Status::ok)
+                            GetWindowManager()->ShowError("Cannot place design", result.getErrorMessage());
+                    }
+                    break;
+                case Page::designPicker:
+                    if (_picker.selected() && Handheld::BeginSavedDesign(_picker.selected()->identity.key))
+                        close();
+                    else
+                    {
+                        refreshPicker();
+                        _status = "Design unavailable";
+                        invalidate();
+                    }
+                    break;
                 case Page::ridePicker:
                     if (_picker.selected() && Handheld::BeginFlatRide(_picker.selected()->identity.index))
                         close();
@@ -1165,7 +1236,9 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::build:
-                    if (choice == 8)
+                    if (choice == 9)
+                        openDesignPicker(true);
+                    else if (choice == 8)
                         openRidePicker(true);
                     else if (choice == 7)
                         openShopPicker(true);
@@ -2055,6 +2128,13 @@ namespace OpenRCT2::Ui::Windows
                     _focus.index(), _priceDraft, _status);
                 return;
             }
+            if (_page == Page::designPicker)
+            {
+                Handheld::DrawObjectPicker(
+                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Wooden designs", _status,
+                    "No supported designs installed");
+                return;
+            }
             if (_page == Page::ridePicker)
             {
                 Handheld::DrawObjectPicker(
@@ -2107,6 +2187,9 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::pathOptions:
                     title = "PATH OPTIONS";
+                    break;
+                case Page::designConfirm:
+                    title = "PLACE DESIGN?";
                     break;
                 case Page::build:
                     title = "BUILD";
@@ -2298,6 +2381,21 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->shopPause();
+    }
+    void HandheldDesignPickerOpen()
+    {
+        if (auto* window = OpenPanel())
+            window->openDesignPicker(!Handheld::Designs::Active());
+    }
+    void HandheldDesignReviewPause()
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            static_cast<HandheldMenuWindow*>(window)->pauseDesignReview();
+    }
+    void HandheldDesignReviewOpen()
+    {
+        if (auto* window = OpenPanel())
+            window->openDesignReview();
     }
     void HandheldRidePickerOpen()
     {

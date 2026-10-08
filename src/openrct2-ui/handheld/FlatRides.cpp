@@ -13,6 +13,7 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
     static Direction direction{};
     static std::optional<RideManagement::Target> target;
     static bool busy{};
+    static StationIndex stationIndex{ StationIndex::FromUnderlying(0) };
     static uint64_t revision{};
     struct Request
     {
@@ -99,11 +100,30 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
     bool CanResume(const RideManagement::Target& t)
     {
         const auto* ride = RideManagement::Resolve(t);
-        if (!ride || FlatRidePlacement::Type(ride->subtype) != ride->type || ride->status != RideStatus::closed
+        if (!ride || !FlatRidePlacement::SupportsStation(*ride) || ride->status != RideStatus::closed
             || !ride->getRideTypeDescriptor().flags.has(RtdFlag::hasEntranceAndExit))
             return false;
-        const auto& station = ride->getStation(StationIndex::FromUnderlying(0));
-        return !station.start.isNull() && (station.entrance.isNull() || station.exit.isNull());
+        for (const auto& station : ride->getStations())
+            if (!station.start.isNull() && (station.entrance.isNull() || station.exit.isNull()))
+                return true;
+        return false;
+    }
+    static void NextStation()
+    {
+        stage = Stage::inactive;
+        const auto* ride = target ? RideManagement::Resolve(*target) : nullptr;
+        if (!ride)
+            return;
+        for (size_t i = 0; i < ride->getStations().size(); ++i)
+        {
+            const auto& station = ride->getStations()[i];
+            if (!station.start.isNull() && (station.entrance.isNull() || station.exit.isNull()))
+            {
+                stationIndex = StationIndex::FromUnderlying(i);
+                stage = station.entrance.isNull() ? Stage::entrance : Stage::exit;
+                return;
+            }
+        }
     }
     bool Resume(const RideManagement::Target& t)
     {
@@ -112,7 +132,7 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
         End();
         target = t;
         selected = t.object;
-        stage = GetRide(t.id)->getStation(StationIndex::FromUnderlying(0)).entrance.isNull() ? Stage::entrance : Stage::exit;
+        NextStation();
         return true;
     }
     void Rotate()
@@ -145,7 +165,7 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
     {
         if (!tile || !target || !RideManagement::Resolve(*target))
             return {};
-        return FlatRidePlacement::EntranceLocation(*GetRide(target->id), *tile);
+        return FlatRidePlacement::EntranceLocation(*GetRide(target->id), *tile, stationIndex);
     }
     static GameActions::Result Query(const Request& request)
     {
@@ -189,6 +209,7 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
                     return;
                 target = RideManagement::Identify(completed->getData<RideId>());
                 const auto* ride = target ? RideManagement::Resolve(*target) : nullptr;
+                stationIndex = StationIndex::FromUnderlying(0);
                 stage = ride && ride->getRideTypeDescriptor().flags.has(RtdFlag::hasEntranceAndExit) ? Stage::entrance
                                                                                                      : Stage::inactive;
             });
@@ -202,25 +223,25 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
         if (!target || !RideManagement::Resolve(*target))
             return Invalid("Ride no longer available");
         const bool isExit = stage == Stage::exit;
-        const auto& station = GetRide(target->id)->getStation(StationIndex::FromUnderlying(0));
+        const auto& station = GetRide(target->id)->getStation(stationIndex);
         if (!(isExit ? station.exit : station.entrance).isNull())
             return Invalid("Entrance/exit already placed; resume construction");
         const auto location = EntranceLocation(tile);
         if (!location)
             return Invalid("Choose a free tile beside the ride");
-        auto action = GameActions::FlatRideEntrancePlaceAction(target->id, *location, isExit);
+        auto action = GameActions::FlatRideEntrancePlaceAction(target->id, *location, isExit, stationIndex);
         const auto result = GameActions::Query(&action, getGameState());
         if (!execute || result.error != GameActions::Status::ok)
             return result;
         const auto token = revision;
         busy = true;
-        action.SetCallback([token, isExit](const auto*, const GameActions::Result* completed) {
+        action.SetCallback([token](const auto*, const GameActions::Result* completed) {
             if (token != revision)
                 return;
             busy = false;
             if (completed->error != GameActions::Status::ok)
                 return;
-            stage = isExit ? Stage::inactive : Stage::exit;
+            NextStation();
         });
         auto queued = GameActions::Execute(&action, getGameState());
         if (queued.error != GameActions::Status::ok)
@@ -275,7 +296,8 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
             Icon::path, true);
         Rule(rt, p + ScreenCoordsXY{ 8, 99 }, 148);
         DrawModernEllipsised(
-            rt, p + ScreenCoordsXY{ 12, 116 }, 140, placing ? "{MUTED}Ground placement" : "{MUTED}Beside the station");
+            rt, p + ScreenCoordsXY{ 12, 116 }, 140,
+            placing ? "{MUTED}Ground placement" : "{MUTED}Station " + std::to_string(stationIndex.ToUnderlying() + 1));
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;
         DrawCommand(rt, { 8, y }, 38, "D-pad", "Move");

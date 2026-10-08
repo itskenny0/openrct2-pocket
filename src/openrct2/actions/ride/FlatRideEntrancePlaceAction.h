@@ -10,6 +10,7 @@ namespace OpenRCT2::GameActions
         RideId _ride{ RideId::GetNull() };
         CoordsXYZD _location{};
         bool _exit{};
+        StationIndex _station{ StationIndex::FromUnderlying(0) };
         ObjectEntryIndex _object{ kObjectEntryIndexNull };
         int32_t _buildDate{};
         CoordsXY _start{};
@@ -17,7 +18,8 @@ namespace OpenRCT2::GameActions
 
     public:
         FlatRideEntrancePlaceAction() = default;
-        FlatRideEntrancePlaceAction(RideId ride, CoordsXYZD location, bool isExit);
+        FlatRideEntrancePlaceAction(
+            RideId ride, CoordsXYZD location, bool isExit, StationIndex station = StationIndex::FromUnderlying(0));
         void AcceptParameters(GameActionParameterVisitor&) final;
         void Serialise(DataSerialiser&) final;
         Result Query(GameState_t&, Park::ParkData&) const final;

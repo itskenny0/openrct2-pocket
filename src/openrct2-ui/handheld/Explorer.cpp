@@ -7,6 +7,7 @@
 
 #include "ControllerInput.h"
 #include "Currency.h"
+#include "Designs.h"
 #include "FlatRides.h"
 #include "Panel.h"
 #include "Paths.h"
@@ -77,6 +78,7 @@ namespace OpenRCT2::Ui::Handheld
         Trees::ClearPreview();
         Shops::ClearPreview();
         FlatRides::End();
+        Designs::End();
         _terrainActive = true;
         _waterTool = false;
         _surfaceTool = false;
@@ -118,6 +120,14 @@ namespace OpenRCT2::Ui::Handheld
         BeginTerrain(true);
         return FlatRides::Begin(index);
     }
+    bool BeginSavedDesign(const std::string& path)
+    {
+        auto td = TrackDesignImport(path.c_str());
+        if (!td || !Designs::Eligible(*td))
+            return false;
+        BeginTerrain(true);
+        return Designs::Begin(path);
+    }
     bool ResumeFlatRide(RideId id)
     {
         auto target = RideManagement::Identify(id);
@@ -150,6 +160,7 @@ namespace OpenRCT2::Ui::Handheld
         }
         Shops::ClearPreview();
         FlatRides::ClearPreview();
+        Designs::ClearPreview();
         _shopIndex = index;
         _terrainStatus.clear();
         return true;
@@ -160,6 +171,7 @@ namespace OpenRCT2::Ui::Handheld
             return;
         Shops::ClearPreview();
         FlatRides::ClearPreview();
+        Designs::ClearPreview();
         _shopDirection = (_shopDirection + 1) & 3;
         _terrainStatus.clear();
     }
@@ -179,6 +191,7 @@ namespace OpenRCT2::Ui::Handheld
         Trees::ClearPreview();
         Shops::ClearPreview();
         FlatRides::ClearPreview();
+        Designs::ClearPreview();
         _treeIndex = index;
         _terrainStatus.clear();
         return true;
@@ -210,6 +223,7 @@ namespace OpenRCT2::Ui::Handheld
         Trees::ClearPreview();
         Shops::ClearPreview();
         FlatRides::End();
+        Designs::End();
         _terrainActive = false;
         _waterTool = false;
         _surfaceTool = false;
@@ -227,6 +241,8 @@ namespace OpenRCT2::Ui::Handheld
 
     static GameActions::Result TerrainAction(bool execute)
     {
+        if (Designs::Active())
+            return Designs::Query(_terrainTile);
         if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
             return FlatRides::Action(_terrainTile, execute);
         if (_sceneryRemovalTool)
@@ -406,6 +422,8 @@ namespace OpenRCT2::Ui::Handheld
                     else
                         Windows::HandheldDashboardPause();
                 }
+                else if (action == Action::openMenu && Designs::HasReview())
+                    Windows::HandheldDesignReviewPause();
                 else if (action == Action::openMenu && Windows::HandheldObjectPickerIsOpen())
                     Windows::HandheldObjectPickerPause();
                 else if (action == Action::openMenu && Windows::HandheldShopManagementIsOpen())
@@ -429,6 +447,16 @@ namespace OpenRCT2::Ui::Handheld
         if (gLegacyScene != LegacyScene::playing)
         {
             EndTerrain();
+        }
+        if (Designs::Completed())
+        {
+            const auto target = *Designs::Completed();
+            EndTerrain();
+            if (FlatRides::CanResume(target))
+                ResumeFlatRide(target.id);
+            else if (RideAccess::Inspect(target))
+                Windows::HandheldRideAccessOpen(target);
+            input.suspend();
         }
         if (_terrainActive && FlatRides::CurrentStage() == FlatRides::Stage::inactive && FlatRides::Target())
         {
@@ -495,6 +523,8 @@ namespace OpenRCT2::Ui::Handheld
                 }
             }
         }
+        if (Designs::Active() && CanExplore() && ContextHasFocus())
+            Designs::UpdatePreview(_terrainTile);
         if (_shopTool && CanExplore() && ContextHasFocus())
             Shops::UpdatePreview(_terrainTile, _shopIndex, _shopDirection);
         if (_treeTool && CanExplore() && ContextHasFocus())
@@ -505,6 +535,7 @@ namespace OpenRCT2::Ui::Handheld
             Trees::ClearPreview();
             Shops::ClearPreview();
             FlatRides::ClearPreview();
+            Designs::ClearPreview();
         }
         SyncFocusWindow();
         HandleExplorerInput(input, input.update(ContextHasFocus(), SDL_GetTicks()));
@@ -579,7 +610,7 @@ namespace OpenRCT2::Ui::Handheld
         }
         for (const auto action : frame.actions)
         {
-            if (FlatRides::Busy())
+            if (FlatRides::Busy() || Designs::Busy())
             {
                 input.suspend();
                 return;
@@ -606,7 +637,9 @@ namespace OpenRCT2::Ui::Handheld
             }
             else if (action == Action::openBuild && CanExplore())
             {
-                if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
+                if (Designs::Active())
+                    Designs::Rotate();
+                else if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
                     FlatRides::Rotate();
                 else if (_shopTool)
                     RotateShop();
@@ -633,6 +666,14 @@ namespace OpenRCT2::Ui::Handheld
                         {
                             if (_terrainTile)
                             {
+                                if (Designs::Active())
+                                {
+                                    if (Designs::Review(_terrainTile))
+                                        Windows::HandheldDesignReviewOpen();
+                                    else
+                                        _terrainStatus = Designs::Query(_terrainTile).getErrorMessage();
+                                    break;
+                                }
                                 const auto result = TerrainAction(true);
                                 _terrainStatus = result.error == GameActions::Status::ok
                                     ? (FlatRides::CurrentStage() != FlatRides::Stage::inactive ? ""
@@ -684,7 +725,9 @@ namespace OpenRCT2::Ui::Handheld
                         }
                         if (_terrainActive)
                         {
-                            if (FlatRides::CurrentStage() == FlatRides::Stage::ride && !FlatRides::Busy())
+                            if (Designs::Active() && !Designs::Busy())
+                                Windows::HandheldDesignPickerOpen();
+                            else if (FlatRides::CurrentStage() == FlatRides::Stage::ride && !FlatRides::Busy())
                                 Windows::HandheldRidePickerOpen();
                             else if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
                                 break;
@@ -730,7 +773,8 @@ namespace OpenRCT2::Ui::Handheld
         const auto height = ContextGetHeight();
         // Completion can arrive after UpdateExplorer but before this frame is drawn.
         // Never fall through to terrain controls while waiting for the next update to end the tool.
-        if (_terrainActive && FlatRides::CurrentStage() == FlatRides::Stage::inactive && FlatRides::Target())
+        if (Designs::Completed()
+            || (_terrainActive && FlatRides::CurrentStage() == FlatRides::Stage::inactive && FlatRides::Target()))
         {
             DrawGameplayFooter(rt, { ContextGetWidth(), height }, "", false, false);
             DrawMapFocus(rt, c);
@@ -740,13 +784,14 @@ namespace OpenRCT2::Ui::Handheld
         std::string costAmount;
         if (_terrainActive)
         {
-            status = FlatRides::CurrentStage() != FlatRides::Stage::inactive ? "PLACE RIDE"
-                : _shopTool                                                  ? "PLACE SHOP"
-                : _treeTool                                                  ? "PLACE TREE"
-                : _sceneryRemovalTool                                        ? "REMOVE SCENERY"
-                : _surfaceTool                                               ? "PAINT SURFACE"
-                : _waterTool                                                 ? (_raiseLand ? "RAISE WATER" : "LOWER WATER")
-                                                                             : (_raiseLand ? "RAISE LAND" : "LOWER LAND");
+            status = Designs::Active()                                    ? "PLACE DESIGN"
+                : FlatRides::CurrentStage() != FlatRides::Stage::inactive ? "PLACE RIDE"
+                : _shopTool                                               ? "PLACE SHOP"
+                : _treeTool                                               ? "PLACE TREE"
+                : _sceneryRemovalTool                                     ? "REMOVE SCENERY"
+                : _surfaceTool                                            ? "PAINT SURFACE"
+                : _waterTool                                              ? (_raiseLand ? "RAISE WATER" : "LOWER WATER")
+                                                                          : (_raiseLand ? "RAISE LAND" : "LOWER LAND");
             if (_terrainTile)
             {
                 const auto result = TerrainAction(false);
@@ -782,7 +827,9 @@ namespace OpenRCT2::Ui::Handheld
         {
             if (_terrainActive)
             {
-                if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
+                if (Designs::Active())
+                    Designs::DrawPanel(rt, { ContextGetWidth(), height });
+                else if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
                     FlatRides::DrawPanel(rt, { ContextGetWidth(), height });
                 else if (_shopTool)
                     DrawShopOverlay(rt, Concept::kOrigin, Shops::Name(_shopIndex), Shops::Eligible(_shopIndex), _shopDirection);
@@ -796,7 +843,7 @@ namespace OpenRCT2::Ui::Handheld
                 else
                     DrawTerrainOverlay(rt, Concept::kOrigin, _raiseLand, _waterTool);
             }
-            if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
+            if (Designs::Active() || FlatRides::CurrentStage() != FlatRides::Stage::inactive)
             { /* The shared ride panel owns its action strip. */
             }
             else if (_shopTool)

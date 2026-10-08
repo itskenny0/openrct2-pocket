@@ -173,6 +173,15 @@ namespace OpenRCT2::Ui::Handheld::Paths
         fixedHeight.reset();
         fixedSlope.reset();
     }
+    bool SetPlacementHeight(int32_t z)
+    {
+        if (!active || z < kFootpathMinHeight || z > kFootpathMaxHeight || z % kCoordsZStep)
+            return false;
+        ClearPreview();
+        fixedHeight = z;
+        fixedSlope = FootpathSlope{ FootpathSlopeType::flat, 0 };
+        return true;
+    }
     bool ChangeHeight(int direction)
     {
         if (!target)

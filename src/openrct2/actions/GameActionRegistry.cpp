@@ -93,6 +93,7 @@
 #include "terraform/WaterLowerAction.h"
 #include "terraform/WaterRaiseAction.h"
 #include "terraform/WaterSetHeightAction.h"
+#include "track/SavedTrackDesignPlaceAction.h"
 #include "track/TrackDesignAction.h"
 #include "track/TrackPlaceAction.h"
 #include "track/TrackRemoveAction.h"
@@ -163,6 +164,7 @@ namespace OpenRCT2::GameActions
         REGISTER_ACTION(ShopPlaceAction);
         REGISTER_ACTION(FlatRidePlaceAction);
         REGISTER_ACTION(FlatRideEntrancePlaceAction);
+        REGISTER_ACTION(SavedTrackDesignPlaceAction);
         REGISTER_ACTION(RideDemolishAction);
         REGISTER_ACTION(RideEntranceExitPlaceAction);
         REGISTER_ACTION(RideEntranceExitRemoveAction);

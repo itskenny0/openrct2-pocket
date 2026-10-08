@@ -8,6 +8,7 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
         CoordsXYZD outside;
         bool attached{};
         bool reachesNormalPath{};
+        StationIndex station{ StationIndex::FromUnderlying(0) };
     };
     struct State
     {

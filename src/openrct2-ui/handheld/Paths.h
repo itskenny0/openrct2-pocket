@@ -24,6 +24,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
     void CycleSurface();
     void FollowGround();
     bool ChangeHeight(int direction);
+    bool SetPlacementHeight(int32_t z);
     bool CycleSlope();
     bool RotateSlope();
     std::string PlacementName();

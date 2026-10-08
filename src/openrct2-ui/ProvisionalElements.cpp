@@ -9,6 +9,7 @@
 
 #include "ProvisionalElements.h"
 
+#include "handheld/Designs.h"
 #include "handheld/FlatRides.h"
 #include "handheld/Paths.h"
 #include "handheld/Shops.h"
@@ -29,6 +30,7 @@ namespace OpenRCT2::Ui
     {
         PROFILED_FUNCTION();
 
+        Handheld::Designs::RemovePreviewTemporarily();
         Handheld::Shops::RemovePreviewTemporarily();
         Handheld::FlatRides::RemovePreviewTemporarily();
         Handheld::Trees::RemovePreviewTemporarily();
@@ -58,6 +60,7 @@ namespace OpenRCT2::Ui
         Handheld::Trees::RestorePreview();
         Handheld::Shops::RestorePreview();
         Handheld::FlatRides::RestorePreview();
+        Handheld::Designs::RestorePreview();
 
         auto* windowMgr = GetWindowManager();
         if (windowMgr->FindByClass(WindowClass::rideConstruction) != nullptr)
