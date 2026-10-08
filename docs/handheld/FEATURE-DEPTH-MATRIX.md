@@ -38,7 +38,7 @@ Complexity refers to implementation, not the number of desktop controls.
 | Ride operations PARTIAL | Ride.cpp operating page; RideSetSettingAction; Ride::getAvailableModes, type flags, LiftData | Existing ride identity, drafts, confirmation, Dashboard | medium / high | Operations list, one bounded native setting draft at a time; mode changes can reset test/vehicle state, waits couple minimum/maximum. First depth package. |
 | Ride maintenance PARTIAL | Ride.cpp maintenance; Ride inspectionInterval, lastInspection, downtime, dueInspection, availableBreakdowns | Existing stats and native setting action | small / high | Maintenance page with interval draft; distinguish rides without breakdowns. |
 | Ride demolition COMPLETE | DemolishRidePrompt.cpp; RideDemolishAction; RideGetRefundPrice uses native track query calculations | Shop confirmation pattern and ride stale identity | medium / high | Delivered named destructive Cancel-first review, native prompt refund calculator and stale quote validation; see RIDE-DEPTH-CHECKPOINT.md. |
-| Vehicles PARTIAL | Ride.cpp vehicle page; RideSetVehicleAction; Ride::updateMaxVehicles, loaded vehicle object limits, proposedNumTrains/proposedNumCarsPerTrain | Ride drafts/identity available | medium / high | Train/car counts and requested/effective review delivered in Vehicles/Dispatch checkpoint. Native station/object limits, closure and clamping apply. Vehicle-object selection and reverse trains remain deferred. |
+| Vehicles PARTIAL | Ride.cpp vehicle page; RideSetVehicleAction; Ride::updateMaxVehicles, loaded vehicle object limits, proposedNumTrains/proposedNumCarsPerTrain | Ride drafts/identity available | medium / high | Train/car counts and requested/effective review delivered in Vehicles/Dispatch checkpoint. Native station/object limits, closure and clamping apply. Loaded researched alternative vehicle selection and descriptor-supported reversed trains delivered in RIDE-MANAGEMENT-COMPLETION.md; native query/review/effective bounds apply. |
 | Mode-specific options PARTIAL | Ride.cpp launch/time/laps/swings/rotations/circuits; load mask/synchronization now represented; RideSetSettingAction | Operations setting model | medium / high | Delivered duration/laps/swings/rotations/launch/speed/circuits and native dispatch controls with typed labels/units and descriptor visibility. No-vehicle maximum-rider fallback remains deferred. |
 | Ride finance/customer depth PARTIAL | Ride.cpp income/customer pages; Ride totalProfit, popularity, satisfaction, queue/station information | Existing read-only stats | small / medium | Split Finance/Customers when enough useful content; respect undefined values and rolling windows. |
 | Ride music/appearance/naming MISSING | Ride.cpp music/colour/name; RideSetSettingAction, RideSetAppearanceAction, RideSetNameAction | Picker/draft architecture | medium / medium | Native music objects and colour choices; keyboard dependency for naming. Defer in first operations package. |
@@ -92,8 +92,7 @@ mode/block and loaded-object limits and the effective count shown in review.
 Dispatch adds native load threshold, wait-for-load, supported adjacent-station
 synchronization and conditional leave-on-another-arrival. Unrelated departure
 bits are preserved. Existing wait-time controls remain in Operations.
-Counts/dispatch are COMPLETE within this named scope; Vehicles remains PARTIAL
-for vehicle-object selection and reversed trains. Mode-specific options are extended by the next package documented below. No new construction, UI
+Counts/dispatch are COMPLETE within this named scope; Named train/car, loaded vehicle-object and reversed-train controls are COMPLETE within the current native configuration scope. Mode-specific options are extended by the next package documented below. No new construction, UI
 shell or save format. See VEHICLES-DISPATCH-CHECKPOINT.md for validation and
 public-fixture limitations.
 
@@ -114,7 +113,7 @@ mode/operation/vehicle state. No raw generic operationOption is exposed.
 
 Mode-specific Operations remains PARTIAL for no-vehicle maximum-rider capacity
 (the desktop fallback), other niche settings and track-piece brake parameters.
-Vehicle-object selection/reversed trains, refurbishment/mechanic assistance,
+Refurbishment/mechanic assistance,
 appearance/music and richer finance/customer information remain open.
 See MODE-OPERATIONS-CHECKPOINT.md for scope, native sources, tests and limits.
 
@@ -123,3 +122,10 @@ inspection state → locate assigned/nearest available mechanic → native queri
 refurbishment review → Cancel-first confirmation → return/save/reload. Reuse
 Maintenance, Staff identities and existing demolition/renew action machinery;
 no patrol editing or new staff roles.
+
+## Ride Management completion: Phase 1
+
+Vehicle-object selection and reversed trains delivered through native typed drafts;
+loaded/research filtering, closure and effective counts remain native. Naming,
+appearance/music, refurbishment and graphs remain explicitly open; see
+RIDE-MANAGEMENT-COMPLETION.md. No prior gameplay phase was redone.

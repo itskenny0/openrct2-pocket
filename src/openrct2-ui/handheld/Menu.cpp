@@ -1842,6 +1842,11 @@ namespace OpenRCT2::Ui::Windows
                                 if (outcome->error == GameActions::Status::ok)
                                 {
                                     const bool demolished = _ridesDraft && _ridesDraft->demolition;
+                                    // A native vehicle-object change intentionally changes the identity's object field.
+                                    // Refresh only after this owned action succeeds; external changes remain stale.
+                                    if (_ridesDraft && _ridesDraft->setting
+                                        && _ridesDraft->setting->vehicle == GameActions::RideSetVehicleType::rideEntry)
+                                        _ridesTarget = Handheld::RideManagement::Identify(_ridesDraft->target.id);
                                     const auto destination = ridesDraftParent();
                                     page(demolished ? Page::ridesRoster : destination);
                                     _status = demolished ? "Ride demolished" : "Ride updated";

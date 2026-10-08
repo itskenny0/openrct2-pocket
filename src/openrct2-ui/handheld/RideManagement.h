@@ -36,9 +36,9 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
     {
         GameActions::RideSetSetting key;
         std::string name;
-        std::vector<uint8_t> values;
+        std::vector<uint16_t> values;
         std::vector<std::string> labels;
-        uint8_t current;
+        uint16_t current;
         std::optional<GameActions::RideSetVehicleType> vehicle{};
         View section = View::operations;
         uint8_t step = 1;
@@ -56,8 +56,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         std::optional<RideStatus> status;
         money64 price;
         std::optional<Setting> setting;
-        uint8_t value{};
-        std::array<uint8_t, 14> baselineSettings{};
+        uint16_t value{};
+        std::array<uint16_t, 15> baselineSettings{};
         std::array<uint8_t, 2> effectiveVehicles{};
         bool demolition{};
         money64 refund{};

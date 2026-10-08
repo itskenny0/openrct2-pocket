@@ -7,12 +7,15 @@
 #include "RideAccess.h"
 
 #include <iomanip>
+#include <openrct2/Context.h>
 #include <openrct2/GameState.h>
 #include <openrct2/actions/ride/RideDemolishAction.h>
 #include <openrct2/actions/ride/RideSetPriceAction.h>
 #include <openrct2/actions/ride/RideSetStatusAction.h>
 #include <openrct2/interface/Window.h>
 #include <openrct2/localisation/Formatting.h>
+#include <openrct2/management/Research.h>
+#include <openrct2/object/ObjectManager.h>
 #include <openrct2/ride/RideData.h>
 #include <openrct2/ride/RideManager.hpp>
 #include <openrct2/ride/ShopItem.h>
@@ -102,7 +105,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                       false,
                       0 };
     }
-    static std::array<uint8_t, 14> Snapshot(const Ride& ride)
+    static std::array<uint16_t, 15> Snapshot(const Ride& ride)
     {
         return { static_cast<uint8_t>(ride.mode),
                  ride.minWaitingTime,
@@ -117,7 +120,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                  ride.numStations,
                  ride.numBlockBrakes,
                  ride.numCircuits,
-                 ride.operationOption };
+                 ride.operationOption,
+                 static_cast<uint16_t>(ride.flags.has(RideFlag::reversedTrains)) };
     }
     std::vector<Setting> Settings(const Ride& ride, bool maintenance)
     {
@@ -247,7 +251,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         }
         return result;
     }
-    static Ride VehicleCalculation(const Ride& ride, const Setting* setting = nullptr, uint8_t value = 0)
+    static Ride VehicleCalculation(const Ride& ride, const Setting* setting = nullptr, uint16_t value = 0)
     {
         // Use the native calculation on a detached copy, never the live ride as query scratch storage.
         Ride preview{};
@@ -269,8 +273,15 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         {
             if (*setting->vehicle == GameActions::RideSetVehicleType::numTrains)
                 preview.proposedNumTrains = value;
-            else
+            else if (*setting->vehicle == GameActions::RideSetVehicleType::numCarsPerTrain)
                 preview.proposedNumCarsPerTrain = value;
+            else if (*setting->vehicle == GameActions::RideSetVehicleType::rideEntry)
+            {
+                preview.subtype = value;
+                if (const auto* entry = GetRideEntryByIndex(value); entry && !getGameState().cheats.disableTrainLengthLimit)
+                    preview.proposedNumCarsPerTrain = std::clamp(
+                        preview.proposedNumCarsPerTrain, entry->min_cars_in_train, entry->max_cars_in_train);
+            }
         }
         preview.updateMaxVehicles();
         return preview;
@@ -281,6 +292,50 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         const auto* entry = ride.getRideEntry();
         if (!entry || ride.getRideTypeDescriptor().flags.has(RtdFlag::noVehicles) || ride.numStations == 0)
             return result;
+        Setting objects{ GameActions::RideSetSetting::departure, "Vehicle type", {}, {}, ride.subtype };
+        objects.vehicle = GameActions::RideSetVehicleType::rideEntry;
+        objects.section = View::vehicles;
+        const auto& state = getGameState();
+        const auto& descriptor = ride.getRideTypeDescriptor();
+        const bool expanded = state.cheats.showVehiclesFromOtherTrackTypes && !descriptor.flags.has(RtdFlag::isFlatRide)
+            && descriptor.specialType != RtdSpecialType::maze && descriptor.specialType != RtdSpecialType::miniGolf;
+        std::vector<std::pair<std::string, ObjectEntryIndex>> entries;
+        for (ride_type_t type = 0; type < RIDE_TYPE_COUNT; ++type)
+        {
+            if (!expanded && type != ride.type)
+                continue;
+            const auto& candidate = GetRideTypeDescriptor(type);
+            if (expanded
+                && (candidate.flags.has(RtdFlag::isFlatRide) || candidate.specialType == RtdSpecialType::maze
+                    || candidate.specialType == RtdSpecialType::miniGolf))
+                continue;
+            for (auto index : GetContext()->GetObjectManager().GetAllRideEntries(type))
+                if (const auto* object = GetRideEntryByIndex(index);
+                    object && (RideEntryIsInvented(index) || state.cheats.ignoreResearchStatus))
+                    entries.emplace_back(FmtString(FormatStringID(object->naming.Name)).WithoutFormatTokens(), index);
+        }
+        std::sort(entries.begin(), entries.end());
+        for (const auto& [name, index] : entries)
+        {
+            if (std::find(objects.values.begin(), objects.values.end(), index) != objects.values.end())
+                continue;
+            objects.values.push_back(index);
+            objects.labels.push_back(name);
+        }
+        if (objects.values.size() > 1)
+            result.push_back(std::move(objects));
+        if ((descriptor.flags.has(RtdFlag::allowReversedTrains) && !entry->flags.has(RideEntryFlag::noReverseOption))
+            || (state.cheats.disableTrainLengthLimit && !descriptor.flags.has(RtdFlag::isFlatRide)))
+        {
+            Setting reversed{ GameActions::RideSetSetting::departure,
+                              "Reversed trains",
+                              { 0, 1 },
+                              { "Off", "On" },
+                              static_cast<uint16_t>(ride.flags.has(RideFlag::reversedTrains)) };
+            reversed.vehicle = GameActions::RideSetVehicleType::trainsReversed;
+            reversed.section = View::vehicles;
+            result.push_back(std::move(reversed));
+        }
         const auto calculated = VehicleCalculation(ride);
         auto add = [&](GameActions::RideSetVehicleType key, const char* name, uint8_t current, int min, int max, int zero) {
             Setting setting{ GameActions::RideSetSetting::departure, name, {}, {}, current };
@@ -413,7 +468,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         draft.refund = RideGetRefundPrice(*ride);
         return draft;
     }
-    static std::string SettingValue(const Setting& setting, uint8_t value)
+    static std::string SettingValue(const Setting& setting, uint16_t value)
     {
         auto found = std::find(setting.values.begin(), setting.values.end(), value);
         return found == setting.values.end() ? "Unavailable" : setting.labels[found - setting.values.begin()];
@@ -685,7 +740,9 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.stats.emplace_back("Draft", SettingValue(*draft->setting, draft->value));
                 if (draft->setting->vehicle)
                 {
-                    const auto* entry = ride->getRideEntry();
+                    const auto* entry = draft->setting->vehicle == GameActions::RideSetVehicleType::rideEntry
+                        ? GetRideEntryByIndex(draft->value)
+                        : ride->getRideEntry();
                     model.stats.emplace_back(
                         "Effective trains / cars",
                         std::to_string(draft->effectiveVehicles[0]) + " / "

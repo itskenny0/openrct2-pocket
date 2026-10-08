@@ -47,6 +47,74 @@ static void TestVehicleDispatch(IContext& context, const std::string& profile, R
     GameActions::ProcessQueue(state);
     const auto target = *C::Target();
     C::End();
+    // Loaded alternative vehicles are filtered by native research, not loaded on player request.
+    auto* alternate = context.GetObjectManager().LoadObject("rct2.ride.ptct2");
+    Require(alternate, "Alternative wooden vehicle metadata missing");
+    const auto alternateIndex = context.GetObjectManager().GetLoadedObjectEntryIndex(alternate);
+    ResearchInsertRideEntry(alternateIndex, false);
+    std::vector<ObjectEntryIndex> invented;
+    for (ObjectEntryIndex i = 0; i < kMaxRideObjects; ++i)
+        if (RideEntryIsInvented(i))
+            invented.push_back(i);
+    SetEveryRideEntryNotInvented();
+    for (auto i : invented)
+        if (i != alternateIndex)
+            RideEntrySetInvented(i);
+    auto hasAlternative = [&] {
+        for (const auto& setting : R::VehicleSettings(*GetRide(target.id)))
+            if (setting.vehicle == GameActions::RideSetVehicleType::rideEntry
+                && std::find(setting.values.begin(), setting.values.end(), alternateIndex) != setting.values.end())
+                return true;
+        return false;
+    };
+    Require(!hasAlternative(), "Unresearched alternative vehicle exposed");
+    RideEntrySetInvented(alternateIndex);
+    Require(hasAlternative(), "Researched loaded vehicle missing");
+    const auto vehicleOptions = R::VehicleSettings(*GetRide(target.id));
+    const auto objectSetting = *std::find_if(vehicleOptions.begin(), vehicleOptions.end(), [](const auto& s) {
+        return s.vehicle == GameActions::RideSetVehicleType::rideEntry;
+    });
+    auto objectDraft = *R::BeginSetting(target, objectSetting);
+    while (objectDraft.value != alternateIndex)
+        R::AdjustPrice(objectDraft, 1);
+    const auto objectCash = state.park.cash;
+    Require(
+        R::Presentation(R::View::confirmation, 1, {}, target, objectDraft).rows[1] == "Cancel",
+        "Vehicle object confirmation not Cancel-first");
+    Require(GetRide(target.id)->subtype == index && state.park.cash == objectCash, "Vehicle review mutated ride");
+    SetEveryRideEntryNotInvented();
+    for (auto i : invented)
+        if (i != alternateIndex)
+            RideEntrySetInvented(i);
+    Require(R::Action(objectDraft, true).error != GameActions::Status::ok, "Lost research not rejected");
+    RideEntrySetInvented(alternateIndex);
+    Require(R::Action(objectDraft, true).error == GameActions::Status::ok, "Vehicle object action failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        GetRide(target.id)->subtype == alternateIndex && state.park.cash == objectCash && !R::Resolve(target),
+        "Native object change/accounting/stale identity differs");
+    const auto changedTarget = *R::Identify(target.id);
+    auto returnDraft = *R::BeginSetting(changedTarget, R::VehicleSettings(*GetRide(target.id)).front());
+    while (returnDraft.value != index)
+        R::AdjustPrice(returnDraft, -1);
+    Require(R::Action(returnDraft, true).error == GameActions::Status::ok, "Return vehicle action failed");
+    GameActions::ProcessQueue(state);
+    const auto reverseOptions = R::VehicleSettings(*GetRide(target.id));
+    const auto reverse = std::find_if(reverseOptions.begin(), reverseOptions.end(), [](const auto& s) {
+        return s.vehicle == GameActions::RideSetVehicleType::trainsReversed;
+    });
+    Require(reverse != reverseOptions.end(), "Native reversed trains missing");
+    auto reverseDraft = *R::BeginSetting(target, *reverse);
+    R::AdjustPrice(reverseDraft, 1);
+    const auto reversePaused = gGamePaused;
+    gGamePaused = 1;
+    Require(R::Action(reverseDraft, true).error == GameActions::Status::ok, "Paused reversed action rejected");
+    GameActions::ProcessQueue(state);
+    gGamePaused = reversePaused;
+    Require(
+        GetRide(target.id)->flags.has(RideFlag::reversedTrains) && state.park.cash == objectCash,
+        "Native reverse/accounting differs");
+    Require(R::Action(reverseDraft, true).error != GameActions::Status::ok, "Repeated reverse accepted");
     auto* ride = GetRide(target.id);
     Require(ride && ride->numStations == 1, "Native station absent");
     GameActions::RideSetVehicleAction minimum(
@@ -153,8 +221,9 @@ static void TestVehicleDispatch(IContext& context, const std::string& profile, R
             && GetRide(dodgTarget.id)->operationOption == durationDraft.value,
         "Placed Dodgems duration/vehicle count not serialized");
     Require(
-        ride && ride->proposedNumCarsPerTrain == proposed && ride->numCarsPerTrain == effective
-            && ride->departFlags == flagsValue && ride->numCircuits == circuitCount && state.park.cash == cash,
+        ride && ride->flags.has(RideFlag::reversedTrains) && ride->subtype == index && ride->proposedNumCarsPerTrain == proposed
+            && ride->numCarsPerTrain == effective && ride->departFlags == flagsValue && ride->numCircuits == circuitCount
+            && state.park.cash == cash,
         "Native configuration serialization differs");
     if (!realUi)
         R::InvalidateAll(); // DummyWindowManager deliberately omits WindowInitAll UI callbacks.
