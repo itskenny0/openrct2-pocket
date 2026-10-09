@@ -126,18 +126,76 @@ query/execute, funds, ownership-loss ghost removal, nested suspension, native ze
 removal refund and save/reload. Connected native start, sequential flat/rise/elevated/
 descend, edges, exact cash, pending repeat prevention, suspension and cancellation.
 SDL connected choice/held-A handoff/options-return/cleanup, plus existing RideAccess,
-path, construction and ride regressions. Queue screens and every expansion addition
-are descriptor-backed but not individually fixture-tested. Direct entrance/exit
+path, construction and ride regressions. Queue-screen placement and normal/queue/slope restrictions, connected queues, stale
+endpoint removal and construction save/reload also pass. Expansion additions beyond
+the named fixtures remain descriptor-backed, not individually fixture-tested. Direct entrance/exit
 endpoint selection, single-step connected undo/history, automatic direction hints,
 asset-backed junction/queue/live guest routing verification and physical Brick
 performance remain gaps; full connected-path parity stays PARTIAL.
 
 ## Captures and publication
 
-Genuine native component captures and the required PNG ZIP will be produced after
-validated source publication. Only implemented screens will be captured. Public
-metadata fixtures will be labelled; no AI world art or fabricated park backdrop.
-Phase 1: `1ad489b600a872c6894a953760a0e81698213a6f`.
-Phase 2: `6238d33a36bf694cf3729eac4b046115598be1df`.
-Phase 3: `42a59570179f561aa097f23fbb905feb451490c9`.
-Phase 4 SHA will be recorded by the subsequent capture/documentation checkpoint.
+The delivered archive is `OpenRCT2-Pocket-Construction-Captures.zip`: eleven
+unscaled 512×384 PNGs plus a README. All are genuine production Pocket drawing
+components rendered by PanelPreview/ConstructionPreview.h using public G2 fonts,
+public object metadata and an actual native 32×32 fixture park. Costs and HUD
+values come from native queries/state; the water fixture executes a native area
+action and the connected fixture executes a native rising piece. No original
+world/scenery sprites are available, so the park area is deliberately blank and
+captures are labelled COMPONENT FIXTURE. They are not asset-backed gameplay
+captures, AI images, mockups, backdrop composites or physical hardware evidence.
+
+| Capture | Production screen / state |
+|---|---|
+| park-build-categories | Scenery category rows; wall/fence focus |
+| park-build-small | Small scenery placement; loaded Corrugated Steel Roof, native cost |
+| park-build-large | Rotated multi-tile 3D Sign placement; native cost |
+| park-build-wall | Brick Wall native edge placement |
+| park-build-colours | Supported primary colour option; native colour name and focus |
+| park-build-terrain-brush | 4×3 native smoothing brush, edge selection options |
+| park-build-water | Native area water raise, 4×3 footprint/cost |
+| park-build-rights-review | Construction-rights counts/cost; Cancel focus |
+| park-build-furniture | Bench addition, native path-edge orientation/cost |
+| park-build-connected | Sequential rising/elevated native path; next-tile query |
+| park-build-dense | Eight visible paginated rows, maximum height 2040, colour/mode/text controls |
+
+Visual QA inspected every frame at native resolution: focus, labels, overlap,
+footer/HUD separation and panel positions. Fixed irrelevant quadrant labels on
+non-small scenery, exposed numerical height in options, added sign keyboard
+footer commands, compacted connected placement and labelled its direction.
+Intentional object-name ellipsis keeps the placement rail narrow and park visible.
+All affected frames were regenerated; every PNG was checked as exactly 512×384.
+Reproduce with `tools/handheld/render_shell.py --build <Release GUI build> --data
+<public OpenRCT2 data> --output <sheet.png> --frames-dir <frames> --pages` followed
+by the eleven `park-build-*` names above. Do not pass a backdrop for milestone
+captures. The contact sheet is diagnostic and excluded from the 512×384 ZIP.
+
+Final validation: Release GUI/CLI builds succeeded. ConstructionTests and SDL
+PresentationLifecycleTests passed after capture/UI fixes. Existing native suite
+passed water, surface, removal, trees, ghosts, paths/queues/elevated slopes,
+RideAccess, rides, shops, staff, finances, research, marketing, guests, overview,
+ride operations/appearance/vehicles/music/refurbishment and save/reload. All three
+lightweight CTests passed (input, launcher, save preservation). Expected dummy-SDL
+renderer and missing private original sprite warnings are not proof of asset-backed
+rendering. No physical Brick, AArch64 package or sustained preview performance
+validation occurred. Native park serialization is used; no Pocket gameplay state
+was added.
+
+Published phase commits:
+
+1. Scenery: `1ad489b600a872c6894a953760a0e81698213a6f`.
+2. Terrain/water: `6238d33a36bf694cf3729eac4b046115598be1df`.
+3. Rights: `42a59570179f561aa097f23fbb905feb451490c9`.
+4. Furniture/connected paths: `0c769bb19eadd1e9e2474070836f9932fa82431b`.
+
+The final capture/UI source checkpoint is recorded by the subsequent publication
+note; the branch may have a newer documentation-only HEAD. Local safety commits
+are retained and publication trees were checked byte-for-byte against their local
+Git trees before guarded fast-forward branch updates. Esperanto remains local.
+
+The matrix keeps broader scenery, terrain and connected paths PARTIAL and marks
+rights purchasing and furniture placement/removal core complete within their named
+scope. Missing ordinary features remain on the 100% roadmap. The recommended next
+subsystem is full Staff Management: patrol editing, security/entertainer roles,
+costumes and operational information. Do not redo the delivered construction core;
+retain the explicit construction parity/asset-validation gaps above.

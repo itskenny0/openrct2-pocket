@@ -24,7 +24,7 @@ No editor/debug features are counted as ordinary park-play gaps.
 | Finances | COMPLETE for loan/admission; PARTIAL domain | Finances.cpp: native cash/loan/income/expenditure/profit, bounded loan/admission confirmation. |
 | Research | COMPLETE for ordinary funding/priorities/progression | ResearchManagement.cpp and ParkSetResearchFundingAction: native current project, estimate, funding/categories, research-filtered Build objects. |
 | Marketing | COMPLETE for starting/reviewing native campaigns | MarketingManagement.cpp, ParkMarketingAction: all eligible campaign/target/duration drafts, native costs/progression; no invented campaign cancellation. |
-| Park/scenario management | PARTIAL | ParkOverview.cpp, Menu.cpp: objectives/status and native save/load; desktop Park.cpp/Map.cpp offer land/construction rights and broader information. |
+| Park/scenario management | PARTIAL | ParkOverview.cpp, Menu.cpp: objectives/status and native save/load; RightsTools.h adds native land/construction-rights purchase/inspection; broader desktop Park/Map information remains. |
 | Save / load | COMPLETE for Pocket slots; PARTIAL domain | Menu.cpp native .park saves/loads, overwrite/discard review, autosave/provisional cleanup; desktop LoadSave.cpp has arbitrary file browsing. |
 | Global information | PARTIAL | Hud.h native cash/date/guests/pause/speed; Dashboard sections provide selected native summaries. |
 
@@ -47,7 +47,7 @@ Complexity refers to implementation, not the number of desktop controls.
 | Custom editing breadth PARTIAL | RideConstruction.cpp backward/selected-block editing, special tracks, brake speeds, design export | Forward native wooden editor | architectural / medium | Endpoint selection and recovery before other coaster types; track metadata and native removal remain authoritative. |
 | Shop appearance/naming PARTIAL | Ride.cpp colours/music/name and item stats; appearance/name actions | Shop management/picker | medium / medium | Shared reusable naming keyboard delivered; broader shop appearance remains outside this ride milestone. |
 | Connected path builder PARTIAL | Footpath.cpp bridge/tunnel next-endpoint building; FootpathPlaceAction | Existing-path endpoint selection, sequential flat/rise/descend/elevated normal/queue placement | medium / high | Native incoming geometry/ghosts/costs, pending guard and options recovery. Entrance endpoint start, undo/history and asset-backed routing validation remain. See PARK-CONSTRUCTION-COMPLETION.md. |
-| Path furniture COMPLETE native placement/removal core; PARTIAL exhaustive validation | Footpath.cpp additions; FootpathAdditionPlaceAction/RemoveAction | Shared object picker/targeting | medium / medium | Delivered loaded/researched additions picker, native path geometry, placement/removal/ghosts and persistence. Queue-screen/expansion exhaustive validation pending. |
+| Path furniture COMPLETE native placement/removal core; PARTIAL exhaustive validation | Footpath.cpp additions; FootpathAdditionPlaceAction/RemoveAction | Shared object picker/targeting | medium / medium | Delivered loaded/researched additions picker, native path geometry, placement/removal/ghosts and persistence. Named bench/bin/lamp/fountain/queue-screen fixtures, queue/slope restrictions and persistence pass; expansion exhaustive validation pending. |
 | Terrain brush/edges COMPLETE requested core; PARTIAL broader depth | Land.cpp, Water.cpp, LandRights.cpp; LandRaise/Lower/SmoothAction, SurfaceSetStyleAction, LandSetRightsAction | Existing one-tile tools | medium / high | Rectangular 1–64 brushes, native corner/edge selection, smoothing, area water and surface/edge styles delivered. Colour-choice controls remain; see PARK-CONSTRUCTION-COMPLETION.md. |
 | Other scenery PARTIAL | Scenery.cpp; small/large/wall/banner placement, colour/removal actions | Reusable picker and tree preview adapter | medium to architectural / high | Four native categories now have placement/ghosts, rotation/elevation, recolouring, removal and sign text; banner styles, bulk tools, filtering and remaining parity are listed in PARK-CONSTRUCTION-COMPLETION.md. |
 | Guest grouping/filtering DEFERRED | GuestList.cpp thought/action groups and filters | Full roster and native details | medium / medium | Filter submenu, counts and stable selection; live membership/stale entities. |
@@ -65,8 +65,8 @@ Complexity refers to implementation, not the number of desktop controls.
 
 First: Ride Details / Operations / Maintenance / demolition. Next: vehicle and
 mode-specific dispatch depth as one complete ride configuration workflow, unless
-hardware feedback identifies a blocker. Then terrain/rights or path furniture,
-followed by scenery categories and staff patrol. Keyboard and arbitrary browsing
+hardware feedback identifies a blocker. Terrain/rights, scenery category and path furniture core are now delivered;
+continue with Staff patrol/roles while retaining documented construction parity gaps. Keyboard and arbitrary browsing
 are cross-cutting completeness tasks, not reasons to redesign the shell.
 Update this document in each depth checkpoint. Treat COMPLETE tasks as regression
 contracts. Public component captures do not prove asset-backed coaster operation.
@@ -131,3 +131,11 @@ ride/shop naming, customer/financial summaries, graphs, scoped track painting,
 random vehicle colours and station detail. See RIDE-MANAGEMENT-COMPLETION.md
 for exact scope and validation limits. The domain remains PARTIAL for broader
 construction and desktop parity; no prior gameplay phase was redone.
+
+## Park construction checkpoint
+
+See `PARK-CONSTRUCTION-COMPLETION.md` for four incremental native construction
+phases, controller mappings, exact published phase SHAs, regression evidence and
+eleven genuine 512×384 component captures. Broader scenery/terrain/connected-path
+parity remains PARTIAL; land/rights purchase and furniture placement/removal core
+are complete within the named scope. The 100% ordinary-gameplay goal is unchanged.

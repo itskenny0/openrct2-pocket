@@ -2895,6 +2895,10 @@ namespace OpenRCT2::Ui::Windows
                     rt, Handheld::Concept::kMenuOrigin,
                     { 324, Handheld::Layout::ContentHeight({ ContextGetWidth(), ContextGetHeight() }) }, model);
                 Handheld::DrawActionStrip(rt, { ContextGetWidth(), ContextGetHeight() });
+                const int footerY = ContextGetHeight() - 21;
+                Handheld::DrawCommand(rt, { 12, footerY }, 38, "D-pad", "Choose");
+                Handheld::DrawCommand(rt, { 184, footerY }, 17, "A", "Select");
+                Handheld::DrawCommand(rt, { 356, footerY }, 17, "B", "Back");
                 return;
             }
             if (_page == Page::sceneryPicker)

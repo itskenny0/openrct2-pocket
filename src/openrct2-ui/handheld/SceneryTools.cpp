@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "SceneryTools.h"
 
+#include "ConstructionPanel.h"
 #include "TextEntry.h"
 
 #include <openrct2-ui/interface/Dropdown.h>
@@ -181,11 +182,11 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                  "Choose object...",
                  current.category == Category::additions ? "Orientation: path edges"
                                                          : "Direction / edge: " + std::to_string(current.direction + 1),
-                 current.category == Category::additions ? "Quadrant: not applicable"
-                                                         : "Quadrant: " + std::to_string(current.quadrant + 1),
+                 current.category != Category::small ? "Quadrant: not applicable"
+                                                     : "Quadrant: " + std::to_string(current.quadrant + 1),
                  "Raise placement height",
                  "Lower placement height",
-                 current.height ? "Automatic height" : "Height: automatic",
+                 current.height ? "Height: " + std::to_string(current.height) + " / reset auto" : "Height: automatic",
                  ch[0] ? "Primary: " + ColourName(current.colours[0]) : "Primary: unavailable",
                  ch[1] ? "Secondary: " + ColourName(current.colours[1]) : "Secondary: unavailable",
                  ch[2] ? "Tertiary: " + ColourName(current.colours[2]) : "Tertiary: unavailable",
@@ -193,6 +194,22 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                      : current.mode == Mode::recolour ? "Mode: Recolour"
                                                       : "Mode: Remove",
                  "Edit sign text..." };
+    }
+    void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position)
+    {
+        const auto& s = Current();
+        DrawConstructionOverlay(
+            rt, position, s.category == Category::additions ? "Path furniture" : "Scenery", Name(s),
+            s.mode == Mode::place          ? "Place"
+                : s.mode == Mode::recolour ? "Recolour"
+                                           : "Remove",
+            s.category == Category::additions     ? "Native path edges"
+                : s.category == Category::walls   ? "Wall edge " + std::to_string(s.direction + 1)
+                : s.category == Category::banners ? "Path edge " + std::to_string(s.direction + 1)
+                : s.category == Category::large
+                ? "Direction " + std::to_string(s.direction + 1) + " / multi-tile"
+                : "Direction " + std::to_string(s.direction + 1) + " / Q" + std::to_string(s.quadrant + 1),
+            s.height ? "Height " + std::to_string(s.height) : "Automatic height");
     }
     void Configure(size_t row, int delta)
     {
@@ -202,7 +219,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                 current.height = surface->getBaseZ();
         if (row == 2 && current.category != Category::additions)
             current.direction = (current.direction + delta + 4) % 4;
-        if (row == 3 && current.category != Category::additions)
+        if (row == 3 && current.category == Category::small)
             current.quadrant = (current.quadrant + delta + 4) % 4;
         if (row == 4)
             current.height = std::min(2040, current.height + 8);

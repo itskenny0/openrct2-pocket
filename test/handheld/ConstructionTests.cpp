@@ -9,6 +9,7 @@
 #include <openrct2/GameState.h>
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/actions/footpath/FootpathPlaceAction.h>
+#include <openrct2/actions/footpath/FootpathRemoveAction.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/object/ObjectManager.h>
 #include <openrct2/scenario/Scenario.h>
@@ -265,7 +266,61 @@ int main(int argc, char** argv)
         P::RestorePreview();
         P::End();
         Require(Ghosts() == 0 && !P::IsActive(), "Connected cancel leaked");
-        std::cout << "Native connected start / flat-rise-elevated-descend / edges-cost-repeat-cancel passed\n";
+        auto* queueSurface = objects.LoadObject("rct2.footpath_surface.queue_blue");
+        Require(queueSurface, "Queue surface missing");
+        P::BeginConnected(true);
+        pathHit.Element = reinterpret_cast<TileElement*>(
+            MapGetFootpathElement({ start, MapGetSurfaceElementAt(start)->getBaseZ() }));
+        P::UpdateTargetFromInfo(pathHit);
+        Require(P::Action(true).error == GameActions::Status::ok && P::TurnConnected(), "Queue connected start failed");
+        const auto queueTile = P::TargetTile();
+        Require(queueTile.has_value(), "Queue connected target missing");
+        const auto queueCash = state.park.cash;
+        const auto queueQuery = P::Action(false);
+        Require(
+            queueQuery.error == GameActions::Status::ok && P::Action(true).error == GameActions::Status::ok,
+            "Queue connected native action failed");
+        GameActions::ProcessQueue(state);
+        auto* queuePath = MapGetFootpathElement({ *queueTile, MapGetSurfaceElementAt(*queueTile)->getBaseZ() });
+        Require(
+            queuePath && queuePath->isQueue() && queuePath->getEdges() && state.park.cash == queueCash - queueQuery.cost,
+            "Connected queue geometry/cash failed");
+        P::End();
+        S::Settings furniture;
+        furniture.category = S::Category::additions;
+        furniture.object = load("rct2.footpath_item.bench1", SCENERY_TYPE_PATH_ITEM);
+        Require(S::Place(*queueTile, furniture, false).error != GameActions::Status::ok, "Bench accepted on queue");
+        Require(S::Place(CoordsXY{ 576, 480 }, furniture, false).error != GameActions::Status::ok, "Bench accepted on slope");
+        furniture.object = load("rct2.footpath_item.qtv1", SCENERY_TYPE_PATH_ITEM);
+        Require(
+            S::Place(bannerTile, furniture, false).error != GameActions::Status::ok, "Queue screen accepted on normal path");
+        Require(S::Place(*queueTile, furniture, true).error == GameActions::Status::ok, "Queue screen rejected on queue");
+        GameActions::ProcessQueue(state);
+        SaveFlags pathSaveFlags{};
+        auto pathSave = std::string(argv[2]) + "/connected.park";
+        const auto pathCash = state.park.cash;
+        Require(
+            ScenarioSave(state, pathSave, pathSaveFlags) && context->LoadParkFromFile(pathSave),
+            "Connected save/reload failed");
+        Require(
+            state.park.cash == pathCash && Ghosts() == 0
+                && TargetAt(*queueTile, S::Category::additions).object == furniture.object,
+            "Queue furniture persistence failed");
+        P::BeginConnected(true);
+        pathHit.Loc = *queueTile;
+        const auto queuePosition = CoordsXYZ{ *queueTile, MapGetSurfaceElementAt(*queueTile)->getBaseZ() };
+        pathHit.Element = reinterpret_cast<TileElement*>(MapGetFootpathElement(queuePosition));
+        P::UpdateTargetFromInfo(pathHit);
+        Require(P::Action(true).error == GameActions::Status::ok, "Stale endpoint start failed");
+        GameActions::FootpathRemoveAction removeEndpoint(queuePosition);
+        Require(
+            GameActions::Execute(&removeEndpoint, state).error == GameActions::Status::ok, "Native endpoint removal failed");
+        GameActions::ProcessQueue(state);
+        Require(P::Action(true).error != GameActions::Status::ok, "Stale connected source accepted");
+        P::End();
+        std::cout
+            << "Native connected start / flat-rise-elevated-descend / queue-edges-cost-repeat / stale-cancel-save passed\n";
+        std::cout << "Native furniture queue/slope restrictions and queue screen placement/persistence passed\n";
         namespace A = Ui::Handheld::AreaTools;
         const CoordsXY areaTile{ 736, 736 };
         A::Settings area;

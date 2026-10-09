@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "Paths.h"
 
+#include "ConstructionPanel.h"
+
 #include <algorithm>
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
@@ -368,9 +370,10 @@ namespace OpenRCT2::Ui::Handheld::Paths
     }
     std::string PlacementName()
     {
+        const char* directions[] = { "NW", "NE", "SE", "SW" };
         if (IsConnected())
             return !endpoint ? "Choose existing path / A start"
-                             : std::string("Dir ") + std::to_string(connectedDirection)
+                             : std::string(directions[connectedDirection])
                     + (connectedGrade > 0       ? " / Rise"
                            : connectedGrade < 0 ? " / Descend"
                                                 : " / Flat")
@@ -380,7 +383,6 @@ namespace OpenRCT2::Ui::Handheld::Paths
         if (!fixedHeight)
             return "Ground / auto slope";
         const auto selectedSlope = fixedSlope.value_or(slope);
-        const char* directions[] = { "NW", "NE", "SE", "SW" };
         return "Height " + std::to_string(*fixedHeight / kCoordsZStep) + " / "
             + (selectedSlope.type == FootpathSlopeType::sloped ? std::string("Rise ") + directions[selectedSlope.direction & 3]
                                                                : "Flat");
@@ -598,6 +600,18 @@ namespace OpenRCT2::Ui::Handheld::Paths
         if (execute && result.error != GameActions::Status::ok && connected)
             connectedBusy = false;
         return result;
+    }
+    void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position)
+    {
+        if (!IsConnected())
+        {
+            DrawPathOverlay(rt, position, SurfaceName(), IsQueue(), IsRemoving(), PlacementName());
+            return;
+        }
+        DrawConstructionOverlay(
+            rt, position, "Connected paths", SurfaceName(), IsQueue() ? "Queue / A extend" : "Normal / A extend",
+            PlacementName(),
+            ConnectedReady() && target ? "Height " + std::to_string(target->z / kCoordsZStep) : "A: choose existing path");
     }
     std::string SurfaceName()
     {

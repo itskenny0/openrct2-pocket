@@ -1105,8 +1105,7 @@ namespace OpenRCT2::Ui::Handheld
                 status = result.getErrorMessage();
             if (!_terrainStatus.empty())
                 status = _terrainStatus;
-            DrawPathOverlay(
-                rt, Concept::kOrigin, Paths::SurfaceName(), Paths::IsQueue(), Paths::IsRemoving(), Paths::PlacementName());
+            Paths::DrawOverlay(rt, Concept::kOrigin);
             if (Paths::IsConnected())
                 DrawConstructionFooter(rt, { ContextGetWidth(), height }, Paths::ConnectedReady() ? "Extend" : "Start", "Turn");
             else
@@ -1134,16 +1133,7 @@ namespace OpenRCT2::Ui::Handheld
                         AreaTools::operations[static_cast<size_t>(AreaTools::settings.operation)], "Area brush",
                         AreaTools::SizeName(AreaTools::settings), AreaTools::SelectionName(AreaTools::settings));
                 else if (_sceneryTool)
-                {
-                    const auto& s = SceneryTools::Current();
-                    DrawConstructionOverlay(
-                        rt, Concept::kOrigin, "Scenery", SceneryTools::Name(s),
-                        s.mode == SceneryTools::Mode::place          ? "Place"
-                            : s.mode == SceneryTools::Mode::recolour ? "Recolour"
-                                                                     : "Remove",
-                        "Edge " + std::to_string(s.direction + 1) + " / Q" + std::to_string(s.quadrant + 1),
-                        s.height ? "Height " + std::to_string(s.height) : "Automatic height");
-                }
+                    SceneryTools::DrawOverlay(rt, Concept::kOrigin);
                 else if (_treeTool)
                     DrawTreeOverlay(rt, Concept::kOrigin, Trees::Name(_treeIndex), Trees::Eligible(_treeIndex));
                 else if (_colourRide)

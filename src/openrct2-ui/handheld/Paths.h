@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include <openrct2/actions/GameActionResult.h>
+#include <openrct2/drawing/RenderTarget.h>
 #include <openrct2/interface/ScreenCoords.hpp>
 #include <openrct2/world/Location.hpp>
 #include <optional>
@@ -33,6 +34,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
     void UseHeightPlane(bool enabled, std::optional<CoordsXY> source = {});
     bool CycleSlope();
     bool RotateSlope();
+    void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position);
     std::string PlacementName();
     void UpdateTarget(ScreenCoordsXY cursor);
     void UpdateTargetFromInfo(const InteractionInfo& info);

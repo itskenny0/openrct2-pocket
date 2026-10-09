@@ -52,6 +52,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     std::string Name(const Settings& settings);
     std::array<bool, 3> Channels(Category category, ObjectEntryIndex object);
     std::vector<std::string> Options();
+    void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position);
     void Configure(size_t row, int delta = 1);
     const Settings& Current();
     void SelectCategory(Category category);
