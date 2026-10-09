@@ -142,6 +142,25 @@ int main(int argc, char** argv)
             Check(D::Begin(file), "Non-Wooden/scenery design unavailable");
             D::SetScenery(false);
             const CoordsXY destination{ 960, tile.y };
+            Check(D::Review(destination), "Automatic design height review failed");
+            const auto automaticLocation = *D::ReviewLocation();
+            D::CancelReview();
+            Check(D::Height(1) && D::HeightOffset() == 16 && D::Review(destination), "Manual design elevation failed");
+            Check(D::ReviewLocation()->z == automaticLocation.z + 16 && !D::Height(1), "Manual/review height changed");
+            D::AutomaticHeight();
+            Check(D::HeightOffset() == 16, "Reviewed height reset");
+            D::CancelReview();
+            D::AutomaticHeight();
+            Check(!D::HeightOffset(), "Automatic height reset failed");
+            for (int n = 0; n < 16; ++n)
+                Check(D::Height(1), "Manual height upper range failed");
+            Check(!D::Height(1) && D::HeightOffset() == 256, "Manual height upper bound failed");
+            for (int n = 0; n < 24; ++n)
+                Check(D::Height(-1), "Manual height lower range failed");
+            Check(!D::Height(-1) && D::HeightOffset() == -128, "Manual height lower bound failed");
+            Check(D::Query(destination).error != GameActions::Status::ok, "Invalid manual native height accepted");
+            D::AutomaticHeight();
+            Check(D::Height(1), "Manual execution draft failed");
             const auto without = D::Query(destination);
             D::SetScenery(true);
             const auto with = D::Query(destination);

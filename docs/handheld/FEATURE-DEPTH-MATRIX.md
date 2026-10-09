@@ -189,3 +189,8 @@ Backward/replacement/variant/export depth remains PARTIAL; see
 Native brake/booster placement now has bounded X/Y speed controls, matching ghost,
 query and execute parameters; existing selected-block speed reviews remain.
 Full seat/covered/inverted variant parity remains PARTIAL.
+
+Design placement: exact manual elevation, automatic-height recovery and compact X
+options are delivered for supported conventional/maze designs. Native query/ghost/
+cost review/execute still own placement. Player-facing export/scenery selection and
+substitution choices remain PARTIAL; ordinary special-family operation is pending.

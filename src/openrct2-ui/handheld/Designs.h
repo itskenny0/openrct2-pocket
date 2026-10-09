@@ -15,6 +15,10 @@ namespace OpenRCT2::Ui::Handheld::Designs
     const std::string& Selection();
     Direction Orientation();
     void Rotate();
+    bool Height(int direction);
+    void AutomaticHeight();
+    std::optional<int32_t> HeightOffset();
+    std::string HeightNotice();
     void SetScenery(bool value);
     std::string SceneryNotice();
     void ClearPreview();

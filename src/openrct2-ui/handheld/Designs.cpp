@@ -29,6 +29,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
     static std::unique_ptr<TrackDesign> design;
     static std::string selection;
     static Direction direction{};
+    static std::optional<int32_t> heightOffset;
     static std::unique_ptr<ShopPlacement::PreviewRide> preview;
     static std::optional<Request> requested, ghost, review;
     static money64 reviewCost{};
@@ -135,6 +136,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
     {
         ClearPreview();
         design.reset();
+        heightOffset.reset();
         review.reset();
         completed.reset();
         busy = false;
@@ -176,6 +178,33 @@ namespace OpenRCT2::Ui::Handheld::Designs
             ClearPreview();
             direction = (direction + 1) & 3;
         }
+    }
+    bool Height(int step)
+    {
+        if (!design || busy || review || !step)
+            return false;
+        const auto next = heightOffset.value_or(0) + (step > 0 ? 2 * kCoordsZStep : -2 * kCoordsZStep);
+        if (next < -128 || next > 256)
+            return false;
+        ClearPreview();
+        heightOffset = next;
+        return true;
+    }
+    void AutomaticHeight()
+    {
+        if (!design || busy || review)
+            return;
+        ClearPreview();
+        heightOffset.reset();
+    }
+    std::optional<int32_t> HeightOffset()
+    {
+        return heightOffset;
+    }
+    std::string HeightNotice()
+    {
+        return heightOffset ? "Manual height " + std::string(*heightOffset >= 0 ? "+" : "") + std::to_string(*heightOffset / 8)
+                            : "Automatic height";
     }
     void SetScenery(bool value)
     {
@@ -247,6 +276,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
             return {};
         CoordsXYZD origin{ *tile, MapGetHighestZ(*tile), direction };
         origin.z += TrackDesignGetZPlacement(*design, *ride, origin);
+        origin.z += heightOffset.value_or(0);
         // Release this borrowed slot before querying native RideCreate.
         return Request{ origin };
     }
@@ -257,7 +287,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
             return Invalid("Choose land / design unavailable");
         auto origin = *request;
         GA::Result result;
-        for (int i = 0; i < 7; ++i, origin.origin.z += kCoordsZStep)
+        for (int i = 0; i < (heightOffset ? 1 : 7); ++i, origin.origin.z += kCoordsZStep)
         {
             result = QueryAt(origin);
             if (result.error == GA::Status::ok || result.error == GA::Status::insufficientFunds)
@@ -270,7 +300,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
         auto request = Resolve(tile);
         if (!request)
             return {};
-        for (int i = 0; i < 7; ++i, request->origin.z += kCoordsZStep)
+        for (int i = 0; i < (heightOffset ? 1 : 7); ++i, request->origin.z += kCoordsZStep)
             if (QueryAt(*request).error == GA::Status::ok)
                 return request;
         return {};
@@ -393,12 +423,14 @@ namespace OpenRCT2::Ui::Handheld::Designs
     void DrawPanel(Drawing::RenderTarget& rt, ScreenSize screen)
     {
         using namespace Concept;
-        Box(rt, kOrigin, { kRailWidth, 146 });
+        Box(rt, kOrigin, { kRailWidth, 172 });
         Heading(rt, kOrigin + ScreenCoordsXY{ 10, 12 }, "Saved design");
         Section(rt, kOrigin + ScreenCoordsXY{ 10, 35 }, GetNameFromTrackPath(selection));
         Row(rt, kOrigin + ScreenCoordsXY{ 8, 54 }, "Place design", Icon::path, true);
         Rule(rt, kOrigin + ScreenCoordsXY{ 8, 99 }, 148);
         DrawModernEllipsised(rt, kOrigin + ScreenCoordsXY{ 12, 116 }, 140, "{MUTED}" + SceneryNotice());
+        DrawModernEllipsised(rt, kOrigin + ScreenCoordsXY{ 12, 142 }, 140, "{MUTED}" + HeightNotice());
+        DrawModernEllipsised(rt, kOrigin + ScreenCoordsXY{ 12, 158 }, 140, "{MUTED}X Design options");
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;
         DrawCommand(rt, { 8, y }, 38, "D-pad", "Move");

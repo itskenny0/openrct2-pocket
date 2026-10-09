@@ -31,6 +31,9 @@
 
 #include <filesystem>
 #include <iomanip>
+#include <openrct2-ui/UiContext.h>
+#include <openrct2-ui/input/ShortcutIds.h>
+#include <openrct2-ui/input/ShortcutManager.h>
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
@@ -77,6 +80,7 @@ namespace OpenRCT2::Ui::Windows
         customChoice,
         trackPiecePicker,
         designConfirm,
+        designOptions,
         dashboard,
         overview,
         overviewConfirm,
@@ -830,6 +834,9 @@ namespace OpenRCT2::Ui::Windows
                     return Handheld::SceneryTools::Options();
                 case Page::sceneryPicker:
                     return {};
+                case Page::designOptions:
+                    return { "Height -",    "Height +",      "Automatic height", "Scenery on",
+                             "Scenery off", "Rotate camera", "Back to placement" };
                 case Page::designConfirm:
                     return { "Cancel", "Place design" };
                 case Page::trackPiecePicker:
@@ -1061,11 +1068,16 @@ namespace OpenRCT2::Ui::Windows
             Handheld::Designs::CancelReview();
             page(Page::park);
         }
+        void openDesignOptions()
+        {
+            page(Page::designOptions);
+            _status = Handheld::Designs::HeightNotice() + " / " + Handheld::Designs::SceneryNotice();
+        }
         void openDesignReview()
         {
             page(Page::designConfirm);
             _status = "Cost " + Handheld::FormatMoney(Handheld::Designs::ReviewCost()) + " / "
-                + Handheld::Designs::SceneryNotice();
+                + (Handheld::Designs::HeightOffset() ? Handheld::Designs::HeightNotice() : Handheld::Designs::SceneryNotice());
         }
         void openTrackPiecePicker()
         {
@@ -1537,6 +1549,9 @@ namespace OpenRCT2::Ui::Windows
                 case Page::dashboard:
                     close();
                     break;
+                case Page::designOptions:
+                    close();
+                    break;
                 case Page::designConfirm:
                     Handheld::Designs::CancelReview();
                     close();
@@ -1752,6 +1767,26 @@ namespace OpenRCT2::Ui::Windows
             const auto choice = _focus.index();
             switch (_page)
             {
+                case Page::designOptions:
+                    if (choice < 2)
+                        Handheld::Designs::Height(choice == 1 ? 1 : -1);
+                    else if (choice == 2)
+                        Handheld::Designs::AutomaticHeight();
+                    else if (choice < 5)
+                        Handheld::Designs::SetScenery(choice == 3);
+                    else if (choice == 5)
+                    {
+                        if (auto* shortcut = GetShortcutManager().getShortcut(ShortcutId::kViewGeneralRotateClockwise))
+                            shortcut->action();
+                    }
+                    else
+                    {
+                        close();
+                        break;
+                    }
+                    _status = Handheld::Designs::HeightNotice() + " / " + Handheld::Designs::SceneryNotice();
+                    invalidate();
+                    break;
                 case Page::designConfirm:
                     if (choice == 0)
                     {
@@ -3681,6 +3716,9 @@ namespace OpenRCT2::Ui::Windows
                 case Page::customChoice:
                     title = "RIDE CONSTRUCTION";
                     break;
+                case Page::designOptions:
+                    title = "DESIGN OPTIONS";
+                    break;
                 case Page::designConfirm:
                     title = "PLACE DESIGN?";
                     break;
@@ -3903,6 +3941,11 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->pauseDesignReview();
+    }
+    void HandheldDesignOptionsOpen()
+    {
+        if (auto* window = OpenPanel())
+            window->openDesignOptions();
     }
     void HandheldDesignReviewOpen()
     {

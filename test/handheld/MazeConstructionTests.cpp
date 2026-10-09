@@ -192,6 +192,14 @@ int main(int argc, char** argv)
             Check(Ghosts() == 0, "Maze ghosts survived cleanup");
             D::Rotate();
         }
+        Check(D::Height(1) && D::Review(designTile), "Manual maze height failed");
+        Check(D::HeightOffset() == 16 && !D::Height(-1), "Maze reviewed height changed");
+        D::CancelReview();
+        D::AutomaticHeight();
+        D::UpdatePreview(designTile);
+        Check(Ghosts() > 0, "Automatic maze preview did not recover");
+        D::ClearPreview();
+        Check(Ghosts() == 0, "Manual maze preview cleanup failed");
         D::SetScenery(false);
         Check(D::Review(designTile), "Maze review failed");
         const auto designCost = D::ReviewCost();

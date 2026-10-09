@@ -1113,6 +1113,12 @@ namespace OpenRCT2::Ui::Handheld
                         }
                         break;
                     case Action::contextPrimary:
+                        if (Designs::Active() && !Designs::Busy())
+                        {
+                            Windows::HandheldDesignOptionsOpen();
+                            input.suspend();
+                            break;
+                        }
                         if (Paths::IsActive() && !Paths::IsConnected())
                         {
                             Paths::ToggleRemove();

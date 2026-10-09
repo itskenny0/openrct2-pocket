@@ -67,3 +67,35 @@ remain explicit ordinary gaps. This phase is not full parameter/variant parity.
 Phase 1 published 4edb3e8e69665595080992b97cb8b68aee79a7b0;
 local 5dc429f56d7f5efed0617d5b50a79846548b8078;
 identical tree 9001e84356042ba40e38004b333fe23633221934.
+
+## Phase 3 — manual design placement elevation (partial)
+
+X opens compact Design options while placing a saved design. Height +/- selects
+an exact offset from the native terrain-fit calculation in 16-unit increments,
+bounded -128..+256. Automatic height restores the existing bounded native height
+search. Manual mode does not silently search upward after an invalid query.
+Native placement actions continue to own geometry, height validity, permissions,
+scenery, costs and execution. The reviewed location/cost is immutable; height and
+scenery controls reject during review/busy. Ghosts are removed before draft changes.
+The offset is transient and resets when the tool ends, not serialized gameplay.
+
+Select still turns the design; Y still opens designs; L2/R2 scenery shortcuts
+remain. X options includes camera rotation; L1/R1 zoom and D-pad camera remain.
+B returns from options without discarding the placement draft. The placement panel
+and Cancel-first review show manual height. Review is still native cost guarded.
+
+Release GUI/CLI build and RideConstructionTests pass five-family exact manual
+height, bounds/invalid-height, locked review, manual query/ghost/execute/accounting
+and native save/reload. MazeConstructionTests passes manual height/review locking,
+automatic recovery and ghost cleanup. Junior asset-backed controller/options/
+manual ghost/review/access/persistence captures pass; material truncated hint fixed.
+
+Player-facing design export/scenery selection and substitution choices remain
+ordinary gaps. Native desktop export requires tested status and native ratings;
+those rules must be preserved in a future player-facing authoring adapter. Flat
+and other incompatible special design categories remain partial. No export screen
+is claimed or fabricated. Full Mini Golf/maze/transport/water operation is pending.
+
+Phase 2 published c9f62be479ce2e74c53440245dcd393adf987b7b;
+local c3ca773d104f5bfe381a92421e13b489c186942d;
+identical tree 6b105c58aee3348612c8a89fa812dfeaf7ac91a2.

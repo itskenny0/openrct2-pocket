@@ -185,3 +185,8 @@ both asset-backed controller/capture scenarios are regenerated and pass.
 Public-source validation is reproducible with tools/handheld/run_native_test.py;
 private-asset captures with tools/handheld/render_ride_construction.py and supplied
 Data/ObjData/Scenarios/Tracks. Original archives, parks and designs are not published.
+
+Follow-up: selected disconnected conventional component continuation, native
+placement speed drafts and exact manual saved-design elevation are now delivered;
+see TRACK-EDITING-DESIGN-COMPLETION.md. Backward/replacement/variants/player export
+and per-family operation remain ordinary gaps.

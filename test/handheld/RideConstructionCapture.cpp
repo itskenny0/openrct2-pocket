@@ -302,6 +302,14 @@ int main(int argc, char** argv)
         D::UpdatePreview(*destination);
         focus = { *destination, MapGetHighestZ(*destination) };
         capture("07-saved-design-preview.png");
+        W::HandheldDesignOptionsOpen();
+        W::HandheldMenuMove(1);
+        H::HandleMenuInput(controller, a);
+        Check(D::HeightOffset() == 16, "Controller manual height failed");
+        capture("19-manual-height-options.png", true);
+        H::HandleMenuInput(controller, b);
+        D::UpdatePreview(*destination);
+        capture("20-manual-elevation-preview.png");
         Check(D::Review(*destination), "Native design review failed");
         W::HandheldDesignReviewOpen();
         capture("08-saved-design-review.png", true);

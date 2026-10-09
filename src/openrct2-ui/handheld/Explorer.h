@@ -105,6 +105,7 @@ namespace OpenRCT2::Ui::Windows
     void HandheldRidePickerOpen();
     void HandheldDesignPickerOpen();
     void HandheldDesignReviewOpen();
+    void HandheldDesignOptionsOpen();
     void HandheldDesignReviewPause();
     bool HandheldObjectPickerIsOpen();
     void HandheldObjectPickerMove(int x, int y);

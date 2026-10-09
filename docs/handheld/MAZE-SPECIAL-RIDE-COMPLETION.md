@@ -184,3 +184,7 @@ with backward/selected geometry recovery, replacement/parameters, manual design
 elevation/export and asset-backed Mini Golf/transport/water operation validation.
 Do not redo the delivered maze, design, ride-management, staff, guest or construction
 work. The complete next prompt accompanies the capture deliverable and final report.
+
+Follow-up: manual saved-design elevation now uses shared native placement, exact
+height review and ghost cleanup; see TRACK-EDITING-DESIGN-COMPLETION.md. Player
+export/substitution and operation gaps remain.
