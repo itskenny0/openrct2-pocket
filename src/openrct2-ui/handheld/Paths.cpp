@@ -26,6 +26,11 @@
 namespace OpenRCT2::Ui::Handheld::Paths
 {
     static bool active{}, removing{}, available{};
+    static bool connected{}, connectedBusy{};
+    static std::optional<CoordsXYZ> endpoint;
+    static FootpathSlope endpointSlope;
+    static Direction connectedDirection{};
+    static int connectedGrade{};
     static std::optional<CoordsXYZ> target;
     static FootpathSlope slope;
     static bool targetIsPath{};
@@ -85,7 +90,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
     }
     static std::optional<Preview> RequestedPreview()
     {
-        if (!active || removing || !target || !available)
+        if (!active || removing || !target || !available || (connected && (!endpoint || connectedBusy)))
             return {};
         auto type = gFootpathSelection.getSelectedSurface();
         PathConstructFlags flags = IsQueue() ? PathConstructFlag::IsQueue : 0;
@@ -183,6 +188,8 @@ namespace OpenRCT2::Ui::Handheld::Paths
         available = Windows::WindowFootpathSelectDefault();
         gFootpathSelection.isQueueSelected = queue;
         active = true;
+        connected = connectedBusy = false;
+        endpoint.reset();
         heightPlane = false;
         accessSource.reset();
         ++accessRevision;
@@ -194,10 +201,77 @@ namespace OpenRCT2::Ui::Handheld::Paths
     {
         ClearPreview();
         active = false;
+        connected = connectedBusy = false;
+        endpoint.reset();
         heightPlane = false;
         accessSource.reset();
         ++accessRevision;
         target.reset();
+    }
+    void BeginConnected(bool queue)
+    {
+        Begin(queue);
+        connected = true;
+        connectedDirection = 0;
+        connectedGrade = 0;
+    }
+    bool IsConnected()
+    {
+        return active && connected;
+    }
+    bool ConnectedReady()
+    {
+        return IsConnected() && endpoint.has_value();
+    }
+    static bool RefreshConnected()
+    {
+        if (!endpoint)
+            return false;
+        const auto* path = MapGetFootpathElement(*endpoint);
+        if (!path || path->isGhost() || path->isSloped() != (endpointSlope.type == FootpathSlopeType::sloped)
+            || (path->isSloped() && path->getSlopeDirection() != endpointSlope.direction))
+        {
+            target.reset();
+            return false;
+        }
+        auto z = endpoint->z;
+        if (path->isSloped() && path->getSlopeDirection() == connectedDirection)
+            z += kPathHeightStep;
+        const CoordsXY next = CoordsXY(*endpoint) + CoordsDirectionDelta[connectedDirection];
+        if (!MapIsLocationValid(next) || next.x < 32 || next.y < 32 || next.x > GetMapSizeMaxXY().x
+            || next.y > GetMapSizeMaxXY().y
+            || !FootpathIsZAndDirectionValid(*path, z / kCoordsZStep, DirectionReverse(connectedDirection)))
+        {
+            target.reset();
+            return false;
+        }
+        target = CoordsXYZ{ next, z - (connectedGrade < 0 ? kPathHeightStep : 0) };
+        fixedHeight = target->z;
+        fixedSlope = FootpathSlope{ connectedGrade == 0 ? FootpathSlopeType::flat : FootpathSlopeType::sloped,
+                                    connectedGrade < 0 ? DirectionReverse(connectedDirection) : connectedDirection };
+        accessSource = CoordsXY(*endpoint);
+        heightPlane = true;
+        return true;
+    }
+    bool TurnConnected()
+    {
+        if (!IsConnected() || connectedBusy)
+            return false;
+        ClearPreview();
+        connectedDirection = DirectionNext(connectedDirection);
+        ++accessRevision;
+        RefreshConnected();
+        return true;
+    }
+    bool SlopeConnected(int delta)
+    {
+        if (!ConnectedReady() || connectedBusy)
+            return false;
+        ClearPreview();
+        connectedGrade = std::clamp(connectedGrade + delta, -1, 1);
+        ++accessRevision;
+        RefreshConnected();
+        return true;
     }
     bool IsActive()
     {
@@ -294,6 +368,13 @@ namespace OpenRCT2::Ui::Handheld::Paths
     }
     std::string PlacementName()
     {
+        if (IsConnected())
+            return !endpoint ? "Choose existing path / A start"
+                             : std::string("Dir ") + std::to_string(connectedDirection)
+                    + (connectedGrade > 0       ? " / Rise"
+                           : connectedGrade < 0 ? " / Descend"
+                                                : " / Flat")
+                    + " / Y turn";
         if (removing)
             return "Remove selected path";
         if (!fixedHeight)
@@ -339,6 +420,11 @@ namespace OpenRCT2::Ui::Handheld::Paths
 
     void UpdateTarget(ScreenCoordsXY cursor)
     {
+        if (ConnectedReady())
+        {
+            RefreshConnected();
+            return;
+        }
         if (heightPlane && fixedHeight)
         {
             const auto xy = ScreenGetMapXYWithZ(cursor, *fixedHeight);
@@ -369,6 +455,11 @@ namespace OpenRCT2::Ui::Handheld::Paths
     }
     void UpdateTargetFromInfo(const InteractionInfo& info)
     {
+        if (ConnectedReady())
+        {
+            RefreshConnected();
+            return;
+        }
         target.reset();
         targetIsPath = false;
         if (!info.Element)
@@ -406,6 +497,42 @@ namespace OpenRCT2::Ui::Handheld::Paths
     }
     GameActions::Result Action(bool execute)
     {
+        if (IsConnected())
+        {
+            GameActions::Result result;
+            result.error = GameActions::Status::invalidParameters;
+            if (connectedBusy)
+            {
+                result.errorMessage = "Path request pending";
+                return result;
+            }
+            if (!endpoint)
+            {
+                result.errorMessage = "A: choose an existing path endpoint";
+                if (!target || !targetIsPath)
+                    return result;
+                const auto* path = MapGetFootpathElement(*target);
+                if (!path || path->isGhost())
+                    return result;
+                result.error = GameActions::Status::ok;
+                if (execute)
+                {
+                    ClearPreview();
+                    endpoint = *target;
+                    endpointSlope = slope;
+                    ++accessRevision;
+                    RefreshConnected();
+                }
+                return result;
+            }
+            if (!RefreshConnected())
+            {
+                ClearPreview();
+                result.errorMessage = "Endpoint changed or direction unavailable; B to restart";
+                return result;
+            }
+        }
+
         const auto requested = RequestedPreview();
         if (!execute && requested && requested == checkedPreview && checkedTick == getGameState().currentTicks
             && checkedCash == getGameState().park.cash && checkedPause == gGamePaused)
@@ -445,12 +572,32 @@ namespace OpenRCT2::Ui::Handheld::Paths
         if (execute && heightPlane)
         {
             const auto revision = accessRevision;
-            action.SetCallback([revision, placement](const auto*, const GameActions::Result* result) {
-                if (active && heightPlane && revision == accessRevision && result->error == GameActions::Status::ok)
-                    accessSource = placement;
-            });
+            const auto selectedSlope = fixedSlope.value_or(slope);
+            const bool wasConnected = connected;
+            if (wasConnected)
+                connectedBusy = true;
+            action.SetCallback(
+                [revision, placement, selectedSlope, wasConnected](const auto*, const GameActions::Result* result) {
+                    if (active && heightPlane && revision == accessRevision && result->error == GameActions::Status::ok)
+                    {
+                        accessSource = placement;
+                        if (wasConnected && connected)
+                        {
+                            endpoint = placement;
+                            endpointSlope = selectedSlope;
+                            RefreshConnected();
+                            RefocusHeight();
+                        }
+                    }
+                    if (revision == accessRevision && wasConnected)
+                        connectedBusy = false;
+                });
         }
-        return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+        const auto result = execute ? GameActions::Execute(&action, getGameState())
+                                    : GameActions::Query(&action, getGameState());
+        if (execute && result.error != GameActions::Status::ok && connected)
+            connectedBusy = false;
+        return result;
     }
     std::string SurfaceName()
     {

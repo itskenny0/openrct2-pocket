@@ -956,7 +956,7 @@ namespace OpenRCT2::Ui::Handheld
                         }
                         break;
                     case Action::contextPrimary:
-                        if (Paths::IsActive())
+                        if (Paths::IsActive() && !Paths::IsConnected())
                         {
                             Paths::ToggleRemove();
                             _terrainStatus.clear();
@@ -973,7 +973,10 @@ namespace OpenRCT2::Ui::Handheld
                     case Action::contextSecondary:
                         if (Paths::IsActive())
                         {
-                            Paths::CycleSurface();
+                            if (Paths::IsConnected())
+                                Paths::TurnConnected();
+                            else
+                                Paths::CycleSurface();
                             _terrainStatus.clear();
                             break;
                         }
@@ -1012,7 +1015,9 @@ namespace OpenRCT2::Ui::Handheld
                     case Action::quit:
                     case Action::slopeDown:
                     case Action::slopeUp:
-                        if (_sceneryTool)
+                        if (Paths::IsConnected())
+                            Paths::SlopeConnected(action == Action::slopeUp ? 1 : -1);
+                        else if (_sceneryTool)
                             SceneryTools::Configure(action == Action::slopeUp ? 4 : 5);
                         break;
                     case Action::cameraMode:
@@ -1102,7 +1107,10 @@ namespace OpenRCT2::Ui::Handheld
                 status = _terrainStatus;
             DrawPathOverlay(
                 rt, Concept::kOrigin, Paths::SurfaceName(), Paths::IsQueue(), Paths::IsRemoving(), Paths::PlacementName());
-            DrawPathFooter(rt, { ContextGetWidth(), height }, status, Paths::IsRemoving());
+            if (Paths::IsConnected())
+                DrawConstructionFooter(rt, { ContextGetWidth(), height }, Paths::ConnectedReady() ? "Extend" : "Start", "Turn");
+            else
+                DrawPathFooter(rt, { ContextGetWidth(), height }, status, Paths::IsRemoving());
         }
         else
         {

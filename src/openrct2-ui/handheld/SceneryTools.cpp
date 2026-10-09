@@ -5,6 +5,8 @@
 
 #include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2/GameState.h>
+#include <openrct2/actions/footpath/FootpathAdditionPlaceAction.h>
+#include <openrct2/actions/footpath/FootpathAdditionRemoveAction.h>
 #include <openrct2/actions/scenery/BannerPlaceAction.h>
 #include <openrct2/actions/scenery/BannerRemoveAction.h>
 #include <openrct2/actions/scenery/BannerSetColourAction.h>
@@ -51,6 +53,8 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     static uint32_t suspended{};
     static ObjectType Type(Category c)
     {
+        if (c == Category::additions)
+            return ObjectType::pathAdditions;
         return c == Category::small ? ObjectType::smallScenery
             : c == Category::large  ? ObjectType::largeScenery
             : c == Category::walls  ? ObjectType::walls
@@ -58,6 +62,8 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     }
     static uint8_t SceneryType(Category c)
     {
+        if (c == Category::additions)
+            return SCENERY_TYPE_PATH_ITEM;
         return c == Category::small ? SCENERY_TYPE_SMALL
             : c == Category::large  ? SCENERY_TYPE_LARGE
             : c == Category::walls  ? SCENERY_TYPE_WALL
@@ -76,10 +82,17 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     }
     std::string CategoryName(Category c)
     {
+        if (c == Category::additions)
+            return "Path furniture";
         return c == Category::small ? "Small scenery / trees"
             : c == Category::large  ? "Large scenery"
             : c == Category::walls  ? "Walls / fences"
                                     : "Banners / signs";
+    }
+    std::vector<std::string> Categories()
+    {
+        return { "Small scenery / trees", "Large scenery",  "Walls / fences",
+                 "Banners / signs",       "Path furniture", "Back to build" };
     }
     std::string Name(const Settings& s)
     {
@@ -89,10 +102,11 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     std::vector<PickerEntry> Entries(Category c)
     {
         std::vector<PickerEntry> result;
-        const auto count = c == Category::small ? kMaxSmallSceneryObjects
-            : c == Category::large              ? kMaxLargeSceneryObjects
-            : c == Category::walls              ? kMaxWallSceneryObjects
-                                                : kMaxBannerObjects;
+        const auto count = c == Category::additions ? kMaxPathAdditionObjects
+            : c == Category::small                  ? kMaxSmallSceneryObjects
+            : c == Category::large                  ? kMaxLargeSceneryObjects
+            : c == Category::walls                  ? kMaxWallSceneryObjects
+                                                    : kMaxBannerObjects;
         for (ObjectEntryIndex i = 0; i < count; ++i)
             if (Eligible(c, i))
                 result.push_back({ { Type(c), i }, GetContext()->GetObjectManager().GetLoadedObject(Type(c), i)->GetName() });
@@ -165,8 +179,10 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         const auto ch = Channels(current.category, current.object);
         return { "Resume",
                  "Choose object...",
-                 "Direction / edge: " + std::to_string(current.direction + 1),
-                 "Quadrant: " + std::to_string(current.quadrant + 1),
+                 current.category == Category::additions ? "Orientation: path edges"
+                                                         : "Direction / edge: " + std::to_string(current.direction + 1),
+                 current.category == Category::additions ? "Quadrant: not applicable"
+                                                         : "Quadrant: " + std::to_string(current.quadrant + 1),
                  "Raise placement height",
                  "Lower placement height",
                  current.height ? "Automatic height" : "Height: automatic",
@@ -184,9 +200,9 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         if ((row == 4 || row == 5) && current.height == 0 && lastTile)
             if (const auto* surface = MapGetSurfaceElementAt(*lastTile))
                 current.height = surface->getBaseZ();
-        if (row == 2)
+        if (row == 2 && current.category != Category::additions)
             current.direction = (current.direction + delta + 4) % 4;
-        if (row == 3)
+        if (row == 3 && current.category != Category::additions)
             current.quadrant = (current.quadrant + delta + 4) % 4;
         if (row == 4)
             current.height = std::min(2040, current.height + 8);
@@ -203,12 +219,12 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     static std::unique_ptr<GameActions::GameAction> Placement(CoordsXY tile, const Settings& s)
     {
         auto z = s.height;
-        if (s.category == Category::banners && z == 0)
+        if ((s.category == Category::banners || s.category == Category::additions) && z == 0)
             for (const auto* path : TileElementsView<PathElement>(tile))
                 if (!path->isGhost())
                 {
                     z = path->getBaseZ();
-                    if (path->isSloped() && path->getSlopeDirection() == s.direction)
+                    if (s.category == Category::banners && path->isSloped() && path->getSlopeDirection() == s.direction)
                         z += kPathHeightStep;
                     break;
                 }
@@ -216,6 +232,8 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         const auto& c = s.colours;
         switch (s.category)
         {
+            case Category::additions:
+                return std::make_unique<GameActions::FootpathAdditionPlaceAction>(loc, s.object);
             case Category::small:
                 return std::make_unique<GameActions::SmallSceneryPlaceAction>(loc, s.quadrant, s.object, c[0], c[1], c[2]);
             case Category::large:
@@ -231,6 +249,8 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     {
         switch (t.category)
         {
+            case Category::additions:
+                return std::make_unique<GameActions::FootpathAdditionRemoveAction>(t.location);
             case Category::small:
                 return std::make_unique<GameActions::SmallSceneryRemoveAction>(t.location, t.part, t.object);
             case Category::large:
@@ -246,6 +266,14 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     {
         if (!MapIsLocationValid(t.location))
             return nullptr;
+        if (t.category == Category::additions)
+        {
+            auto* path = MapGetFootpathElement(t.location);
+            return path && !path->isGhost() && path->hasAddition() && path->additionIsGhost() == isGhost
+                    && path->getAdditionEntryIndex() == t.object
+                ? reinterpret_cast<TileElement*>(path)
+                : nullptr;
+        }
         for (auto* e : TileElementsView<TileElement>(t.location))
         {
             if (e->getBaseZ() != t.location.z || e->isGhost() != isGhost)
@@ -298,6 +326,14 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
             t.banner = s->getBannerIndex();
             t.colours = { s->getPrimaryColour(), s->getSecondaryColour(), s->getTertiaryColour() };
         }
+        else if (e->getType() == TileElementType::path)
+        {
+            const auto* path = e->asPath();
+            if (!path->hasAddition() || path->additionIsGhost())
+                return {};
+            t.category = Category::additions;
+            t.object = path->getAdditionEntryIndex();
+        }
         else if (e->getType() == TileElementType::banner)
         {
             t.category = Category::banners;
@@ -345,6 +381,8 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         std::unique_ptr<GameActions::GameAction> a;
         switch (t.category)
         {
+            case Category::additions:
+                return Invalid("Path furniture has no colour channels");
             case Category::small:
                 a = std::make_unique<GameActions::SmallScenerySetColourAction>(t.location, t.part, t.object, c[0], c[1], c[2]);
                 break;
@@ -419,6 +457,8 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         t.object = request.settings.object;
         t.location = { request.tile, 0, request.settings.direction };
         t.part = request.settings.quadrant;
+        if (t.category == Category::additions)
+            t.location = { request.tile, r.position.z, 0 };
         if (t.category == Category::small)
         {
             const auto d = r.getData<GameActions::SmallSceneryPlaceActionResult>();

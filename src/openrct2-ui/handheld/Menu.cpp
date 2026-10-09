@@ -636,7 +636,7 @@ namespace OpenRCT2::Ui::Windows
                              "Land / Rights...",
                              "Back to park" };
                 case Page::sceneryCategory:
-                    return { "Small scenery / trees", "Large scenery", "Walls / fences", "Banners / signs", "Back to build" };
+                    return Handheld::SceneryTools::Categories();
                 case Page::rightsOptions:
                     return Handheld::RightsTools::Options();
                 case Page::rightsConfirm:
@@ -660,8 +660,10 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ridePicker:
                     return {};
                 case Page::paths:
-                    return { "Normal path", "Queue path", "Remove path", "Back to build" };
+                    return { "Normal path", "Queue path", "Remove path", "Back to build", "Connected path", "Connected queue" };
                 case Page::pathOptions:
+                    if (Handheld::Paths::IsConnected())
+                        return { "Resume", "Turn direction", "Rise", "Descend", "Flat", "Restart endpoint", "Change surface" };
                     return { "Resume",       "Follow ground", "Raise height",  "Lower height",
                              "Flat / slope", "Rotate slope",  "Change surface" };
                 case Page::save:
@@ -1584,7 +1586,7 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::sceneryCategory:
-                    if (choice == 4)
+                    if (choice == 5)
                         page(Page::build);
                     else
                     {
@@ -1754,13 +1756,37 @@ namespace OpenRCT2::Ui::Windows
                     {
                         close();
                         Handheld::EndTerrain();
-                        Handheld::Paths::Begin(choice == 1, choice == 2);
+                        if (choice >= 4)
+                            Handheld::Paths::BeginConnected(choice == 5);
+                        else
+                            Handheld::Paths::Begin(choice == 1, choice == 2);
                     }
                     break;
                 case Page::pathOptions:
                 {
                     namespace Paths = Handheld::Paths;
                     bool changed = true;
+                    if (Paths::IsConnected())
+                    {
+                        if (choice == 0)
+                            close();
+                        else if (choice == 1)
+                            Paths::TurnConnected();
+                        else if (choice == 2 || choice == 3)
+                            Paths::SlopeConnected(choice == 2 ? 1 : -1);
+                        else if (choice == 4)
+                        {
+                            Paths::SlopeConnected(1);
+                            Paths::SlopeConnected(1);
+                            Paths::SlopeConnected(-1);
+                        }
+                        else if (choice == 5)
+                            Paths::BeginConnected(Paths::IsQueue());
+                        else
+                            Paths::CycleSurface();
+                        invalidate();
+                        break;
+                    }
                     switch (choice)
                     {
                         case 0:

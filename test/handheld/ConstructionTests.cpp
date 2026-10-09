@@ -2,6 +2,7 @@
 // Public object metadata/native park fixture. No original sprites or live coaster assets.
 #include <iostream>
 #include <openrct2-ui/handheld/AreaTools.h>
+#include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/RightsTools.h>
 #include <openrct2-ui/handheld/SceneryTools.h>
 #include <openrct2/Context.h>
@@ -29,7 +30,7 @@ static size_t Ghosts()
     for (int y = 32; y < 992; y += 32)
         for (int x = 32; x < 992; x += 32)
             for (const auto* e : TileElementsView<>(CoordsXY{ x, y }))
-                n += e->isGhost();
+                n += e->isGhost() || (e->getType() == TileElementType::path && e->asPath()->additionIsGhost());
     return n;
 }
 static S::Target TargetAt(CoordsXY tile, S::Category category)
@@ -97,7 +98,11 @@ int main(int argc, char** argv)
         const Case cases[] = { { S::Category::small, "rct2.scenery_small.corroof", SCENERY_TYPE_SMALL, { 128, 192 } },
                                { S::Category::large, "rct2.scenery_large.ssig4", SCENERY_TYPE_LARGE, { 288, 192 } },
                                { S::Category::walls, "rct2.scenery_wall.wbrg", SCENERY_TYPE_WALL, { 448, 192 } },
-                               { S::Category::banners, "rct2.footpath_banner.bn1", SCENERY_TYPE_BANNER, bannerTile } };
+                               { S::Category::banners, "rct2.footpath_banner.bn1", SCENERY_TYPE_BANNER, bannerTile },
+                               { S::Category::additions, "rct2.footpath_item.bench1", SCENERY_TYPE_PATH_ITEM, bannerTile },
+                               { S::Category::additions, "rct2.footpath_item.litter1", SCENERY_TYPE_PATH_ITEM, bannerTile },
+                               { S::Category::additions, "rct2.footpath_item.lamp1", SCENERY_TYPE_PATH_ITEM, bannerTile },
+                               { S::Category::additions, "rct2.footpath_item.jumpfnt1", SCENERY_TYPE_PATH_ITEM, bannerTile } };
         for (const auto& c : cases)
         {
             const auto i = load(c.id, c.type);
@@ -186,7 +191,7 @@ int main(int argc, char** argv)
                 state.park.cash == savedCash - remove.cost
                     && S::Modify(target, S::Mode::remove, {}, true).error != GameActions::Status::ok,
                 "Scenery refund/stale removal failed");
-            if (c.category != S::Category::banners)
+            if (c.category != S::Category::banners && c.category != S::Category::additions)
             {
                 settings.direction = 2;
                 settings.height = MapGetSurfaceElementAt(c.tile)->getBaseZ() + 16;
@@ -206,6 +211,61 @@ int main(int argc, char** argv)
             std::cout << "Native " << S::CategoryName(c.category)
                       << " / query-research-bounds-ghost-ownership-colour-removal-persistence passed\n";
         }
+        namespace P = Ui::Handheld::Paths;
+        // Start from an actual native path. No path edges or heights are patched.
+        const CoordsXY start{ 640, 480 };
+        GameActions::FootpathPlaceAction seed(
+            { start, MapGetSurfaceElementAt(start)->getBaseZ() }, FootpathSlope{}, objects.GetLoadedObjectEntryIndex(surface),
+            objects.GetLoadedObjectEntryIndex(railing));
+        Require(GameActions::Execute(&seed, state).error == GameActions::Status::ok, "Connected seed failed");
+        GameActions::ProcessQueue(state);
+        P::BeginConnected(false);
+        InteractionInfo pathHit{};
+        pathHit.Loc = start;
+        pathHit.Element = reinterpret_cast<TileElement*>(
+            MapGetFootpathElement({ start, MapGetSurfaceElementAt(start)->getBaseZ() }));
+        pathHit.interactionType = ViewportInteractionItem::footpath;
+        P::UpdateTargetFromInfo(pathHit);
+        const auto startCash = state.park.cash;
+        Require(
+            P::Action(true).error == GameActions::Status::ok && P::ConnectedReady() && state.park.cash == startCash,
+            "Connected endpoint selection charged/failed");
+        for (int grade : { 0, 1, 0, -1, 0 })
+        {
+            P::SlopeConnected(1);
+            P::SlopeConnected(1);
+            P::SlopeConnected(-1); // flat
+            if (grade)
+                P::SlopeConnected(grade);
+            const auto next = P::TargetTile();
+            Require(next.has_value(), "Connected target missing");
+            const auto cash = state.park.cash;
+            const auto q = P::Action(false);
+            Require(q.error == GameActions::Status::ok, "Connected native query failed");
+            P::UpdatePreview();
+            Require(Ghosts() > 0 && state.park.cash == cash, "Connected ghost missing/charged");
+            Require(P::Action(true).error == GameActions::Status::ok, "Connected execute failed");
+            Require(P::Action(true).error != GameActions::Status::ok, "Repeated pending connected action accepted");
+            GameActions::ProcessQueue(state);
+            Require(
+                state.park.cash == cash - q.cost && P::TargetTile() != next && Ghosts() == 0,
+                "Connected advance/accounting/ghost failed");
+            bool found = false;
+            for (const auto* path : TileElementsView<PathElement>(*next))
+                if (!path->isGhost())
+                {
+                    found = true;
+                    Require(path->getEdges() != 0, "Native connected edges missing");
+                }
+            Require(found, "Connected path missing");
+        }
+        P::UpdatePreview();
+        P::RemovePreviewTemporarily();
+        Require(Ghosts() == 0, "Connected suspension leaked");
+        P::RestorePreview();
+        P::End();
+        Require(Ghosts() == 0 && !P::IsActive(), "Connected cancel leaked");
+        std::cout << "Native connected start / flat-rise-elevated-descend / edges-cost-repeat-cancel passed\n";
         namespace A = Ui::Handheld::AreaTools;
         const CoordsXY areaTile{ 736, 736 };
         A::Settings area;

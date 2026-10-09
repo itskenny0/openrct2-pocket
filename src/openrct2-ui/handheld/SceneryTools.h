@@ -14,7 +14,8 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         small,
         large,
         walls,
-        banners
+        banners,
+        additions
     };
     enum class Mode
     {
@@ -47,6 +48,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     bool Eligible(Category category, ObjectEntryIndex object);
     std::vector<PickerEntry> Entries(Category category);
     std::string CategoryName(Category category);
+    std::vector<std::string> Categories();
     std::string Name(const Settings& settings);
     std::array<bool, 3> Channels(Category category, ObjectEntryIndex object);
     std::vector<std::string> Options();

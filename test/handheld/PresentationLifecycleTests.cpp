@@ -7,6 +7,7 @@
 #include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/Hud.h>
+#include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/RideManagement.h>
 #include <openrct2-ui/handheld/RightsTools.h>
 #include <openrct2-ui/handheld/SceneryTools.h>
@@ -586,6 +587,20 @@ int main(int argc, char** argv)
         Require(state.park.cash == rightsCash, "SDL rights no-money accounting differs");
         H::EndTerrain();
         std::cout << "SDL land review / owned-pause handoff / Cancel-first / single native confirmation passed" << std::endl;
+        W::HandheldBuildOpen();
+        W::HandheldMenuMove(2);
+        press(H::Action::confirm);
+        W::HandheldMenuMove(4);
+        press(H::Action::confirm);
+        Require(H::Paths::IsConnected() && !H::Paths::ConnectedReady(), "Connected UI skipped endpoint selection");
+        W::HandheldPathOptionsOpen();
+        W::HandheldMenuMove(1);
+        press(H::Action::confirm);
+        press(H::Action::back);
+        Require(H::Paths::IsConnected() && !H::Paths::ConnectedReady(), "Connected options cancel lost context");
+        H::EndTerrain();
+        Require(!H::Paths::IsActive(), "Connected park return leaked tool");
+        std::cout << "SDL connected picker / held-A handoff / options-return / cleanup passed" << std::endl;
         SaveFlags flags{};
         const auto save = std::string(argv[2]) + "/hud-lifecycle.park";
         Require(ScenarioSave(state, save, flags), "HUD fixture save failed");

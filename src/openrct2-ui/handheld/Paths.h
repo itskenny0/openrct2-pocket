@@ -12,6 +12,11 @@ namespace OpenRCT2
 namespace OpenRCT2::Ui::Handheld::Paths
 {
     void Begin(bool queue, bool remove = false);
+    void BeginConnected(bool queue);
+    bool IsConnected();
+    bool ConnectedReady();
+    bool TurnConnected();
+    bool SlopeConnected(int delta);
     void End();
     bool IsActive();
     void UpdatePreview();

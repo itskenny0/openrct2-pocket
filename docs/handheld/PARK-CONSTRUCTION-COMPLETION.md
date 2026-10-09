@@ -82,8 +82,6 @@ remain regression contracts. Native landscaping interference tests remain in the
 existing suite. Terrain colour choice controls and a drag-from-two-corners selector
 are still future depth; rectangular dimension selection already covers areas.
 
-## Remaining planned phases
-
 ## Phase 3: Land and construction rights — delivered requested core
 
 Build → Land / Rights provides land/construction-rights inspection and 1–64
@@ -97,7 +95,42 @@ Native available/unavailable, construction-versus-land, query/cancel/stale/funds
 exact accounting/save-reload and SDL Cancel-first/owned-pause/native confirmation
 checks pass. No ownership or availability is invented in production.
 
-4. Path furniture and sequential connected ground/elevated construction.
+## Phase 4: Furniture and connected paths — delivered core, partial full parity
+
+Build → Scenery → Path furniture uses loaded/researched path additions in the
+native object picker. Benches, litter bins, lamps, jumping fountains and queue
+screens are available where native descriptors permit. FootpathAdditionPlaceAction
+and FootpathAdditionRemoveAction own path height, edges, slope/queue restrictions,
+occupancy, broken-addition replacement, costs and serialization. Automatic height
+chooses a real path; explicit height selects stacked levels. These objects have
+native edge orientation rather than a rotation/quadrant setting, and no supported
+colour channels. Recolour reports unavailable; Remove uses the actual path hit.
+Ghost removal exempts only ghost ownership checks and clears the addition ghost
+flag. Ordinary removal still obeys ownership and native zero refund.
+
+Build → Paths → Connected path / Connected queue begins endpoint selection.
+A on an existing real path establishes context without construction or charge.
+Each subsequent A requests exactly one adjacent native footpath action. Y turns
+through four native directions, L2/R2 selects descend/flat/rise, Select opens
+options (including Flat, Restart endpoint and surface). X rotates the camera;
+L1/R1 zoom; D-pad pans. B ends and removes previews. Successful native callbacks
+advance the endpoint; failed/pending actions do not. Source height/slope identity
+is checked, with native slope direction/height validation. Flat/rising/descending
+and elevated pieces reuse native incoming connection geometry, queue flags,
+footpath ghosts, accounting and routing. No edges or simulation flags are patched.
+Context persists through the options menu, not through serialization; restart from
+a real saved path. Existing ordinary Paths and RideAccess remain intact.
+
+Validation: Release GUI/CLI; native benches/bins/lamps/fountains through availability,
+query/execute, funds, ownership-loss ghost removal, nested suspension, native zero
+removal refund and save/reload. Connected native start, sequential flat/rise/elevated/
+descend, edges, exact cash, pending repeat prevention, suspension and cancellation.
+SDL connected choice/held-A handoff/options-return/cleanup, plus existing RideAccess,
+path, construction and ride regressions. Queue screens and every expansion addition
+are descriptor-backed but not individually fixture-tested. Direct entrance/exit
+endpoint selection, single-step connected undo/history, automatic direction hints,
+asset-backed junction/queue/live guest routing verification and physical Brick
+performance remain gaps; full connected-path parity stays PARTIAL.
 
 ## Captures and publication
 
@@ -105,5 +138,6 @@ Genuine native component captures and the required PNG ZIP will be produced afte
 validated source publication. Only implemented screens will be captured. Public
 metadata fixtures will be labelled; no AI world art or fabricated park backdrop.
 Phase 1: `1ad489b600a872c6894a953760a0e81698213a6f`.
-Phase 2: `6238d33a36bf694cf3729eac4b046115598be1df`. Later validated pushed
-commits are recorded in a subsequent documentation checkpoint.
+Phase 2: `6238d33a36bf694cf3729eac4b046115598be1df`.
+Phase 3: `42a59570179f561aa097f23fbb905feb451490c9`.
+Phase 4 SHA will be recorded by the subsequent capture/documentation checkpoint.
