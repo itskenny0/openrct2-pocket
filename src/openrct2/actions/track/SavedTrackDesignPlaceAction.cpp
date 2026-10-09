@@ -2,22 +2,24 @@
 #include "SavedTrackDesignPlaceAction.h"
 
 #include "../../ride/FlatRidePlacement.h"
+#include "../../ride/TrackConstructionSupport.h"
 #include "../GameActionRunner.h"
 namespace OpenRCT2::GameActions
 {
     SavedTrackDesignPlaceAction::SavedTrackDesignPlaceAction(
-        CoordsXYZD origin, const TrackDesign& design, RideInspection inspection, money64 expectedCost)
+        CoordsXYZD origin, const TrackDesign& design, RideInspection inspection, money64 expectedCost, bool placeScenery)
         : _origin(origin)
         , _design(design)
         , _inspection(inspection)
         , _expectedCost(expectedCost)
         , _noMoney(getGameState().park.flags.has(ParkFlag::noMoney))
+        , _placeScenery(placeScenery)
     {
     }
     bool SavedTrackDesignPlaceAction::Eligible(const TrackDesign& design)
     {
-        if (design.trackAndVehicle.rtdIndex != RIDE_TYPE_WOODEN_ROLLER_COASTER || design.trackElements.empty()
-            || !design.mazeElements.empty() || !design.sceneryElements.empty())
+        if (!TrackConstructionSupport::Type(design.trackAndVehicle.rtdIndex) || design.trackElements.empty()
+            || !design.mazeElements.empty())
             return false;
         const auto stations = std::count_if(design.trackElements.begin(), design.trackElements.end(), [](const auto& piece) {
             return piece.type == TrackElemType::endStation;
@@ -27,24 +29,26 @@ namespace OpenRCT2::GameActions
         const auto index = GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(design.trackAndVehicle.vehicleObject);
         const auto* entry = GetRideEntryByIndex(index);
         if (!entry
-            || std::find(std::begin(entry->ride_type), std::end(entry->ride_type), RIDE_TYPE_WOODEN_ROLLER_COASTER)
+            || std::find(std::begin(entry->ride_type), std::end(entry->ride_type), design.trackAndVehicle.rtdIndex)
                 == std::end(entry->ride_type)
             || FlatRidePlacement::StationObject() == kObjectEntryIndexNull)
             return false;
         return getGameState().cheats.ignoreResearchStatus
-            || (RideTypeIsInvented(RIDE_TYPE_WOODEN_ROLLER_COASTER) && RideEntryIsInvented(index));
+            || (RideTypeIsInvented(design.trackAndVehicle.rtdIndex) && RideEntryIsInvented(index));
     }
     void SavedTrackDesignPlaceAction::AcceptParameters(GameActionParameterVisitor& visitor)
     {
         visitor.Visit(_origin);
         visitor.Visit("cost", _expectedCost);
+        visitor.Visit("scenery", _placeScenery);
     }
     void SavedTrackDesignPlaceAction::Serialise(DataSerialiser& serialiser)
     {
         GameAction::Serialise(serialiser);
         if (serialiser.isLoading())
             _queryRide = RideId::GetNull();
-        serialiser << DS_TAG(_origin) << DS_TAG(_inspection) << DS_TAG(_expectedCost) << DS_TAG(_noMoney);
+        serialiser << DS_TAG(_origin) << DS_TAG(_inspection) << DS_TAG(_expectedCost) << DS_TAG(_noMoney)
+                   << DS_TAG(_placeScenery);
         _design.Serialise(serialiser);
     }
     Result SavedTrackDesignPlaceAction::Query(GameState_t& state, Park::ParkData& park) const
@@ -67,11 +71,13 @@ namespace OpenRCT2::GameActions
             // Query the native track layout against the UI-owned provisional ride.
             // The outer action runner still applies pause and funds rules. Real
             // placement always uses TrackDesignAction after removing that record.
-            result = TrackDesignPlace(_design, {}, false, *ride, _origin);
+            result = TrackDesignPlace(_design, {}, _placeScenery, *ride, _origin);
+            if (_trackDesignPlaceStateSceneryUnavailable)
+                result = TrackDesignPlace(_design, {}, false, *ride, _origin);
         }
         else
         {
-            auto action = TrackDesignAction(_origin, _design, false, _inspection);
+            auto action = TrackDesignAction(_origin, _design, _placeScenery, _inspection);
             action.SetFlags(GetFlags());
             result = QueryNested(&action, state);
         }
@@ -89,7 +95,7 @@ namespace OpenRCT2::GameActions
         auto result = Query(state, park);
         if (result.error != Status::ok)
             return result;
-        auto action = TrackDesignAction(_origin, _design, false, _inspection);
+        auto action = TrackDesignAction(_origin, _design, _placeScenery, _inspection);
         action.SetFlags(GetFlags());
         return ExecuteNested(&action, state);
     }

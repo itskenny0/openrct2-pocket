@@ -733,7 +733,7 @@ namespace OpenRCT2::Ui::Windows
                              "Trees",
                              "Shops / Facilities",
                              "Rides",
-                             "Wooden designs",
+                             "Saved designs",
                              "Scenery...",
                              "Terrain / Water...",
                              "Land / Rights...",
@@ -994,7 +994,8 @@ namespace OpenRCT2::Ui::Windows
         void openDesignReview()
         {
             page(Page::designConfirm);
-            _status = "Cost " + Handheld::FormatMoney(Handheld::Designs::ReviewCost());
+            _status = "Cost " + Handheld::FormatMoney(Handheld::Designs::ReviewCost()) + " / "
+                + Handheld::Designs::SceneryNotice();
         }
         void openTrackPiecePicker()
         {
@@ -3358,7 +3359,7 @@ namespace OpenRCT2::Ui::Windows
             if (_page == Page::designPicker)
             {
                 Handheld::DrawObjectPicker(
-                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Wooden designs", _status,
+                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Saved designs", _status,
                     "No supported designs installed");
                 return;
             }

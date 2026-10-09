@@ -12,12 +12,14 @@ namespace OpenRCT2::GameActions
         RideInspection _inspection{ RideInspection::every30Minutes };
         money64 _expectedCost{ kMoney64Undefined };
         bool _noMoney{};
+        bool _placeScenery{};
         RideId _queryRide{ RideId::GetNull() }; // Transient native provisional record, never serialized.
 
     public:
         SavedTrackDesignPlaceAction() = default;
         SavedTrackDesignPlaceAction(
-            CoordsXYZD origin, const TrackDesign& design, RideInspection inspection, money64 expectedCost = kMoney64Undefined);
+            CoordsXYZD origin, const TrackDesign& design, RideInspection inspection, money64 expectedCost = kMoney64Undefined,
+            bool placeScenery = false);
         static bool Eligible(const TrackDesign& design);
         void UsePreviewRideForQuery(RideId ride)
         {

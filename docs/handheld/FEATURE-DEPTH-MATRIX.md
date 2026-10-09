@@ -161,3 +161,5 @@ pieces. Five native families plus original Wooden gameplay regressions pass.
 The domain remains PARTIAL for editing/backward/selected-block controls, design
 breadth, covered/inverted variants and distinct maze/special geometry; no ordinary
 parity gap is removed from the 100% roadmap.
+
+Saved-design breadth checkpoint: compatible conventional native families and optional native design scenery are delivered in [RIDE-CONSTRUCTION-COMPLETION.md](RIDE-CONSTRUCTION-COMPLETION.md). Maze/flat design adapters, object substitution choice and broader editing remain ordinary parity gaps. Goal remains 100% ordinary gameplay.

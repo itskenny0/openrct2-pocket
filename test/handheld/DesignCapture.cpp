@@ -107,7 +107,12 @@ int main(int argc, char** argv)
                     "Export failed");
         }
         TrackRepositoryScan();
-        const auto entries = H::Designs::Entries();
+        auto entries = H::Designs::Entries();
+        const auto exported = std::find_if(entries.begin(), entries.end(), [&](const auto& entry) {
+            return entry.identity.key == (tracks / "Native scenario wooden coaster.td6").string();
+        });
+        Check(exported != entries.end(), "Exported Wooden fixture absent from broader native list");
+        std::rotate(entries.begin(), exported, exported + 1);
         std::cout << "Designs " << entries.size() << std::endl;
         Check(!entries.empty(), "No exported eligible wooden designs");
         GameActions::ParkSetLoanAction loan(state.park.maxBankLoan);
@@ -173,7 +178,7 @@ int main(int argc, char** argv)
         navigation.move(0, 1);
         Check(navigation.focus() == 6 && navigation.page() == 1, "Design picker paging failed");
         navigation.setEntries(copies, copies.back().identity);
-        Check(navigation.focus() == 8, "File identity selection failed");
+        Check(navigation.focus() == copies.size() - 1, "File identity selection failed");
         const CoordsXYZ focus{ tile.x + 16, tile.y + 16, MapGetHighestZ(tile) };
         auto viewFocus = focus;
         auto capture = [&](const char* name, int mode, money64 cost = 0,

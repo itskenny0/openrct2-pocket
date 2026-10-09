@@ -13,6 +13,7 @@
 #include <openrct2/drawing/IDrawingEngine.h>
 #include <openrct2/drawing/NewDrawing.h>
 #include <openrct2/ride/ShopPlacement.h>
+#include <openrct2/ride/TrackConstructionSupport.h>
 #include <openrct2/ride/TrackDesignRepository.h>
 #include <openrct2/ride/ted/TrackElemType.h>
 #include <set>
@@ -33,7 +34,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
     static bool reviewNoMoney{};
     static uint32_t depth{};
     static uint64_t revision{};
-    static bool busy{};
+    static bool busy{}, scenery{}, sceneryWarning{};
     static std::optional<RideManagement::Target> completed;
     static GA::Result Invalid(const char* message)
     {
@@ -59,8 +60,8 @@ namespace OpenRCT2::Ui::Handheld::Designs
         if (!repository)
             return entries;
         std::set<std::string> paths;
-        auto collect = [&](const std::string& object) {
-            for (const auto& file : repository->GetItemsForObjectEntry(RIDE_TYPE_WOODEN_ROLLER_COASTER, object))
+        auto collect = [&](ride_type_t type, const std::string& object) {
+            for (const auto& file : repository->GetItemsForObjectEntry(type, object))
             {
                 if (!paths.insert(file.path).second)
                     continue;
@@ -109,10 +110,15 @@ namespace OpenRCT2::Ui::Handheld::Designs
                 entries.push_back(std::move(entry));
             }
         };
-        collect("");
-        for (ObjectEntryIndex i = 0; i < kMaxRideObjects; ++i)
-            if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject<RideObject>(i))
-                collect(std::string(object->GetObjectEntry().GetName()));
+        for (ride_type_t type = 0; type < RIDE_TYPE_COUNT; ++type)
+            if (TrackConstructionSupport::Type(type))
+            {
+                collect(type, "");
+                for (ObjectEntryIndex i = 0; i < kMaxRideObjects; ++i)
+                    if (TrackConstructionSupport::Available(i, type))
+                        if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject<RideObject>(i))
+                            collect(type, std::string(object->GetObjectEntry().GetName()));
+            }
         return entries;
     }
     void ClearPreview()
@@ -170,11 +176,45 @@ namespace OpenRCT2::Ui::Handheld::Designs
             direction = (direction + 1) & 3;
         }
     }
+    void SetScenery(bool value)
+    {
+        if (!design || busy || review || scenery == value)
+            return;
+        ClearPreview();
+        scenery = value;
+    }
+    std::string SceneryNotice()
+    {
+        if (!design || design->sceneryElements.empty())
+            return "No design scenery";
+        if (!scenery)
+            return "Scenery Off / R2: On";
+        return sceneryWarning ? "Scenery missing; omitted" : "Scenery On / L2: Off";
+    }
     static GA::Result QueryAt(const Request& request)
     {
         if (!design || !Eligible(*design))
             return Invalid("Design unavailable");
-        auto action = GA::SavedTrackDesignPlaceAction(request.origin, *design, Config::Get().general.defaultInspectionInterval);
+        sceneryWarning = false;
+        if (scenery && !design->sceneryElements.empty())
+        {
+            std::unique_ptr<ShopPlacement::PreviewRide> borrowed;
+            auto* ride = preview ? GetRide(preview->id()) : nullptr;
+            if (!ride)
+            {
+                borrowed = std::make_unique<ShopPlacement::PreviewRide>(
+                    GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(design->trackAndVehicle.vehicleObject),
+                    design->trackAndVehicle.rtdIndex);
+                ride = GetRide(borrowed->id());
+            }
+            if (ride)
+            {
+                TrackDesignPlace(*design, {}, true, *ride, request.origin);
+                sceneryWarning = _trackDesignPlaceStateSceneryUnavailable;
+            }
+        }
+        auto action = GA::SavedTrackDesignPlaceAction(
+            request.origin, *design, Config::Get().general.defaultInspectionInterval, kMoney64Undefined, scenery);
         if (preview && !preview->id().IsNull())
         {
             action.UsePreviewRideForQuery(preview->id());
@@ -199,7 +239,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
         {
             borrowed = std::make_unique<ShopPlacement::PreviewRide>(
                 GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(design->trackAndVehicle.vehicleObject),
-                RIDE_TYPE_WOODEN_ROLLER_COASTER);
+                design->trackAndVehicle.rtdIndex);
             ride = GetRide(borrowed->id());
         }
         if (!ride)
@@ -250,7 +290,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
         requested = next;
         preview = std::make_unique<ShopPlacement::PreviewRide>(
             GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(design->trackAndVehicle.vehicleObject),
-            RIDE_TYPE_WOODEN_ROLLER_COASTER);
+            design->trackAndVehicle.rtdIndex);
         if (preview->id().IsNull())
         {
             ClearPreview();
@@ -265,7 +305,8 @@ namespace OpenRCT2::Ui::Handheld::Designs
             ride->trackColours[i] = design->appearance.trackColours[i];
         ghost = next; // Also clean up partial native placement on failure.
         auto result = TrackDesignPlace(
-            *design, { GA::CommandFlag::apply, GA::CommandFlag::ghost, GA::CommandFlag::noSpend }, false, *ride, next->origin);
+            *design, { GA::CommandFlag::apply, GA::CommandFlag::ghost, GA::CommandFlag::noSpend }, scenery && !sceneryWarning,
+            *ride, next->origin);
         if (result.error != GA::Status::ok)
             ClearPreview();
     }
@@ -332,7 +373,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
         if (result.cost != reviewCost)
             return Invalid("Placement changed; review again");
         auto action = GA::SavedTrackDesignPlaceAction(
-            request.origin, *design, Config::Get().general.defaultInspectionInterval, reviewCost);
+            request.origin, *design, Config::Get().general.defaultInspectionInterval, reviewCost, scenery);
         busy = true;
         const auto token = revision;
         action.SetCallback([token](const auto*, const GA::Result* finished) {
@@ -352,11 +393,11 @@ namespace OpenRCT2::Ui::Handheld::Designs
     {
         using namespace Concept;
         Box(rt, kOrigin, { kRailWidth, 146 });
-        Heading(rt, kOrigin + ScreenCoordsXY{ 10, 12 }, "Wooden coaster");
+        Heading(rt, kOrigin + ScreenCoordsXY{ 10, 12 }, "Saved design");
         Section(rt, kOrigin + ScreenCoordsXY{ 10, 35 }, GetNameFromTrackPath(selection));
         Row(rt, kOrigin + ScreenCoordsXY{ 8, 54 }, "Place design", Icon::path, true);
         Rule(rt, kOrigin + ScreenCoordsXY{ 8, 99 }, 148);
-        DrawModernEllipsised(rt, kOrigin + ScreenCoordsXY{ 12, 116 }, 140, "{MUTED}Track + station only");
+        DrawModernEllipsised(rt, kOrigin + ScreenCoordsXY{ 12, 116 }, 140, "{MUTED}" + SceneryNotice());
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;
         DrawCommand(rt, { 8, y }, 38, "D-pad", "Move");

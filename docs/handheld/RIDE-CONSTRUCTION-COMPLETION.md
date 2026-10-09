@@ -39,7 +39,27 @@ passes. Original asset-backed CustomCoasterCapture explicitly selects Wooden fro
 the broader picker, builds/opens its circuit/access and proves natural guest use,
 accounting and save/reload without any guest teleportation or state patches.
 
-Phase 2 saved-design breadth and Phase 3 editing remain pending. Other conventional
+Phase 1 published: `fd35c9b06a80cdebf057e18a9bc078b6a6621022`.
+
+## Phase 2 — native saved designs and scenery
+
+Saved designs now enumerate native repository files for every compatible conventional
+ride family, with exact loaded/researched vehicle/type eligibility. No vehicle
+substitution is invented. Maze and single-piece flat designs remain separate gaps.
+Native import, thumbnail rendering, TrackDesignAction, native design placement,
+orientation, height and station/access recovery remain authoritative.
+L2 excludes design scenery; R2 includes it. Native scenery availability is probed
+through TrackDesignPlaceVirtual; unavailable scenery is explicitly reported and
+omitted according to native desktop fallback. A opens a Cancel-first exact-cost
+review; scenery cannot change within that review. Ghost removal includes native
+track and scenery. No new serialized park state is introduced.
+
+Five-family tests export actual action-built rides through native T6Exporter,
+import them, query scenery off/on, verify extra native cost and real scenery
+placement, prevent duplicate confirmation and check ghost cleanup and save/reload.
+The original asset-backed Wooden design regression explicitly selects its exported
+fixture from the expanded list; picker identity assertions accept the real list size.
+Phase 3 editing remains pending. Other conventional
 families are offered by native descriptors but are not individually exhaustively
 validated. Covered/inverted-track toggle variants, special parameter controls and
 maze/special footprint adapters remain ordinary parity gaps. Physical Brick and

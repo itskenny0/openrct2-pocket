@@ -15,6 +15,8 @@ namespace OpenRCT2::Ui::Handheld::Designs
     const std::string& Selection();
     Direction Orientation();
     void Rotate();
+    void SetScenery(bool value);
+    std::string SceneryNotice();
     void ClearPreview();
     void UpdatePreview(std::optional<CoordsXY> tile);
     void RemovePreviewTemporarily();

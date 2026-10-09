@@ -1094,7 +1094,9 @@ namespace OpenRCT2::Ui::Handheld
                     case Action::quit:
                     case Action::slopeDown:
                     case Action::slopeUp:
-                        if (Paths::IsConnected())
+                        if (Designs::Active())
+                            Designs::SetScenery(action == Action::slopeUp);
+                        else if (Paths::IsConnected())
                             Paths::SlopeConnected(action == Action::slopeUp ? 1 : -1);
                         else if (_sceneryTool)
                             SceneryTools::Configure(action == Action::slopeUp ? 4 : 5);
