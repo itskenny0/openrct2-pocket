@@ -86,6 +86,8 @@ namespace OpenRCT2::Ui::Windows
         staffOrders,
         staffHire,
         staffDismiss,
+        staffRoles,
+        staffCostumes,
         guests,
         guestRoster,
         guestInspect,
@@ -284,6 +286,7 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::StaffManagement::Target> _staffTarget;
         StaffType _hireType = StaffType::handyman;
         uint8_t _ordersBaseline{}, _ordersDraft{};
+        ObjectEntryIndex _costumeBaseline = kObjectEntryIndexNull;
         bool _staffBusy{};
         size_t _staffRosterFocus{};
         std::shared_ptr<int> _staffLifetime = std::make_shared<int>(0);
@@ -291,17 +294,20 @@ namespace OpenRCT2::Ui::Windows
         bool staffManagement() const
         {
             return _page == Page::staff || _page == Page::staffInspect || _page == Page::staffStats
-                || _page == Page::staffOrders || _page == Page::staffHire || _page == Page::staffDismiss;
+                || _page == Page::staffOrders || _page == Page::staffHire || _page == Page::staffDismiss
+                || _page == Page::staffRoles || _page == Page::staffCostumes;
         }
         Handheld::ManagementPresentation staffPresentationFor(Page currentPage, size_t selected) const
         {
             using Handheld::StaffManagement::View;
-            const auto view = currentPage == Page::staff ? View::roster
-                : currentPage == Page::staffInspect      ? View::inspection
-                : currentPage == Page::staffStats        ? View::statistics
-                : currentPage == Page::staffOrders       ? View::orders
-                : currentPage == Page::staffHire         ? View::hire
-                                                         : View::dismissal;
+            const auto view = currentPage == Page::staffRoles ? View::roles
+                : currentPage == Page::staffCostumes          ? View::costumes
+                : currentPage == Page::staff                  ? View::roster
+                : currentPage == Page::staffInspect           ? View::inspection
+                : currentPage == Page::staffStats             ? View::statistics
+                : currentPage == Page::staffOrders            ? View::orders
+                : currentPage == Page::staffHire              ? View::hire
+                                                              : View::dismissal;
             return Handheld::StaffManagement::Presentation(
                 view, selected, _staffRoster, _staffTarget, _hireType, _ordersDraft, _status);
         }
@@ -549,6 +555,8 @@ namespace OpenRCT2::Ui::Windows
                 case Page::staffOrders:
                 case Page::staffHire:
                 case Page::staffDismiss:
+                case Page::staffRoles:
+                case Page::staffCostumes:
                     return staffPresentation().rows;
                 case Page::finances:
                     return Handheld::Finances::Presentation(Handheld::Finances::View::overview, 0).rows;
@@ -1160,6 +1168,18 @@ namespace OpenRCT2::Ui::Windows
             else if (y)
                 move(y);
         }
+        void openStaff(std::optional<Handheld::StaffManagement::Target> target)
+        {
+            _staffTarget = target;
+            if (!target)
+                _staffRosterFocus = 0;
+            _dashboard.focus = Handheld::Dashboard::Focus::content;
+            page(target ? Page::staffInspect : Page::staff);
+        }
+        Handheld::ManagementPresentation staffModel() const
+        {
+            return staffPresentation();
+        }
         bool staffIsOpen() const
         {
             return staffManagement();
@@ -1377,12 +1397,14 @@ namespace OpenRCT2::Ui::Windows
                         _guestTarget && Handheld::GuestManagement::Resolve(*_guestTarget) ? Page::guestInspect
                                                                                           : Page::guestRoster);
                     break;
+                case Page::staffRoles:
                 case Page::staffHire:
                 case Page::staffInspect:
                     page(Page::staff);
                     break;
                 case Page::staffStats:
                 case Page::staffOrders:
+                case Page::staffCostumes:
                 case Page::staffDismiss:
                     page(Page::staffInspect);
                     break;
@@ -1834,8 +1856,36 @@ namespace OpenRCT2::Ui::Windows
                         _staffTarget = _staffRoster[choice - 2];
                         page(Page::staffInspect);
                     }
+                    else if (choice == _staffRoster.size() + 2)
+                        page(Page::staffRoles);
                     else
                         page(Page::dashboard);
+                    break;
+                case Page::staffRoles:
+                    if (choice < 4)
+                    {
+                        _hireType = static_cast<StaffType>(choice);
+                        page(Page::staffHire);
+                    }
+                    else
+                        page(Page::staff);
+                    break;
+                case Page::staffCostumes:
+                    if (_staffTarget)
+                    {
+                        const auto entries = Handheld::StaffManagement::Costumes();
+                        if (choice >= entries.size())
+                            page(Page::staffInspect);
+                        else
+                        {
+                            const auto result = Handheld::StaffManagement::SetCostume(
+                                *_staffTarget, _costumeBaseline, entries[choice].first, true);
+                            if (result.error == GameActions::Status::ok)
+                                page(Page::staffInspect);
+                            else
+                                _status = Handheld::Finances::Feedback(result);
+                        }
+                    }
                     break;
                 case Page::staffHire:
                     if (choice == 1)
@@ -1876,8 +1926,18 @@ namespace OpenRCT2::Ui::Windows
                         }
                         _status = "Location unavailable";
                     }
+                    else if (choice == 4)
+                    {
+                        _costumeBaseline = Handheld::StaffManagement::Resolve(*_staffTarget)->animationObjectIndex;
+                        page(Page::staffCostumes);
+                    }
                     else if (choice == 1)
                     {
+                        if (Handheld::StaffManagement::Orders(_staffTarget->type).empty())
+                        {
+                            _status = "This role has no native orders";
+                            break;
+                        }
                         _ordersBaseline = _ordersDraft = Handheld::StaffManagement::Resolve(*_staffTarget)->staffOrders;
                         page(Page::staffOrders);
                     }
@@ -3289,6 +3349,16 @@ namespace OpenRCT2::Ui::Windows
         Handheld::StaffManagement::Invalidate(id);
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->staffRemoved(id);
+    }
+    void HandheldStaffOpen(std::optional<Handheld::StaffManagement::Target> target)
+    {
+        if (auto* window = OpenPanel())
+            window->openStaff(target);
+    }
+    Handheld::ManagementPresentation HandheldStaffPresentation()
+    {
+        const auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window ? static_cast<const HandheldMenuWindow*>(window)->staffModel() : Handheld::ManagementPresentation{};
     }
     bool HandheldStaffIsOpen()
     {

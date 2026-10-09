@@ -1816,7 +1816,7 @@ static void TestStaff(IContext& context, const std::string& profile, bool realUi
     const auto cash = park.cash;
     const auto ledger = park.expenditureTable;
     const auto count = S::Roster().size();
-    Require(S::Hire(StaffType::security, true).error != GameActions::Status::ok, "Unsupported staff hired");
+    Require(S::Hire(StaffType::count, true).error != GameActions::Status::ok, "Invalid staff role hired");
     Require(
         S::Hire(StaffType::handyman, false).error == GameActions::Status::ok && S::Roster().size() == count
             && park.cash == cash,
@@ -1893,7 +1893,7 @@ static void TestStaff(IContext& context, const std::string& profile, bool realUi
     }
     roster = S::Roster();
     Require(
-        roster.size() >= 11 && S::Presentation(S::View::roster, roster.size() + 1, roster).rows.size() == roster.size() + 3,
+        roster.size() >= 11 && S::Presentation(S::View::roster, roster.size() + 1, roster).rows.size() == roster.size() + 4,
         "Full staff roster truncated");
     const auto stableRoster = roster;
     const auto afterHireCash = park.cash;

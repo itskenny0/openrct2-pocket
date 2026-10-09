@@ -6,6 +6,7 @@
 #pragma once
 #include "RideManagement.h"
 #include "SceneryTools.h"
+#include "StaffManagement.h"
 
 #include <cstddef>
 #include <openrct2/Identifiers.h>
@@ -72,6 +73,8 @@ namespace OpenRCT2::Ui::Windows
     Handheld::ManagementPresentation HandheldRidesPresentation();
     bool HandheldGuestsIsOpen();
     Handheld::ManagementPresentation HandheldGuestsPresentation();
+    void HandheldStaffOpen(std::optional<Handheld::StaffManagement::Target> target = {});
+    Handheld::ManagementPresentation HandheldStaffPresentation();
     bool HandheldStaffIsOpen();
     void HandheldStaffPause();
     void HandheldStaffRemoved(EntityId id);

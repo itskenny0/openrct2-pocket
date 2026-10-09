@@ -65,7 +65,7 @@ namespace OpenRCT2::GameActions
         auto* animObj = objManager.GetLoadedObject<PeepAnimationsObject>(_costume);
 
         auto animPeepType = AnimationPeepType(static_cast<uint8_t>(staff->assignedStaffType) + 1);
-        if (animObj->GetPeepType() != animPeepType)
+        if (animObj == nullptr || animObj->GetPeepType() != animPeepType)
         {
             LOG_ERROR("Invalid entertainer costume %u", _costume);
             return Result(Status::invalidParameters, STR_ERR_INVALID_PARAMETER, STR_ERR_VALUE_OUT_OF_RANGE);

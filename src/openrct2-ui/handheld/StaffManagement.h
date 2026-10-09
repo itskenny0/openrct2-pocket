@@ -24,10 +24,15 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         statistics,
         orders,
         hire,
-        dismissal
+        dismissal,
+        roles,
+        costumes
     };
     void Invalidate(EntityId id);
     bool Supported(StaffType type);
+    std::string RoleName(StaffType type);
+    std::vector<std::pair<ObjectEntryIndex, std::string>> Costumes();
+    GameActions::Result SetCostume(const Target& target, ObjectEntryIndex baseline, ObjectEntryIndex value, bool execute);
     std::vector<Target> Roster();
     std::optional<Target> Identify(EntityId id);
     Staff* Resolve(const Target& target);

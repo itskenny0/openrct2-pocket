@@ -5,6 +5,7 @@
 #include <openrct2/GameState.h>
 #include <openrct2/actions/peep/StaffFireAction.h>
 #include <openrct2/actions/peep/StaffHireNewAction.h>
+#include <openrct2/actions/peep/StaffSetCostumeAction.h>
 #include <openrct2/actions/peep/StaffSetOrdersAction.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/entity/EntityList.h>
@@ -35,7 +36,30 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
     }
     bool Supported(StaffType type)
     {
-        return type == StaffType::handyman || type == StaffType::mechanic;
+        return type < StaffType::count;
+    }
+    std::string RoleName(StaffType type)
+    {
+        const char* names[] = { "Handyman", "Mechanic", "Security guard", "Entertainer" };
+        return Supported(type) ? names[EnumValue(type)] : "Unavailable role";
+    }
+    std::vector<std::pair<ObjectEntryIndex, std::string>> Costumes()
+    {
+        std::vector<std::pair<ObjectEntryIndex, std::string>> entries;
+        for (const auto& costume : getAvailableCostumeStrings(AnimationPeepType::entertainer))
+            entries.push_back({ costume.index, costume.rawName });
+        return entries;
+    }
+    GameActions::Result SetCostume(const Target& target, ObjectEntryIndex baseline, ObjectEntryIndex value, bool execute)
+    {
+        const auto* staff = Resolve(target);
+        if (!staff || target.type != StaffType::entertainer || staff->animationObjectIndex != baseline || value == baseline)
+            return Invalid("Costume changed or unavailable");
+        const auto entries = Costumes();
+        if (std::none_of(entries.begin(), entries.end(), [value](const auto& item) { return item.first == value; }))
+            return Invalid("Costume unavailable");
+        GameActions::StaffSetCostumeAction action(target.id, value);
+        return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
     }
     std::optional<Target> Identify(EntityId id)
     {
@@ -87,9 +111,9 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
                 canPosition = true;
         if (!canPosition)
             return Invalid("No automatic placement location");
-        uint8_t orders = type == StaffType::mechanic
-            ? STAFF_ORDERS_INSPECT_RIDES | STAFF_ORDERS_FIX_RIDES
-            : STAFF_ORDERS_SWEEPING | STAFF_ORDERS_WATER_FLOWERS | STAFF_ORDERS_EMPTY_BINS;
+        uint8_t orders = type == StaffType::mechanic ? STAFF_ORDERS_INSPECT_RIDES | STAFF_ORDERS_FIX_RIDES
+            : type == StaffType::handyman ? STAFF_ORDERS_SWEEPING | STAFF_ORDERS_WATER_FLOWERS | STAFF_ORDERS_EMPTY_BINS
+                                          : 0;
         if (type == StaffType::handyman && Config::Get().general.handymenMowByDefault)
             orders |= STAFF_ORDERS_MOWING;
         GameActions::StaffHireNewAction action(true, type, animation, orders);
@@ -154,14 +178,23 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
                 const auto* staff = Resolve(entry);
                 model.rows.push_back(staff ? staff->getName() : "Employee unavailable");
             }
+            model.rows.push_back("Hire other role...");
             model.rows.push_back("Back to dashboard");
             if (roster.empty())
-                model.status = "No handymen or mechanics";
+                model.status = "No staff employed";
+            return model;
+        }
+        if (view == View::roles)
+        {
+            model.title = "Choose staff role";
+            for (auto role : { StaffType::handyman, StaffType::mechanic, StaffType::security, StaffType::entertainer })
+                model.rows.push_back(RoleName(role));
+            model.rows.push_back("Back to roster");
             return model;
         }
         if (view == View::hire)
         {
-            model.title = hireType == StaffType::handyman ? "Hire handyman" : "Hire mechanic";
+            model.title = "Hire " + RoleName(hireType);
             model.stats = { { "Monthly wage", wage(hireType) },
                             { "Upfront charge",
                               getGameState().park.flags.has(ParkFlag::noMoney) ? "Not applicable" : FormatMoney(0) },
@@ -185,10 +218,12 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         {
             Formatter ft;
             formatPeepActionTo(*staff, ft);
-            model.stats = { { "Role", target->type == StaffType::handyman ? "Handyman" : "Mechanic" },
+            model.stats = { { "Role", RoleName(target->type) },
                             { "Monthly wage", wage(target->type) },
                             { "Status", FormatStringIDLegacy(STR_STRINGID, ft.Data()) } };
-            model.rows = { "Locate", "Orders...", "Statistics...", "Dismiss...", "Back to roster" };
+            model.rows = { "Locate",        Orders(target->type).empty() ? "No configurable orders" : "Orders...",
+                           "Statistics...", "Dismiss...",
+                           "Costume...",    "Back to roster" };
         }
         else if (view == View::statistics)
         {
@@ -203,12 +238,26 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
                                                                     { "Litter swept", staff->staffLitterSwept },
                                                                     { "Bins emptied", staff->staffBinsEmptied } })
                     model.stats.push_back({ value.first, std::to_string(value.second) });
-            else
+            else if (target->type == StaffType::mechanic)
                 model.stats.insert(
                     model.stats.end(),
                     { { "Rides inspected", std::to_string(staff->staffRidesInspected) },
                       { "Rides fixed", std::to_string(staff->staffRidesFixed) } });
+            if (target->type == StaffType::security)
+                model.stats.push_back({ "Vandals stopped", std::to_string(staff->staffVandalsStopped) });
+            if (target->type == StaffType::entertainer)
+                model.stats.push_back({ "Guests entertained", std::to_string(staff->staffGuestsEntertained) });
             model.rows = { "Back to employee" };
+        }
+        else if (view == View::costumes)
+        {
+            model.breadcrumb = "Staff / Entertainer costume";
+            if (target->type == StaffType::entertainer)
+                for (const auto& entry : Costumes())
+                    model.rows.push_back(entry.second + (entry.first == staff->animationObjectIndex ? " / current" : ""));
+            model.rows.push_back("Back to employee");
+            if (target->type != StaffType::entertainer)
+                model.status = "Only entertainers have costumes";
         }
         else if (view == View::orders)
         {

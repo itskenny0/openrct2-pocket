@@ -19,6 +19,7 @@
 #include <openrct2/Input.h>
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/PlatformEnvironment.h>
+#include <openrct2/actions/peep/StaffHireNewAction.h>
 #include <openrct2/actions/ride/RideDemolishAction.h>
 #include <openrct2/audio/AudioContext.h>
 #include <openrct2/config/Config.h>
@@ -601,6 +602,51 @@ int main(int argc, char** argv)
         H::EndTerrain();
         Require(!H::Paths::IsActive(), "Connected park return leaked tool");
         std::cout << "SDL connected picker / held-A handoff / options-return / cleanup passed" << std::endl;
+        namespace S = H::StaffManagement;
+        gOpenRCT2NoGraphics = true;
+        Require(
+            objects.LoadObject("rct2.peep_animations.entertainer_elephant")
+                && objects.LoadObject("rct2.peep_animations.entertainer_tiger"),
+            "SDL costume metadata missing");
+        const auto oldEntrances = state.park.entrances;
+        state.park.entrances.push_back({ 64, 64, 16, 0 });
+        const auto employeeCount = S::Roster().size();
+        W::HandheldStaffOpen();
+        W::HandheldMenuMove(2 + employeeCount);
+        press(H::Action::confirm);
+        Require(W::HandheldStaffPresentation().title == "Choose staff role", "Duplicate A skipped role picker");
+        W::HandheldMenuMove(3);
+        press(H::Action::confirm);
+        Require(W::HandheldStaffPresentation().selected == 1, "Hire did not default to Cancel");
+        press(H::Action::confirm);
+        Require(S::Roster().size() == employeeCount, "Cancel hired entertainer");
+        W::HandheldStaffOpen();
+        W::HandheldMenuMove(2 + employeeCount);
+        press(H::Action::confirm);
+        W::HandheldMenuMove(3);
+        press(H::Action::confirm);
+        W::HandheldMenuMove(-1);
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        auto employee = S::Roster().back();
+        Require(employee.type == StaffType::entertainer, "SDL entertainer hire failed");
+        const auto oldCostume = S::Resolve(employee)->animationObjectIndex;
+        W::HandheldMenuMove(4);
+        press(H::Action::confirm);
+        Require(W::HandheldStaffPresentation().breadcrumb == "Staff / Entertainer costume", "Costume picker route failed");
+        const auto costumes = S::Costumes();
+        const auto chosen = costumes.front().first == oldCostume ? 1 : 0;
+        W::HandheldMenuMove(chosen);
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Require(
+            S::Resolve(employee)->animationObjectIndex == costumes[chosen].first && state.park.cash == cash,
+            "Costume action/held A accounting failed");
+        wm->CloseByClass(WindowClass::handheldMenu);
+        Require(S::Dismiss(employee, true).error == GameActions::Status::ok, "SDL staff cleanup failed");
+        GameActions::ProcessQueue(state);
+        state.park.entrances = oldEntrances;
+        std::cout << "SDL staff roles / held-A handoff / Cancel-first hire / costume native action passed" << std::endl;
         SaveFlags flags{};
         const auto save = std::string(argv[2]) + "/hud-lifecycle.park";
         Require(ScenarioSave(state, save, flags), "HUD fixture save failed");
