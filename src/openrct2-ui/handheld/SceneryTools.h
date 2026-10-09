@@ -44,7 +44,35 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         BannerIndex banner = BannerIndex::GetNull();
         std::array<Drawing::Colour, 3> colours{};
         std::string text{};
+        uint8_t bannerFlags{}, textColour{};
+        RideId linkedRide = RideId::GetNull();
+        std::string descriptor;
+        bool operator==(const Target&) const = default;
     };
+    struct Group
+    {
+        ObjectEntryIndex index;
+        std::string name;
+    };
+    std::vector<Group> Groups(Category category);
+    bool SetGroup(ObjectEntryIndex group);
+    std::string GroupName();
+    enum class Style
+    {
+        noEntry,
+        textColour,
+        mainColour
+    };
+    struct StyleDraft
+    {
+        Target target;
+        Style style;
+        uint8_t value;
+    };
+    std::optional<StyleDraft> BeginStyle(const Target& target, Style style);
+    void AdjustStyle(StyleDraft& draft, int delta);
+    std::string StyleValue(const StyleDraft& draft);
+    GameActions::Result ApplyStyle(const StyleDraft& draft, bool execute);
     bool Eligible(Category category, ObjectEntryIndex object);
     std::vector<PickerEntry> Entries(Category category);
     std::string CategoryName(Category category);

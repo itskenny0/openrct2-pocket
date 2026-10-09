@@ -43,7 +43,8 @@ namespace OpenRCT2::Ui::Handheld
     bool ResumeMaze(RideId id);
     bool BeginCustomTrack(ObjectEntryIndex index, ride_type_t type = kRideTypeNull);
     bool ResumeCustomTrack(RideId id);
-    bool ResumeCustomTrackFrom(const RideManagement::Target& target, CoordsXYZD origin, TrackElemType type, bool backward = false);
+    bool ResumeCustomTrackFrom(
+        const RideManagement::Target& target, CoordsXYZD origin, TrackElemType type, bool backward = false);
     bool BeginFlatRide(ObjectEntryIndex index);
     bool BeginSavedDesign(const std::string& path);
     bool ResumeFlatRide(RideId id);
@@ -96,6 +97,7 @@ namespace OpenRCT2::Ui::Windows
     void HandheldPathOptionsOpen();
     void HandheldTreePickerOpen();
     void HandheldSceneryOptionsOpen();
+    void HandheldSceneryStyleOpen(const Handheld::SceneryTools::Target& target);
     void HandheldAreaOptionsOpen();
     void HandheldRightsOptionsOpen();
     void HandheldRightsReviewOpen(CoordsXY tile);

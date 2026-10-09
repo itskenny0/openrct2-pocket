@@ -4,6 +4,7 @@
 #include "ConstructionPanel.h"
 #include "TextEntry.h"
 
+#include <algorithm>
 #include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2/GameState.h>
 #include <openrct2/actions/footpath/FootpathAdditionPlaceAction.h>
@@ -12,10 +13,12 @@
 #include <openrct2/actions/scenery/BannerRemoveAction.h>
 #include <openrct2/actions/scenery/BannerSetColourAction.h>
 #include <openrct2/actions/scenery/BannerSetNameAction.h>
+#include <openrct2/actions/scenery/BannerSetStyleAction.h>
 #include <openrct2/actions/scenery/LargeSceneryPlaceAction.h>
 #include <openrct2/actions/scenery/LargeSceneryRemoveAction.h>
 #include <openrct2/actions/scenery/LargeScenerySetColourAction.h>
 #include <openrct2/actions/scenery/SignSetNameAction.h>
+#include <openrct2/actions/scenery/SignSetStyleAction.h>
 #include <openrct2/actions/scenery/SmallSceneryPlaceAction.h>
 #include <openrct2/actions/scenery/SmallSceneryRemoveAction.h>
 #include <openrct2/actions/scenery/SmallScenerySetColourAction.h>
@@ -24,10 +27,12 @@
 #include <openrct2/actions/scenery/WallSetColourAction.h>
 #include <openrct2/drawing/Colour.h>
 #include <openrct2/localisation/Formatting.h>
+#include <openrct2/management/Research.h>
 #include <openrct2/object/BannerObject.h>
 #include <openrct2/object/LargeSceneryObject.h>
 #include <openrct2/object/ObjectEntryManager.h>
 #include <openrct2/object/ObjectLimits.h>
+#include <openrct2/object/SceneryGroupObject.h>
 #include <openrct2/object/SmallSceneryObject.h>
 #include <openrct2/object/WallObject.h>
 #include <openrct2/world/Banner.h>
@@ -42,6 +47,7 @@
 namespace OpenRCT2::Ui::Handheld::SceneryTools
 {
     static Settings current;
+    static ObjectEntryIndex groupFilter = kObjectEntryIndexNull;
     static std::optional<CoordsXY> lastTile;
     struct Request
     {
@@ -109,9 +115,51 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
             : c == Category::walls                  ? kMaxWallSceneryObjects
                                                     : kMaxBannerObjects;
         for (ObjectEntryIndex i = 0; i < count; ++i)
-            if (Eligible(c, i))
+            if (Eligible(c, i)
+                && (groupFilter == kObjectEntryIndexNull
+                    || (SceneryGroupIsInvented(groupFilter)
+                        && ObjectEntryManager::GetObjectEntry<SceneryGroupEntry>(groupFilter)
+                        && std::ranges::find(
+                               ObjectEntryManager::GetObjectEntry<SceneryGroupEntry>(groupFilter)->SceneryEntries,
+                               ScenerySelection{ SceneryType(c), i })
+                            != ObjectEntryManager::GetObjectEntry<SceneryGroupEntry>(groupFilter)->SceneryEntries.end())))
                 result.push_back({ { Type(c), i }, GetContext()->GetObjectManager().GetLoadedObject(Type(c), i)->GetName() });
         return result;
+    }
+    std::vector<Group> Groups(Category c)
+    {
+        std::vector<Group> result{ { kObjectEntryIndexNull, "All available objects" } };
+        for (ObjectEntryIndex i = 0; i < kMaxSceneryGroupObjects; ++i)
+        {
+            const auto* entry = ObjectEntryManager::GetObjectEntry<SceneryGroupEntry>(i);
+            const auto* object = GetContext()->GetObjectManager().GetLoadedObject(ObjectType::sceneryGroup, i);
+            if (!entry || !object || !SceneryGroupIsInvented(i))
+                continue;
+            if (std::ranges::any_of(entry->SceneryEntries, [c](auto selection) {
+                    return selection.SceneryType == SceneryType(c) && Eligible(c, selection.EntryIndex);
+                }))
+                result.push_back({ i, object->GetName() });
+        }
+        return result;
+    }
+    bool SetGroup(ObjectEntryIndex group)
+    {
+        const auto groups = Groups(current.category);
+        if (std::ranges::none_of(groups, [group](const auto& g) { return g.index == group; }))
+            return false;
+        ClearPreview();
+        groupFilter = group;
+        const auto entries = Entries(current.category);
+        if (std::ranges::none_of(entries, [](const auto& e) { return e.identity.index == current.object; }))
+            current.object = entries.empty() ? kObjectEntryIndexNull : entries.front().identity.index;
+        return true;
+    }
+    std::string GroupName()
+    {
+        for (const auto& g : Groups(current.category))
+            if (g.index == groupFilter)
+                return g.name;
+        return "Group unavailable";
     }
     std::array<bool, 3> Channels(Category c, ObjectEntryIndex i)
     {
@@ -154,6 +202,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     {
         ClearPreview();
         current.category = c;
+        groupFilter = kObjectEntryIndexNull;
         current.object = kObjectEntryIndexNull;
         current.mode = Mode::place;
         const auto list = Entries(c);
@@ -193,7 +242,9 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                  current.mode == Mode::place          ? "Mode: Place"
                      : current.mode == Mode::recolour ? "Mode: Recolour"
                                                       : "Mode: Remove",
-                 "Edit sign text..." };
+                 "Edit sign text...",
+                 "Filter scenery group...",
+                 "Edit sign style..." };
     }
     void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position)
     {
@@ -365,8 +416,15 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         }
         else
             return {};
+        if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject(Type(t.category), t.object))
+            t.descriptor = object->GetIdentifier();
         if (const auto* banner = GetBanner(t.banner))
+        {
             t.text = banner->text;
+            t.bannerFlags = banner->flags.holder;
+            t.textColour = static_cast<uint8_t>(banner->textColour);
+            t.linkedRide = banner->rideIndex;
+        }
         // Reject ambiguous native identities: normal small removal can match ghosts.
         if (Find(t, false) != e || Find(t, true))
             return {};
@@ -426,6 +484,77 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
             action = std::make_unique<GameActions::BannerSetNameAction>(t.banner, text);
         else
             action = std::make_unique<GameActions::SignSetNameAction>(t.banner, text);
+        return execute ? GameActions::Execute(action.get(), getGameState()) : GameActions::Query(action.get(), getGameState());
+    }
+    static bool Fresh(const Target& t)
+    {
+        auto* e = Find(t, false);
+        if (!e || Find(t, true))
+            return false;
+        InteractionInfo hit{};
+        hit.Loc = t.location;
+        hit.Element = e;
+        const auto fresh = Capture(hit);
+        return fresh && *fresh == t;
+    }
+    std::optional<StyleDraft> BeginStyle(const Target& t, Style style)
+    {
+        if (!Fresh(t) || t.banner == BannerIndex::GetNull())
+            return {};
+        const bool banner = t.category == Category::banners;
+        if (style == Style::noEntry && !banner)
+            return {};
+        const auto channels = Channels(t.category, t.object);
+        if (style == Style::mainColour && !channels[0])
+            return {};
+        if (style == Style::textColour && !banner && !channels[1])
+            return {};
+        uint8_t value = style == Style::noEntry ? !!(t.bannerFlags & 1)
+            : style == Style::textColour        ? (banner ? t.textColour : static_cast<uint8_t>(t.colours[1]))
+                                                : static_cast<uint8_t>(t.colours[0]);
+        return StyleDraft{ t, style, value };
+    }
+    void AdjustStyle(StyleDraft& d, int delta)
+    {
+        const int count = d.style == Style::noEntry                                  ? 2
+            : d.style == Style::textColour && d.target.category == Category::banners ? 14
+                                                                                     : 72;
+        d.value = (static_cast<int>(d.value) + delta % count + count) % count;
+    }
+    std::string StyleValue(const StyleDraft& d)
+    {
+        if (d.style == Style::noEntry)
+            return std::string("No entry: ") + (d.value ? "On" : "Off");
+        if (d.style == Style::textColour && d.target.category == Category::banners)
+        {
+            static constexpr const char* names[] = { "Black",     "Grey",       "White",      "Red",        "Green",
+                                                     "Yellow",    "Topaz",      "Celadon",    "Baby blue",  "Pale lavender",
+                                                     "Pale gold", "Light pink", "Pearl aqua", "Pale silver" };
+            return std::string("Text: ") + (d.value < 14 ? names[d.value] : "Invalid");
+        }
+        return std::string(d.style == Style::mainColour ? "Primary: " : "Text: ")
+            + ColourName(static_cast<Drawing::Colour>(d.value));
+    }
+    GameActions::Result ApplyStyle(const StyleDraft& d, bool execute)
+    {
+        const auto baseline = BeginStyle(d.target, d.style);
+        const int count = d.style == Style::noEntry                                  ? 2
+            : d.style == Style::textColour && d.target.category == Category::banners ? 14
+                                                                                     : 72;
+        if (!baseline || d.value >= count || baseline->value == d.value)
+            return Invalid("Sign changed or style unavailable");
+        std::unique_ptr<GameActions::GameAction> action;
+        if (d.target.category == Category::banners)
+            action = std::make_unique<GameActions::BannerSetStyleAction>(
+                d.style == Style::noEntry          ? GameActions::BannerSetStyleType::noEntry
+                    : d.style == Style::textColour ? GameActions::BannerSetStyleType::textColour
+                                                   : GameActions::BannerSetStyleType::primaryColour,
+                d.target.banner, d.value);
+        else
+            action = std::make_unique<GameActions::SignSetStyleAction>(
+                d.target.banner, d.style == Style::mainColour ? static_cast<Drawing::Colour>(d.value) : d.target.colours[0],
+                d.style == Style::textColour ? static_cast<Drawing::Colour>(d.value) : d.target.colours[1],
+                d.target.category == Category::large);
         return execute ? GameActions::Execute(action.get(), getGameState()) : GameActions::Query(action.get(), getGameState());
     }
     static void RemoveGhost()

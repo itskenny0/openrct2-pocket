@@ -263,3 +263,10 @@ Advanced milestone final validation: Release GUI/CLI, ten native/SDL suites, CTe
 512×384 fixture captures document the new workflows. Overall construction remains
 PARTIAL. Next highest-value subsystem: scenery/path construction parity and connected
 path recovery, preserving all ordinary gaps in the matrix and checkpoints.
+
+## Scenery/path parity follow-up
+
+SCENERY-PATH-PARITY-COMPLETION.md Phase 1 delivers researched loaded native scenery
+group filtering and guarded Cancel-first banner no-entry/text/primary style and
+scrolling sign channel controls. Four-category placement and trees are preserved.
+Scenery and Paths remain PARTIAL; later phases/gaps are recorded in that checkpoint.

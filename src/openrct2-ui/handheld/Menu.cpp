@@ -70,6 +70,10 @@ namespace OpenRCT2::Ui::Windows
         sceneryCategory,
         sceneryPicker,
         sceneryOptions,
+        sceneryGroups,
+        sceneryStyle,
+        sceneryStyleEditor,
+        sceneryStyleConfirm,
         areaOptions,
         rightsOptions,
         rightsConfirm,
@@ -243,6 +247,7 @@ namespace OpenRCT2::Ui::Windows
         bool _ridesBusy{};
         Handheld::TextEntry _nameEntry;
         std::optional<Handheld::SceneryTools::Target> _signTarget;
+        std::optional<Handheld::SceneryTools::StyleDraft> _signStyle;
         std::optional<Handheld::RightsTools::Draft> _rightsDraft;
         bool _rightsReviewResumed{};
         size_t _rideGraphMetric{}, _rideGraphOffset{};
@@ -584,7 +589,8 @@ namespace OpenRCT2::Ui::Windows
             return _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
                 || _page == Page::staffPatrolClear || _page == Page::rightsOptions || _page == Page::rightsConfirm
                 || _page == Page::areaOptions || _page == Page::sceneryOptions || _page == Page::sceneryName
-                || _page == Page::sceneryConfirm;
+                || _page == Page::sceneryConfirm || _page == Page::sceneryGroups || _page == Page::sceneryStyle
+                || _page == Page::sceneryStyleEditor || _page == Page::sceneryStyleConfirm;
         }
         void constructionMove(int x, int y)
         {
@@ -604,6 +610,8 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::RightsTools::Configure(_focus.index(), x);
             else if (x && _page == Page::areaOptions)
                 Handheld::AreaTools::Configure(_focus.index(), x);
+            else if (x && _page == Page::sceneryStyleEditor && _focus.index() == 0 && _signStyle)
+                Handheld::SceneryTools::AdjustStyle(*_signStyle, x);
             else if (x && _page == Page::sceneryOptions)
                 Handheld::SceneryTools::Configure(_focus.index(), x);
             invalidate();
@@ -879,6 +887,19 @@ namespace OpenRCT2::Ui::Windows
                     return _nameEntry.Keys();
                 case Page::sceneryConfirm:
                     return { "Apply text", "Cancel" };
+                case Page::sceneryGroups:
+                {
+                    std::vector<std::string> list;
+                    for (const auto& group : Handheld::SceneryTools::Groups(Handheld::SceneryTools::Current().category))
+                        list.push_back(group.name);
+                    return list;
+                }
+                case Page::sceneryStyle:
+                    return {"No entry...", "Text colour...", "Primary colour...", "Back"};
+                case Page::sceneryStyleEditor:
+                    return {_signStyle ? Handheld::SceneryTools::StyleValue(*_signStyle) : "Sign unavailable", "Review change", "Cancel"};
+                case Page::sceneryStyleConfirm:
+                    return {"Apply native style", "Cancel"};
                 case Page::sceneryOptions:
                     return Handheld::SceneryTools::Options();
                 case Page::sceneryPicker:
@@ -1074,6 +1095,11 @@ namespace OpenRCT2::Ui::Windows
         void openAreaOptions()
         {
             page(Page::areaOptions);
+        }
+        void openSceneryStyle(const Handheld::SceneryTools::Target& target)
+        {
+            _signTarget = target;
+            page(Page::sceneryStyle);
         }
         void openSceneryOptions()
         {
@@ -1593,6 +1619,16 @@ namespace OpenRCT2::Ui::Windows
                 case Page::sceneryConfirm:
                     page(Page::sceneryName);
                     break;
+                case Page::sceneryGroups:
+                case Page::sceneryStyle:
+                    page(Page::sceneryOptions);
+                    break;
+                case Page::sceneryStyleEditor:
+                    page(Page::sceneryStyle);
+                    break;
+                case Page::sceneryStyleConfirm:
+                    page(Page::sceneryStyleEditor);
+                    break;
                 case Page::sceneryOptions:
                     close();
                     break;
@@ -2069,8 +2105,53 @@ namespace OpenRCT2::Ui::Windows
                         }
                     }
                     break;
+                case Page::sceneryGroups:
+                {
+                    const auto groups = Handheld::SceneryTools::Groups(Handheld::SceneryTools::Current().category);
+                    if (choice < groups.size() && Handheld::SceneryTools::SetGroup(groups[choice].index))
+                    { page(Page::sceneryPicker); refreshPicker(); }
+                    else { _status = "Scenery group changed"; invalidate(); }
+                    break;
+                }
+                case Page::sceneryStyle:
+                    if (choice == 3) page(Page::sceneryOptions);
+                    else if (_signTarget)
+                    {
+                        _signStyle = Handheld::SceneryTools::BeginStyle(*_signTarget,
+                            choice == 0 ? Handheld::SceneryTools::Style::noEntry
+                            : choice == 1 ? Handheld::SceneryTools::Style::textColour : Handheld::SceneryTools::Style::mainColour);
+                        if (_signStyle) page(Page::sceneryStyleEditor);
+                        else { _status = "Style unavailable for this sign"; invalidate(); }
+                    }
+                    break;
+                case Page::sceneryStyleEditor:
+                    if (choice == 2) page(Page::sceneryStyle);
+                    else if (_signStyle && choice == 0) { Handheld::SceneryTools::AdjustStyle(*_signStyle, 1); invalidate(); }
+                    else if (_signStyle)
+                    {
+                        const auto result = Handheld::SceneryTools::ApplyStyle(*_signStyle, false);
+                        if (result.error == GameActions::Status::ok) { page(Page::sceneryStyleConfirm); _focus.move(1, 2); }
+                        else { _status = result.getErrorMessage(); invalidate(); }
+                    }
+                    break;
+                case Page::sceneryStyleConfirm:
+                    if (choice == 1) page(Page::sceneryStyleEditor);
+                    else if (_signStyle)
+                    {
+                        const auto result = Handheld::SceneryTools::ApplyStyle(*_signStyle, true);
+                        if (result.error == GameActions::Status::ok) { _signTarget.reset(); _signStyle.reset(); page(Page::sceneryOptions); }
+                        else { _status = result.getErrorMessage(); invalidate(); }
+                    }
+                    break;
                 case Page::sceneryOptions:
-                    if (choice == 11)
+                    if (choice == 12) page(Page::sceneryGroups);
+                    else if (choice == 13)
+                    {
+                        _signTarget = Handheld::SceneryEditTarget();
+                        if (_signTarget && _signTarget->banner != BannerIndex::GetNull()) page(Page::sceneryStyle);
+                        else { _status = "Point at a banner or sign"; invalidate(); }
+                    }
+                    else if (choice == 11)
                     {
                         _signTarget = Handheld::SceneryEditTarget();
                         if (_signTarget && _signTarget->banner != BannerIndex::GetNull())
@@ -3808,6 +3889,17 @@ namespace OpenRCT2::Ui::Windows
                     Handheld::RightsTools::Presentation(*_rightsDraft, _focus.index(), _status));
                 return;
             }
+            if (_page == Page::sceneryStyleEditor || _page == Page::sceneryStyleConfirm)
+            {
+                Handheld::ManagementPresentation model;
+                model.breadcrumb = "Scenery / Sign style";
+                model.title = _signStyle ? Handheld::SceneryTools::StyleValue(*_signStyle) : "Sign unavailable";
+                model.rows = rows(); model.selected = _focus.index();
+                model.confirmation = _page == Page::sceneryStyleConfirm;
+                model.status = _status.empty() ? "Native style / no construction charge" : _status;
+                Handheld::DrawManagementPanel(rt, {ContextGetWidth(), ContextGetHeight()}, model);
+                return;
+            }
             if (_page == Page::sceneryName || _page == Page::sceneryConfirm)
             {
                 Handheld::ManagementPresentation model;
@@ -3832,7 +3924,8 @@ namespace OpenRCT2::Ui::Windows
             {
                 Handheld::DrawObjectPicker(
                     rt, { ContextGetWidth(), ContextGetHeight() }, _picker,
-                    Handheld::SceneryTools::CategoryName(Handheld::SceneryTools::Current().category), _status);
+                    Handheld::SceneryTools::CategoryName(Handheld::SceneryTools::Current().category),
+                    _status.empty() ? Handheld::SceneryTools::GroupName() : _status);
                 return;
             }
             if (_page == Page::treePicker)
@@ -3896,6 +3989,12 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::areaOptions:
                     title = "AREA BRUSH OPTIONS";
+                    break;
+                case Page::sceneryGroups:
+                    title = "SCENERY GROUP";
+                    break;
+                case Page::sceneryStyle:
+                    title = "SIGN STYLE";
                     break;
                 case Page::sceneryCategory:
                     title = "SCENERY CATEGORY";
@@ -4170,6 +4269,10 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* w = OpenPanel())
             w->openAreaOptions();
+    }
+    void HandheldSceneryStyleOpen(const Handheld::SceneryTools::Target& target)
+    {
+        if (auto* window = OpenPanel()) window->openSceneryStyle(target);
     }
     void HandheldSceneryOptionsOpen()
     {
