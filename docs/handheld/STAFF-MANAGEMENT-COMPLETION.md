@@ -149,3 +149,16 @@ collision was found. The capture fixture annotation initially overlapped the pat
 HUD; it was moved outside the HUD and those captures regenerated. Original-sprite
 patrol overlays, animation, live workload effectiveness, AArch64 and physical Brick
 remain unverified. Captures ship as OpenRCT2-Pocket-Staff-Captures.zip with a manifest.
+
+Published capture/validation source: `beec27c221bbd508ded6e2dc117cd2d803ab3756`.
+The fifteen PNGs and ZIP were saved as downloadable deliverables. ZIP integrity and
+all PNG dimensions were verified; ZIP SHA-256:
+`b3818dc8d64d8db6bc0a78512f200816b78913592c726c3b9af2af7408c11fcf`.
+Local safety commits are retained independently of equivalent canonical GitHub
+commits; each published tree was checked for exact equality before a guarded
+fast-forward branch update. The unrelated Esperanto edit remains uncommitted.
+
+Next recommended milestone: Guest Management and Peep Placement Completion.
+Native guest grouping/filtering, supported naming/tracking and shared guest/staff
+pickup/repositioning close meaningful remaining ordinary-play gaps without
+repeating delivered staff roles, patrol, wages, uniforms or naming.
