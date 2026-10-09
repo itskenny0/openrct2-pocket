@@ -7,6 +7,7 @@
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/Hud.h>
 #include <openrct2-ui/handheld/RideManagement.h>
+#include <openrct2-ui/handheld/SceneryTools.h>
 #include <openrct2-ui/handheld/Shops.h>
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
@@ -529,6 +530,27 @@ int main(int argc, char** argv)
         state.park.flags.set(ParkFlag::noMoney, originalNoMoney);
         Require(state.park.cash == cash, "Shop keyboard fixture changed accounting");
         std::cout << "SDL shop keyboard / rail handoff / typing-cancel passed" << std::endl;
+        auto* wallObject = objects.LoadObject("rct2.scenery_wall.wbrg");
+        Require(wallObject, "Scenery SDL wall fixture missing");
+        ScenerySetInvented({ SCENERY_TYPE_WALL, objects.GetLoadedObjectEntryIndex(wallObject) });
+        W::HandheldBuildOpen();
+        W::HandheldMenuMove(10);
+        press(H::Action::confirm);
+        Require(!W::HandheldObjectPickerIsOpen(), "Duplicate A skipped scenery category");
+        W::HandheldMenuMove(2);
+        press(H::Action::confirm);
+        Require(W::HandheldObjectPickerIsOpen(), "Scenery category failed to open picker");
+        press(H::Action::confirm);
+        Require(H::IsSceneryToolActive() && !W::HandheldObjectPickerIsOpen(), "Scenery selection failed to return to park");
+        W::HandheldSceneryOptionsOpen();
+        const auto wallDirection = H::SceneryTools::Current().direction;
+        W::HandheldMenuMove(2);
+        press(H::Action::confirm);
+        Require(H::SceneryTools::Current().direction == (wallDirection + 1) % 4, "Duplicate A rotated scenery twice");
+        press(H::Action::back);
+        Require(H::IsSceneryToolActive(), "Scenery options cancel lost tool");
+        H::EndTerrain();
+        std::cout << "SDL scenery category / picker / duplicate A / options-return passed" << std::endl;
         SaveFlags flags{};
         const auto save = std::string(argv[2]) + "/hud-lifecycle.park";
         Require(ScenarioSave(state, save, flags), "HUD fixture save failed");

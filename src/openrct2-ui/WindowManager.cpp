@@ -15,6 +15,7 @@
 #include "handheld/MarketingManagement.h"
 #include "handheld/Paths.h"
 #include "handheld/RideManagement.h"
+#include "handheld/SceneryTools.h"
 #include "handheld/Shops.h"
 #include "handheld/Trees.h"
 #include "interface/Chat.h"
@@ -1157,6 +1158,7 @@ public:
     {
         Handheld::Paths::ClearPreview();
         Handheld::Trees::ClearPreview();
+        Handheld::SceneryTools::ClearPreview();
         Handheld::Shops::ClearPreview();
         Handheld::FlatRides::ClearPreview();
         CloseByClass(WindowClass::rideConstruction);

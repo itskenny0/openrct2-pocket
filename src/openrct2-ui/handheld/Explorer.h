@@ -5,6 +5,7 @@
 
 #pragma once
 #include "RideManagement.h"
+#include "SceneryTools.h"
 
 #include <cstddef>
 #include <openrct2/Identifiers.h>
@@ -29,6 +30,9 @@ namespace OpenRCT2::Ui::Handheld
     void BeginWater(bool raise = true);
     void BeginSurface();
     void BeginTrees();
+    void BeginScenery();
+    bool IsSceneryToolActive();
+    std::optional<SceneryTools::Target> SceneryEditTarget();
     bool BeginCustomTrack(ObjectEntryIndex index);
     bool ResumeCustomTrack(RideId id);
     bool BeginFlatRide(ObjectEntryIndex index);
@@ -77,6 +81,9 @@ namespace OpenRCT2::Ui::Windows
     void HandheldShopManagementPause();
     void HandheldPathOptionsOpen();
     void HandheldTreePickerOpen();
+    void HandheldSceneryOptionsOpen();
+    bool HandheldConstructionMenuIsOpen();
+    void HandheldConstructionMove(int x, int y);
     void HandheldShopPickerOpen();
     void HandheldRidePickerOpen();
     void HandheldDesignPickerOpen();

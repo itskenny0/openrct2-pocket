@@ -85,7 +85,8 @@ namespace OpenRCT2::GameActions
 
             auto currentTile = CoordsXYZ{ firstTile.x, firstTile.y, firstTile.z } + currentTileRotatedOffset;
 
-            if (gLegacyScene != LegacyScene::scenarioEditor && !gameState.cheats.sandboxMode)
+            if (gLegacyScene != LegacyScene::scenarioEditor && !GetFlags().has(CommandFlag::ghost)
+                && !gameState.cheats.sandboxMode)
             {
                 if (park.flags.has(ParkFlag::forbidTreeRemoval))
                 {
@@ -164,7 +165,8 @@ namespace OpenRCT2::GameActions
 
             auto currentTile = CoordsXYZ{ firstTile.x, firstTile.y, firstTile.z } + rotatedCurrentTile;
 
-            if (gLegacyScene != LegacyScene::scenarioEditor && !gameState.cheats.sandboxMode)
+            if (gLegacyScene != LegacyScene::scenarioEditor && !GetFlags().has(CommandFlag::ghost)
+                && !gameState.cheats.sandboxMode)
             {
                 if (!MapIsLocationOwned({ currentTile.x, currentTile.y, currentTile.z }))
                 {

@@ -16,6 +16,7 @@
 #include "RideAccess.h"
 #include "RideManagement.h"
 #include "SaveSlots.h"
+#include "SceneryTools.h"
 #include "ShopManagement.h"
 #include "Shops.h"
 #include "StaffManagement.h"
@@ -57,6 +58,11 @@ namespace OpenRCT2::Ui::Windows
         paths,
         pathOptions,
         treePicker,
+        sceneryCategory,
+        sceneryPicker,
+        sceneryOptions,
+        sceneryName,
+        sceneryConfirm,
         shopPicker,
         ridePicker,
         designPicker,
@@ -192,6 +198,7 @@ namespace OpenRCT2::Ui::Windows
         size_t _ridesRosterFocus{};
         bool _ridesBusy{};
         Handheld::TextEntry _nameEntry;
+        std::optional<Handheld::SceneryTools::Target> _signTarget;
         size_t _rideGraphMetric{}, _rideGraphOffset{};
         bool _ridesReviewResumed{};
         uint64_t _ridesRequest{};
@@ -380,6 +387,26 @@ namespace OpenRCT2::Ui::Windows
             return Handheld::FormatMoney(value);
         }
 
+    public:
+        bool constructionMenu() const
+        {
+            return _page == Page::sceneryOptions || _page == Page::sceneryName || _page == Page::sceneryConfirm;
+        }
+        void constructionMove(int x, int y)
+        {
+            if (_page == Page::sceneryName)
+            {
+                const auto next = _nameEntry.Move(_focus.index(), x, y);
+                _focus.move(static_cast<int>(next) - static_cast<int>(_focus.index()), rows().size());
+            }
+            else if (y)
+                move(y);
+            else if (x && _page == Page::sceneryOptions)
+                Handheld::SceneryTools::Configure(_focus.index(), x);
+            invalidate();
+        }
+
+    private:
         void layout()
         {
             const auto size = Handheld::OverlaySize(std::min<size_t>(8, rows().size()));
@@ -387,14 +414,16 @@ namespace OpenRCT2::Ui::Windows
             const ScreenSize target{ _page == Page::overwrite || _page == Page::discard || _page == Page::exit ? 330
                                                                                                                : size.width,
                                      size.height };
-            const ScreenSize bounds = (_page == Page::pathOptions || picker() || shopManagement() || managementShell())
+            const ScreenSize bounds = (_page == Page::sceneryName || _page == Page::sceneryConfirm || _page == Page::pathOptions
+                                       || picker() || shopManagement() || managementShell())
                 ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
                 : information() ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 }
                                 : target;
             WindowSetResize(*this, bounds, bounds);
             WindowSetPosition(
                 *this,
-                (_page == Page::pathOptions || picker() || shopManagement() || managementShell())
+                (_page == Page::sceneryName || _page == Page::sceneryConfirm || _page == Page::pathOptions || picker()
+                 || shopManagement() || managementShell())
                     ? ScreenCoordsXY{ 0, 0 }
                     : ScreenCoordsXY{ 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
         }
@@ -572,8 +601,18 @@ namespace OpenRCT2::Ui::Windows
                 case Page::customChoice:
                     return { "Custom build", "Saved designs...", "Back" };
                 case Page::build:
-                    return { "Raise land", "Lower land",         "Paths", "Water",          "Surface",     "Remove scenery",
-                             "Trees",      "Shops / Facilities", "Rides", "Wooden designs", "Back to park" };
+                    return { "Raise land", "Lower land",         "Paths", "Water",          "Surface",    "Remove scenery",
+                             "Trees",      "Shops / Facilities", "Rides", "Wooden designs", "Scenery...", "Back to park" };
+                case Page::sceneryCategory:
+                    return { "Small scenery / trees", "Large scenery", "Walls / fences", "Banners / signs", "Back to build" };
+                case Page::sceneryName:
+                    return _nameEntry.Keys();
+                case Page::sceneryConfirm:
+                    return { "Apply text", "Cancel" };
+                case Page::sceneryOptions:
+                    return Handheld::SceneryTools::Options();
+                case Page::sceneryPicker:
+                    return {};
                 case Page::designConfirm:
                     return { "Cancel", "Place design" };
                 case Page::trackPiecePicker:
@@ -676,6 +715,7 @@ namespace OpenRCT2::Ui::Windows
         {
             Handheld::Paths::ClearPreview();
             Handheld::Trees::ClearPreview();
+            Handheld::SceneryTools::ClearPreview();
             Handheld::Shops::ClearPreview();
             Handheld::FlatRides::ClearPreview();
             Handheld::Designs::ClearPreview();
@@ -718,12 +758,17 @@ namespace OpenRCT2::Ui::Windows
             auto custom = Handheld::CustomTracks::RideEntries();
             rideEntries.insert(rideEntries.end(), custom.begin(), custom.end());
             _picker.setEntries(
-                _page == Page::trackPiecePicker   ? Handheld::CustomTracks::Pieces()
-                    : _page == Page::designPicker ? Handheld::Designs::Entries()
-                    : _page == Page::ridePicker   ? rideEntries
-                    : _page == Page::shopPicker   ? Handheld::Shops::Entries()
-                                                  : Handheld::TreePickerEntries(),
+                _page == Page::trackPiecePicker    ? Handheld::CustomTracks::Pieces()
+                    : _page == Page::designPicker  ? Handheld::Designs::Entries()
+                    : _page == Page::ridePicker    ? rideEntries
+                    : _page == Page::shopPicker    ? Handheld::Shops::Entries()
+                    : _page == Page::sceneryPicker ? Handheld::SceneryTools::Entries(Handheld::SceneryTools::Current().category)
+                                                   : Handheld::TreePickerEntries(),
                 preferred);
+        }
+        void openSceneryOptions()
+        {
+            page(Page::sceneryOptions);
         }
         void openTreePicker()
         {
@@ -779,8 +824,8 @@ namespace OpenRCT2::Ui::Windows
         }
         bool picker() const
         {
-            return _page == Page::trackPiecePicker || _page == Page::designPicker || _page == Page::treePicker
-                || _page == Page::shopPicker || _page == Page::ridePicker;
+            return _page == Page::sceneryPicker || _page == Page::trackPiecePicker || _page == Page::designPicker
+                || _page == Page::treePicker || _page == Page::shopPicker || _page == Page::ridePicker;
         }
         bool treePicker() const
         {
@@ -1135,6 +1180,21 @@ namespace OpenRCT2::Ui::Windows
         {
             switch (_page)
             {
+                case Page::sceneryCategory:
+                    page(Page::build);
+                    break;
+                case Page::sceneryPicker:
+                    page(Page::sceneryOptions);
+                    break;
+                case Page::sceneryName:
+                    page(Page::sceneryOptions);
+                    break;
+                case Page::sceneryConfirm:
+                    page(Page::sceneryName);
+                    break;
+                case Page::sceneryOptions:
+                    close();
+                    break;
                 case Page::dashboard:
                     close();
                     break;
@@ -1446,8 +1506,99 @@ namespace OpenRCT2::Ui::Windows
                             break;
                     }
                     break;
+                case Page::sceneryCategory:
+                    if (choice == 4)
+                        page(Page::build);
+                    else
+                    {
+                        Handheld::SceneryTools::SelectCategory(static_cast<Handheld::SceneryTools::Category>(choice));
+                        page(Page::sceneryPicker);
+                        refreshPicker();
+                    }
+                    break;
+                case Page::sceneryPicker:
+                    if (_picker.selected() && Handheld::SceneryTools::Select(_picker.selected()->identity.index))
+                    {
+                        close();
+                        if (!Handheld::IsSceneryToolActive())
+                            Handheld::BeginScenery();
+                    }
+                    else
+                    {
+                        refreshPicker();
+                        _status = "Scenery unavailable";
+                    }
+                    break;
+                case Page::sceneryName:
+                    if (choice == 47)
+                        page(Page::sceneryOptions);
+                    else if (choice == 46 && _signTarget)
+                    {
+                        const auto query = Handheld::SceneryTools::SetText(*_signTarget, _nameEntry.text, false);
+                        if (query.error == GameActions::Status::ok)
+                        {
+                            page(Page::sceneryConfirm);
+                            _focus.move(1, 2);
+                        }
+                        else
+                        {
+                            _status = query.getErrorMessage();
+                            invalidate();
+                        }
+                    }
+                    else
+                    {
+                        _nameEntry.Press(choice);
+                        invalidate();
+                    }
+                    break;
+                case Page::sceneryConfirm:
+                    if (choice == 1)
+                        page(Page::sceneryName);
+                    else if (_signTarget)
+                    {
+                        const auto result = Handheld::SceneryTools::SetText(*_signTarget, _nameEntry.text, true);
+                        if (result.error == GameActions::Status::ok)
+                            page(Page::sceneryOptions);
+                        else
+                        {
+                            _status = result.getErrorMessage();
+                            invalidate();
+                        }
+                    }
+                    break;
+                case Page::sceneryOptions:
+                    if (choice == 11)
+                    {
+                        _signTarget = Handheld::SceneryEditTarget();
+                        if (_signTarget && _signTarget->banner != BannerIndex::GetNull())
+                        {
+                            _nameEntry = { _signTarget->text };
+                            page(Page::sceneryName);
+                        }
+                        else
+                        {
+                            _status = "Point at a banner or sign";
+                            invalidate();
+                        }
+                    }
+                    else if (choice == 0)
+                        close();
+                    else if (choice == 1)
+                    {
+                        page(Page::sceneryPicker);
+                        refreshPicker();
+                    }
+                    else
+                    {
+                        Handheld::SceneryTools::Configure(choice);
+                        invalidate();
+                    }
+                    break;
                 case Page::build:
-                    if (choice == 9)
+                    if (choice == 10)
+                        page(Page::sceneryCategory);
+                    else if (choice == 9)
                         openDesignPicker(true);
                     else if (choice == 8)
                         openRidePicker(true);
@@ -2571,6 +2722,29 @@ namespace OpenRCT2::Ui::Windows
                     "No shops available");
                 return;
             }
+            if (_page == Page::sceneryName || _page == Page::sceneryConfirm)
+            {
+                Handheld::ManagementPresentation model;
+                model.breadcrumb = "Scenery / Sign text";
+                model.title = _nameEntry.text.empty() ? "Empty text" : _nameEntry.text;
+                model.rows = rows();
+                model.selected = _focus.index();
+                model.columns = _page == Page::sceneryName ? Handheld::TextEntry::columns : 1;
+                model.confirmation = _page == Page::sceneryConfirm;
+                model.status = _status.empty() ? "32 characters / native sign action" : _status;
+                Handheld::DrawManagementContent(
+                    rt, Handheld::Concept::kMenuOrigin,
+                    { 324, Handheld::Layout::ContentHeight({ ContextGetWidth(), ContextGetHeight() }) }, model);
+                Handheld::DrawActionStrip(rt, { ContextGetWidth(), ContextGetHeight() });
+                return;
+            }
+            if (_page == Page::sceneryPicker)
+            {
+                Handheld::DrawObjectPicker(
+                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker,
+                    Handheld::SceneryTools::CategoryName(Handheld::SceneryTools::Current().category), _status);
+                return;
+            }
             if (_page == Page::treePicker)
             {
                 Handheld::DrawObjectPicker(
@@ -2616,6 +2790,12 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::designConfirm:
                     title = "PLACE DESIGN?";
+                    break;
+                case Page::sceneryCategory:
+                    title = "SCENERY CATEGORY";
+                    break;
+                case Page::sceneryOptions:
+                    title = "SCENERY OPTIONS";
                     break;
                 case Page::build:
                     title = "BUILD";
@@ -2854,6 +3034,21 @@ namespace OpenRCT2::Ui::Windows
         return window && static_cast<const HandheldMenuWindow*>(window)->picker()
             ? static_cast<const HandheldMenuWindow*>(window)->pickerFocus()
             : kObjectEntryIndexNull;
+    }
+    bool HandheldConstructionMenuIsOpen()
+    {
+        const auto* w = static_cast<HandheldMenuWindow*>(GetWindowManager()->FindByClass(WindowClass::handheldMenu));
+        return w && w->constructionMenu();
+    }
+    void HandheldConstructionMove(int x, int y)
+    {
+        if (auto* w = static_cast<HandheldMenuWindow*>(GetWindowManager()->FindByClass(WindowClass::handheldMenu)))
+            w->constructionMove(x, y);
+    }
+    void HandheldSceneryOptionsOpen()
+    {
+        if (auto* window = OpenPanel())
+            window->openSceneryOptions();
     }
     void HandheldTreePickerOpen()
     {

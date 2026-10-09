@@ -13,6 +13,7 @@
 #include "handheld/Designs.h"
 #include "handheld/FlatRides.h"
 #include "handheld/Paths.h"
+#include "handheld/SceneryTools.h"
 #include "handheld/Shops.h"
 #include "handheld/Trees.h"
 
@@ -36,6 +37,7 @@ namespace OpenRCT2::Ui
         Handheld::Shops::RemovePreviewTemporarily();
         Handheld::FlatRides::RemovePreviewTemporarily();
         Handheld::Trees::RemovePreviewTemporarily();
+        Handheld::SceneryTools::RemovePreviewTemporarily();
         Handheld::Paths::RemovePreviewTemporarily();
         FootpathRemoveProvisionalTemporarily();
 
@@ -60,6 +62,7 @@ namespace OpenRCT2::Ui
         FootpathRestoreProvisional();
         Handheld::Paths::RestorePreview();
         Handheld::Trees::RestorePreview();
+        Handheld::SceneryTools::RestorePreview();
         Handheld::Shops::RestorePreview();
         Handheld::FlatRides::RestorePreview();
         Handheld::Designs::RestorePreview();
