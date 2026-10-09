@@ -188,8 +188,8 @@ Published phase commits:
 3. Rights: `42a59570179f561aa097f23fbb905feb451490c9`.
 4. Furniture/connected paths: `0c769bb19eadd1e9e2474070836f9932fa82431b`.
 
-The final capture/UI source checkpoint is recorded by the subsequent publication
-note; the branch may have a newer documentation-only HEAD. Local safety commits
+Final validated capture/UI source checkpoint:
+`03451b3bd597200d7a0b54c841e40e4ffadb74e0`. The branch may have a newer documentation-only HEAD. Local safety commits
 are retained and publication trees were checked byte-for-byte against their local
 Git trees before guarded fast-forward branch updates. Esperanto remains local.
 
