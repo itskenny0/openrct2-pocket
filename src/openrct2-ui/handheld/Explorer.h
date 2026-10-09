@@ -32,6 +32,7 @@ namespace OpenRCT2::Ui::Handheld
     void BeginTrees();
     void BeginScenery();
     void BeginAreaTools();
+    void BeginRightsTools();
     bool IsSceneryToolActive();
     std::optional<SceneryTools::Target> SceneryEditTarget();
     bool BeginCustomTrack(ObjectEntryIndex index);
@@ -84,6 +85,8 @@ namespace OpenRCT2::Ui::Windows
     void HandheldTreePickerOpen();
     void HandheldSceneryOptionsOpen();
     void HandheldAreaOptionsOpen();
+    void HandheldRightsOptionsOpen();
+    void HandheldRightsReviewOpen(CoordsXY tile);
     bool HandheldConstructionMenuIsOpen();
     void HandheldConstructionMove(int x, int y);
     void HandheldShopPickerOpen();

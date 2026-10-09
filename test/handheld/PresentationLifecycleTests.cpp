@@ -8,6 +8,7 @@
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/Hud.h>
 #include <openrct2-ui/handheld/RideManagement.h>
+#include <openrct2-ui/handheld/RightsTools.h>
 #include <openrct2-ui/handheld/SceneryTools.h>
 #include <openrct2-ui/handheld/Shops.h>
 #include <openrct2-ui/interface/Window.h>
@@ -563,6 +564,28 @@ int main(int argc, char** argv)
         press(H::Action::back);
         H::EndTerrain();
         std::cout << "SDL area brush / duplicate A / bounded adjustment / return passed" << std::endl;
+        const CoordsXY rightsTile{ 352, 352 };
+        MapGetSurfaceElementAt(rightsTile)->setOwnership({ OwnershipFlag::landForSale });
+        const auto rightsCash = state.park.cash;
+        state.park.flags.set(ParkFlag::noMoney);
+        H::RightsTools::settings = {};
+        H::BeginRightsTools();
+        W::HandheldRightsReviewOpen(rightsTile);
+        Require(W::HandheldConstructionMenuIsOpen() && GameIsNotPaused(), "Rights review blocked by owned menu pause");
+        press(H::Action::confirm);
+        Require(
+            state.park.cash == rightsCash && !MapGetSurfaceElementAt(rightsTile)->hasOwnership(OwnershipFlag::landOwned),
+            "Rights review not Cancel-first");
+        W::HandheldRightsReviewOpen(rightsTile);
+        W::HandheldMenuMove(-1);
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Require(MapGetSurfaceElementAt(rightsTile)->hasOwnership(OwnershipFlag::landOwned), "SDL rights confirmation failed");
+        // Reversible UI fixture finishes with original cash via no-money native purchase.
+        state.park.flags.set(ParkFlag::noMoney, originalNoMoney);
+        Require(state.park.cash == rightsCash, "SDL rights no-money accounting differs");
+        H::EndTerrain();
+        std::cout << "SDL land review / owned-pause handoff / Cancel-first / single native confirmation passed" << std::endl;
         SaveFlags flags{};
         const auto save = std::string(argv[2]) + "/hud-lifecycle.park";
         Require(ScenarioSave(state, save, flags), "HUD fixture save failed");

@@ -16,6 +16,7 @@
 #include "Panel.h"
 #include "Paths.h"
 #include "RideAccess.h"
+#include "RightsTools.h"
 #include "SceneryRemoval.h"
 #include "SceneryTools.h"
 #include "ShopManagement.h"
@@ -65,6 +66,7 @@ namespace OpenRCT2::Ui::Handheld
     static bool _sceneryRemovalTool{};
     static bool _sceneryTool{};
     static bool _areaTool{};
+    static bool _rightsTool{};
     static std::optional<SceneryTools::Target> _sceneryEdit;
     static std::optional<RideManagement::Target> _colourRide;
     static std::optional<RideManagement::PaintTarget> _colourTarget;
@@ -115,6 +117,7 @@ namespace OpenRCT2::Ui::Handheld
         _sceneryRemovalTool = false;
         _sceneryTool = false;
         _areaTool = false;
+        _rightsTool = false;
         _sceneryEdit.reset();
         _sceneryTarget.reset();
         _surfaceIndex = kObjectEntryIndexNull;
@@ -135,6 +138,11 @@ namespace OpenRCT2::Ui::Handheld
         _surfaceIndex = Surface::Next(kObjectEntryIndexNull);
     }
 
+    void BeginRightsTools()
+    {
+        BeginTerrain(true);
+        _rightsTool = true;
+    }
     void BeginAreaTools()
     {
         BeginTerrain(true);
@@ -308,6 +316,7 @@ namespace OpenRCT2::Ui::Handheld
         _sceneryRemovalTool = false;
         _sceneryTool = false;
         _areaTool = false;
+        _rightsTool = false;
         _sceneryEdit.reset();
         _sceneryTarget.reset();
         _surfaceIndex = kObjectEntryIndexNull;
@@ -324,6 +333,8 @@ namespace OpenRCT2::Ui::Handheld
             return Designs::Query(_terrainTile);
         if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
             return FlatRides::Action(_terrainTile, execute);
+        if (_rightsTool)
+            return RightsTools::Query(_terrainTile, RightsTools::settings);
         if (_areaTool)
             return AreaTools::Action(_terrainTile, AreaTools::settings, execute);
         if (_sceneryTool)
@@ -642,6 +653,17 @@ namespace OpenRCT2::Ui::Handheld
                 _terrainTile = CoordsXY{ coords->x & ~31, coords->y & ~31 };
                 gMapSelectPositionA = gMapSelectPositionB = *_terrainTile;
                 gMapSelectType = MapSelectType::full;
+                if (_rightsTool)
+                {
+                    const auto r = AreaTools::Range(_terrainTile, RightsTools::settings.width, RightsTools::settings.height);
+                    if (!r)
+                        _terrainTile.reset();
+                    else
+                    {
+                        gMapSelectPositionA = { r->getX1(), r->getY1() };
+                        gMapSelectPositionB = { r->getX2(), r->getY2() };
+                    }
+                }
                 if (_areaTool)
                 {
                     const auto range = AreaTools::Range(_terrainTile, AreaTools::settings.width, AreaTools::settings.height);
@@ -864,6 +886,8 @@ namespace OpenRCT2::Ui::Handheld
                     Designs::Rotate();
                 else if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
                     FlatRides::Rotate();
+                else if (_rightsTool)
+                    Windows::HandheldRightsOptionsOpen();
                 else if (_areaTool)
                     Windows::HandheldAreaOptionsOpen();
                 else if (_sceneryTool)
@@ -889,6 +913,8 @@ namespace OpenRCT2::Ui::Handheld
                             _terrainStatus = result.error == GameActions::Status::ok ? "Path change requested."
                                                                                      : result.getErrorMessage();
                         }
+                        else if (_rightsTool && _terrainTile)
+                            Windows::HandheldRightsReviewOpen(*_terrainTile);
                         else if (_terrainActive)
                         {
                             if (_terrainTile)
@@ -961,6 +987,8 @@ namespace OpenRCT2::Ui::Handheld
                                 break;
                             else if (_shopTool)
                                 Windows::HandheldShopPickerOpen();
+                            else if (_rightsTool)
+                                Windows::HandheldRightsOptionsOpen();
                             else if (_areaTool)
                                 Windows::HandheldAreaOptionsOpen();
                             else if (_sceneryTool)
@@ -1086,6 +1114,12 @@ namespace OpenRCT2::Ui::Handheld
                     FlatRides::DrawPanel(rt, { ContextGetWidth(), height });
                 else if (_shopTool)
                     DrawShopOverlay(rt, Concept::kOrigin, Shops::Name(_shopIndex), Shops::Eligible(_shopIndex), _shopDirection);
+                else if (_rightsTool)
+                    DrawConstructionOverlay(
+                        rt, Concept::kOrigin, "Land / Rights", RightsTools::Kind(RightsTools::settings.construction),
+                        "A: Purchase review", RightsTools::Summary(_terrainTile, RightsTools::settings),
+                        std::to_string(RightsTools::settings.width) + " x " + std::to_string(RightsTools::settings.height)
+                            + " tiles");
                 else if (_areaTool)
                     DrawConstructionOverlay(
                         rt, Concept::kOrigin, "Terrain / Water",
@@ -1119,6 +1153,8 @@ namespace OpenRCT2::Ui::Handheld
             }
             else if (_shopTool)
                 DrawShopFooter(rt, { ContextGetWidth(), height });
+            else if (_rightsTool)
+                DrawConstructionFooter(rt, { ContextGetWidth(), height }, "Review", "Options");
             else if (_areaTool)
                 DrawConstructionFooter(rt, { ContextGetWidth(), height }, "Apply", "Brush");
             else if (_sceneryTool)

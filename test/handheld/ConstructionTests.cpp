@@ -2,6 +2,7 @@
 // Public object metadata/native park fixture. No original sprites or live coaster assets.
 #include <iostream>
 #include <openrct2-ui/handheld/AreaTools.h>
+#include <openrct2-ui/handheld/RightsTools.h>
 #include <openrct2-ui/handheld/SceneryTools.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
@@ -277,6 +278,64 @@ int main(int argc, char** argv)
             "Area persistence differs");
         std::cout << "Native area terrain / mixed heights / smoothing / corner-edge / water / style-footprint / "
                      "bounds-ownership-funds / cash-persistence passed\n";
+        namespace R = Ui::Handheld::RightsTools;
+        const CoordsXY rightsTile{ 160, 736 };
+        R::Settings rs;
+        rs.width = 2;
+        MapGetSurfaceElementAt(rightsTile)->setOwnership({ OwnershipFlag::landForSale });
+        MapGetSurfaceElementAt(rightsTile + CoordsXY{ 32, 0 })->setOwnership({});
+        const auto rightsCash = state.park.cash;
+        const auto draft = R::Begin(rightsTile, rs);
+        Require(draft.has_value(), "Land purchase review missing");
+        Require(
+            R::Count(*Ui::Handheld::AreaTools::Range(rightsTile, 2, 1), false).available == 1
+                && R::Count(*Ui::Handheld::AreaTools::Range(rightsTile, 2, 1), false).unavailable == 1,
+            "Land availability inspection differs");
+        Require(
+            R::Action(*draft, false).error == GameActions::Status::ok && state.park.cash == rightsCash
+                && !MapGetSurfaceElementAt(rightsTile)->hasOwnership(OwnershipFlag::landOwned),
+            "Land cancellation/query mutated ownership/cash");
+        state.scenarioOptions.landPrice += 10;
+        Require(R::Action(*draft, true).error != GameActions::Status::ok, "Stale land price accepted");
+        state.scenarioOptions.landPrice -= 10;
+        MapGetSurfaceElementAt(rightsTile)->setOwnership({});
+        Require(R::Action(*draft, true).error != GameActions::Status::ok, "Stale land availability accepted");
+        MapGetSurfaceElementAt(rightsTile)->setOwnership({ OwnershipFlag::landForSale });
+        state.park.cash = 0;
+        Require(!R::Begin(rightsTile, rs), "Land funds bypassed");
+        state.park.cash = rightsCash;
+        Require(R::Action(*draft, true).error == GameActions::Status::ok, "Land native purchase failed");
+        GameActions::ProcessQueue(state);
+        Require(
+            MapGetSurfaceElementAt(rightsTile)->hasOwnership(OwnershipFlag::landOwned)
+                && MapGetSurfaceElementAt(rightsTile + CoordsXY{ 32, 0 })->getOwnership().isEmpty()
+                && state.park.cash == rightsCash - draft->cost && R::Action(*draft, true).error != GameActions::Status::ok,
+            "Land native ownership/accounting/repeat differs");
+        const CoordsXY constructionTile{ 256, 736 };
+        MapGetSurfaceElementAt(constructionTile)->setOwnership({ OwnershipFlag::constructionRightsForSale });
+        rs.width = 1;
+        rs.construction = true;
+        const auto cd = R::Begin(constructionTile, rs);
+        Require(
+            cd.has_value() && R::Action(*cd, true).error == GameActions::Status::ok,
+            "Construction rights native purchase failed");
+        GameActions::ProcessQueue(state);
+        Require(
+            MapGetSurfaceElementAt(constructionTile)->hasOwnership(OwnershipFlag::constructionRightsOwned)
+                && !MapGetSurfaceElementAt(constructionTile)->hasOwnership(OwnershipFlag::landOwned),
+            "Construction rights converted to land");
+        rs.construction = false;
+        Require(!R::Begin(constructionTile, rs), "Unavailable land purchase invented");
+        SaveFlags rf{};
+        const auto rightsSave = std::string(argv[2]) + "/rights.park";
+        const auto boughtCash = state.park.cash;
+        Require(ScenarioSave(state, rightsSave, rf) && context->LoadParkFromFile(rightsSave), "Rights save/reload failed");
+        Require(
+            state.park.cash == boughtCash
+                && MapGetSurfaceElementAt(constructionTile)->hasOwnership(OwnershipFlag::constructionRightsOwned),
+            "Rights persistence differs");
+        std::cout << "Native land / construction rights / mixed available-unavailable / query-cancel-stale-funds / exact cash "
+                     "/ save-reload passed\n";
         std::cout << "Pocket park construction native checks passed\n";
         return 0;
     }

@@ -84,7 +84,19 @@ are still future depth; rectangular dimension selection already covers areas.
 
 ## Remaining planned phases
 
-3. Native land and construction-rights inspection and Cancel-first purchasing.
+## Phase 3: Land and construction rights — delivered requested core
+
+Build → Land / Rights provides land/construction-rights inspection and 1–64
+rectangular dimensions. A opens native cost/count review, Y/Select opens kind/size
+options, B returns/exits. Review defaults to Cancel and reports available, owned
+and skipped unavailable tiles. LandBuyRightsAction alone changes ownership,
+fences, cash and construction permissions. Exact ownership, scenario prices,
+cash/no-money and quoted cost are revalidated; stale/repeated reviews reject.
+Only Pocket's owned menu pause is released for review; existing player pause stays.
+Native available/unavailable, construction-versus-land, query/cancel/stale/funds,
+exact accounting/save-reload and SDL Cancel-first/owned-pause/native confirmation
+checks pass. No ownership or availability is invented in production.
+
 4. Path furniture and sequential connected ground/elevated construction.
 
 ## Captures and publication
@@ -92,5 +104,6 @@ are still future depth; rectangular dimension selection already covers areas.
 Genuine native component captures and the required PNG ZIP will be produced after
 validated source publication. Only implemented screens will be captured. Public
 metadata fixtures will be labelled; no AI world art or fabricated park backdrop.
-Phase 1: `1ad489b600a872c6894a953760a0e81698213a6f`. Later validated pushed
+Phase 1: `1ad489b600a872c6894a953760a0e81698213a6f`.
+Phase 2: `6238d33a36bf694cf3729eac4b046115598be1df`. Later validated pushed
 commits are recorded in a subsequent documentation checkpoint.

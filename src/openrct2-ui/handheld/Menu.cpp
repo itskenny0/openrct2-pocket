@@ -16,6 +16,7 @@
 #include "ResearchManagement.h"
 #include "RideAccess.h"
 #include "RideManagement.h"
+#include "RightsTools.h"
 #include "SaveSlots.h"
 #include "SceneryTools.h"
 #include "ShopManagement.h"
@@ -63,6 +64,8 @@ namespace OpenRCT2::Ui::Windows
         sceneryPicker,
         sceneryOptions,
         areaOptions,
+        rightsOptions,
+        rightsConfirm,
         sceneryName,
         sceneryConfirm,
         shopPicker,
@@ -201,6 +204,8 @@ namespace OpenRCT2::Ui::Windows
         bool _ridesBusy{};
         Handheld::TextEntry _nameEntry;
         std::optional<Handheld::SceneryTools::Target> _signTarget;
+        std::optional<Handheld::RightsTools::Draft> _rightsDraft;
+        bool _rightsReviewResumed{};
         size_t _rideGraphMetric{}, _rideGraphOffset{};
         bool _ridesReviewResumed{};
         uint64_t _ridesRequest{};
@@ -392,8 +397,8 @@ namespace OpenRCT2::Ui::Windows
     public:
         bool constructionMenu() const
         {
-            return _page == Page::areaOptions || _page == Page::sceneryOptions || _page == Page::sceneryName
-                || _page == Page::sceneryConfirm;
+            return _page == Page::rightsOptions || _page == Page::rightsConfirm || _page == Page::areaOptions
+                || _page == Page::sceneryOptions || _page == Page::sceneryName || _page == Page::sceneryConfirm;
         }
         void constructionMove(int x, int y)
         {
@@ -404,6 +409,8 @@ namespace OpenRCT2::Ui::Windows
             }
             else if (y)
                 move(y);
+            else if (x && _page == Page::rightsOptions)
+                Handheld::RightsTools::Configure(_focus.index(), x);
             else if (x && _page == Page::areaOptions)
                 Handheld::AreaTools::Configure(_focus.index(), x);
             else if (x && _page == Page::sceneryOptions)
@@ -419,22 +426,30 @@ namespace OpenRCT2::Ui::Windows
             const ScreenSize target{ _page == Page::overwrite || _page == Page::discard || _page == Page::exit ? 330
                                                                                                                : size.width,
                                      size.height };
-            const ScreenSize bounds = (_page == Page::sceneryName || _page == Page::sceneryConfirm || _page == Page::pathOptions
-                                       || picker() || shopManagement() || managementShell())
+            const ScreenSize bounds = (_page == Page::rightsConfirm || _page == Page::sceneryName
+                                       || _page == Page::sceneryConfirm || _page == Page::pathOptions || picker()
+                                       || shopManagement() || managementShell())
                 ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
                 : information() ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 }
                                 : target;
             WindowSetResize(*this, bounds, bounds);
             WindowSetPosition(
                 *this,
-                (_page == Page::sceneryName || _page == Page::sceneryConfirm || _page == Page::pathOptions || picker()
-                 || shopManagement() || managementShell())
+                (_page == Page::rightsConfirm || _page == Page::sceneryName || _page == Page::sceneryConfirm
+                 || _page == Page::pathOptions || picker() || shopManagement() || managementShell())
                     ? ScreenCoordsXY{ 0, 0 }
                     : ScreenCoordsXY{ 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
         }
 
         void page(Page next)
         {
+            if (_rightsReviewResumed && next != Page::rightsConfirm)
+            {
+                if (_pausedHere && !(gGamePaused & GAME_PAUSED_NORMAL))
+                    PauseToggle();
+                _rightsReviewResumed = false;
+            }
+
             if (_ridesReviewResumed && next != Page::ridesConfirm)
             {
                 // Return only our Dashboard pause; never clear native/external pause reasons.
@@ -606,11 +621,26 @@ namespace OpenRCT2::Ui::Windows
                 case Page::customChoice:
                     return { "Custom build", "Saved designs...", "Back" };
                 case Page::build:
-                    return { "Raise land",  "Lower land",         "Paths", "Water",          "Surface",    "Remove scenery",
-                             "Trees",       "Shops / Facilities", "Rides", "Wooden designs", "Scenery...", "Terrain / Water...",
+                    return { "Raise land",
+                             "Lower land",
+                             "Paths",
+                             "Water",
+                             "Surface",
+                             "Remove scenery",
+                             "Trees",
+                             "Shops / Facilities",
+                             "Rides",
+                             "Wooden designs",
+                             "Scenery...",
+                             "Terrain / Water...",
+                             "Land / Rights...",
                              "Back to park" };
                 case Page::sceneryCategory:
                     return { "Small scenery / trees", "Large scenery", "Walls / fences", "Banners / signs", "Back to build" };
+                case Page::rightsOptions:
+                    return Handheld::RightsTools::Options();
+                case Page::rightsConfirm:
+                    return { "Purchase available tiles", "Cancel" };
                 case Page::areaOptions:
                     return Handheld::AreaTools::Options();
                 case Page::sceneryName:
@@ -738,7 +768,7 @@ namespace OpenRCT2::Ui::Windows
         }
         void onClose() override
         {
-            if (_ridesReviewResumed)
+            if (_ridesReviewResumed || _rightsReviewResumed)
                 _pausedHere = false; // Our pause was already released; retain any external pause.
             if (_page == Page::designConfirm && _focus.index() == 0)
                 Handheld::Designs::CancelReview();
@@ -773,6 +803,31 @@ namespace OpenRCT2::Ui::Windows
                     : _page == Page::sceneryPicker ? Handheld::SceneryTools::Entries(Handheld::SceneryTools::Current().category)
                                                    : Handheld::TreePickerEntries(),
                 preferred);
+        }
+        void openRightsOptions()
+        {
+            page(Page::rightsOptions);
+        }
+        void openRightsReview(CoordsXY tile)
+        {
+            if (_pausedHere && (gGamePaused & GAME_PAUSED_NORMAL))
+            {
+                PauseToggle();
+                _rightsReviewResumed = true;
+            }
+
+            const auto q = Handheld::RightsTools::Query(tile, Handheld::RightsTools::settings);
+            _rightsDraft = Handheld::RightsTools::Begin(tile, Handheld::RightsTools::settings);
+            if (_rightsDraft)
+            {
+                page(Page::rightsConfirm);
+                _focus.move(1, 2);
+            }
+            else
+            {
+                page(Page::rightsOptions);
+                _status = q.getErrorMessage();
+            }
         }
         void openAreaOptions()
         {
@@ -1198,6 +1253,13 @@ namespace OpenRCT2::Ui::Windows
                 case Page::sceneryPicker:
                     page(Page::sceneryOptions);
                     break;
+                case Page::rightsConfirm:
+                    _rightsDraft.reset();
+                    close();
+                    break;
+                case Page::rightsOptions:
+                    close();
+                    break;
                 case Page::areaOptions:
                     close();
                     break;
@@ -1610,6 +1672,36 @@ namespace OpenRCT2::Ui::Windows
                         invalidate();
                     }
                     break;
+                case Page::rightsOptions:
+                    if (choice == 0)
+                        close();
+                    else
+                    {
+                        Handheld::RightsTools::Configure(choice);
+                        invalidate();
+                    }
+                    break;
+                case Page::rightsConfirm:
+                    if (choice == 1)
+                    {
+                        _rightsDraft.reset();
+                        close();
+                    }
+                    else if (_rightsDraft)
+                    {
+                        const auto r = Handheld::RightsTools::Action(*_rightsDraft, true);
+                        if (r.error == GameActions::Status::ok)
+                        {
+                            _rightsDraft.reset();
+                            close();
+                        }
+                        else
+                        {
+                            _status = r.getErrorMessage();
+                            invalidate();
+                        }
+                    }
+                    break;
                 case Page::areaOptions:
                     if (choice == 0)
                         close();
@@ -1620,7 +1712,12 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::build:
-                    if (choice == 11)
+                    if (choice == 12)
+                    {
+                        close();
+                        Handheld::BeginRightsTools();
+                    }
+                    else if (choice == 11)
                     {
                         close();
                         Handheld::BeginAreaTools();
@@ -2751,6 +2848,13 @@ namespace OpenRCT2::Ui::Windows
                     "No shops available");
                 return;
             }
+            if (_page == Page::rightsConfirm && _rightsDraft)
+            {
+                Handheld::DrawManagementPanel(
+                    rt, { ContextGetWidth(), ContextGetHeight() },
+                    Handheld::RightsTools::Presentation(*_rightsDraft, _focus.index(), _status));
+                return;
+            }
             if (_page == Page::sceneryName || _page == Page::sceneryConfirm)
             {
                 Handheld::ManagementPresentation model;
@@ -2819,6 +2923,9 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::designConfirm:
                     title = "PLACE DESIGN?";
+                    break;
+                case Page::rightsOptions:
+                    title = "LAND / RIGHTS OPTIONS";
                     break;
                 case Page::areaOptions:
                     title = "AREA BRUSH OPTIONS";
@@ -3076,6 +3183,16 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* w = static_cast<HandheldMenuWindow*>(GetWindowManager()->FindByClass(WindowClass::handheldMenu)))
             w->constructionMove(x, y);
+    }
+    void HandheldRightsOptionsOpen()
+    {
+        if (auto* w = OpenPanel())
+            w->openRightsOptions();
+    }
+    void HandheldRightsReviewOpen(CoordsXY tile)
+    {
+        if (auto* w = OpenPanel())
+            w->openRightsReview(tile);
     }
     void HandheldAreaOptionsOpen()
     {
