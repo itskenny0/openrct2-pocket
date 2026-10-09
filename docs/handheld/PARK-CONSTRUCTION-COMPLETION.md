@@ -199,3 +199,9 @@ scope. Missing ordinary features remain on the 100% roadmap. The recommended nex
 subsystem is full Staff Management: patrol editing, security/entertainer roles,
 costumes and operational information. Do not redo the delivered construction core;
 retain the explicit construction parity/asset-validation gaps above.
+
+Subsequent parity checkpoint: SCENERY-PATH-PARITY-COMPLETION.md adds researched
+scenery group filtering, supported native banner/sign styles, category-selective
+area clearing with corrected multi-tile quote/refund accounting, connected native
+ride access starts and guarded new-section undo. Earlier missing ordinary features
+not closed by that checkpoint remain on the 100% roadmap.

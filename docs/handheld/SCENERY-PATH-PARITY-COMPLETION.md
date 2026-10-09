@@ -87,3 +87,85 @@ ConstructionTests and PresentationLifecycleTests PASS after recovery.
 Connected native entrance/exit starts and connected undo remain incomplete pending
 the next independently validated phase. Terrain surface colour remains a documented
 gap. Full scenery/path desktop parity remains PARTIAL.
+
+
+## Phase 3 — connected access starts and guarded native undo
+
+Rides → Access appends Connected entrance queue and Connected exit path, preserving
+all previous indices/workflows. It uses the actual selected station's native
+outside tile/height/direction. The first landing stays fixed until explicit A;
+existing native paths are selected without deleting/replacing them automatically.
+Native FootpathPlaceAction supplies queue association, slope/elevation, connection
+edges, cost/error and real placement. Subsequent directions/grades reuse the
+existing sequential adapter. No independent routing or automatic route is added.
+
+Select opens path options: Resume, Turn, Rise, Descend, Flat, Restart endpoint,
+Change surface, Undo section. All eight rows now render in the compact indigo rail,
+including the focused undo row. Undo opens a native FootpathRemoveAction quote with
+Cancel initially selected. Only new sections created in the current session enter
+history; joining/converting an existing path clears history. No existing junction
+can be deleted through this undo. A/B review/cancel preserves the previous context.
+
+Copied native path baselines, session revision, cash, queried refund and copied
+ride generation/type/object/date/station/outside identity are checked again.
+Pending actions reject repeated input. Successful removal restores the previous
+endpoint while retaining the current direction/grade choice (including a removed first access landing); adjacent native
+edges are refreshed after the action. Menus preserve context and remove provisional
+ghosts; load/exit ends transient tools/history. Real paths persist in native saves.
+No Pocket gameplay state is serialized.
+
+Coverage: ConstructionTests exercises flat/rise/elevated/descent build, native
+undo query/execute/refund/repeat/context recovery and existing-junction protection.
+FamilyOperationTests uses production RideAccess handoff and native queue/normal
+landing actions for Monorail, Dinghy Slide and Flying coaster, stale generation,
+held confirm, Cancel-first undo, explicit rebuild, elevated extension, native
+station association and Open/save. RideAccessWorkflowTests tests menu connected
+handoff without accidental placement and B recovery. These fixtures demonstrate
+native connectivity/access, not sustained guest throughput of the new routes.
+
+Phase 2 canonical `b216ca3e17185a11407914ef19f09c8dcc221f63` / local
+`c4e2845a6c4b3b3fba924d242db956ea8f93d777` share tree
+`3cf89bb707f018908b1c561acded4a2af7dd5ed8`.
+
+Remaining ordinary gaps: scenery eyedropper, broader search/filter presentation,
+bulk placement, terrain surface colour draft, exhaustive sign/object combinations,
+connected history recovery after save/load and richer queue/normal junction editing.
+Existing native placed paths remain inspectable/removable after load; transient
+undo history is intentionally not serialized. All prior advanced ride/design gaps
+remain in their checkpoints. Full ordinary scenery/path parity remains PARTIAL.
+
+
+## Validation and limitations at Phase 3 publication
+
+Release GUI/CLI PASS. Native/SDL PASS: SceneryPathParityTests, ConstructionTests,
+PathActionsTests, PresentationLifecycleTests, RideConstructionTests,
+SeatRotationTests, FamilyOperationTests, MazeConstructionTests,
+MiniGolfConstructionTests, StaffCompletionTests and GuestCompletionTests.
+CTest input/launcher/save-preservation PASS 3/3. A stricter whole-history path guard
+rejects externally changed native edges; explicit fresh endpoint selection recovers
+construction. Own native placement/removal refreshes retained edge baselines.
+
+Private African Diamond Mine DesignCapture, RideConstructionCapture and original
+Wooden CustomCoasterCapture PASS; Factory Capers MazeConstructionCapture PASS.
+The original Wooden regression observes a natural queue participant over its
+simulation window; this does not prove sustained throughput on the new connected
+routes. An extra ElevatedAccessCapture attempt on Factory Capers correctly rejected
+because that scenario has no supported researched coaster for its fixture; no
+research or live park state was patched to make it pass.
+
+Private original sprites and objects are available. New captures are production
+native viewport + Pocket components over native action-built initialized fixtures,
+not full SDL gameplay frames, actual original scenarios, or physical Brick captures.
+No AArch64 build, physical Brick input/performance or sustained new-route routing
+is validated in this run. Dummy SDL hardware-renderer warnings are not hardware
+validation. Private original archives/parks/exported test designs are excluded.
+
+Capture list: 01 native scenery group filter; 02 no-entry Cancel-first review;
+03 native banner text colour draft; 04 area selection; 05 dense native categories;
+06 quoted clear/refund review; 07 after native clear; 08 queue access landing;
+09 normal exit landing; 10 native undo review; 11 elevated access extension;
+12 dense eight-row path controls; 13 genuine invalid area-bounds feedback.
+All 512×384 PNGs are visually inspected; category On/Off states, review labels,
+landing prompt and undo focus clipping were fixed and affected captures regenerated.
+Final package contains dimension/SHA256/provenance manifest. Final publication SHA
+is recorded externally to avoid a self-referential source commit hash.

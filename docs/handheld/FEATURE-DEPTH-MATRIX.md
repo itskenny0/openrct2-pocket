@@ -16,9 +16,9 @@ No editor/debug features are counted as ordinary park-play gaps.
 | Ride construction | PARTIAL | FlatRides.cpp and Designs.cpp: eligible non-track flats and conventional descriptor-compatible native saved designs, optional native scenery, previews/actions and entrance/exit recovery. |
 | Custom track | PARTIAL | CustomTracks.cpp: descriptor-driven regular-station forward editor, loaded/researched object/type pairs, native curves/slopes/banks/chain/brakes and compatible special/inversion pieces, native track actions, endpoint undo, coordinate block selection, guarded removal/refund and brake/booster speed reviews, gap and circuit/access recovery. |
 | Shops / facilities | COMPLETE for placement/basic management; PARTIAL domain | Shops.cpp, ShopManagement.cpp: eligible native objects, rotation, ghost, status, product/common prices, statistics and demolition. |
-| Paths | PARTIAL | Paths.cpp: normal/queue surfaces, raised/sloped tiles, options, ghost, removal; RideAccess.cpp: elevated station landings and genuine connectivity. |
+| Paths | PARTIAL | Paths.cpp: normal/queue surfaces, raised/sloped sequential sections, guarded native undo, ghosts; RideAccess.cpp: connected entrance/exit starts, elevated landings and native connectivity. See SCENERY-PATH-PARITY-COMPLETION.md. |
 | Terrain / water | PARTIAL | Terrain.h, Water.h, Surface.h / AreaTools.h: original single-tile actions plus rectangular brush, native smoothing, corners/edges, water and loaded area surface/edge styles. |
-| Scenery | PARTIAL full parity; four native categories delivered | SceneryTools.cpp: small/large/wall/banner picker, native geometry, heights, ghosts, colour/removal and sign text; original Trees retained. See PARK-CONSTRUCTION-COMPLETION.md. |
+| Scenery | PARTIAL full parity; four native categories delivered | SceneryTools.cpp: small/large/wall/banner picker, researched native groups, geometry, heights, ghosts, colour/removal and sign text/styles. SceneryClear.h: guarded native area clearing. Original Trees retained; see SCENERY-PATH-PARITY-COMPLETION.md. |
 | Guests | COMPLETE for individual read-only inspection; PARTIAL domain | GuestManagement.cpp: summary, full roster, native action/thought groups and tracked filter, status/needs/thoughts/spending/inventory/preferences, naming/tracking and shared native pickup/placement; identity reuse protection. Ride history, persistent follow and broader filter/map entry points remain gaps; see GUEST-PLACEMENT-COMPLETION.md. |
 | Staff | PARTIAL | StaffManagement.cpp: all four native roles, automatic hire, role orders/counters, locate/dismissal and loaded entertainer costumes. Native patrol area editing/clear is delivered; naming, role filtering/counts/wages and native role uniforms are delivered; shared pickup/manual hiring delivered; see STAFF-MANAGEMENT-COMPLETION.md. |
 | Finances | COMPLETE for loan/admission; PARTIAL domain | Finances.cpp: native cash/loan/income/expenditure/profit, bounded loan/admission confirmation. |
@@ -277,3 +277,11 @@ removal and path preservation/opt-in removal is delivered. Native multi-tile cle
 query accounting is corrected and regression-tested against execution. Connected
 access starts/undo, eyedropper, bulk placement and terrain surface colour remain
 PARTIAL; see SCENERY-PATH-PARITY-COMPLETION.md.
+
+Scenery/path parity Phase 3 adds actual native ride entrance/exit connected starts,
+fixed landing height/direction, guarded session undo/refunds with Cancel-first review,
+new-section-only history and existing-junction protection. Eight-row path options
+remain controller-visible. Native action-built queue association, elevated extension,
+menu recovery and persistence are tested; sustained new-route guest throughput and
+physical Brick remain unproven. Full parity remains PARTIAL; see
+SCENERY-PATH-PARITY-COMPLETION.md for precise gaps.

@@ -8,6 +8,7 @@
 #include <openrct2-ui/handheld/CustomTracks.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/FlatRides.h>
+#include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/RideAccess.h>
 #include <openrct2-ui/handheld/TrackEditing.h>
 #include <openrct2-ui/windows/Windows.h>
@@ -121,6 +122,8 @@ int main(int argc, char** argv)
             ViewportRender(rt, &viewport);
             if (menu)
                 Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu)->onDraw(rt);
+            else if (H::Paths::IsActive())
+                H::Paths::DrawOverlay(rt, { 8, 8 });
             else
                 C::DrawPanel(rt, { 512, 384 });
             Image image;
@@ -204,14 +207,60 @@ int main(int argc, char** argv)
             for (bool exit : { false, true })
             {
                 const auto point = exit ? access->exit : access->entrance;
-                GameActions::FootpathPlaceAction path(
-                    CoordsXYZ(point.outside), {}, objects.GetLoadedObjectEntryIndex(exit ? normalPath : queuePath),
-                    objects.GetLoadedObjectEntryIndex(railings), kInvalidDirection, exit ? 0 : PathConstructFlag::IsQueue);
+                namespace P = H::Paths;
+                Check(H::RideAccess::BeginPaths(circuit, exit, true), "Connected access UI start failed");
+                Check(P::TargetTile() == CoordsXY(point.outside) && !P::TurnConnected(), "Initial access geometry changed");
+                auto departed = circuit;
+                ++departed.generation;
+                Check(!P::BeginConnectedAccess(departed, point.station, exit, point.outside), "Stale access ride accepted");
+                const auto landingCash = state.park.cash;
+                const auto landingQuery = P::Action(false);
+                captureFocus = { point.outside.x + 16, point.outside.y + 16, point.outside.z };
+                if (family == 0)
+                    capture(exit ? "parity-09-connected-exit-start.png" : "parity-08-connected-queue-start.png", false);
                 Check(
-                    GameActions::Query(&path, state).error == GameActions::Status::ok
-                        && GameActions::Execute(&path, state).error == GameActions::Status::ok,
-                    "Family native path landing failed");
+                    landingQuery.error == GameActions::Status::ok && P::Action(true).error == GameActions::Status::ok,
+                    "Connected native access landing failed");
+                Check(P::Action(true).error != GameActions::Status::ok, "Held access placement repeated");
                 GameActions::ProcessQueue(state);
+                Check(state.park.cash == landingCash - landingQuery.cost, "Access landing cost differs");
+                if (family == 0)
+                {
+                    auto draft = P::BeginUndo();
+                    Check(draft.has_value(), "Access landing undo unavailable");
+                    H::ControllerInput controller;
+                    H::Frame confirm;
+                    confirm.actions = { H::Action::confirm, H::Action::confirm };
+                    W::HandheldPathOptionsOpen();
+                    W::HandheldConstructionMove(0, 7);
+                    H::HandleMenuInput(controller, confirm);
+                    capture("parity-10-connected-undo-review.png", true);
+                    H::HandleMenuInput(controller, confirm); // Held confirm cannot remove.
+                    Check(MapGetFootpathElement(CoordsXYZ(point.outside)), "Held undo confirmation removed path");
+                    Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+                    draft = P::BeginUndo();
+                    Check(draft && P::Undo(*draft, true).error == GameActions::Status::ok, "Access landing native undo failed");
+                    GameActions::ProcessQueue(state);
+                    Check(P::TargetTile() == CoordsXY(point.outside), "Undo lost access landing context");
+                    Check(P::Action(true).error == GameActions::Status::ok, "Access landing rebuild failed");
+                    GameActions::ProcessQueue(state);
+                    Check(P::Action(false).error == GameActions::Status::ok, "Connected extension query failed");
+                    if (exit)
+                    {
+                        Check(P::SlopeConnected(1), "Connected rise unavailable");
+                        const auto extension = P::Action(false);
+                        Check(
+                            extension.error == GameActions::Status::ok && P::Action(true).error == GameActions::Status::ok,
+                            "Access elevated extension failed");
+                        GameActions::ProcessQueue(state);
+                        capture("parity-11-connected-elevated-extension.png", false);
+                        W::HandheldPathOptionsOpen();
+                        W::HandheldConstructionMove(0, 7);
+                        capture("parity-12-connected-dense-options.png", true);
+                        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+                    }
+                }
+                P::End();
             }
             access = H::RideAccess::Inspect(circuit);
             Check(access && access->entrance.attached && access->exit.attached, "Family native access not attached");

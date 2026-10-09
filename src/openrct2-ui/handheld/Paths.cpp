@@ -2,8 +2,10 @@
 #include "Paths.h"
 
 #include "ConstructionPanel.h"
+#include "RideAccess.h"
 
 #include <algorithm>
+#include <cstring>
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
@@ -31,6 +33,56 @@ namespace OpenRCT2::Ui::Handheld::Paths
     static bool connected{}, connectedBusy{};
     static std::optional<CoordsXYZ> endpoint;
     static FootpathSlope endpointSlope;
+    struct AccessStart
+    {
+        RideManagement::Target ride;
+        StationIndex station;
+        bool exit;
+        CoordsXYZD outside;
+    };
+    static std::optional<AccessStart> accessStart;
+    static bool firstLanding{};
+    struct BuiltPath
+    {
+        CoordsXYZ position;
+        std::array<uint8_t, 16> baseline;
+        std::optional<CoordsXYZ> previous;
+        FootpathSlope previousSlope;
+    };
+    static std::vector<BuiltPath> history;
+    static std::optional<std::array<uint8_t, 16>> PathBaseline(CoordsXYZ position)
+    {
+        const auto* path = MapGetFootpathElement(position);
+        if (!path || path->isGhost())
+            return {};
+        static_assert(sizeof(PathElement) == 16);
+        std::array<uint8_t, 16> result;
+        std::memcpy(result.data(), path, result.size());
+        return result;
+    }
+    static bool HistoryValid()
+    {
+        return std::all_of(
+            history.begin(), history.end(), [](const auto& built) { return PathBaseline(built.position) == built.baseline; });
+    }
+    static void RefreshHistoryBaselines()
+    {
+        for (auto& built : history)
+        {
+            const auto baseline = PathBaseline(built.position);
+            if (!baseline)
+            {
+                history.clear();
+                return;
+            }
+            built.baseline = *baseline;
+        }
+    }
+    static bool AccessValid()
+    {
+        return !accessStart
+            || RideAccess::PointValid(accessStart->ride, accessStart->station, accessStart->exit, accessStart->outside);
+    }
     static Direction connectedDirection{};
     static int connectedGrade{};
     static std::optional<CoordsXYZ> target;
@@ -92,7 +144,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
     }
     static std::optional<Preview> RequestedPreview()
     {
-        if (!active || removing || !target || !available || (connected && (!endpoint || connectedBusy)))
+        if (!active || removing || !target || !available || (connected && ((!endpoint && !firstLanding) || connectedBusy)))
             return {};
         auto type = gFootpathSelection.getSelectedSurface();
         PathConstructFlags flags = IsQueue() ? PathConstructFlag::IsQueue : 0;
@@ -192,6 +244,9 @@ namespace OpenRCT2::Ui::Handheld::Paths
         active = true;
         connected = connectedBusy = false;
         endpoint.reset();
+        history.clear();
+        accessStart.reset();
+        firstLanding = false;
         heightPlane = false;
         accessSource.reset();
         ++accessRevision;
@@ -205,6 +260,9 @@ namespace OpenRCT2::Ui::Handheld::Paths
         active = false;
         connected = connectedBusy = false;
         endpoint.reset();
+        history.clear();
+        accessStart.reset();
+        firstLanding = false;
         heightPlane = false;
         accessSource.reset();
         ++accessRevision;
@@ -223,10 +281,24 @@ namespace OpenRCT2::Ui::Handheld::Paths
     }
     bool ConnectedReady()
     {
-        return IsConnected() && endpoint.has_value();
+        return IsConnected() && (endpoint.has_value() || firstLanding);
     }
     static bool RefreshConnected()
     {
+        if (!AccessValid())
+        {
+            target.reset();
+            return false;
+        }
+        if (firstLanding && accessStart)
+        {
+            target = CoordsXYZ(accessStart->outside);
+            fixedHeight = target->z;
+            fixedSlope = FootpathSlope{};
+            accessSource = CoordsXY(*target) + CoordsDirectionDelta[accessStart->outside.direction];
+            heightPlane = true;
+            return true;
+        }
         if (!endpoint)
             return false;
         const auto* path = MapGetFootpathElement(*endpoint);
@@ -255,9 +327,70 @@ namespace OpenRCT2::Ui::Handheld::Paths
         heightPlane = true;
         return true;
     }
+    bool BeginConnectedAccess(const RideManagement::Target& ride, StationIndex station, bool exit, CoordsXYZD outside)
+    {
+        if (!RideAccess::PointValid(ride, station, exit, outside))
+            return false;
+        BeginConnected(!exit);
+        accessStart = AccessStart{ ride, station, exit, outside };
+        firstLanding = true;
+        connectedDirection = DirectionReverse(outside.direction);
+        return RefreshConnected();
+    }
+    std::optional<UndoDraft> BeginUndo()
+    {
+        ClearPreview();
+        if (!IsConnected() || connectedBusy || history.empty() || !AccessValid() || !HistoryValid())
+            return {};
+        const auto& last = history.back();
+        if (PathBaseline(last.position) != last.baseline)
+            return {};
+        GameActions::FootpathRemoveAction action(last.position);
+        const auto q = GameActions::Query(&action, getGameState());
+        if (q.error != GameActions::Status::ok)
+            return {};
+        return UndoDraft{ last.position, last.baseline, accessRevision, q.cost, getGameState().park.cash };
+    }
+    GameActions::Result Undo(const UndoDraft& d, bool execute)
+    {
+        ClearPreview();
+        GameActions::Result invalid;
+        invalid.error = GameActions::Status::invalidParameters;
+        invalid.errorMessage = "Path changed; reopen undo review";
+        if (!IsConnected() || connectedBusy || history.empty() || !AccessValid() || !HistoryValid()
+            || d.revision != accessRevision || history.back().position != d.position || PathBaseline(d.position) != d.baseline
+            || getGameState().park.cash != d.cash)
+            return invalid;
+        GameActions::FootpathRemoveAction action(d.position);
+        auto q = GameActions::Query(&action, getGameState());
+        if (q.error != GameActions::Status::ok || q.cost != d.cost)
+            return q.error == GameActions::Status::ok ? invalid : q;
+        if (!execute)
+            return q;
+        connectedBusy = true;
+        action.SetCallback([revision = d.revision](const auto*, const GameActions::Result* result) {
+            if (!active || !connected || accessRevision != revision)
+                return;
+            connectedBusy = false;
+            if (result->error != GameActions::Status::ok || history.empty())
+                return;
+            const auto previous = history.back();
+            history.pop_back();
+            endpoint = previous.previous;
+            endpointSlope = previous.previousSlope;
+            firstLanding = !endpoint && accessStart.has_value();
+            ++accessRevision;
+            RefreshHistoryBaselines();
+            RefreshConnected();
+        });
+        const auto result = GameActions::Execute(&action, getGameState());
+        if (result.error != GameActions::Status::ok)
+            connectedBusy = false;
+        return result;
+    }
     bool TurnConnected()
     {
-        if (!IsConnected() || connectedBusy)
+        if (!IsConnected() || connectedBusy || firstLanding)
             return false;
         ClearPreview();
         connectedDirection = DirectionNext(connectedDirection);
@@ -267,7 +400,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
     }
     bool SlopeConnected(int delta)
     {
-        if (!ConnectedReady() || connectedBusy)
+        if (!ConnectedReady() || connectedBusy || firstLanding)
             return false;
         ClearPreview();
         connectedGrade = std::clamp(connectedGrade + delta, -1, 1);
@@ -372,8 +505,9 @@ namespace OpenRCT2::Ui::Handheld::Paths
     {
         const char* directions[] = { "NW", "NE", "SE", "SW" };
         if (IsConnected())
-            return !endpoint ? "Choose existing path / A start"
-                             : std::string(directions[connectedDirection])
+            return firstLanding ? "A: build landing"
+                : !endpoint     ? "Choose existing path / A start"
+                                : std::string(directions[connectedDirection])
                     + (connectedGrade > 0       ? " / Rise"
                            : connectedGrade < 0 ? " / Descend"
                                                 : " / Flat")
@@ -501,6 +635,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
     {
         if (IsConnected())
         {
+            ClearPreview();
             GameActions::Result result;
             result.error = GameActions::Status::invalidParameters;
             if (connectedBusy)
@@ -508,8 +643,23 @@ namespace OpenRCT2::Ui::Handheld::Paths
                 result.errorMessage = "Path request pending";
                 return result;
             }
-            if (!endpoint)
+            if (!HistoryValid())
             {
+                result.errorMessage = "Built path changed; B to restart";
+                return result;
+            }
+            if (firstLanding && !RefreshConnected())
+            {
+                result.errorMessage = "Ride access changed; restart from inspection";
+                return result;
+            }
+            if (!endpoint && (!firstLanding || MapGetFootpathElement(*target)))
+            {
+                if (firstLanding)
+                {
+                    targetIsPath = true;
+                    slope = FootpathSlope{};
+                }
                 result.errorMessage = "A: choose an existing path endpoint";
                 if (!target || !targetIsPath)
                     return result;
@@ -521,7 +671,10 @@ namespace OpenRCT2::Ui::Handheld::Paths
                 {
                     ClearPreview();
                     endpoint = *target;
-                    endpointSlope = slope;
+                    endpointSlope = { path->isSloped() ? FootpathSlopeType::sloped : FootpathSlopeType::flat,
+                                      path->getSlopeDirection() };
+                    firstLanding = false;
+                    history.clear();
                     ++accessRevision;
                     RefreshConnected();
                 }
@@ -576,24 +729,34 @@ namespace OpenRCT2::Ui::Handheld::Paths
             const auto revision = accessRevision;
             const auto selectedSlope = fixedSlope.value_or(slope);
             const bool wasConnected = connected;
+            const bool existed = PathBaseline(placement).has_value();
+            const auto previous = endpoint;
+            const auto previousSlope = endpointSlope;
             if (wasConnected)
                 connectedBusy = true;
-            action.SetCallback(
-                [revision, placement, selectedSlope, wasConnected](const auto*, const GameActions::Result* result) {
-                    if (active && heightPlane && revision == accessRevision && result->error == GameActions::Status::ok)
+            action.SetCallback([revision, placement, selectedSlope, wasConnected, existed, previous,
+                                previousSlope](const auto*, const GameActions::Result* result) {
+                if (active && heightPlane && revision == accessRevision && result->error == GameActions::Status::ok)
+                {
+                    accessSource = placement;
+                    if (wasConnected && connected)
                     {
-                        accessSource = placement;
-                        if (wasConnected && connected)
-                        {
-                            endpoint = placement;
-                            endpointSlope = selectedSlope;
-                            RefreshConnected();
-                            RefocusHeight();
-                        }
+                        const auto baseline = PathBaseline(placement);
+                        if (!existed && baseline)
+                            history.push_back({ placement, *baseline, previous, previousSlope });
+                        else
+                            history.clear(); // Joining/converting existing paths is never undone by deleting them.
+                        RefreshHistoryBaselines();
+                        firstLanding = false;
+                        endpoint = placement;
+                        endpointSlope = selectedSlope;
+                        RefreshConnected();
+                        RefocusHeight();
                     }
-                    if (revision == accessRevision && wasConnected)
-                        connectedBusy = false;
-                });
+                }
+                if (revision == accessRevision && wasConnected)
+                    connectedBusy = false;
+            });
         }
         const auto result = execute ? GameActions::Execute(&action, getGameState())
                                     : GameActions::Query(&action, getGameState());
@@ -609,7 +772,9 @@ namespace OpenRCT2::Ui::Handheld::Paths
             return;
         }
         DrawConstructionOverlay(
-            rt, position, "Connected paths", SurfaceName(), IsQueue() ? "Queue / A extend" : "Normal / A extend",
+            rt, position, "Connected paths", SurfaceName(),
+            firstLanding ? (IsQueue() ? "Queue / A build" : "Normal / A build")
+                         : (IsQueue() ? "Queue / A extend" : "Normal / A extend"),
             PlacementName(),
             ConnectedReady() && target ? "Height " + std::to_string(target->z / kCoordsZStep) : "A: choose existing path");
     }

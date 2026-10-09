@@ -90,7 +90,16 @@ static void TestRideAccess(
         for (int n = 0; n < 3; ++n)
             W::HandheldMenuMove(1);
         W::HandheldMenuConfirm();
-        Require(W::HandheldRidesPresentation().rows.size() == 5, "Park ride inspection cannot recover access");
+        Require(W::HandheldRidesPresentation().rows.size() == 7, "Park ride inspection cannot recover access");
+        for (int n = 0; n < 5; ++n)
+            W::HandheldMenuMove(1);
+        H::HandleMenuInput(input, frame);
+        Require(
+            P::IsConnected() && P::TargetTile() == CoordsXY(access->entrance.outside) && state.park.cash == initialCash
+                && !MapGetFootpathElement(access->entrance.outside),
+            "Connected access start placed without explicit intent or lost geometry");
+        H::HandleExplorerInput(input, cancel);
+        Require(W::HandheldDashboardIsOpen() && !P::IsActive(), "Connected access cancel lost menu recovery");
         for (int n = 0; n < 5 && W::HandheldDashboardIsOpen(); ++n)
             W::HandheldMenuBack();
         Require(!W::HandheldDashboardIsOpen() && gGamePaused == 0, "Access inspection did not return to unpaused park");

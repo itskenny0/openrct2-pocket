@@ -260,10 +260,38 @@ int main(int argc, char** argv)
                 }
             Require(found, "Connected path missing");
         }
+        auto undo = P::BeginUndo();
+        Require(undo.has_value(), "Native connected undo absent");
+        auto changedQuote = *undo;
+        ++changedQuote.cost;
+        Require(P::Undo(changedQuote, true).error != GameActions::Status::ok, "Changed undo quote accepted");
+        const auto undoCash = state.park.cash;
+        Require(P::Undo(*undo, false).error == GameActions::Status::ok && state.park.cash == undoCash, "Undo query charged");
+        Require(P::Undo(*undo, true).error == GameActions::Status::ok, "Native undo failed");
+        Require(P::Undo(*undo, true).error != GameActions::Status::ok, "Repeated undo accepted");
+        GameActions::ProcessQueue(state);
+        Require(state.park.cash == undoCash - undo->cost && !MapGetFootpathElement(undo->position), "Undo refund differs");
+        Require(P::Action(true).error == GameActions::Status::ok, "Undo context did not recover");
+        GameActions::ProcessQueue(state);
         P::UpdatePreview();
         P::RemovePreviewTemporarily();
         Require(Ghosts() == 0, "Connected suspension leaked");
         P::RestorePreview();
+        P::ClearPreview();
+        const auto joinTile = *P::TargetTile();
+        GameActions::FootpathPlaceAction junction({joinTile, MapGetSurfaceElementAt(joinTile)->getBaseZ()},
+            FootpathSlope{}, objects.GetLoadedObjectEntryIndex(surface), objects.GetLoadedObjectEntryIndex(railing));
+        Require(GameActions::Execute(&junction, state).error == GameActions::Status::ok, "Existing junction seed failed");
+        GameActions::ProcessQueue(state);
+        Require(P::Action(true).error != GameActions::Status::ok, "Externally changed connected edges accepted");
+        P::BeginConnected(false);
+        pathHit.Loc = CoordsXY(undo->position);
+        pathHit.Element = reinterpret_cast<TileElement*>(MapGetFootpathElement(undo->position));
+        P::UpdateTargetFromInfo(pathHit);
+        Require(P::Action(true).error == GameActions::Status::ok, "Fresh junction source selection failed");
+        Require(P::Action(true).error == GameActions::Status::ok, "Joining native existing path failed");
+        GameActions::ProcessQueue(state);
+        Require(!P::BeginUndo(), "Existing junction offered destructive undo");
         P::End();
         Require(Ghosts() == 0 && !P::IsActive(), "Connected cancel leaked");
         auto* queueSurface = objects.LoadObject("rct2.footpath_surface.queue_blue");

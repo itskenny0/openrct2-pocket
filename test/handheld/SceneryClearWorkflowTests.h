@@ -65,6 +65,9 @@ void TestSceneryClear(
     gMapSelectType = MapSelectType::full;
     gMapSelectFlags.set(MapSelectFlag::enable);
     capture("parity-04-area-footprint.png", false);
+    W::HandheldSceneryClearReviewOpen(CoordsXY{ 0, 0 });
+    capture("parity-13-invalid-area-bounds.png", true);
+    Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
     W::HandheldSceneryClearOptionsOpen();
     W::HandheldConstructionMove(0, 7);
     capture("parity-05-clear-dense-options.png", true);

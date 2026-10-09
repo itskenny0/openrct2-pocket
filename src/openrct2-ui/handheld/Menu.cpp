@@ -67,6 +67,7 @@ namespace OpenRCT2::Ui::Windows
         build,
         paths,
         pathOptions,
+        pathUndoConfirm,
         treePicker,
         sceneryCategory,
         sceneryPicker,
@@ -253,6 +254,8 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::SceneryTools::StyleDraft> _signStyle;
         std::optional<Handheld::SceneryClear::Draft> _clearDraft;
         bool _clearReviewResumed{};
+        bool _pathUndoResumed{};
+        std::optional<Handheld::Paths::UndoDraft> _pathUndo;
         std::optional<Handheld::RightsTools::Draft> _rightsDraft;
         bool _rightsReviewResumed{};
         size_t _rideGraphMetric{}, _rideGraphOffset{};
@@ -655,6 +658,11 @@ namespace OpenRCT2::Ui::Windows
                     PauseToggle();
                 _clearReviewResumed = false;
             }
+            if (_pathUndoResumed && next != Page::pathUndoConfirm)
+            {
+                if (_pausedHere && !(gGamePaused & GAME_PAUSED_NORMAL)) PauseToggle();
+                _pathUndoResumed = false;
+            }
             if (_rightsReviewResumed && next != Page::rightsConfirm)
             {
                 if (_pausedHere && !(gGamePaused & GAME_PAUSED_NORMAL))
@@ -949,9 +957,10 @@ namespace OpenRCT2::Ui::Windows
                     return { "Normal path", "Queue path", "Remove path", "Back to build", "Connected path", "Connected queue" };
                 case Page::pathOptions:
                     if (Handheld::Paths::IsConnected())
-                        return { "Resume", "Turn direction", "Rise", "Descend", "Flat", "Restart endpoint", "Change surface" };
+                        return { "Resume", "Turn direction", "Rise", "Descend", "Flat", "Restart endpoint", "Change surface", "Undo section..." };
                     return { "Resume",       "Follow ground", "Raise height",  "Lower height",
                              "Flat / slope", "Rotate slope",  "Change surface" };
+                case Page::pathUndoConfirm: return {"Remove last new section", "Cancel"};
                 case Page::save:
                 case Page::load:
                 {
@@ -1059,7 +1068,7 @@ namespace OpenRCT2::Ui::Windows
         void onClose() override
         {
             Handheld::DesignAuthoring::End();
-            if (_ridesReviewResumed || _rightsReviewResumed || _clearReviewResumed)
+            if (_ridesReviewResumed || _rightsReviewResumed || _clearReviewResumed || _pathUndoResumed)
                 _pausedHere = false; // Our pause was already released; retain any external pause.
             if (_page == Page::designConfirm && _focus.index() == 0)
                 Handheld::Designs::CancelReview();
@@ -1708,6 +1717,10 @@ namespace OpenRCT2::Ui::Windows
                 case Page::shopPrices:
                 case Page::shopDemolish:
                     page(Page::shop);
+                    break;
+                case Page::pathUndoConfirm:
+                    _pathUndo.reset();
+                    page(Page::pathOptions);
                     break;
                 case Page::shop:
                 case Page::ride:
@@ -2383,6 +2396,15 @@ namespace OpenRCT2::Ui::Windows
                             Handheld::Paths::Begin(choice == 1, choice == 2);
                     }
                     break;
+                case Page::pathUndoConfirm:
+                    if (choice == 1) { _pathUndo.reset(); page(Page::pathOptions); }
+                    else if (_pathUndo)
+                    {
+                        const auto result = Handheld::Paths::Undo(*_pathUndo, true);
+                        if (result.error == GameActions::Status::ok) { _pathUndo.reset(); close(); }
+                        else { _status = result.getErrorMessage(); invalidate(); }
+                    }
+                    break;
                 case Page::pathOptions:
                 {
                     namespace Paths = Handheld::Paths;
@@ -2403,8 +2425,20 @@ namespace OpenRCT2::Ui::Windows
                         }
                         else if (choice == 5)
                             Paths::BeginConnected(Paths::IsQueue());
-                        else
+                        else if (choice == 6)
                             Paths::CycleSurface();
+                        else if (choice == 7)
+                        {
+                            if (_pausedHere && (gGamePaused & GAME_PAUSED_NORMAL)) { PauseToggle(); _pathUndoResumed = true; }
+                            _pathUndo = Paths::BeginUndo();
+                            if (_pathUndo) { page(Page::pathUndoConfirm); _focus.move(1, 2); }
+                            else
+                            {
+                                if (_pathUndoResumed && _pausedHere && !(gGamePaused & GAME_PAUSED_NORMAL)) PauseToggle();
+                                _pathUndoResumed = false;
+                                _status = "No unchanged new section to undo";
+                            }
+                        }
                         invalidate();
                         break;
                     }
@@ -3080,6 +3114,12 @@ namespace OpenRCT2::Ui::Windows
                         const auto target = *_ridesTarget;
                         close();
                         Handheld::RideAccess::BeginPaths(target, choice == 2);
+                    }
+                    else if (choice == 5 || choice == 6)
+                    {
+                        const auto target = *_ridesTarget;
+                        close();
+                        Handheld::RideAccess::BeginPaths(target, choice == 6, true);
                     }
                     else if (choice == 3)
                     {
@@ -3983,6 +4023,17 @@ namespace OpenRCT2::Ui::Windows
             {
                 Handheld::DrawObjectPicker(
                     rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Choose tree", _status, "No trees available");
+                return;
+            }
+            if (_page == Page::pathUndoConfirm && _pathUndo)
+            {
+                Handheld::ManagementPresentation model;
+                model.breadcrumb = "Build / Connected path";
+                model.title = "Remove last new section?";
+                model.rows = rows(); model.selected = _focus.index(); model.confirmation = true;
+                model.stats = {{"Cost / refund", Handheld::FormatMoney(_pathUndo->cost)}};
+                model.status = _status.empty() ? "Existing paths preserved" : _status;
+                Handheld::DrawManagementPanel(rt, {ContextGetWidth(), ContextGetHeight()}, model);
                 return;
             }
             if (_page == Page::pathOptions)

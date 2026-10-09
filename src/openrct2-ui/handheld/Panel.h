@@ -493,6 +493,15 @@ namespace OpenRCT2::Ui::Handheld
         Box(rt, p, { kRailWidth, Layout::ContentHeight(screen) });
         Heading(rt, p + ScreenCoordsXY{ 10, 12 }, "Path options");
         DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, 32 }, 144, "{MUTED}" + status);
+        if (rows.size() > 7)
+        {
+            const Icon icons[] = {Icon::play, Icon::options, Icon::rise, Icon::lower,
+                                  Icon::slope, Icon::options, Icon::path, Icon::options};
+            for (size_t i = 0; i < rows.size() && i < 8; ++i)
+                Row(rt, p + ScreenCoordsXY{8, 52 + static_cast<int32_t>(i) * 32}, rows[i], icons[i], i == selected);
+        }
+        else
+        {
         const int rowY[] = { 52, 108, 136, 164, 220, 248, 304 };
         const Icon icons[] = { Icon::play, Icon::ground, Icon::rise, Icon::lower, Icon::slope, Icon::options, Icon::path };
         Section(rt, p + ScreenCoordsXY{ 10, 87 }, "Height");
@@ -500,6 +509,7 @@ namespace OpenRCT2::Ui::Handheld
         Section(rt, p + ScreenCoordsXY{ 10, 283 }, "Surface");
         for (size_t i = 0; i < rows.size() && i < 7; ++i)
             Row(rt, p + ScreenCoordsXY{ 8, rowY[i] }, rows[i], icons[i], i == selected);
+        }
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;
         DrawCommand(rt, { 12, y }, 38, "D-pad", "Choose");

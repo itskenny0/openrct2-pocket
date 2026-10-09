@@ -163,7 +163,7 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
                 model.rows.end(),
                 { state->entrance.reachesParkEntrance ? "Locate entrance / queue..." : "Connect entrance queue...",
                   state->exit.reachesParkEntrance ? "Locate exit / paths..." : "Connect exit path...", "Review opening...",
-                  "Ride inspection..." });
+                  "Ride inspection...", "Connected entrance queue...", "Connected exit path..." });
             model.status = "Link both access points to park paths";
         }
         else
@@ -185,7 +185,7 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
         current -= CoordsDirectionDelta[current.direction];
         return current == outside && Supported(target);
     }
-    bool BeginPaths(const RideManagement::Target& target, bool exit)
+    bool BeginPaths(const RideManagement::Target& target, bool exit, bool connected)
     {
         const auto state = Inspect(target);
         auto* main = WindowGetMain();
@@ -194,7 +194,13 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
             return false;
         const auto point = exit ? state->exit : state->entrance;
         EndTerrain();
-        Paths::Begin(!exit);
+        if (connected)
+        {
+            if (!Paths::BeginConnectedAccess(target, point.station, exit, point.outside))
+                return false;
+        }
+        else
+            Paths::Begin(!exit);
         SetRidePathAccess(target, point.station, exit, point.outside);
         const auto* surface = MapGetSurfaceElementAt(point.outside);
         if (!surface)

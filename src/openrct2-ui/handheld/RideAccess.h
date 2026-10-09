@@ -21,5 +21,5 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
         const RideManagement::Target& target, size_t selected, const std::string& feedback = {});
     bool NormalPathReachesParkEntrance(CoordsXYZ position);
     bool PointValid(const RideManagement::Target& target, StationIndex station, bool exit, CoordsXYZD outside);
-    bool BeginPaths(const RideManagement::Target& target, bool exit);
+    bool BeginPaths(const RideManagement::Target& target, bool exit, bool connected = false);
 } // namespace OpenRCT2::Ui::Handheld::RideAccess
