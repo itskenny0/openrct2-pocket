@@ -179,3 +179,46 @@ local 13084ebcf01aea36a6702d640f9314f0fe478499;
 identical tree 53ebad9e0d6d12e0df15ce0a4e6c36517a010694.
 Phase 4/final publication is recorded in a subsequent documentation checkpoint
 and the capture manifest to avoid a commit self-reference.
+
+## Published implementation history
+
+| Phase | Canonical published commit | Local safety commit | Identical source tree |
+|---|---|---|---|
+| Selected section recovery | 4edb3e8e69665595080992b97cb8b68aee79a7b0 | 5dc429f56d7f5efed0617d5b50a79846548b8078 | 9001e84356042ba40e38004b333fe23633221934 |
+| Placement speed | c9f62be479ce2e74c53440245dcd393adf987b7b | c3ca773d104f5bfe381a92421e13b489c186942d | 6b105c58aee3348612c8a89fa812dfeaf7ac91a2 |
+| Exact design elevation | e9f256775bbc47d9ce8e720ec73bf6e7c1d831fb | 13084ebcf01aea36a6702d640f9314f0fe478499 | 53ebad9e0d6d12e0df15ce0a4e6c36517a010694 |
+| Operation/input evidence | 0a915988a0264402ff50a161430efd9ed5b1b715 | dbc8ffbe9614263d0a313e3bc66118020c3486da | a0d4fd685289d0b83cb438b0604c395c9b1b051a |
+
+Every canonical commit uses the current native remote parent and guarded
+expected_sha/force=false fast-forward update. Each tree matches its local commit;
+Esperanto is excluded and remains untouched locally. Final documentation commit
+SHA/tree is recorded externally in the delivered manifest/next prompt.
+
+## Native systems reused
+
+Native TED sequence metadata, trackBlockGetNext/TrackIsConnectedByShape, loaded
+RideObject/research/vehicle-group eligibility, RideManagement identities,
+SequentialTrackPlaceAction guards, TrackPlaceAction, TrackRemoveAction,
+TrackSetBrakeSpeedAction, TrackPreview borrowed native ghosts,
+TrackDesignImport/GetZPlacement/PlaceVirtual, SavedTrackDesignPlaceAction native
+query/execute/cost guards and provisional cleanup, native entrance/exit actions,
+RideSetStatusAction, native accounting and ScenarioSave/load. No custom geometry,
+simulation or gameplay save fields are introduced.
+
+## Capture inventory
+
+Fourteen genuine 512×384 asset-backed viewport/component PNGs are packaged:
+Junior block roster; selected speed review; Cancel-first removal; dense operations;
+invalid unowned placement; continuation editor; placement speed; continuation
+selection; manual-height options; manual-elevation ghost; manual-elevation cost
+review; Looping continuation editor and placement speed; native maze Open inspector.
+The manifest records per-file SHA-256, dimensions, scenario provenance, renderer,
+validation limits and latest canonical/local source tree. All were inspected for
+clipping/overlap/focus/control readability; essential shortened hint regenerated.
+Existing shell HUD is not drawn in these component captures, so whole-frame HUD
+collision and physical-display readability remain hardware validation gaps.
+
+Highest-value next work: native player-facing tested/rated design authoring with
+scenery selection, plus the remaining backward/replacement and variant editing
+adapters, with independent validated publication and operation evidence. Do not
+repeat delivered selected forward recovery/speed/manual elevation.

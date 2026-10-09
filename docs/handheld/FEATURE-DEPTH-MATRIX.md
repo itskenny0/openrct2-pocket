@@ -201,3 +201,8 @@ public tests and Factory Capers asset-backed capture. Sustained guest operation,
 asset-backed Mini Golf and transport/water-family operation remain unvalidated.
 Overall construction stays PARTIAL toward 100% ordinary gameplay; export,
 backward/replacement and variant parity remain on the roadmap.
+
+Track editing/design follow-up comprises four validated implementation publications
+through 0a915988a0264402ff50a161430efd9ed5b1b715 with canonical/local tree equality.
+The new checkpoint preserves exact remaining ordinary gaps and 14 genuine
+asset-backed viewport/component captures. No full gameplay-completeness claim.
