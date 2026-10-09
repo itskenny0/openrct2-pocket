@@ -12,6 +12,7 @@
 #include <openrct2-ui/handheld/RightsTools.h>
 #include <openrct2-ui/handheld/SceneryTools.h>
 #include <openrct2-ui/handheld/Shops.h>
+#include <openrct2-ui/handheld/StaffPatrol.h>
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
@@ -642,6 +643,32 @@ int main(int argc, char** argv)
         Require(
             S::Resolve(employee)->animationObjectIndex == costumes[chosen].first && state.park.cash == cash,
             "Costume action/held A accounting failed");
+        W::HandheldMenuMove(6);
+        press(H::Action::confirm);
+        Require(H::StaffPatrol::Active() && !W::HandheldStaffIsOpen(), "Patrol inspector route failed");
+        Require(
+            H::StaffPatrol::Action(CoordsXY{ 320, 320 }, true).error == GameActions::Status::ok,
+            "SDL native patrol seed failed");
+        GameActions::ProcessQueue(state);
+        W::HandheldStaffPatrolOptionsOpen();
+        W::HandheldMenuMove(2);
+        press(H::Action::confirm);
+        Require(H::StaffPatrol::settings.width == 2, "Duplicate A changed patrol width twice");
+        W::HandheldMenuMove(2);
+        press(H::Action::confirm);
+        press(H::Action::confirm);
+        Require(H::StaffPatrol::Snapshot(employee).size() == 1, "Cancel-first cleared patrol");
+        W::HandheldMenuMove(4);
+        press(H::Action::confirm);
+        W::HandheldMenuMove(-1);
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Require(H::StaffPatrol::Snapshot(employee).empty(), "SDL native patrol clear failed");
+        press(H::Action::back);
+        Require(H::StaffPatrol::Active(), "Patrol options B lost context");
+        H::EndTerrain();
+        Require(!H::StaffPatrol::Active(), "Patrol cleanup leaked");
+        std::cout << "SDL patrol inspector / width-held-A / Cancel-first clear / options recovery passed" << std::endl;
         wm->CloseByClass(WindowClass::handheldMenu);
         Require(S::Dismiss(employee, true).error == GameActions::Status::ok, "SDL staff cleanup failed");
         GameActions::ProcessQueue(state);

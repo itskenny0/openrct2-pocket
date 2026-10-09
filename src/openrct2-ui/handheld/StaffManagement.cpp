@@ -223,7 +223,8 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
                             { "Status", FormatStringIDLegacy(STR_STRINGID, ft.Data()) } };
             model.rows = { "Locate",        Orders(target->type).empty() ? "No configurable orders" : "Orders...",
                            "Statistics...", "Dismiss...",
-                           "Costume...",    "Back to roster" };
+                           "Costume...",    "Back to roster",
+                           "Patrol area..." };
         }
         else if (view == View::statistics)
         {

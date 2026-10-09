@@ -2,6 +2,7 @@
 // Public animation metadata / native scenario fixture, no original sprites required.
 #include <iostream>
 #include <openrct2-ui/handheld/StaffManagement.h>
+#include <openrct2-ui/handheld/StaffPatrol.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
 #include <openrct2/OpenRCT2.h>
@@ -103,6 +104,43 @@ int main(int argc, char** argv)
         FinancePayWages();
         Require(state.park.cash == before, "No-money wages charged");
         state.park.flags.unset(ParkFlag::noMoney);
+        namespace P = Ui::Handheld::StaffPatrol;
+        Require(P::Begin(hired.front()), "Patrol employee selection failed");
+        const CoordsXY tile{ 320, 320 };
+        P::settings.width = 3;
+        P::settings.height = 2;
+        Require(P::Action(CoordsXY{ 32, 32 }, false).error != GameActions::Status::ok, "Patrol bounds clamped");
+        Require(P::Action(CoordsXY{ 321, 320 }, false).error != GameActions::Status::ok, "Unaligned patrol accepted");
+        Require(
+            P::Action(tile, false).error == GameActions::Status::ok && P::Snapshot(hired.front()).empty(),
+            "Patrol query mutated coverage");
+        Require(
+            P::Action(tile, true).error == GameActions::Status::ok && P::Action(tile, true).error != GameActions::Status::ok,
+            "Patrol pending guard failed");
+        GameActions::ProcessQueue(state);
+        Require(
+            P::Snapshot(hired.front()).size() == 6 && P::Snapshot(hired[1]).empty(),
+            "Native patrol footprint/employee differs");
+        auto draft = P::ReviewClear();
+        Require(draft && P::Clear(*draft, false).error == GameActions::Status::ok, "Patrol clear review failed");
+        P::settings = { 1, 1, true };
+        Require(P::Action(tile, true).error == GameActions::Status::ok, "Native patrol remove failed");
+        GameActions::ProcessQueue(state);
+        Require(
+            P::Snapshot(hired.front()).size() == 5 && P::Clear(*draft, true).error != GameActions::Status::ok,
+            "Patrol removal/stale clear failed");
+        draft = P::ReviewClear();
+        Require(draft.has_value(), "Patrol clear draft missing");
+        Require(P::Clear(*draft, true).error == GameActions::Status::ok, "Native patrol clear failed");
+        GameActions::ProcessQueue(state);
+        Require(
+            P::Snapshot(hired.front()).empty() && P::Clear(*draft, true).error != GameActions::Status::ok,
+            "Repeated patrol clear accepted");
+        P::settings = { 2, 2, false };
+        Require(P::Action(tile, true).error == GameActions::Status::ok, "Patrol save seed failed");
+        GameActions::ProcessQueue(state);
+        P::End();
+        Require(!P::Active(), "Patrol cleanup retained target");
         SaveFlags flags{};
         const auto save = std::string(argv[2]) + "/staff-completion.park";
         Require(ScenarioSave(state, save, flags) && context->LoadParkFromFile(save), "Staff save/reload failed");

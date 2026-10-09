@@ -21,6 +21,7 @@
 #include "SceneryTools.h"
 #include "ShopManagement.h"
 #include "Shops.h"
+#include "StaffPatrol.h"
 #include "Surface.h"
 #include "Trees.h"
 #include "Water.h"
@@ -97,6 +98,7 @@ namespace OpenRCT2::Ui::Handheld
 
     void BeginTerrain(bool raise)
     {
+        StaffPatrol::End();
         _ridePathAccess.reset();
         Paths::End();
         Trees::ClearPreview();
@@ -142,6 +144,14 @@ namespace OpenRCT2::Ui::Handheld
     {
         BeginTerrain(true);
         _rightsTool = true;
+    }
+    bool BeginStaffPatrol(const StaffManagement::Target& employee)
+    {
+        BeginTerrain(true);
+        if (StaffPatrol::Begin(employee))
+            return true;
+        EndTerrain();
+        return false;
     }
     void BeginAreaTools()
     {
@@ -297,6 +307,7 @@ namespace OpenRCT2::Ui::Handheld
 
     void EndTerrain()
     {
+        StaffPatrol::End();
         _ridePathAccess.reset();
         Trees::ClearPreview();
         SceneryTools::ClearPreview();
@@ -333,6 +344,8 @@ namespace OpenRCT2::Ui::Handheld
             return Designs::Query(_terrainTile);
         if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
             return FlatRides::Action(_terrainTile, execute);
+        if (StaffPatrol::Active())
+            return StaffPatrol::Action(_terrainTile, execute);
         if (_rightsTool)
             return RightsTools::Query(_terrainTile, RightsTools::settings);
         if (_areaTool)
@@ -610,6 +623,15 @@ namespace OpenRCT2::Ui::Handheld
                 Windows::HandheldRideAccessOpen(target);
             input.suspend();
         }
+        if (StaffPatrol::Active())
+        {
+            if (!StaffManagement::Resolve(*StaffPatrol::target))
+                EndTerrain();
+            else if (CanExplore() && ContextHasFocus())
+                StaffPatrol::ShowOverlay();
+            else
+                StaffPatrol::HideOverlay();
+        }
         if (_ridePathAccess && (!Paths::IsActive() || !AccessTargetValid()))
         {
             EndTerrain();
@@ -653,6 +675,18 @@ namespace OpenRCT2::Ui::Handheld
                 _terrainTile = CoordsXY{ coords->x & ~31, coords->y & ~31 };
                 gMapSelectPositionA = gMapSelectPositionB = *_terrainTile;
                 gMapSelectType = MapSelectType::full;
+                if (StaffPatrol::Active())
+                {
+                    const auto range = StaffPatrol::Range(_terrainTile);
+                    if (!range)
+                        _terrainTile.reset();
+                    else
+                    {
+                        gMapSelectPositionA = { range->getX1(), range->getY1() };
+                        gMapSelectPositionB = { range->getX2(), range->getY2() };
+                        gMapSelectType = MapSelectType::fullTerrainAndWater;
+                    }
+                }
                 if (_rightsTool)
                 {
                     const auto r = AreaTools::Range(_terrainTile, RightsTools::settings.width, RightsTools::settings.height);
@@ -869,7 +903,10 @@ namespace OpenRCT2::Ui::Handheld
                 else if ((_terrainActive || Paths::IsActive()) && CanExplore())
                 {
                     const auto access = _ridePathAccess;
+                    const auto employee = StaffPatrol::target;
                     EndTerrain();
+                    if (employee && StaffManagement::Resolve(*employee))
+                        Windows::HandheldStaffOpen(employee);
                     if (access && RideManagement::Resolve(*access))
                         Windows::HandheldRideAccessOpen(*access);
                 }
@@ -886,6 +923,8 @@ namespace OpenRCT2::Ui::Handheld
                     Designs::Rotate();
                 else if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
                     FlatRides::Rotate();
+                else if (StaffPatrol::Active())
+                    Windows::HandheldStaffPatrolOptionsOpen();
                 else if (_rightsTool)
                     Windows::HandheldRightsOptionsOpen();
                 else if (_areaTool)
@@ -990,6 +1029,8 @@ namespace OpenRCT2::Ui::Handheld
                                 break;
                             else if (_shopTool)
                                 Windows::HandheldShopPickerOpen();
+                            else if (StaffPatrol::Active())
+                                StaffPatrol::Configure(1);
                             else if (_rightsTool)
                                 Windows::HandheldRightsOptionsOpen();
                             else if (_areaTool)
@@ -1121,6 +1162,8 @@ namespace OpenRCT2::Ui::Handheld
                     FlatRides::DrawPanel(rt, { ContextGetWidth(), height });
                 else if (_shopTool)
                     DrawShopOverlay(rt, Concept::kOrigin, Shops::Name(_shopIndex), Shops::Eligible(_shopIndex), _shopDirection);
+                else if (StaffPatrol::Active())
+                    StaffPatrol::DrawOverlay(rt, Concept::kOrigin);
                 else if (_rightsTool)
                     DrawConstructionOverlay(
                         rt, Concept::kOrigin, "Land / Rights", RightsTools::Kind(RightsTools::settings.construction),
@@ -1151,6 +1194,8 @@ namespace OpenRCT2::Ui::Handheld
             }
             else if (_shopTool)
                 DrawShopFooter(rt, { ContextGetWidth(), height });
+            else if (StaffPatrol::Active())
+                DrawConstructionFooter(rt, { ContextGetWidth(), height }, "Apply", "Add/Remove");
             else if (_rightsTool)
                 DrawConstructionFooter(rt, { ContextGetWidth(), height }, "Review", "Options");
             else if (_areaTool)

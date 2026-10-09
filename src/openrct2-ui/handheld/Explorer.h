@@ -27,6 +27,7 @@ namespace OpenRCT2::Ui::Handheld
     void UpdateExplorer(ControllerInput& input);
     void HandleExplorerInput(ControllerInput& input, const Frame& frame);
     void EndTerrain();
+    bool BeginStaffPatrol(const StaffManagement::Target& employee);
     void BeginTerrain(bool raise);
     void BeginWater(bool raise = true);
     void BeginSurface();
@@ -77,6 +78,7 @@ namespace OpenRCT2::Ui::Windows
     Handheld::ManagementPresentation HandheldStaffPresentation();
     bool HandheldStaffIsOpen();
     void HandheldStaffPause();
+    void HandheldStaffPatrolOptionsOpen();
     void HandheldStaffRemoved(EntityId id);
     bool HandheldFinancesIsOpen();
     void HandheldFinancesMove(int x, int y);
