@@ -22,6 +22,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     bool Select(TrackElemType type);
     void Cycle(int direction);
     void Slope(int direction);
+    uint8_t PlacementSpeed();
+    bool SetPlacementSpeed(uint8_t speed);
     void Bank();
     void Chain();
     std::vector<PickerEntry> Pieces();

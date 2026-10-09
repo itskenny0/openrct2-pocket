@@ -64,6 +64,7 @@ namespace OpenRCT2::GameActions
         visitor.Visit("baselineSpeed", _baselineSpeed);
         visitor.Visit("newSpeed", _newSpeed);
         visitor.Visit("sourceInverted", _sourceInverted);
+        visitor.Visit("placementSpeed", _placementSpeed);
     }
     void SequentialTrackPlaceAction::Serialise(DataSerialiser& stream)
     {
@@ -71,7 +72,7 @@ namespace OpenRCT2::GameActions
         stream << DS_TAG(_ride) << DS_TAG(_object) << DS_TAG(_buildDate) << DS_TAG(_origin) << DS_TAG(_source) << DS_TAG(_piece)
                << DS_TAG(_sourceType) << DS_TAG(_first) << DS_TAG(_chain) << DS_TAG(_cost) << DS_TAG(_noMoney)
                << DS_TAG(_remove) << DS_TAG(_selected) << DS_TAG(_speedChange) << DS_TAG(_baselineSpeed) << DS_TAG(_newSpeed)
-               << DS_TAG(_sourceInverted) << DS_TAG(_expectedType) << DS_TAG(_expectedView);
+               << DS_TAG(_sourceInverted) << DS_TAG(_placementSpeed) << DS_TAG(_expectedType) << DS_TAG(_expectedView);
     }
     Result SequentialTrackPlaceAction::Query(GameState_t& state, Park::ParkData&) const
     {
@@ -88,9 +89,12 @@ namespace OpenRCT2::GameActions
             || _sourceType >= TrackElemType::count || _noMoney != state.park.flags.has(ParkFlag::noMoney)
             || (!state.cheats.ignoreResearchStatus && (!RideTypeIsInvented(ride->type) || !RideEntryIsInvented(_object))))
             return invalid();
-        if (_selected && (ride->type != _expectedType || ride->overallView != _expectedView))
+        if (ride->type != _expectedType || ride->overallView != _expectedView)
             return invalid();
         if (_selected && !_remove && !_speedChange)
+            return invalid();
+        if (!_remove && !_speedChange
+            && (trackTypeHasSpeedSetting(_piece) ? (_placementSpeed < 2 || _placementSpeed > 30) : _placementSpeed != 6))
             return invalid();
         const auto& ted = GetTrackElementDescriptor(_piece);
         if (!ride->getRideTypeDescriptor().SupportsTrackGroup(ted.definition.group)
@@ -183,7 +187,7 @@ namespace OpenRCT2::GameActions
         SelectedLiftAndInverted flags{};
         if (_chain)
             flags.set(LiftHillAndInverted::liftHill);
-        TrackPlaceAction native(_ride, _piece, ride->type, _origin, 6, 0, 0, flags, false);
+        TrackPlaceAction native(_ride, _piece, ride->type, _origin, _placementSpeed, 0, 0, flags, false);
         native.SetFlags(GetFlags());
         auto result = QueryNested(&native, state);
         if (result.error == Status::ok && _cost != kMoney64Undefined && result.cost != _cost)
@@ -217,7 +221,7 @@ namespace OpenRCT2::GameActions
         SelectedLiftAndInverted flags{};
         if (_chain)
             flags.set(LiftHillAndInverted::liftHill);
-        TrackPlaceAction native(_ride, _piece, GetRide(_ride)->type, _origin, 6, 0, 0, flags, false);
+        TrackPlaceAction native(_ride, _piece, GetRide(_ride)->type, _origin, _placementSpeed, 0, 0, flags, false);
         native.SetFlags(GetFlags());
         return ExecuteNested(&native, state);
     }

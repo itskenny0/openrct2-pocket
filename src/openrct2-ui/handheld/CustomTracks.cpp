@@ -31,6 +31,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     using namespace TrackMetadata;
     static bool active{}, busy{}, camera{}, chain{}, createdHere{};
     static int32_t stationOffset{};
+    static uint8_t placementSpeed{ 6 };
     static uint32_t depth{};
     static uint64_t revision{};
     static std::optional<RideManagement::Target> target, completed;
@@ -48,6 +49,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     {
         Block block;
         bool chain;
+        uint8_t speed;
         bool operator==(const Preview&) const = default;
     };
     static std::optional<Block> previous, anchor;
@@ -334,6 +336,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         }
         createdHere = false;
         stationOffset = 0;
+        placementSpeed = 6;
         active = false;
         busy = false;
         target.reset();
@@ -500,8 +503,25 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                 }
             }
     }
+    uint8_t PlacementSpeed()
+    {
+        return placementSpeed;
+    }
+    bool SetPlacementSpeed(uint8_t speed)
+    {
+        if (!active || busy || !trackTypeHasSpeedSetting(selected) || speed < 2 || speed > 30)
+            return false;
+        ClearPreview();
+        placementSpeed = speed;
+        return true;
+    }
     void Bank()
     {
+        if (trackTypeHasSpeedSetting(selected))
+        {
+            SetPlacementSpeed(std::min<int>(30, placementSpeed + 2));
+            return;
+        }
         const std::array banks{ TrackRoll::none, TrackRoll::left, TrackRoll::right };
         const auto current = GetTrackElementDescriptor(selected).definition.rollEnd;
         auto it = std::find(banks.begin(), banks.end(), current);
@@ -523,6 +543,11 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     }
     void Chain()
     {
+        if (trackTypeHasSpeedSetting(selected))
+        {
+            SetPlacementSpeed(std::max<int>(2, placementSpeed - 2));
+            return;
+        }
         if (!busy && ChainAllowed())
         {
             ClearPreview();
@@ -560,11 +585,13 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         const auto source = previous.value_or(Block{});
         auto query = GA::SequentialTrackPlaceAction(
             target->id, request->type, request->origin, chain, !previous, source.origin, source.type);
+        query.SetPlacementSpeed(trackTypeHasSpeedSetting(request->type) ? placementSpeed : 6);
         auto q = GA::Query(&query, getGameState());
         if (!execute || q.error != GA::Status::ok)
             return q;
         auto action = GA::SequentialTrackPlaceAction(
             target->id, request->type, request->origin, chain, !previous, source.origin, source.type, q.cost);
+        action.SetPlacementSpeed(trackTypeHasSpeedSetting(request->type) ? placementSpeed : 6);
         ClearPreview();
         busy = true;
         const auto token = revision;
@@ -685,7 +712,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             ClearPreview();
             return;
         }
-        const Preview next{ *request, chain };
+        const Preview next{ *request, chain, trackTypeHasSpeedSetting(request->type) ? placementSpeed : uint8_t{ 6 } };
         if (ghost && *ghost == next)
             return;
         ClearPreview();
@@ -693,7 +720,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         if (chain)
             flags.set(LiftHillAndInverted::liftHill);
         auto* ride = RideManagement::Resolve(*target);
-        if (nativePreview.place(ride->subtype, ride->type, request->origin, request->type, flags))
+        if (nativePreview.place(ride->subtype, ride->type, request->origin, request->type, flags, next.speed))
             ghost = next;
     }
     void RemovePreviewTemporarily()
@@ -736,12 +763,13 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                                                            : "Special"));
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 108 },
-            "{MUTED}Bank "
-                + std::string(
-                    d.rollEnd == TrackRoll::none        ? "Level"
-                        : d.rollEnd == TrackRoll::left  ? "Left"
-                        : d.rollEnd == TrackRoll::right ? "Right"
-                                                        : "Inverted"));
+            trackTypeHasSpeedSetting(selected) ? "{MUTED}Speed "
+                    + FormatStringID(STR_VELOCITY, static_cast<uint16_t>((placementSpeed * 9) >> 2))
+                                               : "{MUTED}Bank "
+                    + std::string(d.rollEnd == TrackRoll::none        ? "Level"
+                                      : d.rollEnd == TrackRoll::left  ? "Left"
+                                      : d.rollEnd == TrackRoll::right ? "Right"
+                                                                      : "Inverted"));
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 130 },
             std::string("{MUTED}Chain ") + (ChainAllowed() ? (chain ? "On" : "Off") : "Unavailable"));
@@ -754,8 +782,12 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         DrawCommand(rt, { 8, y }, 17, "A", "Build");
         DrawCommand(rt, { 100, y }, 17, "B", StationPlacement() ? "Cancel" : "Undo");
         DrawCommand(rt, { 192, y }, 30, "L/R", camera ? "Zoom" : "Piece");
-        DrawCommand(rt, { 306, y }, 17, "X", camera ? "Rotate" : "Bank");
-        DrawCommand(rt, { 411, y }, 17, "Y", StationPlacement() ? "Turn" : "Chain");
+        DrawCommand(rt, { 306, y }, 17, "X", camera ? "Rotate" : trackTypeHasSpeedSetting(selected) ? "Speed +" : "Bank");
+        DrawCommand(
+            rt, { 411, y }, 17, "Y",
+            StationPlacement()                       ? "Turn"
+                : trackTypeHasSpeedSetting(selected) ? "Speed -"
+                                                     : "Chain");
         const auto q = Action(false);
         if (q.error == GA::Status::ok)
             DrawCostBadge(rt, Layout::ContextAnchor(screen, kContextSize, true), FormatMoney(q.cost));

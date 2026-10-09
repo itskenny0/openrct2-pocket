@@ -233,6 +233,16 @@ int main(int argc, char** argv)
             const auto piece = n < 4 ? TrackElemType::endStation : n == 6 ? TrackElemType::brakes : TrackElemType::flat;
             Check(C::Select(piece), "Native compatible piece absent");
             C::Update(n == 0 ? site : std::nullopt);
+            if (n == 6)
+            {
+                H::Frame increase;
+                increase.actions = { H::Action::contextPrimary };
+                H::HandleExplorerInput(controller, increase);
+                Check(C::PlacementSpeed() == 8, "Controller placement parameter failed");
+                C::Update({});
+                focus = *C::Endpoint();
+                capture("17-placement-speed-parameter.png");
+            }
             Check(C::Action(true).error == GameActions::Status::ok, "Native construction failed");
             GameActions::ProcessQueue(state);
         }
@@ -370,6 +380,7 @@ int main(int argc, char** argv)
         H::HandleMenuInput(controller, a);
         capture("12-dense-block-operations.png", true);
         W::HandheldMenuMove(6);
+        capture("18-continue-section-selection.png", true);
         H::HandleMenuInput(controller, a);
         Check(C::Active() && C::Endpoint(), "Selected section controller handoff failed");
         focus = *C::Endpoint();

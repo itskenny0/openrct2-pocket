@@ -46,3 +46,24 @@ Base local: 20542113fba2b5066a4ed3a1900c327b1aae4ba4.
 Base source tree: 61bbf89aef9c6642c231577e4b416e86fa115977.
 Canonical/local phase SHAs will be recorded after guarded publication.
 Esperanto remains a separate preserved local edit.
+
+## Phase 2 — native placement speed parameters (partial)
+
+Applicable native brake/booster pieces now expose X speed + and Y speed - before
+placement, bounded to 2–30 native units. The panel uses native STR_VELOCITY
+formatting. The exact speed travels through SequentialTrackPlaceAction parameter
+visitation/serialization, cost query, ghost and native TrackPlaceAction execute.
+Non-speed pieces accept only the default parameter; out-of-range values reject.
+Existing selected-block speed reviews remain unchanged. The strict sequential
+context now checks ride type and overall-view baseline for every operation.
+
+RideConstructionTests verifies native placement value 12, invalid 1/31 and
+persistence alongside existing selected speed baseline/refund cases. The Junior
+asset-backed capture uses real X controller dispatch to choose speed 8 and renders
+its ghost, price and controls. GUI/CLI Release and native/SDL checks pass.
+Seat rotation, covered/inverted alternatives and other native special parameters
+remain explicit ordinary gaps. This phase is not full parameter/variant parity.
+
+Phase 1 published 4edb3e8e69665595080992b97cb8b68aee79a7b0;
+local 5dc429f56d7f5efed0617d5b50a79846548b8078;
+identical tree 9001e84356042ba40e38004b333fe23633221934.

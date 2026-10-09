@@ -15,7 +15,7 @@ namespace OpenRCT2::GameActions
         TrackElemType _piece{}, _sourceType{};
         bool _first{}, _chain{}, _noMoney{}, _remove{};
         bool _selected{}, _speedChange{}, _sourceInverted{};
-        uint8_t _baselineSpeed{}, _newSpeed{};
+        uint8_t _baselineSpeed{}, _newSpeed{}, _placementSpeed{ 6 };
         money64 _cost{ kMoney64Undefined };
 
     public:
@@ -39,6 +39,10 @@ namespace OpenRCT2::GameActions
             _baselineSpeed = baseline;
             _newSpeed = speed;
             _sourceInverted = inverted;
+        }
+        void SetPlacementSpeed(uint8_t speed)
+        {
+            _placementSpeed = speed;
         }
         void AcceptParameters(GameActionParameterVisitor&) final;
         void Serialise(DataSerialiser&) final;

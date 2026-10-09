@@ -22,6 +22,6 @@ namespace OpenRCT2::Ui::Handheld
         void clear();
         bool place(
             ObjectEntryIndex index, ride_type_t type, CoordsXYZD origin, TrackElemType piece = TrackElemType::none,
-            SelectedLiftAndInverted flags = {});
+            SelectedLiftAndInverted flags = {}, uint8_t speed = 6);
     };
 } // namespace OpenRCT2::Ui::Handheld

@@ -185,3 +185,7 @@ forward editor at the gap of a selected disconnected component. Native traversal
 costs and undo remain authoritative; deleting its anchor ends context safely.
 Backward/replacement/variant/export depth remains PARTIAL; see
 [TRACK-EDITING-DESIGN-COMPLETION.md](TRACK-EDITING-DESIGN-COMPLETION.md).
+
+Native brake/booster placement now has bounded X/Y speed controls, matching ghost,
+query and execute parameters; existing selected-block speed reviews remain.
+Full seat/covered/inverted variant parity remains PARTIAL.

@@ -176,8 +176,10 @@ int main(int argc, char** argv)
         namespace E = Ui::Handheld::TrackEditing;
         auto original = Ui::Handheld::RideManagement::Identify(RideId::FromUnderlying(0));
         Check(original && C::Resume(*original), "Editing fixture resume failed");
+        Check(C::Select(TrackElemType::brakes), "Native brake selection failed");
         Check(
-            C::Select(TrackElemType::brakes) && C::Action(true).error == GameActions::Status::ok, "Native brake build failed");
+            !C::SetPlacementSpeed(1) && !C::SetPlacementSpeed(31) && C::SetPlacementSpeed(12), "Placement speed bounds failed");
+        Check(C::Action(true).error == GameActions::Status::ok, "Native brake build failed");
         GameActions::ProcessQueue(state);
         original = C::Target();
         C::End();
@@ -186,6 +188,7 @@ int main(int argc, char** argv)
             return *std::find_if(blocks.begin(), blocks.end(), [](const auto& b) { return b.type == TrackElemType::brakes; });
         };
         auto brake = findBrake();
+        Check(brake.speed == 12, "Native placement speed not persisted");
         const auto baseline = state.park.cash;
         Check(
             E::Change(brake, 8).error == GameActions::Status::ok && E::Change(brake, 31).error != GameActions::Status::ok,
