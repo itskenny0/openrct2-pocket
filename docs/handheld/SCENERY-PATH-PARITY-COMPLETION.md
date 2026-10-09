@@ -169,3 +169,22 @@ All 512×384 PNGs are visually inspected; category On/Off states, review labels,
 landing prompt and undo focus clipping were fixed and affected captures regenerated.
 Final package contains dimension/SHA256/provenance manifest. Final publication SHA
 is recorded externally to avoid a self-referential source commit hash.
+
+
+## Published implementation history
+
+| Phase | Canonical commit | Local safety commit | Matching source tree |
+| --- | --- | --- | --- |
+| Group filtering/styles | 83588d25266100e9f3bc896b3730943467ac03c1 | f353bce3849b82076b9f2920226fcc7c50864d9a (recovery) | 5931f7b7db57eee099259cc618a4ecc5b52856bc |
+| Area clearing | b216ca3e17185a11407914ef19f09c8dcc221f63 | c4e2845a6c4b3b3fba924d242db956ea8f93d777 | 3cf89bb707f018908b1c561acded4a2af7dd5ed8 |
+| Connected starts/undo | be0bca16661905774608d5c640f758f373ab6322 | 679a802e62b91323ea3c14074cf985d6e20caa1a | 205d8ae411920019eb58314a3c560e8c323d2c94 |
+
+All updates used verified remote native parents, exact tree equality and guarded
+expected_sha/force=false fast-forward publication. Esperanto SHA256 remains
+`e37ba559b4d9d761e74f2bb284d1ec762b813e789655c0495a882c83651890b5`.
+
+Recommended next substantial subsystem: native Park Map and Information, currently
+missing as a Pocket player workflow in the matrix. Reuse native map rendering,
+legends, object/peep overlays, news/awards and park histories; link existing locate,
+roster and construction flows rather than repeating delivered features. Retain
+all unfinished ordinary construction, design, guest and staff functionality.
