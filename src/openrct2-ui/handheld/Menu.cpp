@@ -24,6 +24,7 @@
 #include "StaffManagement.h"
 #include "StaffPatrol.h"
 #include "TextEntry.h"
+#include "TrackEditing.h"
 #include "TreePicker.h"
 #include "Trees.h"
 
@@ -112,6 +113,10 @@ namespace OpenRCT2::Ui::Windows
         peepCancel,
         ridesRoster,
         ridesInspect,
+        trackBlocks,
+        trackBlock,
+        trackRemoveConfirm,
+        trackSpeedConfirm,
         ridesAccess,
         ridesStats,
         ridesCustomers,
@@ -258,9 +263,18 @@ namespace OpenRCT2::Ui::Windows
                                                                                                     : Page::ridesOperations;
             return _ridesTarget && Handheld::RideManagement::Resolve(*_ridesTarget) ? Page::ridesInspect : Page::ridesRoster;
         }
+        std::vector<Handheld::TrackEditing::Block> _trackBlocks;
+        std::optional<Handheld::TrackEditing::Block> _trackBlock;
+        money64 _trackCost{};
+        uint8_t _trackSpeed{};
+        bool trackManagement() const
+        {
+            return _page == Page::trackBlocks || _page == Page::trackBlock || _page == Page::trackRemoveConfirm
+                || _page == Page::trackSpeedConfirm;
+        }
         bool ridesManagement() const
         {
-            return _page == Page::ridesRoster || _page == Page::ridesInspect || _page == Page::ridesGraphs
+            return trackManagement() || _page == Page::ridesRoster || _page == Page::ridesInspect || _page == Page::ridesGraphs
                 || _page == Page::ridesStations || _page == Page::ridesCustomers || _page == Page::ridesEarnings
                 || _page == Page::ridesStats || _page == Page::ridesVehicles || _page == Page::ridesName
                 || _page == Page::ridesAppearance || _page == Page::ridesMusic || _page == Page::ridesDispatch
@@ -270,6 +284,50 @@ namespace OpenRCT2::Ui::Windows
         Handheld::ManagementPresentation ridesPresentationFor(Page current, size_t selected) const
         {
             using Handheld::RideManagement::View;
+            if (trackManagement())
+            {
+                Handheld::ManagementPresentation model;
+                model.breadcrumb = "Dashboard / Rides / Track";
+                model.title = current == Page::trackBlocks ? "SELECT TRACK BLOCK" : "TRACK BLOCK";
+                model.selected = selected;
+                model.primaryAction = "Select";
+                model.status = _status;
+                if (current == Page::trackBlocks)
+                {
+                    for (const auto& block : _trackBlocks)
+                        model.rows.push_back(Handheld::TrackEditing::Label(block));
+                    model.rows.push_back("Back to ride");
+                }
+                else if (_trackBlock && Handheld::TrackEditing::Valid(*_trackBlock))
+                {
+                    model.stats.emplace_back("Block", Handheld::TrackEditing::Label(*_trackBlock));
+                    if (trackTypeHasSpeedSetting(_trackBlock->type))
+                        model.stats.emplace_back(
+                            "Speed", FormatStringID(STR_VELOCITY, static_cast<uint16_t>((_trackSpeed * 9) >> 2)));
+                    model.rows = { "Locate block", "Remove block...", "Back to blocks" };
+                    if (trackTypeHasSpeedSetting(_trackBlock->type))
+                    {
+                        model.rows.push_back("Speed -");
+                        model.rows.push_back("Speed +");
+                        model.rows.push_back("Review speed...");
+                    }
+                    if (current == Page::trackRemoveConfirm || current == Page::trackSpeedConfirm)
+                    {
+                        model.confirmation = true;
+                        model.title = current == Page::trackRemoveConfirm ? "REMOVE BLOCK?" : "CHANGE TRACK SPEED?";
+                        model.rows = { "Cancel", "Confirm" };
+                        model.status = current == Page::trackRemoveConfirm && _trackCost < 0
+                            ? "Native refund " + Handheld::FormatMoney(-_trackCost)
+                            : "Native cost " + Handheld::FormatMoney(_trackCost);
+                    }
+                }
+                else
+                {
+                    model.rows = { "Back to blocks" };
+                    model.status = "Block changed; select again";
+                }
+                return model;
+            }
             if (current == Page::ridesName)
             {
                 Handheld::ManagementPresentation model;
@@ -657,6 +715,10 @@ namespace OpenRCT2::Ui::Windows
                 case Page::overview:
                 case Page::overviewConfirm:
                     return overviewPresentation().rows;
+                case Page::trackBlocks:
+                case Page::trackBlock:
+                case Page::trackRemoveConfirm:
+                case Page::trackSpeedConfirm:
                 case Page::ridesRoster:
                 case Page::ridesInspect:
                 case Page::ridesAccess:
@@ -719,6 +781,8 @@ namespace OpenRCT2::Ui::Windows
                         result.push_back("Access / paths...");
                     if (_ridesTarget && Handheld::CustomTracks::CanResume(*_ridesTarget))
                         result.push_back("Continue track...");
+                    if (_ridesTarget && Handheld::TrackEditing::Eligible(*_ridesTarget))
+                        result.push_back("Edit track blocks...");
                     return result;
                 }
                 case Page::customChoice:
@@ -1508,6 +1572,18 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ridesRoster:
                     page(Page::dashboard);
                     break;
+                case Page::trackBlocks:
+                    page(Page::ridesInspect);
+                    break;
+                case Page::trackBlock:
+                    if (_ridesTarget)
+                        _trackBlocks = Handheld::TrackEditing::Blocks(*_ridesTarget);
+                    page(Page::trackBlocks);
+                    break;
+                case Page::trackRemoveConfirm:
+                case Page::trackSpeedConfirm:
+                    page(Page::trackBlock);
+                    break;
                 case Page::ridesInspect:
                     page(Page::ridesRoster);
                     break;
@@ -1718,6 +1794,11 @@ namespace OpenRCT2::Ui::Windows
                         if (key == "leave")
                         {
                             Handheld::EndTerrain();
+                            close();
+                        }
+                        else if (key == "camera")
+                        {
+                            Handheld::CustomTracks::ToggleCamera();
                             close();
                         }
                         else if (Handheld::CustomTracks::Select(static_cast<TrackElemType>(std::stoi(key))))
@@ -2464,6 +2545,74 @@ namespace OpenRCT2::Ui::Windows
                         invalidate();
                     }
                     break;
+                case Page::trackBlocks:
+                    if (choice < _trackBlocks.size())
+                    {
+                        _trackBlock = _trackBlocks[choice];
+                        _trackSpeed = _trackBlock->speed;
+                        page(Page::trackBlock);
+                    }
+                    else
+                        page(Page::ridesInspect);
+                    break;
+                case Page::trackBlock:
+                    if (!_trackBlock || !Handheld::TrackEditing::Valid(*_trackBlock))
+                    {
+                        if (_ridesTarget)
+                            _trackBlocks = Handheld::TrackEditing::Blocks(*_ridesTarget);
+                        page(Page::trackBlocks);
+                        _status = "Block changed; select again";
+                    }
+                    else if (choice == 0)
+                    {
+                        const auto origin = _trackBlock->origin;
+                        close();
+                        if (auto* main = WindowGetMain())
+                            WindowScrollToLocation(*main, origin);
+                    }
+                    else if (choice == 1 || choice == 5)
+                    {
+                        const auto speed = choice == 5 ? std::optional<uint8_t>{ _trackSpeed } : std::nullopt;
+                        const auto result = Handheld::TrackEditing::Change(*_trackBlock, speed);
+                        if (result.error == GameActions::Status::ok)
+                        {
+                            _trackCost = result.cost;
+                            page(choice == 1 ? Page::trackRemoveConfirm : Page::trackSpeedConfirm);
+                        }
+                        else
+                        {
+                            _status = result.getErrorMessage();
+                            invalidate();
+                        }
+                    }
+                    else if (choice == 2)
+                    {
+                        _trackBlocks = Handheld::TrackEditing::Blocks(*_ridesTarget);
+                        page(Page::trackBlocks);
+                    }
+                    else if (trackTypeHasSpeedSetting(_trackBlock->type))
+                    {
+                        const int minimum = getGameState().cheats.unlockOperatingLimits ? 0 : 2;
+                        _trackSpeed = std::clamp<int>(_trackSpeed + (choice == 3 ? -2 : 2), minimum, kMaximumTrackSpeed);
+                        invalidate();
+                    }
+                    break;
+                case Page::trackRemoveConfirm:
+                case Page::trackSpeedConfirm:
+                    if (choice == 0)
+                        page(Page::trackBlock);
+                    else if (_trackBlock)
+                    {
+                        const auto block = *_trackBlock;
+                        const auto speed = _page == Page::trackSpeedConfirm ? std::optional<uint8_t>{ _trackSpeed }
+                                                                            : std::nullopt;
+                        const auto cost = _trackCost;
+                        close();
+                        const auto result = Handheld::TrackEditing::Change(block, speed, cost, true);
+                        if (result.error != GameActions::Status::ok)
+                            GetWindowManager()->ShowError("Cannot edit track", result.getErrorMessage());
+                    }
+                    break;
                 case Page::ridesInspect:
                 {
                     if (!_ridesTarget || !Handheld::RideManagement::Resolve(*_ridesTarget))
@@ -2472,6 +2621,21 @@ namespace OpenRCT2::Ui::Windows
                         break;
                     }
                     const auto rows = ridesPresentationFor(Page::ridesInspect, choice).rows;
+                    if (choice < rows.size() && rows[choice] == "Edit track blocks...")
+                    {
+                        if (_pausedHere && (gGamePaused & GAME_PAUSED_NORMAL))
+                        {
+                            PauseToggle();
+                            _pausedHere = false;
+                        }
+                        _trackBlocks = Handheld::TrackEditing::Blocks(*_ridesTarget);
+                        _trackBlock.reset();
+                        _dashboard.section = Handheld::Dashboard::Section::rides;
+                        _dashboard.focus = Handheld::Dashboard::Focus::content;
+                        page(Page::trackBlocks);
+                        break;
+                    }
+
                     if (choice == rows.size() - 8)
                     {
                         _ridesDraft = Handheld::RideManagement::BeginName(*_ridesTarget);
@@ -3189,7 +3353,21 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::ride:
-                    if (_ridesTarget && Handheld::CustomTracks::CanResume(*_ridesTarget)
+                    if (_ridesTarget && choice < rows().size() && rows()[choice] == "Edit track blocks...")
+                    {
+                        if (_pausedHere && (gGamePaused & GAME_PAUSED_NORMAL))
+                        {
+                            PauseToggle();
+                            _pausedHere = false;
+                        }
+                        _trackBlocks = Handheld::TrackEditing::Blocks(*_ridesTarget);
+                        _trackBlock.reset();
+                        _dashboard.section = Handheld::Dashboard::Section::rides;
+                        _dashboard.focus = Handheld::Dashboard::Focus::content;
+                        page(Page::trackBlocks);
+                    }
+                    else if (
+                        _ridesTarget && Handheld::CustomTracks::CanResume(*_ridesTarget)
                         && choice == (Handheld::RideAccess::Supported(*_ridesTarget) ? 4u : 3u))
                     {
                         const auto target = *_ridesTarget;

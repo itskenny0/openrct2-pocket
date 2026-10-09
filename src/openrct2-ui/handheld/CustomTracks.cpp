@@ -204,10 +204,10 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         return endpoint && ted.definition.pitchStart == pitch && ted.definition.rollStart == roll
             && (ted.coordinates.rotationBegin & 4) == (endpoint->direction & 4);
     }
-    static std::string Name(TrackElemType type)
+    std::string PieceName(TrackElemType type)
     {
         const auto& ted = GetTrackElementDescriptor(type);
-        if (type == TrackElemType::endStation)
+        if (type == TrackElemType::endStation || type == TrackElemType::beginStation || type == TrackElemType::middleStation)
             return "Station";
         const auto native = FormatStringIDLegacy(ted.description, nullptr);
         if (!native.empty())
@@ -273,10 +273,17 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             auto type = static_cast<TrackElemType>(i);
             if (!Supported(type) || type == TrackElemType::beginStation || type == TrackElemType::middleStation)
                 continue;
-            PickerEntry entry{ { ObjectType::ride, kObjectEntryIndexNull, std::to_string(i) }, Name(type), ZoomLevel{ 0 } };
+            PickerEntry entry{ { ObjectType::ride, kObjectEntryIndexNull, std::to_string(i) },
+                               PieceName(type),
+                               ZoomLevel{ 0 } };
             entry.drawPreview = [type](Drawing::RenderTarget& rt) { DrawPiecePreview(rt, type); };
             result.push_back(std::move(entry));
         }
+        result.push_back(
+            { { ObjectType::ride, kObjectEntryIndexNull, "camera" },
+              camera ? "Piece controls" : "Camera controls",
+              ZoomLevel{ 0 },
+              [](Drawing::RenderTarget& rt) { Concept::DrawIcon(rt, { rt.x + 20, rt.y + 22 }, Concept::Icon::play); } });
         result.push_back(
             { { ObjectType::ride, kObjectEntryIndexNull, "leave" },
               "Return to park",
@@ -404,7 +411,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         FocusEndpoint();
         if (!Supported(selected))
             for (const auto& entry : Pieces())
-                if (entry.identity.key != "leave")
+                if (entry.identity.key != "leave" && entry.identity.key != "camera")
                 {
                     selected = static_cast<TrackElemType>(std::stoi(entry.identity.key));
                     break;
@@ -427,6 +434,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     void Cycle(int direction)
     {
         auto entries = Pieces();
+        entries.pop_back();
         entries.pop_back();
         if (entries.empty())
             return;
@@ -451,7 +459,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         int index = it == slopes.end() ? 2 : it - slopes.begin();
         const auto desired = slopes[std::clamp(index + (direction > 0 ? 1 : -1), 0, 4)];
         for (const auto& e : Pieces())
-            if (e.identity.key != "leave")
+            if (e.identity.key != "leave" && e.identity.key != "camera")
             {
                 auto type = static_cast<TrackElemType>(std::stoi(e.identity.key));
                 const auto& ted = GetTrackElementDescriptor(type);
@@ -471,7 +479,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         size_t index = it == banks.end() ? 0 : it - banks.begin();
         for (size_t offset = 1; offset <= banks.size(); ++offset)
             for (const auto& e : Pieces())
-                if (e.identity.key != "leave")
+                if (e.identity.key != "leave" && e.identity.key != "camera")
                 {
                     auto type = static_cast<TrackElemType>(std::stoi(e.identity.key));
                     const auto& ted = GetTrackElementDescriptor(type);
@@ -546,7 +554,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                 {
                     selected = TrackElemType::flat;
                     for (const auto& e : Pieces())
-                        if (e.identity.key != "leave")
+                        if (e.identity.key != "leave" && e.identity.key != "camera")
                         {
                             auto t = static_cast<TrackElemType>(std::stoi(e.identity.key));
                             if (t == TrackElemType::flat)
@@ -599,7 +607,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                     selected = TrackElemType::endStation;
                 if (!Supported(selected))
                     for (const auto& entry : Pieces())
-                        if (entry.identity.key != "leave")
+                        if (entry.identity.key != "leave" && entry.identity.key != "camera")
                         {
                             selected = static_cast<TrackElemType>(std::stoi(entry.identity.key));
                             break;
@@ -676,7 +684,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         Box(rt, p, { 164, 238 });
         Heading(rt, p + ScreenCoordsXY{ 10, 12 }, StationPlacement() ? "Place station" : "Build track");
         Rule(rt, p + ScreenCoordsXY{ 8, 38 }, 148);
-        Row(rt, p + ScreenCoordsXY{ 8, 48 }, Name(selected), Icon::path, true);
+        Row(rt, p + ScreenCoordsXY{ 8, 48 }, PieceName(selected), Icon::path, true);
         const auto& d = GetTrackElementDescriptor(selected).definition;
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 86 },
@@ -701,7 +709,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             std::string("{MUTED}Chain ") + (ChainAllowed() ? (chain ? "On" : "Off") : "Unavailable"));
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 152 }, "{MUTED}Height " + (endpoint ? std::to_string(endpoint->z / 8) : "Unavailable"));
-        DrawModernText(rt, p + ScreenCoordsXY{ 10, 180 }, camera ? "{GOLD}Camera controls" : "{MUTED}L3 Camera controls");
+        DrawModernText(rt, p + ScreenCoordsXY{ 10, 180 }, camera ? "{GOLD}Camera controls" : "{MUTED}SEL Pieces / camera");
         DrawModernText(rt, p + ScreenCoordsXY{ 10, 208 }, "{MUTED}L2/R2 Slope | SEL Pieces");
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;

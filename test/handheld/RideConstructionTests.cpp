@@ -5,6 +5,7 @@
 #include <openrct2-ui/handheld/CustomTracks.h>
 #include <openrct2-ui/handheld/Designs.h>
 #include <openrct2-ui/handheld/FlatRides.h>
+#include <openrct2-ui/handheld/TrackEditing.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
 #include <openrct2/OpenRCT2.h>
@@ -172,11 +173,55 @@ int main(int argc, char** argv)
         }
         TrackRepositoryScan();
         Check(Ui::Handheld::Designs::Entries().size() == 5, "Native repository omitted supported family designs");
+        namespace E = Ui::Handheld::TrackEditing;
+        auto original = Ui::Handheld::RideManagement::Identify(RideId::FromUnderlying(0));
+        Check(original && C::Resume(*original), "Editing fixture resume failed");
+        Check(
+            C::Select(TrackElemType::brakes) && C::Action(true).error == GameActions::Status::ok, "Native brake build failed");
+        GameActions::ProcessQueue(state);
+        original = C::Target();
+        C::End();
+        auto blocks = E::Blocks(*original);
+        auto findBrake = [&]() {
+            return *std::find_if(blocks.begin(), blocks.end(), [](const auto& b) { return b.type == TrackElemType::brakes; });
+        };
+        auto brake = findBrake();
+        const auto baseline = state.park.cash;
+        Check(
+            E::Change(brake, 8).error == GameActions::Status::ok && E::Change(brake, 31).error != GameActions::Status::ok,
+            "Native speed bounds failed");
+        Check(E::Change(brake, 8, 0, true).error == GameActions::Status::ok, "Native speed execute failed");
+        GameActions::ProcessQueue(state);
+        Check(!E::Valid(brake) && state.park.cash == baseline, "Speed stale baseline/accounting failed");
+        blocks = E::Blocks(*original);
+        brake = findBrake();
+        Check(brake.speed == 8, "Native brake value not changed");
+        // Remove a middle block with a following brake; endpoint-only undo must reject it.
+        const auto middle = *std::find_if(
+            blocks.begin(), blocks.end(), [](const auto& b) { return b.type == TrackElemType::flat; });
+        GameActions::SequentialTrackPlaceAction endpoint(
+            middle.ride.id, middle.type, middle.origin, middle.chain, false, middle.origin, middle.type);
+        endpoint.UseRemoval();
+        Check(GameActions::Query(&endpoint, state).error != GameActions::Status::ok, "Endpoint guard lost");
+        const auto removal = E::Change(middle, {});
+        Check(
+            removal.error == GameActions::Status::ok
+                && E::Change(middle, {}, removal.cost + 1, true).error != GameActions::Status::ok,
+            "Selected removal cost guard failed");
+        Check(E::Change(middle, {}, removal.cost, true).error == GameActions::Status::ok, "Selected middle removal failed");
+        GameActions::ProcessQueue(state);
+        Check(
+            !E::Valid(middle) && E::Change(middle, {}, removal.cost, true).error != GameActions::Status::ok
+                && state.park.cash == baseline - removal.cost && C::CanResume(*original),
+            "Selected refund/repeat/gap recovery failed");
+        auto stale = brake;
+        stale.ride.generation++;
+        Check(!E::Valid(stale) && E::Change(stale, 8).error != GameActions::Status::ok, "Reused ride identity accepted");
         const auto save = std::string(argv[2]) + "/ride-breadth.park";
         SaveFlags flags{};
         Check(ScenarioSave(state, save, flags) && context->LoadParkFromFile(save), "Breadth save/reload failed");
         std::cout << "Native five-family construction / native stations-straights-multitile-turns / query-repeat-cost-refund / "
-                     "unsupported geometry / ghosts-resume-save passed\n";
+                     "unsupported geometry / selected-block-refund-gap / brake-baseline-bounds / ghosts-resume-save passed\n";
     }
     catch (const std::exception& e)
     {

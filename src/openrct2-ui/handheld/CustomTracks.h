@@ -24,6 +24,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     void Bank();
     void Chain();
     std::vector<PickerEntry> Pieces();
+    std::string PieceName(TrackElemType type);
     void DrawPiecePreview(Drawing::RenderTarget& rt, TrackElemType type);
     TrackElemType Selection();
     std::optional<CoordsXYZD> Endpoint();

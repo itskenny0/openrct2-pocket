@@ -4,6 +4,7 @@
 #include "../../GameState.h"
 #include "../../management/Research.h"
 #include "../../ride/RideData.h"
+#include "../../ride/Track.h"
 #include "../../ride/TrackConstructionSupport.h"
 #include "../../ride/TrackData.h"
 #include "../../ride/TrackIteration.h"
@@ -13,6 +14,7 @@
 #include "../../world/tile_element/TrackElement.h"
 #include "../GameActionRunner.h"
 #include "TrackRemoveAction.h"
+#include "TrackSetBrakeSpeedAction.h"
 namespace OpenRCT2::GameActions
 {
     using namespace TrackMetadata;
@@ -32,6 +34,8 @@ namespace OpenRCT2::GameActions
         {
             _object = ride->subtype;
             _buildDate = ride->buildDate;
+            _expectedType = ride->type;
+            _expectedView = ride->overallView;
         }
         _noMoney = getGameState().park.flags.has(ParkFlag::noMoney);
     }
@@ -52,13 +56,22 @@ namespace OpenRCT2::GameActions
         visitor.Visit("buildDate", _buildDate);
         visitor.Visit("expectedCost", _cost);
         visitor.Visit("noMoney", _noMoney);
+        visitor.Visit("expectedType", _expectedType);
+        visitor.Visit("expectedViewX", _expectedView.x);
+        visitor.Visit("expectedViewY", _expectedView.y);
+        visitor.Visit("selected", _selected);
+        visitor.Visit("speedChange", _speedChange);
+        visitor.Visit("baselineSpeed", _baselineSpeed);
+        visitor.Visit("newSpeed", _newSpeed);
+        visitor.Visit("sourceInverted", _sourceInverted);
     }
     void SequentialTrackPlaceAction::Serialise(DataSerialiser& stream)
     {
         GameAction::Serialise(stream);
         stream << DS_TAG(_ride) << DS_TAG(_object) << DS_TAG(_buildDate) << DS_TAG(_origin) << DS_TAG(_source) << DS_TAG(_piece)
                << DS_TAG(_sourceType) << DS_TAG(_first) << DS_TAG(_chain) << DS_TAG(_cost) << DS_TAG(_noMoney)
-               << DS_TAG(_remove);
+               << DS_TAG(_remove) << DS_TAG(_selected) << DS_TAG(_speedChange) << DS_TAG(_baselineSpeed) << DS_TAG(_newSpeed)
+               << DS_TAG(_sourceInverted) << DS_TAG(_expectedType) << DS_TAG(_expectedView);
     }
     Result SequentialTrackPlaceAction::Query(GameState_t& state, Park::ParkData&) const
     {
@@ -75,6 +88,10 @@ namespace OpenRCT2::GameActions
             || _sourceType >= TrackElemType::count || _noMoney != state.park.flags.has(ParkFlag::noMoney)
             || (!state.cheats.ignoreResearchStatus && (!RideTypeIsInvented(ride->type) || !RideEntryIsInvented(_object))))
             return invalid();
+        if (_selected && (ride->type != _expectedType || ride->overallView != _expectedView))
+            return invalid();
+        if (_selected && !_remove && !_speedChange)
+            return invalid();
         const auto& ted = GetTrackElementDescriptor(_piece);
         if (!ride->getRideTypeDescriptor().SupportsTrackGroup(ted.definition.group)
             || !RideEntryGetSupportedTrackPieces(*entry)[static_cast<size_t>(ted.definition.group)]
@@ -82,7 +99,7 @@ namespace OpenRCT2::GameActions
             return invalid();
         if (_first)
         {
-            if (_remove || _piece != TrackElemType::endStation)
+            if (_remove || _selected || _speedChange || _piece != TrackElemType::endStation)
                 return invalid();
             if (!ride->overallView.isNull())
                 for (int y = 32; y < state.mapSize.y * 32 - 32; y += 32)
@@ -107,10 +124,27 @@ namespace OpenRCT2::GameActions
                 }
             if (!found)
                 return invalid();
+            if (_selected
+                && (_origin != _source || found->hasChain() != _chain || found->isInverted() != _sourceInverted
+                    || found->getBrakeBoosterSpeed() != _baselineSpeed))
+                return invalid();
+            if (_speedChange)
+            {
+                if (!_selected || _remove || !trackTypeHasSpeedSetting(_sourceType) || _newSpeed > kMaximumTrackSpeed
+                    || (_newSpeed < 2 && !state.cheats.unlockOperatingLimits)
+                    || (!state.cheats.sandboxMode && !MapIsLocationOwned({ xy, _source.z + c.z })))
+                    return invalid();
+                TrackSetBrakeSpeedAction native({ xy, _source.z + c.z }, _sourceType, _newSpeed);
+                native.SetFlags(GetFlags());
+                auto result = QueryNested(&native, state);
+                if (result.error == Status::ok && _cost != kMoney64Undefined && result.cost != _cost)
+                    return invalid();
+                return result;
+            }
             CoordsXYE next;
             int32_t z{}, direction{};
             const CoordsXYE input{ xy, const_cast<TileElement*>(reinterpret_cast<const TileElement*>(found)) };
-            if (trackBlockGetNext(&input, &next, &z, &direction))
+            if (!_selected && trackBlockGetNext(&input, &next, &z, &direction))
                 return invalid();
             if (_remove)
             {
@@ -164,6 +198,14 @@ namespace OpenRCT2::GameActions
         auto result = Query(state, park);
         if (result.error != Status::ok)
             return result;
+        if (_speedChange)
+        {
+            const auto& c = GetTrackElementDescriptor(_sourceType).sequenceData.sequences[0].clearance;
+            const auto xy = CoordsXY(_source) + CoordsXY{ c.x, c.y }.rotate(_source.direction);
+            TrackSetBrakeSpeedAction native({ xy, _source.z + c.z }, _sourceType, _newSpeed);
+            native.SetFlags(GetFlags());
+            return ExecuteNested(&native, state);
+        }
         if (_remove)
         {
             const auto& c = GetTrackElementDescriptor(_sourceType).sequenceData.sequences[0].clearance;

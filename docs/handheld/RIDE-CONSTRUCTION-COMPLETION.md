@@ -27,7 +27,8 @@ geometry and cost; Pocket supplies no independent shaping algorithm or track rou
 
 Controls retain A Build; B native endpoint Undo; L1/R1 compatible piece; L2/R2 slope
 or station height; X bank; Y chain/station turn; Select paged pieces/Return to park;
-L3 camera mode then L1/R1 zoom and X camera rotation. Start preserves menu recovery.
+Select picker → Camera controls, then L1/R1 zoom and X camera rotation;
+Select picker → Piece controls returns. Legacy L3 mapping remains available. Start preserves menu recovery.
 Extended native pitch/roll pieces remain selectable through the paginated picker.
 
 Phase 1 validation: Release GUI/CLI; new public-metadata RideConstructionTests builds
@@ -59,8 +60,77 @@ import them, query scenery off/on, verify extra native cost and real scenery
 placement, prevent duplicate confirmation and check ghost cleanup and save/reload.
 The original asset-backed Wooden design regression explicitly selects its exported
 fixture from the expanded list; picker identity assertions accept the real list size.
-Phase 3 editing remains pending. Other conventional
+Phase 2 published: `2fa67fbd3105e52b2787d7d803860ae867e14c28`.
+
+## Phase 3 — selected native blocks and recovery
+
+Closed conventional rides offer Edit track blocks from their park inspection and
+Dashboard inspection. The paged roster enumerates real non-ghost sequence-zero
+blocks and derives each origin from native TED clearance/rotation metadata.
+Rows show the shared piece name and tile/height. Select a block to locate it,
+review its native removal refund, or edit supported brake/booster/block-brake
+speed in native two-unit steps. Both reviews default to Cancel. A confirms,
+B returns without execution; the menu closes before the single queued action.
+Select → Camera controls now provides camera mode without requiring an analog
+stick button. Existing station, zoom/rotation and return-to-park controls remain.
+
+TrackEditing revalidates generation-aware RideManagement identity and exact
+block type/origin/direction/height/chain/inversion/speed. The serialized native
+SequentialTrackPlaceAction adds selected removal and speed operations with
+ride object/build date/type/overall-view, closed status, research, bounds,
+block baselines, no-money mode and quoted refund checks repeated at execution.
+Native TrackRemoveAction and TrackSetBrakeSpeedAction own all map/state changes.
+Speed editing checks native ownership and limits before calling the native action.
+Endpoint-only Undo retains its original no-following-block guard; selected removal
+can remove a middle block. The native gap then becomes recoverable through the
+existing forward Continue track workflow. No independent track geometry, map
+insertion/removal, simulation algorithm or serialized Pocket park state is added.
+Menus retain their own block draft while navigating; stale or loaded/departed
+identities are rejected. A menu-owned pause is released when entering this
+construction workflow; externally paused construction still follows native rules.
+
+Validation: Release GUI/CLI; native five-family/design/scenery tests; selected
+middle removal, exact/stale refunds, repeated removal rejection, brake bounds and
+baseline invalidation, unchanged speed-edit cash, gap recovery and save/reload.
+Full asset-backed PathActionsTests (including Ride Management, RideAccess and SDL),
+StaffCompletionTests, GuestCompletionTests, ConstructionTests and all three CTest
+input/presentation/save checks pass. Original Mines of Africa Wooden regression
+still proves native circuit/access, opening, natural guest use and save/reload.
+Production RideConstructionCapture in Factory Capers proves non-Wooden Junior
+Coaster picker/editor/design preview, both Cancel-first block reviews, confirmed
+native speed change, SDL held-A suppression, Select camera handoff, entrance/exit
+completion and save/reload. The same asset-backed workflow also passes for the
+Looping Coaster in Build your own Six Flags Magic Mountain, including its inversion
+preview. Native station height is raised explicitly and the driver selects sites
+through native ownership/clearance queries; it never terraforms or edits ownership
+to force success. PresentationLifecycleTests also passes SDL HUD/tool/dashboard,
+load/shutdown cleanup and staff controls. No object/research or live simulation
+patches are used.
+
+## Captures and remaining ordinary parity gaps
+
+The new capture driver renders native viewports and actual production Pocket
+pickers, panels and menus at 512×384. Captures include category/object choice,
+station/editor, native compatible pieces, design preview/review, existing block
+selection, speed/removal reviews, dense block roster, entrances/exits and native
+invalid placement. Original assets remain private; only PNGs and manifest are
+packaged. Capture inspection and final published commit are recorded below.
+
+This is substantial breadth and selected-block editing, **not full ordinary track
+editing parity**. Backward building, explicit choice among multiple disconnected
+endpoints, drag/map block highlighting, direct replacing/rebuilding a selected
+block, lift/alternative-track changes on existing blocks, covered/inverted
+variant controls, seat rotation and special-piece parameters beyond speed,
+native UI design export/scenery selection, maze/special footprint construction,
+maze/flat saved-design adapters and user-directed vehicle substitutions remain.
+Availability is exact loaded/researched native objects; unsupported designs are
+filtered, not parsed or silently substituted by Pocket. Broader conventional
+families are descriptor-offered but require individual validation of ride-specific
+station/vehicle geometry and operation. Goal remains 100% ordinary gameplay.
+New family operation/guest use is not claimed from construction/capture tests;
+the natural guest proof is the existing Wooden regression. AArch64 builds,
+performance and physical Brick controls/operation remain unvalidated. Other conventional
 families are offered by native descriptors but are not individually exhaustively
-validated. Covered/inverted-track toggle variants, special parameter controls and
+validated. Covered/inverted-track toggle variants, special parameter controls beyond speed and
 maze/special footprint adapters remain ordinary parity gaps. Physical Brick and
 AArch64 performance/controls are not claimed.

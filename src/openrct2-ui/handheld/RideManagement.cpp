@@ -7,6 +7,7 @@
 #include "FlatRides.h"
 #include "RideAccess.h"
 #include "TextEntry.h"
+#include "TrackEditing.h"
 
 #include <iomanip>
 #include <openrct2/Context.h>
@@ -1017,6 +1018,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.rows.push_back("Access / paths...");
             if (CustomTracks::CanResume(*target))
                 model.rows.push_back("Continue track...");
+            if (TrackEditing::Eligible(*target))
+                model.rows.push_back("Edit track blocks...");
             model.rows.push_back("Rename...");
             model.rows.push_back("Appearance...");
             model.rows.push_back("Music...");
