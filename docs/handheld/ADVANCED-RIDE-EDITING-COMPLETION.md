@@ -100,3 +100,37 @@ Remaining: exhaustive covered slopes/curves, positive variant-toggle/transition
 coverage for other eligible objects, selected-seat direct adjustment, other special
 parameters, atomic/station/inverted replacement, diagonal/complex backward coverage,
 arbitrary design scenery/substitutions and broad operation/hardware parity.
+
+## Phase 2 publication
+
+Canonical f79d077682b19caae380b1f807c9177c75c6155e; local
+eac254e1de9fd1f1977e49fa7ce30f549f39c984; matching tree
+bca2ea2d961798252fa9120b0022662b818084dd. Release GUI/CLI,
+RideConstructionTests and expanded SeatRotationTests PASS before publication.
+
+## Phase 3 — representative native family operation workflow
+
+FamilyOperationTests initializes legal native 64×64 scenario metadata and loaded
+Monorail (mono1), Dinghy Slide (ding1) and Flying (bmair) objects before any actions.
+It then uses the production controller construction adapter and native GameActions
+to build four-tile stations and closed circuits, including a real Dinghy covered
+segment and Flying inverted track. Native entrance/exit recovery places actual
+access elements; FootpathPlaceAction builds queue/normal landings and native
+RideAccess inspection confirms both attachments. It does not claim a connection
+to a park entrance or natural guest routing in the initialized fixture.
+
+Each family passes native RideSetStatusAction query/execute to Open, exact placement
+accounting and native save/reload with status retained. The empty Monorail vehicle
+changes native coordinates over 4096 simulation ticks. Dinghy and Flying evidence
+is limited to valid construction/access/Open/persistence; a flat coaster/water circuit
+is not evidence of sustained running, ratings, guest throughput or ride excitement.
+No guests, positions, ride status, vehicle flags, ownership, cash or research are
+patched live to force these new workflows. Native fixture ownership/cash/research
+initialization precedes construction. Private original sprites are used only for
+production viewport/component captures; no private park/design/archive is published.
+
+This validation closes demonstrated station/variant/access/Open workflow evidence
+for these representative objects. It does not complete every transport/water/inverted
+family, cover every special piece or establish live scenario guest use. Existing
+Mini Golf/maze opening and original Wooden natural queue use remain regression
+contracts. Full construction still remains PARTIAL toward 100% ordinary gameplay.

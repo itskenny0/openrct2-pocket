@@ -1,0 +1,270 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Native initialized scenario fixture; construction and editing use real actions.
+#include <SDL.h>
+#include <filesystem>
+#include <iostream>
+#include <openrct2-ui/UiContext.h>
+#include <openrct2-ui/handheld/ControllerInput.h>
+#include <openrct2-ui/handheld/CustomTracks.h>
+#include <openrct2-ui/handheld/Explorer.h>
+#include <openrct2-ui/handheld/FlatRides.h>
+#include <openrct2-ui/handheld/RideAccess.h>
+#include <openrct2-ui/handheld/TrackEditing.h>
+#include <openrct2-ui/windows/Windows.h>
+#include <openrct2/Context.h>
+#include <openrct2/GameState.h>
+#include <openrct2/Input.h>
+#include <openrct2/OpenRCT2.h>
+#include <openrct2/PlatformEnvironment.h>
+#include <openrct2/actions/footpath/FootpathPlaceAction.h>
+#include <openrct2/actions/ride/RideSetStatusAction.h>
+#include <openrct2/audio/AudioContext.h>
+#include <openrct2/config/Config.h>
+#include <openrct2/core/Imaging.h>
+#include <openrct2/drawing/Palette.h>
+#include <openrct2/drawing/X8DrawingEngine.h>
+#include <openrct2/paint/Paint.h>
+#include <openrct2/park/ParkFile.h>
+#include <openrct2/ride/Vehicle.h>
+#include <openrct2/scenario/Scenario.h>
+#include <openrct2/ui/UiContext.h>
+#include <openrct2/ui/WindowManager.h>
+#include <openrct2/world/tile_element/SurfaceElement.h>
+using namespace OpenRCT2;
+namespace H = Ui::Handheld;
+namespace C = H::CustomTracks;
+namespace W = Ui::Windows;
+static void Check(bool ok, const char* message)
+{
+    if (!ok)
+        throw std::runtime_error(message);
+}
+int main(int argc, char** argv)
+{
+    try
+    {
+        if (argc != 3 && argc != 4)
+            return 2;
+        SDL_setenv("OPENRCT2_HANDHELD", "1", 1);
+        SDL_setenv("SDL_VIDEODRIVER", "dummy", 0);
+        SDL_setenv("SDL_AUDIODRIVER", "dummy", 0);
+        gCustomOpenRCT2DataPath = argv[1];
+        gCustomUserDataPath = argv[2];
+        gOpenRCT2Headless = true;
+        gOpenRCT2NoGraphics = argc != 4;
+        auto env = CreatePlatformEnvironment();
+        if (argc == 4)
+            env->SetBasePath(DirBase::rct2, argv[3]);
+        auto ui = Ui::CreateUiContext(*env);
+        auto context = CreateContext(std::move(env), Audio::CreateDummyAudioContext(), std::move(ui));
+        Config::SetDefaults();
+        if (argc == 4)
+            Config::Get().general.rct2Path = argv[3];
+        Config::Get().general.windowWidth = 512;
+        Config::Get().general.windowHeight = 384;
+        Config::Get().general.windowScale = 1;
+        Check(context->Initialise(), "Context failed");
+        context->GetUiContext().CreateWindow();
+        auto& state = getGameState();
+        gameStateInitAll(state, { 64, 64 });
+        gLegacyScene = LegacyScene::playing;
+        Check(W::MainOpen(), "Fixture viewport missing");
+        WindowGetMain()->onResize();
+        InputSetState(InputState::normal);
+        Ui::GetWindowManager()->CloseByClass(WindowClass::progressWindow);
+        state.park.cash = 10000000;
+        state.park.flags.unset(ParkFlag::noMoney, ParkFlag::noMoneyScenario);
+        for (int y = 32; y < 2016; y += 32)
+            for (int x = 32; x < 2016; x += 32)
+                MapGetSurfaceElementAt(CoordsXY{ x, y })->setOwnership({ OwnershipFlag::landOwned });
+        auto& objects = context->GetObjectManager();
+        Check(
+            objects.LoadObject("rct2.terrain_surface.grass") && objects.LoadObject("rct2.terrain_edge.rock")
+                && objects.LoadObject("rct2.station.plain"),
+            "Fixture terrain/station missing");
+        const char* ids[] = { "rct2.ride.mono1", "rct2.ride.ding1", "rct2.ride.bmair" };
+        const ride_type_t types[] = { RIDE_TYPE_MONORAIL, RIDE_TYPE_DINGHY_SLIDE, RIDE_TYPE_FLYING_ROLLER_COASTER };
+        const CoordsXY positions[] = { { 640, 640 }, { 640, 1408 }, { 1408, 1408 } };
+        std::array<ObjectEntryIndex, 3> indices{};
+        // Object/research availability is fixture initialization, before actions.
+        for (int n = 0; n < 3; ++n)
+        {
+            auto* o = objects.LoadObject(ids[n]);
+            Check(o, "Family native object missing");
+            indices[n] = objects.GetLoadedObjectEntryIndex(o);
+            RideTypeSetInvented(types[n]);
+            RideEntrySetInvented(indices[n]);
+        }
+        auto* normalPath = objects.LoadObject("rct2.footpath_surface.tarmac");
+        auto* queuePath = objects.LoadObject("rct2.footpath_surface.queue_blue");
+        auto* railings = objects.LoadObject("rct2.footpath_railings.wood");
+        Check(normalPath && queuePath && railings, "Family native path fixture missing");
+        CoordsXYZ captureFocus{ 656, 656, 112 };
+        auto capture = [&](const char* name, bool menu) {
+            const auto* output = std::getenv("POCKET_FAMILY_CAPTURES");
+            if (!output || argc != 4)
+                return;
+            std::filesystem::create_directories(output);
+            Drawing::X8DrawingEngine engine(context->GetUiContext());
+            engine.Resize(512, 384);
+            engine.BeginDraw();
+            auto& rt = *engine.getRT();
+            Viewport viewport{};
+            viewport.width = 512;
+            viewport.height = 384;
+            viewport.zoom = ZoomLevel{ 1 };
+            const auto focus = C::Endpoint() ? CoordsXYZ(*C::Endpoint()) + CoordsXYZ{ 16, 16, 0 } : captureFocus;
+            const auto centre = Translate3DTo2DWithZ(0, focus);
+            viewport.viewPos = centre - ScreenCoordsXY{ viewport.zoom.ApplyTo(310), viewport.zoom.ApplyTo(190) };
+            ResetAllSpriteQuadrantPlacements();
+            Drawing::UpdatePaletteEffects();
+            ViewportRender(rt, &viewport);
+            if (menu)
+                Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu)->onDraw(rt);
+            else
+                C::DrawPanel(rt, { 512, 384 });
+            Image image;
+            image.Width = 512;
+            image.Height = 384;
+            image.Depth = 8;
+            image.Stride = rt.LineStride();
+            image.Palette = Drawing::gPalette;
+            const auto* bytes = reinterpret_cast<uint8_t*>(rt.bits);
+            image.Pixels.assign(bytes, bytes + rt.LineStride() * rt.height);
+            Imaging::WriteToFile((std::filesystem::path(output) / name).string(), image, ImageFormat::png);
+            engine.EndDraw();
+        };
+
+        std::vector<RideId> built;
+        for (int family = 0; family < 3; ++family)
+        {
+            auto place = [&](TrackElemType piece) {
+                Check(C::Select(piece), "Family native piece unavailable");
+                const auto q = C::Action(false);
+                const auto cash = state.park.cash;
+                if (q.error != GameActions::Status::ok)
+                    std::cerr << q.getErrorMessage() << "\n";
+                Check(
+                    q.error == GameActions::Status::ok && C::Action(true).error == GameActions::Status::ok,
+                    "Family placement failed");
+                GameActions::ProcessQueue(state);
+                Check(state.park.cash == cash - q.cost, "Family native accounting differs");
+            };
+            Check(H::BeginCustomTrack(indices[family], types[family]), "Family controller begin unavailable");
+            GameActions::ProcessQueue(state);
+            C::Update(positions[family]);
+            captureFocus = { positions[family].x + 16, positions[family].y + 16, C::Endpoint()->z };
+            place(TrackElemType::endStation);
+            for (int n = 0; n < 3; ++n)
+                place(TrackElemType::endStation);
+            if (family == 1)
+            {
+                Check(C::Select(TrackElemType::flat) && C::ToggleCovered(), "Native covered circuit segment absent");
+                place(TrackElemType::flatCovered);
+                Check(C::ToggleCovered(), "Native covered circuit did not return to open");
+            }
+            else
+                place(TrackElemType::flat);
+            place(TrackElemType::flat);
+            place(TrackElemType::leftQuarterTurn3Tiles);
+            for (int n = 0; n < 4; ++n)
+                place(TrackElemType::flat);
+            place(TrackElemType::leftQuarterTurn3Tiles);
+            for (int n = 0; n < 6; ++n)
+                place(TrackElemType::flat);
+            place(TrackElemType::leftQuarterTurn3Tiles);
+            for (int n = 0; n < 4; ++n)
+                place(TrackElemType::flat);
+            place(TrackElemType::leftQuarterTurn3Tiles);
+            Check(C::Completed().has_value(), "Family native circuit did not close");
+            const auto circuit = *C::Completed();
+            built.push_back(circuit.id);
+            capture(
+                family == 0       ? "advanced-10-monorail-circuit-complete.png"
+                    : family == 1 ? "advanced-11-dinghy-covered-circuit-complete.png"
+                                  : "advanced-12-flying-inverted-circuit-complete.png",
+                false);
+            H::EndTerrain();
+            Check(H::FlatRides::Resume(circuit), "Family native access recovery missing");
+            for (int access = 0; access < 2; ++access)
+            {
+                std::optional<CoordsXY> tile;
+                for (int y = 32; y < 2016 && !tile; y += 32)
+                    for (int x = 32; x < 2016 && !tile; x += 32)
+                        if (H::FlatRides::Action(CoordsXY{ x, y }, false).error == GameActions::Status::ok)
+                            tile = CoordsXY{ x, y };
+                Check(
+                    tile && H::FlatRides::Action(tile, true).error == GameActions::Status::ok,
+                    "Family native entrance/exit failed");
+                GameActions::ProcessQueue(state);
+            }
+            H::EndTerrain();
+            auto access = H::RideAccess::Inspect(circuit);
+            Check(access.has_value(), "Family native entrances/exits not present");
+            for (bool exit : { false, true })
+            {
+                const auto point = exit ? access->exit : access->entrance;
+                GameActions::FootpathPlaceAction path(
+                    CoordsXYZ(point.outside), {}, objects.GetLoadedObjectEntryIndex(exit ? normalPath : queuePath),
+                    objects.GetLoadedObjectEntryIndex(railings), kInvalidDirection, exit ? 0 : PathConstructFlag::IsQueue);
+                Check(
+                    GameActions::Query(&path, state).error == GameActions::Status::ok
+                        && GameActions::Execute(&path, state).error == GameActions::Status::ok,
+                    "Family native path landing failed");
+                GameActions::ProcessQueue(state);
+            }
+            access = H::RideAccess::Inspect(circuit);
+            Check(access && access->entrance.attached && access->exit.attached, "Family native access not attached");
+            GameActions::RideSetStatusAction opening(circuit.id, RideStatus::open);
+            const auto q = GameActions::Query(&opening, state);
+            if (q.error != GameActions::Status::ok)
+                std::cerr << q.getErrorMessage() << "\n";
+            Check(
+                q.error == GameActions::Status::ok && GameActions::Execute(&opening, state).error == GameActions::Status::ok,
+                "Family native opening failed");
+            GameActions::ProcessQueue(state);
+            Check(GetRide(circuit.id)->status == RideStatus::open, "Family native opening did not persist");
+            if (family == 0)
+            {
+                std::optional<CoordsXYZ> initial;
+                bool moved = false;
+                for (int tick = 0; tick < 4096; ++tick)
+                {
+                    gameStateUpdateLogic();
+                    const auto* nativeRide = GetRide(circuit.id);
+                    if (auto* vehicle = getGameState().entities.getEntity<Vehicle>(nativeRide->vehicles[0]))
+                    {
+                        const CoordsXYZ location{ vehicle->x, vehicle->y, vehicle->z };
+                        if (initial && location != *initial)
+                            moved = true;
+                        if (!initial)
+                            initial = location;
+                    }
+                }
+                Check(moved, "Native empty Monorail train did not move");
+                std::cout << "Native empty Monorail vehicle moved over 4096 simulation ticks; no guest-use claim\n";
+            }
+            W::HandheldRideOpen(circuit.id);
+            capture(
+                family == 0       ? "advanced-13-monorail-native-open.png"
+                    : family == 1 ? "advanced-14-dinghy-native-open.png"
+                                  : "advanced-15-flying-native-open.png",
+                true);
+            Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+            std::cout << ids[family] << " action-built circuit/access/native Open PASS\n";
+        }
+        const auto file = std::string(argv[2]) + "/family-operation.park";
+        SaveFlags flags{};
+        Check(ScenarioSave(state, file, flags) && context->LoadParkFromFile(file), "Family native save/reload failed");
+        for (auto id : built)
+            Check(GetRide(id) && GetRide(id)->status == RideStatus::open, "Family saved Open lost");
+        Check(!C::Active(), "Family tool context survived load");
+        std::cout << "Native transport/water/inverted circuit/access/open/accounting/save workflow passed; no sustained "
+                     "guest-use claim\n";
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+        return 1;
+    }
+}

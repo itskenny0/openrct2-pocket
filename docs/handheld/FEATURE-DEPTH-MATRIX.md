@@ -250,3 +250,10 @@ forward/backward source-variant recovery are delivered. Native query/ghost/execu
 controller covered utility, unsupported inversion, undo and save persistence pass.
 Positive transition and exhaustive family/variant coverage, direct selected-seat
 adjustment and other special parameters remain PARTIAL; see advanced checkpoint.
+
+Representative family validation now passes action-built Monorail, Dinghy (covered
+segment) and Flying (inverted) closed circuits, native access/queue-normal landings,
+Open and save/reload using initialized native fixtures with real sprites. Empty
+Monorail movement is observed for 4096 ticks. No sustained guest use, full park-network
+routing, Dinghy/Flying motion or exhaustive family operation is claimed. Overall
+construction remains PARTIAL; see ADVANCED-RIDE-EDITING-COMPLETION.md.
