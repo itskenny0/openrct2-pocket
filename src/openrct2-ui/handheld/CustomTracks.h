@@ -11,12 +11,15 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     bool Begin(ObjectEntryIndex index, ride_type_t type = kRideTypeNull);
     bool CanResume(const RideManagement::Target& target);
     bool Resume(const RideManagement::Target& target);
-    bool ResumeFrom(const RideManagement::Target& target, std::optional<std::pair<CoordsXYZD, TrackElemType>> source);
+    bool ResumeFrom(
+        const RideManagement::Target& target, std::optional<std::pair<CoordsXYZD, TrackElemType>> source,
+        bool backward = false);
     void End();
     bool Active();
     bool Busy();
     bool StationPlacement();
     bool CameraMode();
+    bool Backward();
     void ToggleCamera();
     void Rotate();
     bool Select(TrackElemType type);

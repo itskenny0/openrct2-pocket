@@ -29,7 +29,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
 {
     namespace GA = GameActions;
     using namespace TrackMetadata;
-    static bool active{}, busy{}, camera{}, chain{}, createdHere{};
+    static bool active{}, busy{}, camera{}, chain{}, createdHere{}, backward{};
+    static std::optional<TrackConstructionSupport::BlockSnapshot> sourceBaseline;
     static int32_t stationOffset{};
     static uint8_t placementSpeed{ 6 }, placementSeat{ 4 };
     static uint32_t depth{};
@@ -90,6 +91,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     static bool Recover()
     {
         previous.reset();
+        sourceBaseline.reset();
         pitch = TrackPitch::none;
         roll = TrackRoll::none;
         auto* ride = target ? RideManagement::Resolve(*target) : nullptr;
@@ -145,6 +147,50 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                 return true;
             }
             const auto& ted = GetTrackElementDescriptor(e->getTrackType());
+            if (backward)
+            {
+                if (e->isInverted())
+                    return false;
+                const auto snapshot = TrackConstructionSupport::Previous(current);
+                if (!snapshot)
+                {
+                    TrackBeginEnd gap{};
+                    if (trackBlockGetPrevious(current, &gap))
+                        return false;
+                    const auto& c = ted.sequenceData.sequences[e->getSequenceIndex()].clearance;
+                    const auto origin = CoordsXY(current) - CoordsXY{ c.x, c.y }.rotate(e->getDirection());
+                    sourceBaseline = TrackConstructionSupport::BlockSnapshot{ { origin, e->getBaseZ() - c.z,
+                                                                                e->getDirection() },
+                                                                              e->getTrackType(),
+                                                                              e->getBrakeBoosterSpeed(),
+                                                                              e->getSeatRotation(),
+                                                                              e->hasChain(),
+                                                                              e->isInverted() };
+                    previous = Block{ sourceBaseline->origin, sourceBaseline->type };
+                    endpoint = CoordsXYZD{ gap.end_x, gap.end_y, sourceBaseline->origin.z + ted.coordinates.zBegin,
+                                           static_cast<Direction>(
+                                               (((e->getDirection() + ted.coordinates.rotationBegin) & 3)
+                                                | (ted.coordinates.rotationBegin & 4))
+                                               ^ 2) };
+                    pitch = ted.definition.pitchStart;
+                    roll = ted.definition.rollStart;
+                    return true;
+                }
+                const auto& c = GetTrackElementDescriptor(snapshot->type).sequenceData.sequences[0].clearance;
+                const auto tile = CoordsXY(snapshot->origin) + CoordsXY{ c.x, c.y }.rotate(snapshot->origin.direction);
+                current = { tile, nullptr };
+                for (auto* track : TileElementsView<TrackElement>(tile))
+                    if (!track->isGhost() && track->getRideIndex() == ride->id && track->getSequenceIndex() == 0
+                        && track->getTrackType() == snapshot->type && track->getDirection() == snapshot->origin.direction
+                        && track->getBaseZ() == snapshot->origin.z + c.z)
+                    {
+                        current.element = reinterpret_cast<TileElement*>(track);
+                        break;
+                    }
+                if (!current.element)
+                    return false;
+                continue;
+            }
             CoordsXYE next;
             int32_t z{}, direction{};
             const bool connected = trackBlockGetNext(&current, &next, &z, &direction);
@@ -183,6 +229,10 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     {
         return camera;
     }
+    bool Backward()
+    {
+        return active && backward;
+    }
     bool StationPlacement()
     {
         return active && !previous && !completed;
@@ -218,8 +268,11 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         // conventional special pieces, including inversions/helixes/photo.
         if (StationPlacement())
             return type == TrackElemType::endStation;
-        return endpoint && ted.definition.pitchStart == pitch && ted.definition.rollStart == roll
-            && (ted.coordinates.rotationBegin & 4) == (endpoint->direction & 4);
+        return endpoint
+            && (backward ? ted.definition.pitchEnd == pitch && ted.definition.rollEnd == roll
+                        && (ted.coordinates.rotationEnd & 4) == (endpoint->direction & 4)
+                         : ted.definition.pitchStart == pitch && ted.definition.rollStart == roll
+                        && (ted.coordinates.rotationBegin & 4) == (endpoint->direction & 4));
     }
     std::string PieceName(TrackElemType type)
     {
@@ -354,6 +407,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         anchor.reset();
         depth = 0;
         camera = false;
+        backward = false;
+        sourceBaseline.reset();
         ++revision;
     }
     bool Begin(ObjectEntryIndex index, ride_type_t requested)
@@ -426,7 +481,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             return false;
         return ResumeFrom(t, std::nullopt);
     }
-    bool ResumeFrom(const RideManagement::Target& t, std::optional<std::pair<CoordsXYZD, TrackElemType>> source)
+    bool ResumeFrom(const RideManagement::Target& t, std::optional<std::pair<CoordsXYZD, TrackElemType>> source, bool reverse)
     {
         const auto* ride = RideManagement::Resolve(t);
         if (!ride || ride->status != RideStatus::closed || !Eligible(ride->subtype, ride->type))
@@ -437,6 +492,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             return false;
         End();
         target = t;
+        backward = reverse;
         if (source)
             anchor = Block{ source->first, source->second };
         active = true;
@@ -474,8 +530,9 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     void Cycle(int direction)
     {
         auto entries = Pieces();
-        entries.pop_back();
-        entries.pop_back();
+        std::erase_if(entries, [](const auto& entry) {
+            return entry.identity.key.empty() || entry.identity.key.front() < '0' || entry.identity.key.front() > '9';
+        });
         if (entries.empty())
             return;
         size_t index = 0;
@@ -494,7 +551,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             return;
         }
         const std::array slopes{ TrackPitch::down60, TrackPitch::down25, TrackPitch::none, TrackPitch::up25, TrackPitch::up60 };
-        const auto current = GetTrackElementDescriptor(selected).definition.pitchEnd;
+        const auto current = backward ? GetTrackElementDescriptor(selected).definition.pitchStart
+                                      : GetTrackElementDescriptor(selected).definition.pitchEnd;
         auto it = std::find(slopes.begin(), slopes.end(), current);
         int index = it == slopes.end() ? 2 : it - slopes.begin();
         const auto desired = slopes[std::clamp(index + (direction > 0 ? 1 : -1), 0, 4)];
@@ -503,7 +561,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             {
                 auto type = static_cast<TrackElemType>(std::stoi(e.identity.key));
                 const auto& ted = GetTrackElementDescriptor(type);
-                if (ted.definition.pitchEnd == desired && ted.definition.rollEnd == roll
+                if ((backward ? ted.definition.pitchStart : ted.definition.pitchEnd) == desired
+                    && (backward ? ted.definition.rollStart : ted.definition.rollEnd) == roll
                     && !ted.flags.has(TrackElementFlag::turnLeft) && !ted.flags.has(TrackElementFlag::turnRight))
                 {
                     Select(type);
@@ -548,7 +607,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             return;
         }
         const std::array banks{ TrackRoll::none, TrackRoll::left, TrackRoll::right };
-        const auto current = GetTrackElementDescriptor(selected).definition.rollEnd;
+        const auto current = backward ? GetTrackElementDescriptor(selected).definition.rollStart
+                                      : GetTrackElementDescriptor(selected).definition.rollEnd;
         auto it = std::find(banks.begin(), banks.end(), current);
         size_t index = it == banks.end() ? 0 : it - banks.begin();
         for (size_t offset = 1; offset <= banks.size(); ++offset)
@@ -557,8 +617,10 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                 {
                     auto type = static_cast<TrackElemType>(std::stoi(e.identity.key));
                     const auto& ted = GetTrackElementDescriptor(type);
-                    if (ted.definition.rollEnd == banks[(index + offset) % banks.size()]
-                        && ted.definition.pitchEnd == GetTrackElementDescriptor(selected).definition.pitchEnd
+                    if ((backward ? ted.definition.rollStart : ted.definition.rollEnd) == banks[(index + offset) % banks.size()]
+                        && (backward ? ted.definition.pitchStart : ted.definition.pitchEnd)
+                            == (backward ? GetTrackElementDescriptor(selected).definition.pitchStart
+                                         : GetTrackElementDescriptor(selected).definition.pitchEnd)
                         && !ted.flags.has(TrackElementFlag::turnLeft) && !ted.flags.has(TrackElementFlag::turnRight))
                     {
                         Select(type);
@@ -595,6 +657,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     {
         if (!active || !target || !endpoint || !Supported(selected))
             return {};
+        if (backward)
+            return Block{ TrackConstructionSupport::BackwardOrigin(*endpoint, selected), selected };
         auto origin = *endpoint;
         const auto& coords = GetTrackElementDescriptor(selected).coordinates;
         origin.direction = (origin.direction - coords.rotationBegin) & 3;
@@ -612,6 +676,12 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             target->id, request->type, request->origin, chain, !previous, source.origin, source.type);
         query.SetPlacementSpeed(trackTypeHasSpeedSetting(request->type) ? placementSpeed : 6);
         query.SetPlacementSeat(SeatSupported() ? placementSeat : 0);
+        if (backward)
+        {
+            if (!sourceBaseline)
+                return Invalid("Backward source unavailable");
+            query.UseBackward(*sourceBaseline);
+        }
         auto q = GA::Query(&query, getGameState());
         if (!execute || q.error != GA::Status::ok)
             return q;
@@ -619,6 +689,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             target->id, request->type, request->origin, chain, !previous, source.origin, source.type, q.cost);
         action.SetPlacementSpeed(trackTypeHasSpeedSetting(request->type) ? placementSpeed : 6);
         action.SetPlacementSeat(SeatSupported() ? placementSeat : 0);
+        if (backward)
+            action.UseBackward(*sourceBaseline);
         ClearPreview();
         busy = true;
         const auto token = revision;
@@ -669,12 +741,22 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         auto query = GA::SequentialTrackPlaceAction(
             target->id, block.type, block.origin, false, false, block.origin, block.type);
         query.UseRemoval();
+        if (backward && sourceBaseline)
+            query.UseBackward(*sourceBaseline);
+        if (backward)
+        {
+            if (!sourceBaseline)
+                return Invalid("Backward source unavailable");
+            query.UseBackward(*sourceBaseline);
+        }
         auto q = GA::Query(&query, getGameState());
         if (!execute || q.error != GA::Status::ok)
             return q;
         auto remove = GA::SequentialTrackPlaceAction(
             target->id, block.type, block.origin, false, false, block.origin, block.type, q.cost);
         remove.UseRemoval();
+        if (backward && sourceBaseline)
+            remove.UseBackward(*sourceBaseline);
         const auto token = revision;
         busy = true;
         remove.SetCallback([token](const auto*, const GA::Result* result) {
@@ -774,30 +856,36 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             return;
         }
         Box(rt, p, { 164, 238 });
-        Heading(rt, p + ScreenCoordsXY{ 10, 12 }, StationPlacement() ? "Place station" : "Build track");
+        Heading(
+            rt, p + ScreenCoordsXY{ 10, 12 },
+            StationPlacement() ? "Place station"
+                : backward     ? "Build backward"
+                               : "Build track");
         Rule(rt, p + ScreenCoordsXY{ 8, 38 }, 148);
         Box(rt, p + ScreenCoordsXY{ 8, 48 }, { 148, 28 }, true);
         DrawStrongText(rt, p + ScreenCoordsXY{ 14, 57 }, "{BLACK}" + PieceName(selected), 136);
         const auto& d = GetTrackElementDescriptor(selected).definition;
+        const auto displayPitch = backward ? d.pitchStart : d.pitchEnd;
+        const auto displayRoll = backward ? d.rollStart : d.rollEnd;
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 86 },
             "{MUTED}Slope "
                 + std::string(
-                    d.pitchEnd == TrackPitch::none         ? "Level"
-                        : d.pitchEnd == TrackPitch::up25   ? "Up 25"
-                        : d.pitchEnd == TrackPitch::up60   ? "Up 60"
-                        : d.pitchEnd == TrackPitch::down25 ? "Down 25"
-                        : d.pitchEnd == TrackPitch::down60 ? "Down 60"
-                                                           : "Special"));
+                    displayPitch == TrackPitch::none         ? "Level"
+                        : displayPitch == TrackPitch::up25   ? "Up 25"
+                        : displayPitch == TrackPitch::up60   ? "Up 60"
+                        : displayPitch == TrackPitch::down25 ? "Down 25"
+                        : displayPitch == TrackPitch::down60 ? "Down 60"
+                                                             : "Special"));
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 108 },
             trackTypeHasSpeedSetting(selected) ? "{MUTED}Speed "
                     + FormatStringID(STR_VELOCITY, static_cast<uint16_t>((placementSpeed * 9) >> 2))
                                                : "{MUTED}Bank "
-                    + std::string(d.rollEnd == TrackRoll::none        ? "Level"
-                                      : d.rollEnd == TrackRoll::left  ? "Left"
-                                      : d.rollEnd == TrackRoll::right ? "Right"
-                                                                      : "Inverted"));
+                    + std::string(displayRoll == TrackRoll::none        ? "Level"
+                                      : displayRoll == TrackRoll::left  ? "Left"
+                                      : displayRoll == TrackRoll::right ? "Right"
+                                                                        : "Inverted"));
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 130 },
             std::string("{MUTED}Chain ") + (ChainAllowed() ? (chain ? "On" : "Off") : "Unavailable"));

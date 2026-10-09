@@ -67,6 +67,12 @@ namespace OpenRCT2::GameActions
         visitor.Visit("sourceInverted", _sourceInverted);
         visitor.Visit("placementSpeed", _placementSpeed);
         visitor.Visit("placementSeat", _placementSeat);
+        visitor.Visit("backward", _backward);
+        visitor.Visit("guardSource", _guardSource);
+        visitor.Visit("sourceSpeed", _sourceSnapshot.speed);
+        visitor.Visit("sourceSeat", _sourceSnapshot.seat);
+        visitor.Visit("sourceChain", _sourceSnapshot.chain);
+        visitor.Visit("sourceInvertedBaseline", _sourceSnapshot.inverted);
         visitor.Visit("guardPrevious", _guardPrevious);
         visitor.Visit("previousX", _previous.origin.x);
         visitor.Visit("previousY", _previous.origin.y);
@@ -87,7 +93,8 @@ namespace OpenRCT2::GameActions
                << DS_TAG(_baselineSeat) << DS_TAG(_sourceInverted) << DS_TAG(_placementSeat) << DS_TAG(_placementSpeed)
                << DS_TAG(_expectedType) << DS_TAG(_expectedView) << DS_TAG(_guardPrevious) << DS_TAG(_previous.origin)
                << DS_TAG(_previous.type) << DS_TAG(_previous.speed) << DS_TAG(_previous.seat) << DS_TAG(_previous.chain)
-               << DS_TAG(_previous.inverted);
+               << DS_TAG(_previous.inverted) << DS_TAG(_backward) << DS_TAG(_guardSource) << DS_TAG(_sourceSnapshot.speed)
+               << DS_TAG(_sourceSnapshot.seat) << DS_TAG(_sourceSnapshot.chain) << DS_TAG(_sourceSnapshot.inverted);
     }
     Result SequentialTrackPlaceAction::Query(GameState_t& state, Park::ParkData&) const
     {
@@ -105,6 +112,8 @@ namespace OpenRCT2::GameActions
             || (!state.cheats.ignoreResearchStatus && (!RideTypeIsInvented(ride->type) || !RideEntryIsInvented(_object))))
             return invalid();
         if (ride->type != _expectedType || ride->overallView != _expectedView)
+            return invalid();
+        if (_backward && (_first || _selected || _speedChange || !_guardSource))
             return invalid();
         if (_guardPrevious && (!_selected || !_remove || _first))
             return invalid();
@@ -148,6 +157,12 @@ namespace OpenRCT2::GameActions
                 }
             if (!found)
                 return invalid();
+            if (_backward && found->isInverted())
+                return invalid();
+            if (_guardSource
+                && (found->getBrakeBoosterSpeed() != _sourceSnapshot.speed || found->getSeatRotation() != _sourceSnapshot.seat
+                    || found->hasChain() != _sourceSnapshot.chain || found->isInverted() != _sourceSnapshot.inverted))
+                return invalid();
             if (_selected
                 && (_origin != _source || found->hasChain() != _chain || found->isInverted() != _sourceInverted
                     || found->getBrakeBoosterSpeed() != _baselineSpeed || found->getSeatRotation() != _baselineSeat))
@@ -175,7 +190,17 @@ namespace OpenRCT2::GameActions
             CoordsXYE next;
             int32_t z{}, direction{};
             const CoordsXYE input{ xy, const_cast<TileElement*>(reinterpret_cast<const TileElement*>(found)) };
-            if (!_selected && trackBlockGetNext(&input, &next, &z, &direction))
+            TrackBeginEnd back{};
+            if (_backward)
+            {
+                if (trackBlockGetPrevious(input, &back))
+                    return invalid();
+                const auto& sourceCoordinates = GetTrackElementDescriptor(_sourceType).coordinates;
+                next = { back.end_x, back.end_y, nullptr };
+                z = _source.z + sourceCoordinates.zBegin;
+                direction = ((_source.direction + sourceCoordinates.rotationBegin) & 3) | (sourceCoordinates.rotationBegin & 4);
+            }
+            else if (!_selected && trackBlockGetNext(&input, &next, &z, &direction))
                 return invalid();
             if (_remove)
             {
@@ -189,14 +214,20 @@ namespace OpenRCT2::GameActions
                 }
                 return result;
             }
-            const auto expected = CoordsXYZD{ _origin.x, _origin.y, _origin.z + ted.coordinates.zBegin,
-                                              static_cast<Direction>(
-                                                  ((_origin.direction + ted.coordinates.rotationBegin) & 3)
-                                                  | (ted.coordinates.rotationBegin & 4)) };
+            const auto endXY = CoordsXY(_origin) + CoordsXY{ ted.coordinates.x, ted.coordinates.y }.rotate(_origin.direction);
+            const auto expected = _backward
+                ? CoordsXYZD{ endXY, _origin.z + ted.coordinates.zEnd,
+                              static_cast<Direction>(
+                                  ((_origin.direction + ted.coordinates.rotationEnd) & 3) | (ted.coordinates.rotationEnd & 4)) }
+                : CoordsXYZD{ _origin.x, _origin.y, _origin.z + ted.coordinates.zBegin,
+                              static_cast<Direction>(
+                                  ((_origin.direction + ted.coordinates.rotationBegin) & 3)
+                                  | (ted.coordinates.rotationBegin & 4)) };
             if (next.x == kLocationNull || expected != CoordsXYZD{ next.x, next.y, z, static_cast<Direction>(direction) })
                 return invalid();
             const auto& previous = GetTrackElementDescriptor(_sourceType).definition;
-            if (previous.pitchEnd != ted.definition.pitchStart || previous.rollEnd != ted.definition.rollStart)
+            if (_backward ? (ted.definition.pitchEnd != previous.pitchStart || ted.definition.rollEnd != previous.rollStart)
+                          : (previous.pitchEnd != ted.definition.pitchStart || previous.rollEnd != ted.definition.rollStart))
                 return invalid();
         }
         // Native endpoint lookup also checks a prospective closing connection's shape.
@@ -210,6 +241,21 @@ namespace OpenRCT2::GameActions
             const auto& next = GetTrackElementDescriptor(outgoing.element->asTrack()->getTrackType()).definition;
             if (ted.definition.pitchEnd != next.pitchStart || ted.definition.rollEnd != next.rollStart)
                 return invalid();
+        }
+        if (_backward)
+        {
+            TrackBeginEnd incoming{};
+            const auto beginDirection = ((_origin.direction + ted.coordinates.rotationBegin) & 3)
+                | (ted.coordinates.rotationBegin & 4);
+            if (trackBlockGetPreviousFromZero(
+                    { _origin.x, _origin.y, _origin.z + ted.coordinates.zBegin }, *ride, beginDirection, &incoming)
+                && incoming.begin_element)
+            {
+                const auto& definition = GetTrackElementDescriptor(incoming.begin_element->asTrack()->getTrackType())
+                                             .definition;
+                if (definition.pitchEnd != ted.definition.pitchStart || definition.rollEnd != ted.definition.rollStart)
+                    return invalid();
+            }
         }
         SelectedLiftAndInverted flags{};
         if (_chain)

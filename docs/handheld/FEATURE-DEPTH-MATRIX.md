@@ -237,3 +237,9 @@ viewport/component captures accompany DESIGN-AUTHORING-COMPLETION.md. Stand-up
 construction and original Wooden natural queue use are evidenced; sustained special
 ride throughput, AArch64 and physical Brick remain unverified. Overall construction
 and design authoring remain PARTIAL with precise ordinary gaps retained.
+
+Advanced editing Phase 1: native rear-gap selection and backward construction are
+delivered through block rosters, TED/native traversal and strict query/execute source
+baselines. Straight, multi-tile turn, slope, held-A, native cost/refund/undo and save
+coverage pass. Complex/diagonal/inverted family coverage and full editing parity remain
+PARTIAL; see ADVANCED-RIDE-EDITING-COMPLETION.md. No ordinary gap is removed.

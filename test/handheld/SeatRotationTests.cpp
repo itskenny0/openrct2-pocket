@@ -231,6 +231,51 @@ int main(int argc, char** argv)
         GameActions::ProcessQueue(state);
         Check(H::TrackEditing::Valid(seatBlock), "Replacement did not preserve native seat/geometry");
         H::EndTerrain();
+        W::HandheldRideOpen(ride.id);
+        W::HandheldMenuMove(3 + (H::RideAccess::Supported(ride) ? 1 : 0) + (C::CanResume(ride) ? 1 : 0));
+        H::HandleMenuInput(controller, confirm);
+        H::HandleMenuInput(controller, confirm);
+        auto backwardRows = W::HandheldRidesPresentation().rows;
+        const auto backwardOption = std::find(backwardRows.begin(), backwardRows.end(), "Build backward...");
+        Check(backwardOption != backwardRows.end(), "Backward roster control missing");
+        capture("advanced-01-endpoint-block-selection.png", true);
+        W::HandheldMenuMove(std::distance(backwardRows.begin(), backwardOption));
+        H::HandleMenuInput(controller, confirm);
+        Check(
+            C::Backward() && !Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu), "Held-A backward handoff failed");
+        C::Update({});
+        capture("advanced-02-backward-native-preview.png", false);
+        const auto backwardCash = state.park.cash;
+        const auto backwardCount = H::TrackEditing::Blocks(ride).size();
+        quote = C::Action(false);
+        Check(
+            quote.error == GameActions::Status::ok && C::Action(true).error == GameActions::Status::ok
+                && C::Action(true).error != GameActions::Status::ok,
+            "Backward SDL/native build repeat failed");
+        GameActions::ProcessQueue(state);
+        Check(
+            H::TrackEditing::Blocks(ride).size() == backwardCount + 1 && state.park.cash == backwardCash - quote.cost,
+            "Backward native accounting failed");
+        Check(C::Select(TrackElemType::leftQuarterTurn3Tiles), "Backward native turn unavailable");
+        C::Update({});
+        capture("advanced-03-backward-multitile-preview.png", false);
+        Check(C::Action(true).error == GameActions::Status::ok, "Backward native turn execute failed");
+        GameActions::ProcessQueue(state);
+        Check(C::Undo().error == GameActions::Status::ok, "Backward native turn undo failed");
+        GameActions::ProcessQueue(state);
+        Check(C::Select(TrackElemType::down25ToFlat), "Backward native slope transition absent");
+        Check(
+            C::Action(false).error == GameActions::Status::ok && C::Action(true).error == GameActions::Status::ok,
+            "Backward native slope transition failed");
+        GameActions::ProcessQueue(state);
+        C::Update({});
+        capture("advanced-04-backward-slope-preview.png", false);
+        Check(C::Undo().error == GameActions::Status::ok, "Backward slope undo failed");
+        GameActions::ProcessQueue(state);
+        Check(C::Undo().error == GameActions::Status::ok, "Backward native straight undo failed");
+        GameActions::ProcessQueue(state);
+        H::EndTerrain();
+        Check(!C::Backward() && H::TrackEditing::Valid(seatBlock), "Backward return-to-park damaged forward context");
         Check(H::BeginCustomTrack(GetRide(ride.id)->subtype, ride.type), "Invalid placement fixture begin failed");
         GameActions::ProcessQueue(getGameState());
         C::Update(CoordsXY{ 0, 0 });

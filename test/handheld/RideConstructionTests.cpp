@@ -322,12 +322,66 @@ int main(int argc, char** argv)
         GameActions::ProcessQueue(state);
         Check(!C::Active() && !Ghosts(), "Removed anchor jumped to unrelated section");
         Check(!C::ResumeFrom(brake.ride, std::pair{ brake.origin, brake.type }), "Missing anchor resumed");
+        // Resume the disconnected component from its native rear gap. No track
+        // is built by resume; native actions retain costs, shape and station rules.
+        auto rearBlocks = E::Blocks(*original);
+        Check(!rearBlocks.empty(), "Rear source missing");
+        const auto rear = rearBlocks.front();
+        const auto rearCash = state.park.cash;
+        Check(C::ResumeFrom(rear.ride, std::pair{ rear.origin, rear.type }, true) && C::Backward(), "Backward resume failed");
+        Check(C::Select(TrackElemType::flat), "Backward flat absent");
+        const auto rearEndpoint = *C::Endpoint();
+        const auto rearQuote = C::Action(false);
+        Check(rearQuote.error == GameActions::Status::ok && state.park.cash == rearCash, "Backward native query failed");
+        auto back = GameActions::SequentialTrackPlaceAction(
+            rear.ride.id, TrackElemType::flat, TrackConstructionSupport::BackwardOrigin(rearEndpoint, TrackElemType::flat),
+            false, false, rear.origin, rear.type, rearQuote.cost);
+        back.UseBackward({ rear.origin, rear.type, rear.speed, rear.seat, rear.chain, rear.inverted });
+        Check(
+            GameActions::Query(&back, state).error == GameActions::Status::ok, "Backward native action rejected valid source");
+        back.UseBackward(
+            { rear.origin, rear.type, rear.speed, static_cast<uint8_t>(rear.seat ^ 1), rear.chain, rear.inverted });
+        Check(GameActions::Query(&back, state).error != GameActions::Status::ok, "Backward stale baseline accepted");
+        Check(
+            C::Action(true).error == GameActions::Status::ok && C::Action(true).error != GameActions::Status::ok,
+            "Backward execute/repeat guard failed");
+        GameActions::ProcessQueue(state);
+        Check(
+            C::Backward() && C::Endpoint() != rearEndpoint && state.park.cash == rearCash - rearQuote.cost,
+            "Backward extension/cost/recovery failed");
+        C::Cycle(1); // Utility keys must never be parsed as native piece IDs.
+        Check(C::Select(TrackElemType::leftQuarterTurn3Tiles), "Backward multi-tile turn absent");
+        Check(
+            C::Action(false).error == GameActions::Status::ok && C::Action(true).error == GameActions::Status::ok,
+            "Backward multi-tile turn failed");
+        GameActions::ProcessQueue(state);
+        Check(C::Undo().error == GameActions::Status::ok, "Backward turn undo failed");
+        GameActions::ProcessQueue(state);
+        Check(C::Undo().error == GameActions::Status::ok, "Backward straight undo failed");
+        GameActions::ProcessQueue(state);
+        Check(
+            C::Endpoint() == rearEndpoint && E::Valid(rear) && state.park.cash <= rearCash,
+            "Backward undo did not restore source");
+        C::End();
+        Check(!C::Backward() && !Ghosts(), "Backward cleanup failed");
         auto stale = brake;
         stale.ride.generation++;
         Check(!E::Valid(stale) && E::Change(stale, 8).error != GameActions::Status::ok, "Reused ride identity accepted");
+        Check(
+            C::ResumeFrom(rear.ride, std::pair{ rear.origin, rear.type }, true) && C::Select(TrackElemType::flat),
+            "Backward persistence context failed");
+        const auto persistedOrigin = TrackConstructionSupport::BackwardOrigin(*C::Endpoint(), TrackElemType::flat);
+        Check(C::Action(true).error == GameActions::Status::ok, "Backward persistence build failed");
+        GameActions::ProcessQueue(state);
+        C::End();
         const auto save = std::string(argv[2]) + "/ride-breadth.park";
         SaveFlags flags{};
         Check(ScenarioSave(state, save, flags) && context->LoadParkFromFile(save), "Breadth save/reload failed");
+        bool persistedRear = false;
+        for (auto* e : TileElementsView<TrackElement>(persistedOrigin))
+            persistedRear |= !e->isGhost() && e->getRideIndex() == rear.ride.id && e->getTrackType() == TrackElemType::flat
+                && e->getDirection() == persistedOrigin.direction && e->getBaseZ() == persistedOrigin.z;
+        Check(persistedRear && !C::Active(), "Backward native save persistence/context teardown failed");
         std::cout << "Native five-family construction / native stations-straights-multitile-turns / query-repeat-cost-refund / "
                      "unsupported geometry / selected-block-refund-gap / brake-baseline-bounds / ghosts-resume-save passed\n";
     }

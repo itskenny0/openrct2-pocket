@@ -17,7 +17,8 @@ namespace OpenRCT2::GameActions
         bool _first{}, _chain{}, _noMoney{}, _remove{};
         bool _selected{}, _speedChange{}, _sourceInverted{};
         uint8_t _baselineSpeed{}, _baselineSeat{}, _newSpeed{}, _placementSpeed{ 6 }, _placementSeat{};
-        bool _guardPrevious{};
+        bool _guardPrevious{}, _backward{}, _guardSource{};
+        TrackConstructionSupport::BlockSnapshot _sourceSnapshot{};
         TrackConstructionSupport::BlockSnapshot _previous{};
         money64 _cost{ kMoney64Undefined };
 
@@ -57,6 +58,11 @@ namespace OpenRCT2::GameActions
         {
             _guardPrevious = true;
             _previous = previous;
+        }
+        void UseBackward(const TrackConstructionSupport::BlockSnapshot& source)
+        {
+            _backward = _guardSource = true;
+            _sourceSnapshot = source;
         }
         void AcceptParameters(GameActionParameterVisitor&) final;
         void Serialise(DataSerialiser&) final;

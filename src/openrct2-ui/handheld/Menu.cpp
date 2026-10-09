@@ -323,6 +323,7 @@ namespace OpenRCT2::Ui::Windows
                         model.rows.push_back("Review speed...");
                     }
                     model.rows.push_back("Continue section...");
+                    model.rows.push_back("Build backward...");
                     if (Handheld::TrackEditing::CanReplace(*_trackBlock)) model.rows.push_back("Replace block...");
                     if (current == Page::trackRemoveConfirm || current == Page::trackSpeedConfirm || current == Page::trackReplaceConfirm)
                     {
@@ -2687,6 +2688,13 @@ namespace OpenRCT2::Ui::Windows
                         if (!Handheld::ResumeCustomTrackFrom(block.ride, block.origin, block.type))
                             GetWindowManager()->ShowError(
                                 "Cannot continue section", "No compatible forward endpoint; select again");
+                    }
+                    else if (ridesPresentationFor(Page::trackBlock, choice).rows[choice] == "Build backward...")
+                    {
+                        const auto block = *_trackBlock;
+                        close();
+                        if (!Handheld::ResumeCustomTrackFrom(block.ride, block.origin, block.type, true))
+                            GetWindowManager()->ShowError("Cannot build backward", "No compatible backward endpoint; select again");
                     }
                     else if (ridesPresentationFor(Page::trackBlock,choice).rows[choice] == "Replace block...")
                     {

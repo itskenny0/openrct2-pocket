@@ -223,12 +223,12 @@ namespace OpenRCT2::Ui::Handheld
         BeginTerrain(true);
         return CustomTracks::Resume(*target);
     }
-    bool ResumeCustomTrackFrom(const RideManagement::Target& target, CoordsXYZD origin, TrackElemType type)
+    bool ResumeCustomTrackFrom(const RideManagement::Target& target, CoordsXYZD origin, TrackElemType type, bool backward)
     {
         if (!RideManagement::Resolve(target))
             return false;
         BeginTerrain(true);
-        return CustomTracks::ResumeFrom(target, std::pair{ origin, type });
+        return CustomTracks::ResumeFrom(target, std::pair{ origin, type }, backward);
     }
     bool BeginFlatRide(ObjectEntryIndex index)
     {

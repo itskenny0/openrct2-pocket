@@ -60,6 +60,15 @@ namespace OpenRCT2::TrackConstructionSupport
         bool chain{}, inverted{};
         bool operator==(const BlockSnapshot&) const = default;
     };
+    // Native TED end offset used by desktop backward construction. Endpoint is
+    // the gap returned by trackBlockGetPrevious, facing away from the source.
+    inline CoordsXYZD BackwardOrigin(CoordsXYZD endpoint, TrackElemType piece)
+    {
+        const auto& c = TrackMetadata::GetTrackElementDescriptor(piece).coordinates;
+        const auto direction = static_cast<Direction>(((endpoint.direction ^ 2) - c.rotationEnd) & 3);
+        const auto xy = CoordsXY(endpoint) - CoordsXY{ c.x, c.y }.rotate(direction);
+        return { xy, endpoint.z - c.zEnd, direction };
+    }
     inline std::optional<BlockSnapshot> Previous(const CoordsXYE& input)
     {
         TrackBeginEnd previous{};
