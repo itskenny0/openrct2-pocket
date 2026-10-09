@@ -312,6 +312,7 @@ namespace OpenRCT2::Ui::Windows
                         model.rows.push_back("Speed +");
                         model.rows.push_back("Review speed...");
                     }
+                    model.rows.push_back("Continue section...");
                     if (current == Page::trackRemoveConfirm || current == Page::trackSpeedConfirm)
                     {
                         model.confirmation = true;
@@ -2579,6 +2580,12 @@ namespace OpenRCT2::Ui::Windows
                             _trackBlocks = Handheld::TrackEditing::Blocks(*_ridesTarget);
                         page(Page::trackBlocks);
                         _status = "Block changed; select again";
+                    }
+                    else if (ridesPresentationFor(Page::trackBlock, choice).rows[choice] == "Continue section...")
+                    {
+                        const auto block = *_trackBlock;
+                        close();
+                        Handheld::ResumeCustomTrackFrom(block.ride, block.origin, block.type);
                     }
                     else if (choice == 0)
                     {

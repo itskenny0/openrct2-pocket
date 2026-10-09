@@ -179,3 +179,9 @@ tree equality, 14 native asset-backed captures, all regression results and preci
 gaps. Overall ride construction and special-family parity remain PARTIAL toward
 100% ordinary gameplay, including ghosts, further editing/design authoring and
 individual family operation validation.
+
+Conventional selected-section continuation: the native block roster can resume the
+forward editor at the gap of a selected disconnected component. Native traversal,
+costs and undo remain authoritative; deleting its anchor ends context safely.
+Backward/replacement/variant/export depth remains PARTIAL; see
+[TRACK-EDITING-DESIGN-COMPLETION.md](TRACK-EDITING-DESIGN-COMPLETION.md).

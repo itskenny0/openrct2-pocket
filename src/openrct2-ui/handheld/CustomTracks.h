@@ -11,6 +11,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     bool Begin(ObjectEntryIndex index, ride_type_t type = kRideTypeNull);
     bool CanResume(const RideManagement::Target& target);
     bool Resume(const RideManagement::Target& target);
+    bool ResumeFrom(const RideManagement::Target& target, std::optional<std::pair<CoordsXYZD, TrackElemType>> source);
     void End();
     bool Active();
     bool Busy();

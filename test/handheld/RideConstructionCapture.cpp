@@ -369,7 +369,14 @@ int main(int argc, char** argv)
         W::HandheldMenuMove(std::distance(blocks.begin(), brakeIt));
         H::HandleMenuInput(controller, a);
         capture("12-dense-block-operations.png", true);
-        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        W::HandheldMenuMove(6);
+        H::HandleMenuInput(controller, a);
+        Check(C::Active() && C::Endpoint(), "Selected section controller handoff failed");
+        focus = *C::Endpoint();
+        C::Update({});
+        capture("16-selected-section-continuation.png");
+        H::EndTerrain();
+        Check(!C::Active(), "Selected section cleanup failed");
         Check(F::Resume(target), "Native station completion unavailable");
         for (int phase = 0; phase < 2; ++phase)
         {

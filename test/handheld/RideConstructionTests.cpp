@@ -214,6 +214,20 @@ int main(int argc, char** argv)
             !E::Valid(middle) && E::Change(middle, {}, removal.cost, true).error != GameActions::Status::ok
                 && state.park.cash == baseline - removal.cost && C::CanResume(*original),
             "Selected refund/repeat/gap recovery failed");
+        Check(C::ResumeFrom(brake.ride, std::pair{ brake.origin, brake.type }), "Disconnected section resume failed");
+        Check(C::Endpoint() && C::Select(TrackElemType::flat), "Disconnected native endpoint missing");
+        const auto sectionQuote = C::Action(false);
+        Check(
+            sectionQuote.error == GameActions::Status::ok && C::Action(true).error == GameActions::Status::ok,
+            "Disconnected extension failed");
+        GameActions::ProcessQueue(state);
+        Check(C::Undo().error == GameActions::Status::ok, "Disconnected extension undo failed");
+        GameActions::ProcessQueue(state);
+        Check(C::Active() && C::Endpoint(), "Selected section anchor lost after undo");
+        Check(C::Undo().error == GameActions::Status::ok, "Selected anchor removal failed");
+        GameActions::ProcessQueue(state);
+        Check(!C::Active() && !Ghosts(), "Removed anchor jumped to unrelated section");
+        Check(!C::ResumeFrom(brake.ride, std::pair{ brake.origin, brake.type }), "Missing anchor resumed");
         auto stale = brake;
         stale.ride.generation++;
         Check(!E::Valid(stale) && E::Change(stale, 8).error != GameActions::Status::ok, "Reused ride identity accepted");

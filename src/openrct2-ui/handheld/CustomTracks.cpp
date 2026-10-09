@@ -50,7 +50,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         bool chain;
         bool operator==(const Preview&) const = default;
     };
-    static std::optional<Block> previous;
+    static std::optional<Block> previous, anchor;
     static std::optional<Preview> ghost;
     static TrackPreview nativePreview;
     static std::string feedback;
@@ -94,8 +94,23 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         if (!ride || !TrackConstructionSupport::Type(ride->type) || ride->status != RideStatus::closed)
             return false;
         std::optional<CoordsXYE> first;
+        if (anchor)
+        {
+            const auto& clearance = GetTrackElementDescriptor(anchor->type).sequenceData.sequences[0].clearance;
+            const auto tile = CoordsXY(anchor->origin) + CoordsXY{ clearance.x, clearance.y }.rotate(anchor->origin.direction);
+            for (auto* e : TileElementsView<TrackElement>(tile))
+                if (!e->isGhost() && e->getRideIndex() == ride->id && e->getSequenceIndex() == 0
+                    && e->getTrackType() == anchor->type && e->getDirection() == anchor->origin.direction
+                    && e->getBaseZ() == anchor->origin.z + clearance.z)
+                {
+                    first = CoordsXYE{ tile, reinterpret_cast<TileElement*>(e) };
+                    break;
+                }
+            if (!first)
+                return false;
+        }
         for (const auto& station : ride->getStations())
-            if (!station.start.isNull())
+            if (!first && !station.start.isNull())
             {
                 auto* e = RideGetStationStartTrackElement(
                     *ride, StationIndex::FromUnderlying(&station - ride->getStations().data()));
@@ -325,6 +340,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         completed.reset();
         endpoint.reset();
         previous.reset();
+        anchor.reset();
         depth = 0;
         camera = false;
         ++revision;
@@ -397,13 +413,26 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     {
         if (!CanResume(t))
             return false;
+        return ResumeFrom(t, std::nullopt);
+    }
+    bool ResumeFrom(const RideManagement::Target& t, std::optional<std::pair<CoordsXYZD, TrackElemType>> source)
+    {
+        const auto* ride = RideManagement::Resolve(t);
+        if (!ride || ride->status != RideStatus::closed || !Eligible(ride->subtype, ride->type))
+            return false;
+        if (source
+            && (source->second >= TrackElemType::count
+                || GetTrackElementDescriptor(source->second).sequenceData.numSequences == 0))
+            return false;
         End();
         target = t;
+        if (source)
+            anchor = Block{ source->first, source->second };
         active = true;
         selected = TrackElemType::flat;
         chain = false;
         feedback.clear();
-        if (!Recover())
+        if (!Recover() || completed)
         {
             End();
             return false;
@@ -547,7 +576,11 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             if (result->error == GA::Status::ok)
             {
                 target = RideManagement::Identify(target->id);
-                Recover();
+                if (!Recover())
+                {
+                    End();
+                    return;
+                }
                 if (!completed)
                     FocusEndpoint();
                 if (!completed && !Supported(selected))
@@ -599,7 +632,11 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             {
                 const auto removed = previous;
                 target = RideManagement::Identify(target->id);
-                Recover();
+                if (!Recover())
+                {
+                    End();
+                    return;
+                }
                 if (!previous && removed)
                     endpoint = removed->origin;
                 selected = TrackElemType::flat;
