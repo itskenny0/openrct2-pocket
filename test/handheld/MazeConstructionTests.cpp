@@ -137,6 +137,20 @@ int main(int argc, char** argv)
         Check(access, "Maze native adjacency unavailable");
         M::End();
         namespace D = Ui::Handheld::Designs;
+        GA::MazeSetTrackAction disconnected({ 800, 800, first.z, 0 }, false, t.id, GA::MazeBuildMode::build);
+        Check(GA::Execute(&disconnected, state).error == GA::Status::ok, "Native disconnected fixture failed");
+        GA::ProcessQueue(state);
+        Check(M::Resume(t), "Resume for disconnected selection failed");
+        M::ToggleCamera();
+        M::Update(CoordsXY{ 640, 640 });
+        Check(M::Picking() && M::SelectCell(false).error != GA::Status::ok, "Wrong maze pick accepted");
+        M::Update(CoordsXY{ 800, 800 });
+        M::Height(1);
+        Check(
+            M::SelectCell(false).error == GA::Status::ok && M::SelectCell(true).error == GA::Status::ok && M::Cursor()->x == 816
+                && !M::Picking(),
+            "Disconnected quarter selection failed");
+        M::End();
         namespace F = Ui::Handheld::FlatRides;
         Check(F::Resume(t), "Maze access recovery failed");
         for (int n = 0; n < 2; n++)
@@ -158,6 +172,9 @@ int main(int argc, char** argv)
         auto invalid = td;
         invalid.mazeElements.clear();
         Check(!D::Eligible(invalid), "Empty maze design accepted");
+        auto missingObject = td;
+        missingObject.trackAndVehicle.vehicleObject = ObjectEntryDescriptor("rct2.ride.nonexistent");
+        Check(!D::Eligible(missingObject), "Missing maze design object accepted");
         const auto tracks = std::filesystem::path(
             context->GetPlatformEnvironment().GetDirectoryPath(DirBase::user, DirId::trackDesigns));
         std::filesystem::create_directories(tracks);
@@ -195,6 +212,23 @@ int main(int argc, char** argv)
         SaveFlags flags{};
         Check(ScenarioSave(state, save, flags) && context->LoadParkFromFile(save), "Maze save/reload failed");
         Check(GetRide(t.id) && GetRide(t.id)->mazeTiles > 0 && Walls(first, t.id) != 0xFFFF, "Maze persistence failed");
+        // A separate scenario fixture verifies native funds rejection without patching a live park.
+        gameStateInitAll(state, { 64, 64 });
+        gLegacyScene = LegacyScene::playing;
+        state.park.cash = 0;
+        state.park.flags.unset(ParkFlag::noMoney, ParkFlag::noMoneyScenario);
+        MapGetSurfaceElementAt(CoordsXY{ 320, 320 })->setOwnership({ OwnershipFlag::landOwned });
+        RideTypeSetInvented(RIDE_TYPE_MAZE);
+        RideEntrySetInvented(index);
+        Check(M::Begin(index), "Zero funds maze create failed");
+        GA::ProcessQueue(state);
+        M::Update(CoordsXY{ 320, 320 });
+        Check(
+            M::Build(false).error != GA::Status::ok && M::Build(true).error != GA::Status::ok && state.park.cash == 0
+                && GetRide(M::Target()->id)->mazeTiles == 0,
+            "Native maze insufficient funds bypassed");
+        M::End();
+        GA::ProcessQueue(state);
         std::cout << "Native maze "
                      "availability/create/half-cells/multi-tiles/move/fill/cancel/stale/identity/bounds/ownership/cost/access/"
                      "save passed\n";

@@ -40,9 +40,9 @@ Captures are native viewport + production Pocket components, not full SDL frames
 ### Precise remaining maze / ordinary construction gaps
 
 Maze construction remains PARTIAL on the 100% roadmap. Selection footprint/arrow
-and native queries are delivered; individual segment placement ghosts, arbitrary
-existing-cell picking across disconnected components and direct wall-only toggles
-are not delivered. Native build/fill supplies desktop segment/wall semantics.
+and native queries are delivered. Individual segment placement ghosts remain
+missing. Disconnected-cell selection was delivered in Phase 3 below. Native
+build/fill supplies desktop segment/wall editing semantics without a Pocket wall algorithm.
 Sustained maze operation/natural guests, full-gameplay-frame HUD verification,
 AArch64 execution and physical Brick validation are not claimed.
 
@@ -76,3 +76,51 @@ elevation, substitution choices and player-facing export remain ordinary gaps.
 Publication: Phase 1 canonical `bbf017d6834c5f332e398b171b4651165456c5e2`,
 local `c6c6934a04fc3734ef3a77c741030f5b490a6e1f`, identical tree
 `5aee5e2e7dcf11881bdaa6efd956e502a9b2f1bf`.
+
+## Phase 3 — existing-cell recovery and special-family audit
+
+Maze camera mode now supplies controller-native selection of any real tile belonging
+to the same closed native maze, including disconnected sections. D-pad pans, L2/R2
+chooses one of four native quarter positions, A selects and resumes segment editing;
+Select returns without selection. Ghosts, other rides, invalid map coordinates and
+stale identities are excluded. Native MapGetTileQuadrant/getMapSelectQuarter owns
+the selection overlay. This closes the disconnected-cell picking gap above.
+
+Mini Golf uses regular native station endpoints, native miniGolfHole track group
+and two/three-sequence TED footprints. The existing conventional adapter already
+supports it; no duplicate adapter or geometry was introduced. New
+MiniGolfConstructionTests validates all five native holes in all four orientations,
+actual placement, multi-tile block identity, native costs, removal/undo refunds,
+recovery, unsupported coaster inversions and save/reload. Mini Golf is validated
+with public/native scenario fixtures, not asset-backed full circuit operation.
+Transport/water/special families still need individual native operation validation;
+this audit does not declare all offered ride types complete.
+
+Updated maze mappings: Select camera, L1/R1 zoom and X rotate while in camera;
+L2/R2 chooses cell corner and A selects an existing maze cell after initial placement.
+Y removal is available outside camera mode. Review overrides camera controls and
+always starts on Cancel. Start/menu and B/inspection recovery remain unchanged.
+
+Phase 2 canonical `e3770c0482dff4dc0e580068623ec10e677c02a2`, local
+`c79f7c4cc464864ff6aeb44d015790aacb1fd15e`, identical tree
+`b43f9fb88b881ae73fbbc508a12d915244f0796e`.
+
+## Final verification
+
+Release GUI and CLI pass. MazeConstructionTests additionally passes disconnected
+quarter selection, missing design objects and native insufficient-funds rejection
+in a separately initialized zero-cash scenario. No live park cash/ownership/research
+patches are used to make these tests pass. MiniGolfConstructionTests passes.
+ConstructionTests, StaffCompletionTests, GuestCompletionTests,
+PresentationLifecycleTests, RideConstructionTests and full asset-backed
+PathActionsTests pass. CTest: 3/3 (input, launcher, save preservation).
+Asset-backed CustomCoasterCapture (Wooden circuit, access, native open/natural
+visitors), DesignCapture, and RideConstructionCapture Junior/Looping pass.
+Capture drivers now count the new maze picker rows when selecting existing families.
+
+Factory Capers maze capture also verifies menu context recovery, native entrance /
+exit preservation in a design, held-A Cancel-first review handoff, quarter selection
+and native persistence. SDL dummy hardware-renderer warnings are expected; PNGs
+use the native X8 renderer and production panels. No sustained maze/Mini Golf guest
+operation, other family operation, AArch64 execution or physical Brick behavior is
+claimed. Original assets, archives, parks and generated TD6 test designs stay private.

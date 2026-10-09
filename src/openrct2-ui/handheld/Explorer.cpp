@@ -841,7 +841,12 @@ namespace OpenRCT2::Ui::Handheld
                 else if (!Mazes::Busy())
                 {
                     if (action == Action::confirm)
-                        Mazes::Confirm();
+                    {
+                        if (Mazes::Picking())
+                            Mazes::SelectCell(true);
+                        else
+                            Mazes::Confirm();
+                    }
                     else if (action == Action::back)
                     {
                         if (Mazes::Reviewing())
@@ -870,7 +875,7 @@ namespace OpenRCT2::Ui::Handheld
                         else
                             Mazes::Move();
                     }
-                    else if (action == Action::contextSecondary && !Mazes::Reviewing())
+                    else if (action == Action::contextSecondary && !Mazes::Reviewing() && !Mazes::Picking())
                         Mazes::ReviewRemoval();
                     else if (action == Action::openBuild)
                         Mazes::ToggleCamera();

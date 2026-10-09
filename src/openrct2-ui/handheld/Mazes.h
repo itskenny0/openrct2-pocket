@@ -15,6 +15,8 @@ namespace OpenRCT2::Ui::Handheld::Mazes
     bool Reviewing();
     bool CameraMode();
     void ToggleCamera();
+    bool Picking();
+    GameActions::Result SelectCell(bool execute);
     void Turn(int delta);
     void Height(int delta);
     void Update(std::optional<CoordsXY> tile);

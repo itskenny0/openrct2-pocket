@@ -119,7 +119,7 @@ int main(int argc, char** argv)
         a.actions = { H::Action::confirm, H::Action::confirm };
         CoordsXYZ focus{ 800, 800, MapGetHighestZ({ 800, 800 }) };
         auto capture = [&](const char* name, bool modal = false) {
-            if (M::Active() && M::Target() && GetRide(M::Target()->id)->mazeTiles && M::Cursor())
+            if (M::Active() && M::Target() && GetRide(M::Target()->id)->mazeTiles && M::Cursor() && !M::Picking())
                 M::Update(M::Cursor()->toTileStart());
             Viewport vp{};
             vp.width = 512;
@@ -251,11 +251,27 @@ int main(int argc, char** argv)
         GameActions::ProcessQueue(state);
         if (!M::CameraMode())
             M::ToggleCamera();
+        M::Update(site);
+        M::Height(1);
         capture("07-maze-dense-camera-controls.png");
+        Check(M::SelectCell(false).error == GameActions::Status::ok, "Existing cell picker query failed");
+        capture("14-existing-maze-cell-picker.png");
+        H::HandleExplorerInput(controller, a);
+        Check(!M::Picking(), "Cell picker controller selection failed");
+        M::ToggleCamera();
         M::ToggleCamera();
         M::End();
         Check(M::Resume(target), "Existing maze recovery failed");
         capture("08-existing-maze-recovery.png");
+        const auto beforeMenu = M::Cursor();
+        H::Frame menuFrame;
+        menuFrame.actions = { H::Action::openMenu };
+        H::HandleExplorerInput(controller, menuFrame);
+        Check(M::Active() && M::Cursor() == beforeMenu, "Menu discarded maze context");
+        H::Frame menuBack;
+        menuBack.actions = { H::Action::back };
+        Check(H::HandleMenuInput(controller, menuBack), "Maze menu return failed");
+        Check(M::Active() && M::Cursor() == beforeMenu, "Menu return lost maze context");
         M::End();
         Check(F::Resume(target), "Maze access resume failed");
         for (int n = 0; n < 2; n++)
@@ -296,9 +312,6 @@ int main(int argc, char** argv)
         D::UpdatePreview(*destination);
         capture("11-maze-design-ghost.png");
         D::Rotate();
-        D::UpdatePreview(*destination);
-        capture("12-maze-design-rotation.png");
-        D::ClearPreview();
         if (D::Query(*destination).error != GameActions::Status::ok)
         {
             destination.reset();
@@ -308,6 +321,9 @@ int main(int argc, char** argv)
                         destination = CoordsXY{ x, y };
         }
         Check(destination.has_value(), "Rotated maze site unavailable");
+        focus = { *destination, MapGetHighestZ(*destination) };
+        D::UpdatePreview(*destination);
+        capture("12-maze-design-rotation.png");
         Check(D::Review(*destination), "Maze design review failed");
         W::HandheldDesignReviewOpen();
         capture("13-maze-design-cost-review.png", true);

@@ -19,6 +19,8 @@ namespace OpenRCT2::Ui::Handheld::Mazes
     static bool active{}, busy{}, placed{}, removeChoice{}, createdHere{}, camera{};
     static uint64_t revision{};
     static int offset{};
+    static int quadrant{};
+    static std::optional<CoordsXY> hovered;
     static Direction direction{};
     static std::optional<RideManagement::Target> target;
     static std::optional<CoordsXYZD> cursor;
@@ -80,7 +82,8 @@ namespace OpenRCT2::Ui::Handheld::Mazes
         target.reset();
         cursor.reset();
         review.reset();
-        offset = 0;
+        offset = quadrant = 0;
+        hovered.reset();
         direction = 0;
         feedback.clear();
         ++revision;
@@ -105,6 +108,42 @@ namespace OpenRCT2::Ui::Handheld::Mazes
     {
         if (!review)
             camera = !camera;
+    }
+    bool Picking()
+    {
+        return camera && placed && !review;
+    }
+    static std::optional<CoordsXYZD> PickLocation()
+    {
+        if (!target || !CanResume(*target) || !hovered || !MapIsLocationValid(*hovered) || hovered->x % 32 || hovered->y % 32)
+            return {};
+        std::optional<CoordsXYZD> found;
+        for (auto* e : TileElementsView<TrackElement>(*hovered))
+            if (!e->isGhost() && e->getRideIndex() == target->id && e->getTrackType() == TrackElemType::maze)
+            {
+                found = CoordsXYZD{ hovered->x + (quadrant & 1) * 16, hovered->y + (quadrant / 2) * 16, e->getBaseZ(),
+                                    direction };
+                if (cursor && e->getBaseZ() == cursor->z)
+                    break;
+            }
+        return found;
+    }
+    GA::Result SelectCell(bool execute)
+    {
+        const auto location = PickLocation();
+        if (!Picking() || !location)
+        {
+            if (execute)
+                feedback = "Point at this ride's maze";
+            return Invalid("Point at this ride's maze");
+        }
+        if (execute)
+        {
+            cursor = location;
+            camera = false;
+            feedback.clear();
+        }
+        return {};
     }
     std::optional<RideManagement::Target> Target()
     {
@@ -291,23 +330,31 @@ namespace OpenRCT2::Ui::Handheld::Mazes
     }
     void Height(int delta)
     {
-        if (!placed && !review)
+        if (Picking())
+        {
+            quadrant = (quadrant + delta + 4) & 3;
+            feedback.clear();
+        }
+        else if (!placed && !review)
             offset = std::clamp(offset + delta * 16, -256, 512);
     }
     void Update(std::optional<CoordsXY> tile)
     {
         if (!active)
             return;
+        hovered = tile;
         if (!placed && !busy)
             cursor = tile ? std::optional<CoordsXYZD>{ { *tile, (MapGetHighestZ(*tile) + 15) / 16 * 16 + offset, direction } }
                           : std::nullopt;
         MapSelection::invalidate();
         gMapSelectFlags.unset(MapSelectFlag::enable, MapSelectFlag::enableArrow);
-        if (cursor)
+        const auto selected = Picking() ? PickLocation() : cursor ? std::optional<CoordsXYZD>{ Next() } : std::nullopt;
+        if (selected)
         {
-            const auto loc = Next();
+            const auto loc = *selected;
             gMapSelectPositionA = gMapSelectPositionB = loc.toTileStart();
-            gMapSelectType = MapSelectType::full;
+            gMapSelectType = Picking() ? getMapSelectQuarter(MapGetTileQuadrant({ loc.x + 8, loc.y + 8 }) ^ 2)
+                                       : MapSelectType::full;
             gMapSelectFlags.set(MapSelectFlag::enable, MapSelectFlag::enableArrow);
             gMapSelectArrowPosition = { loc.x + 8, loc.y + 8, loc.z };
             gMapSelectArrowDirection = direction;
@@ -331,22 +378,29 @@ namespace OpenRCT2::Ui::Handheld::Mazes
         DrawModernText(rt, p + ScreenCoordsXY{ 10, 86 }, "{MUTED}Direction " + std::string(directions[direction]));
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 108 }, "{MUTED}Height " + (cursor ? std::to_string(cursor->z / 8) : "Unavailable"));
-        DrawModernText(rt, p + ScreenCoordsXY{ 10, 132 }, review ? "{MUTED}L/R Select option" : "{MUTED}X Move | Y Remove");
+        DrawModernText(
+            rt, p + ScreenCoordsXY{ 10, 132 },
+            review          ? "{MUTED}L/R Select option"
+                : Picking() ? "{MUTED}Corner " + std::to_string(quadrant + 1) + "/4 L2/R2"
+                            : "{MUTED}X Move | Y Remove");
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 154 },
-            review       ? "{MUTED}A Apply | B Cancel"
-                : placed ? "{MUTED}B Finish / access"
-                         : "{MUTED}L2/R2 Height");
+            review          ? "{MUTED}A Apply | B Cancel"
+                : Picking() ? "{MUTED}A Select maze cell"
+                : placed    ? "{MUTED}B Finish / access"
+                            : "{MUTED}L2/R2 Height");
         DrawModernText(rt, p + ScreenCoordsXY{ 10, 178 }, "{MUTED}SEL Camera | START");
         DrawActionStrip(rt, screen);
-        DrawCommand(rt, { 8, screen.height - 21 }, 17, "A", review ? "Select" : "Build");
+        DrawCommand(rt, { 8, screen.height - 21 }, 17, "A", review ? "Select" : Picking() ? "Pick" : "Build");
         DrawCommand(rt, { 112, screen.height - 21 }, 17, "B", review ? "Cancel" : "Leave");
         DrawCommand(rt, { 220, screen.height - 21 }, 30, "L/R", review ? "Choice" : (camera ? "Zoom" : "Direction"));
         if (!review)
             DrawCommand(rt, { 374, screen.height - 21 }, 17, "X", camera ? "Rotate" : "Move");
-        const auto q = review ? Apply(GA::MazeBuildMode::fill, false) : Build(false);
+        const auto q = review ? Apply(GA::MazeBuildMode::fill, false) : Picking() ? SelectCell(false) : Build(false);
         if (!feedback.empty())
             DrawContextMessage(rt, Layout::ContextAnchor(screen, kContextSize, true), feedback);
+        else if (Picking() && q.error == GA::Status::ok)
+            DrawContextMessage(rt, Layout::ContextAnchor(screen, kContextSize, true), "Choose native maze cell");
         else if (q.error == GA::Status::ok)
             DrawCostBadge(rt, Layout::ContextAnchor(screen, kContextSize, true), FormatMoney(q.cost));
         else

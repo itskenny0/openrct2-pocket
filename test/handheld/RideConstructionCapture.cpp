@@ -12,6 +12,7 @@
 #include <openrct2-ui/handheld/Designs.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/FlatRides.h>
+#include <openrct2-ui/handheld/Mazes.h>
 #include <openrct2-ui/handheld/Panel.h>
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/RideAccess.h>
@@ -171,7 +172,7 @@ int main(int argc, char** argv)
         W::HandheldBuildOpen();
         W::HandheldMenuMove(8);
         H::HandleMenuInput(controller, a);
-        const auto row = F::Entries().size() + std::distance(entries.begin(), chosen);
+        const auto row = F::Entries().size() + H::Mazes::Entries().size() + std::distance(entries.begin(), chosen);
         for (size_t n = 0; n < row / 3; ++n)
             W::HandheldObjectPickerMove(0, 1);
         for (size_t n = 0; n < row % 3; ++n)

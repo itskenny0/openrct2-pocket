@@ -12,6 +12,7 @@
 #include <openrct2-ui/handheld/Designs.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/FlatRides.h>
+#include <openrct2-ui/handheld/Mazes.h>
 #include <openrct2-ui/handheld/Panel.h>
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/RideAccess.h>
@@ -113,7 +114,7 @@ int main(int argc, char** argv)
         Ui::Windows::HandheldBuildOpen();
         Ui::Windows::HandheldMenuMove(8);
         Ui::Windows::HandheldMenuConfirm();
-        const auto flat = F::Entries().size() + std::distance(objects.begin(), wooden);
+        const auto flat = F::Entries().size() + Ui::Handheld::Mazes::Entries().size() + std::distance(objects.begin(), wooden);
         for (size_t n = 0; n < flat / 3; ++n)
             Ui::Windows::HandheldObjectPickerMove(0, 1);
         for (size_t n = 0; n < flat % 3; ++n)
