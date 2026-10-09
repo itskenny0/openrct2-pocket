@@ -107,11 +107,13 @@ int main(int argc, char** argv)
         Check(GameActions::Execute(&loan, state).error == GameActions::Status::ok, "Native loan setup failed");
         GameActions::ProcessQueue(state);
         const auto objects = C::RideEntries();
-        Check(!objects.empty(), "No researched loaded wooden coaster");
+        const auto wooden = std::find_if(
+            objects.begin(), objects.end(), [](const auto& item) { return item.identity.key.starts_with("custom:"); });
+        Check(wooden != objects.end(), "No researched loaded wooden coaster");
         Ui::Windows::HandheldBuildOpen();
         Ui::Windows::HandheldMenuMove(8);
         Ui::Windows::HandheldMenuConfirm();
-        const auto flat = F::Entries().size();
+        const auto flat = F::Entries().size() + std::distance(objects.begin(), wooden);
         for (size_t n = 0; n < flat / 3; ++n)
             Ui::Windows::HandheldObjectPickerMove(0, 1);
         for (size_t n = 0; n < flat % 3; ++n)

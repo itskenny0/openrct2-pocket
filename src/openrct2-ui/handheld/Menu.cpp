@@ -174,6 +174,7 @@ namespace OpenRCT2::Ui::Windows
         bool _ridePickerFromBuild{};
         bool _designPickerFromBuild{};
         ObjectEntryIndex _customObject = kObjectEntryIndexNull;
+        ride_type_t _customType = kRideTypeNull;
         bool _exitAfterSave{};
         size_t _slot{};
         Handheld::Dashboard::State _dashboard;
@@ -1696,11 +1697,11 @@ namespace OpenRCT2::Ui::Windows
                 case Page::customChoice:
                     if (choice == 0)
                     {
-                        if (Handheld::BeginCustomTrack(_customObject))
+                        if (Handheld::BeginCustomTrack(_customObject, _customType))
                             close();
                         else
                         {
-                            _status = "Wooden coaster unavailable";
+                            _status = "Ride construction unavailable";
                             invalidate();
                         }
                     }
@@ -1729,9 +1730,15 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::ridePicker:
-                    if (_picker.selected() && _picker.selected()->identity.key.starts_with("custom:"))
+                    if (_picker.selected()
+                        && (_picker.selected()->identity.key.starts_with("custom:")
+                            || _picker.selected()->identity.key.starts_with("custom-type:")))
                     {
                         _customObject = _picker.selected()->identity.index;
+                        const auto key = _picker.selected()->identity.key;
+                        _customType = key.starts_with("custom-type:")
+                            ? static_cast<ride_type_t>(std::stoi(key.substr(12)))
+                            : static_cast<ride_type_t>(RIDE_TYPE_WOODEN_ROLLER_COASTER);
                         page(Page::customChoice);
                         break;
                     }
@@ -3456,7 +3463,7 @@ namespace OpenRCT2::Ui::Windows
                     title = "PATH OPTIONS";
                     break;
                 case Page::customChoice:
-                    title = "WOODEN COASTER";
+                    title = "RIDE CONSTRUCTION";
                     break;
                 case Page::designConfirm:
                     title = "PLACE DESIGN?";

@@ -189,12 +189,12 @@ namespace OpenRCT2::Ui::Handheld
         _treeIndex = Trees::Next(kObjectEntryIndexNull);
     }
 
-    bool BeginCustomTrack(ObjectEntryIndex index)
+    bool BeginCustomTrack(ObjectEntryIndex index, ride_type_t type)
     {
-        if (!CustomTracks::Eligible(index))
+        if (!CustomTracks::Eligible(index, type))
             return false;
         BeginTerrain(true);
-        return CustomTracks::Begin(index);
+        return CustomTracks::Begin(index, type);
     }
     bool ResumeCustomTrack(RideId id)
     {

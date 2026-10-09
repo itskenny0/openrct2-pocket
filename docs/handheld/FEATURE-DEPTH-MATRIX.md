@@ -14,7 +14,7 @@ No editor/debug features are counted as ordinary park-play gaps.
 | Park / overview | COMPLETE for summary/status; PARTIAL domain | ParkOverview.cpp: native objective, rating, value, guests, open/close review; ParkSetParameterAction. |
 | Rides | PARTIAL | RideManagement.cpp: full non-shop roster, ratings/reliability/customers/income/profit, locate, status and admission drafts; RideSetStatusAction, RideSetPriceAction. |
 | Ride construction | PARTIAL | FlatRides.cpp and Designs.cpp: eligible supported non-track flats and wooden saved designs, native previews/actions, entrance/exit recovery. |
-| Custom track | PARTIAL | CustomTracks.cpp: wooden forward-endpoint editor, ordinary curves/slopes/banks/chain/brakes, native track actions, undo and circuit/access recovery. |
+| Custom track | PARTIAL | CustomTracks.cpp: descriptor-driven regular-station forward editor, loaded/researched object/type pairs, native curves/slopes/banks/chain/brakes and compatible special/inversion pieces, native track actions, undo and circuit/access recovery. |
 | Shops / facilities | COMPLETE for placement/basic management; PARTIAL domain | Shops.cpp, ShopManagement.cpp: eligible native objects, rotation, ghost, status, product/common prices, statistics and demolition. |
 | Paths | PARTIAL | Paths.cpp: normal/queue surfaces, raised/sloped tiles, options, ghost, removal; RideAccess.cpp: elevated station landings and genuine connectivity. |
 | Terrain / water | PARTIAL | Terrain.h, Water.h, Surface.h / AreaTools.h: original single-tile actions plus rectangular brush, native smoothing, corners/edges, water and loaded area surface/edge styles. |
@@ -151,3 +151,13 @@ Guest domain remains PARTIAL for ride history, persistent follow, broader deskto
 filter entry points/map display and filter restoration after closing into placement.
 Staff pickup/manual-hire gap is closed; hardware/routing/patrol validation remains
 explicitly limited. The 100% ordinary-gameplay goal and construction gaps remain.
+
+
+## Ride construction breadth follow-up
+
+RIDE-CONSTRUCTION-COMPLETION.md Phase 1 replaces Wooden-only forward construction
+with native descriptor-backed conventional track families and compatible special
+pieces. Five native families plus original Wooden gameplay regressions pass.
+The domain remains PARTIAL for editing/backward/selected-block controls, design
+breadth, covered/inverted variants and distinct maze/special geometry; no ordinary
+parity gap is removed from the 100% roadmap.

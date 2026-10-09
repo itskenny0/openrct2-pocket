@@ -6,6 +6,7 @@
 #include "../world/TileElementsView.h"
 #include "../world/tile_element/TrackElement.h"
 #include "ShopPlacement.h"
+#include "TrackConstructionSupport.h"
 #include "TrackData.h"
 #include "ted/TrackElementDescriptor.h"
 
@@ -64,7 +65,7 @@ namespace OpenRCT2::FlatRidePlacement
     {
         if (Type(ride.subtype) == ride.type)
             return true;
-        if (ride.type != RIDE_TYPE_WOODEN_ROLLER_COASTER)
+        if (!TrackConstructionSupport::Type(ride.type))
             return false;
         size_t count = 0;
         for (const auto& station : ride.getStations())

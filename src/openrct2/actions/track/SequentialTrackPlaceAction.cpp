@@ -4,6 +4,7 @@
 #include "../../GameState.h"
 #include "../../management/Research.h"
 #include "../../ride/RideData.h"
+#include "../../ride/TrackConstructionSupport.h"
 #include "../../ride/TrackData.h"
 #include "../../ride/TrackIteration.h"
 #include "../../ride/ted/TrackElementDescriptor.h"
@@ -69,8 +70,8 @@ namespace OpenRCT2::GameActions
         };
         const auto* ride = GetRide(_ride);
         const auto* entry = GetRideEntryByIndex(_object);
-        if (!ride || ride->type != RIDE_TYPE_WOODEN_ROLLER_COASTER || ride->subtype != _object || ride->buildDate != _buildDate
-            || ride->status != RideStatus::closed || !entry || _origin.direction > 3 || _piece >= TrackElemType::count
+        if (!ride || !TrackConstructionSupport::Type(ride->type) || ride->subtype != _object || ride->buildDate != _buildDate
+            || ride->status != RideStatus::closed || !entry || _origin.direction > 3 || !TrackConstructionSupport::Piece(_piece)
             || _sourceType >= TrackElemType::count || _noMoney != state.park.flags.has(ParkFlag::noMoney)
             || (!state.cheats.ignoreResearchStatus && (!RideTypeIsInvented(ride->type) || !RideEntryIsInvented(_object))))
             return invalid();

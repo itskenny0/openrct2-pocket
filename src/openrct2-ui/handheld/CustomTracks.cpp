@@ -17,6 +17,7 @@
 #include <openrct2/object/RideObject.h>
 #include <openrct2/ride/FlatRidePlacement.h>
 #include <openrct2/ride/Track.h>
+#include <openrct2/ride/TrackConstructionSupport.h>
 #include <openrct2/ride/TrackData.h>
 #include <openrct2/ride/TrackIteration.h>
 #include <openrct2/ride/ted/TrackElementDescriptor.h>
@@ -60,26 +61,26 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         r.errorMessage = text;
         return r;
     }
-    bool Eligible(ObjectEntryIndex index)
+    bool Eligible(ObjectEntryIndex index, ride_type_t type)
     {
-        auto* object = GetContext()->GetObjectManager().GetLoadedObject<RideObject>(index);
-        return object
-            && std::find(
-                   std::begin(object->GetEntry().ride_type), std::end(object->GetEntry().ride_type),
-                   RIDE_TYPE_WOODEN_ROLLER_COASTER)
-            != std::end(object->GetEntry().ride_type)
-            && (getGameState().cheats.ignoreResearchStatus
-                || (RideTypeIsInvented(RIDE_TYPE_WOODEN_ROLLER_COASTER) && RideEntryIsInvented(index)));
+        return TrackConstructionSupport::ForObject(index, type) != kRideTypeNull
+            && FlatRidePlacement::StationObject() != kObjectEntryIndexNull;
     }
     std::vector<PickerEntry> RideEntries()
     {
         std::vector<PickerEntry> result;
         for (ObjectEntryIndex i = 0; i < kMaxRideObjects; ++i)
-            if (Eligible(i))
-                result.push_back(
-                    { { ObjectType::ride, i, "custom:" + std::to_string(i) },
-                      GetContext()->GetObjectManager().GetLoadedObject<RideObject>(i)->GetName(),
-                      ZoomLevel{ 1 } });
+            if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject<RideObject>(i))
+                for (auto type : object->GetEntry().ride_type)
+                    if (Eligible(i, type) && type != kRideTypeNull)
+                    {
+                        const auto key = type == RIDE_TYPE_WOODEN_ROLLER_COASTER
+                            ? "custom:" + std::to_string(i)
+                            : "custom-type:" + std::to_string(type) + ":" + std::to_string(i);
+                        const auto label = FmtString(FormatStringID(GetRideTypeDescriptor(type).Naming.Name))
+                                               .WithoutFormatTokens();
+                        result.push_back({ { ObjectType::ride, i, key }, label + " / " + object->GetName(), ZoomLevel{ 1 } });
+                    }
         return result;
     }
     // Native real-track traversal is the authority for resume and circuit completion.
@@ -90,7 +91,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         pitch = TrackPitch::none;
         roll = TrackRoll::none;
         auto* ride = target ? RideManagement::Resolve(*target) : nullptr;
-        if (!ride || ride->type != RIDE_TYPE_WOODEN_ROLLER_COASTER || ride->status != RideStatus::closed)
+        if (!ride || !TrackConstructionSupport::Type(ride->type) || ride->status != RideStatus::closed)
             return false;
         std::optional<CoordsXYE> first;
         for (const auto& station : ride->getStations())
@@ -187,43 +188,17 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     }
     static bool Supported(TrackElemType type)
     {
+        if (!TrackConstructionSupport::Piece(type))
+            return false;
         const auto& ted = GetTrackElementDescriptor(type);
         const auto group = ted.definition.group;
         const auto* ride = target ? RideManagement::Resolve(*target) : nullptr;
-        if (!ride || !Eligible(ride->subtype) || !ride->getRideTypeDescriptor().SupportsTrackGroup(group)
+        if (!ride || !Eligible(ride->subtype, ride->type) || !ride->getRideTypeDescriptor().SupportsTrackGroup(group)
             || !RideEntryGetSupportedTrackPieces(*GetRideEntryByIndex(ride->subtype))[static_cast<size_t>(group)]
             || ted.sequenceData.numSequences == 0)
             return false;
-        // Ordinary non-inverting vocabulary; rare inversions/helixes/splash/photo deferred.
-        switch (group)
-        {
-            case TrackGroup::flat:
-            case TrackGroup::straight:
-            case TrackGroup::stationEnd:
-            case TrackGroup::slope:
-            case TrackGroup::slopeSteepUp:
-            case TrackGroup::slopeSteepDown:
-            case TrackGroup::flatRollBanking:
-            case TrackGroup::slopeRollBanking:
-            case TrackGroup::slopeCurve:
-            case TrackGroup::slopeCurveBanked:
-            case TrackGroup::slopeCurveSteep:
-            case TrackGroup::sBend:
-            case TrackGroup::curveSmall:
-            case TrackGroup::curve:
-            case TrackGroup::curveLarge:
-            case TrackGroup::brakes:
-            case TrackGroup::blockBrakes:
-            case TrackGroup::diagSlope:
-            case TrackGroup::diagSlopeSteepUp:
-            case TrackGroup::diagSlopeSteepDown:
-            case TrackGroup::diagBrakes:
-            case TrackGroup::diagBlockBrakes:
-            case TrackGroup::slopeSteepLong:
-                break;
-            default:
-                return false;
-        }
+        // Loaded vehicle support and native TED endpoint geometry filter all
+        // conventional special pieces, including inversions/helixes/photo.
         if (StationPlacement())
             return type == TrackElemType::endStation;
         return endpoint && ted.definition.pitchStart == pitch && ted.definition.rollStart == roll
@@ -347,13 +322,14 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         camera = false;
         ++revision;
     }
-    bool Begin(ObjectEntryIndex index)
+    bool Begin(ObjectEntryIndex index, ride_type_t requested)
     {
-        if (!Eligible(index))
+        const auto type = TrackConstructionSupport::ForObject(index, requested);
+        if (!Eligible(index, type) || type == kRideTypeNull)
             return false;
         End();
         const auto entrance = FlatRidePlacement::StationObject();
-        GA::RideCreateAction create(RIDE_TYPE_WOODEN_ROLLER_COASTER, index, 0, 0, entrance, RideInspection::every30Minutes);
+        GA::RideCreateAction create(type, index, 0, 0, entrance, RideInspection::every30Minutes);
         const auto q = GA::Query(&create, getGameState());
         if (q.error != GA::Status::ok)
             return false;
@@ -396,8 +372,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     bool CanResume(const RideManagement::Target& t)
     {
         const auto* ride = RideManagement::Resolve(t);
-        if (!ride || ride->type != RIDE_TYPE_WOODEN_ROLLER_COASTER || ride->status != RideStatus::closed
-            || !Eligible(ride->subtype))
+        if (!ride || !TrackConstructionSupport::Type(ride->type) || ride->status != RideStatus::closed
+            || !Eligible(ride->subtype, ride->type))
             return false;
         // A native gap, rather than a Pocket save marker, identifies an unfinished course.
         for (const auto& station : ride->getStations())
@@ -641,7 +617,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     {
         if (!active || busy)
             return;
-        if (!target || !RideManagement::Resolve(*target) || !Eligible(RideManagement::Resolve(*target)->subtype))
+        if (!target || !RideManagement::Resolve(*target)
+            || !Eligible(RideManagement::Resolve(*target)->subtype, RideManagement::Resolve(*target)->type))
         {
             End();
             return;
@@ -697,7 +674,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             return;
         }
         Box(rt, p, { 164, 238 });
-        Heading(rt, p + ScreenCoordsXY{ 10, 12 }, StationPlacement() ? "Place station" : "Wooden coaster");
+        Heading(rt, p + ScreenCoordsXY{ 10, 12 }, StationPlacement() ? "Place station" : "Build track");
         Rule(rt, p + ScreenCoordsXY{ 8, 38 }, 148);
         Row(rt, p + ScreenCoordsXY{ 8, 48 }, Name(selected), Icon::path, true);
         const auto& d = GetTrackElementDescriptor(selected).definition;
@@ -715,9 +692,10 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             rt, p + ScreenCoordsXY{ 10, 108 },
             "{MUTED}Bank "
                 + std::string(
-                    d.rollEnd == TrackRoll::none       ? "Level"
-                        : d.rollEnd == TrackRoll::left ? "Left"
-                                                       : "Right"));
+                    d.rollEnd == TrackRoll::none        ? "Level"
+                        : d.rollEnd == TrackRoll::left  ? "Left"
+                        : d.rollEnd == TrackRoll::right ? "Right"
+                                                        : "Inverted"));
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 130 },
             std::string("{MUTED}Chain ") + (ChainAllowed() ? (chain ? "On" : "Off") : "Unavailable"));

@@ -6,9 +6,9 @@
 #include <openrct2/ride/ted/TrackElemType.h>
 namespace OpenRCT2::Ui::Handheld::CustomTracks
 {
-    bool Eligible(ObjectEntryIndex index);
+    bool Eligible(ObjectEntryIndex index, ride_type_t type = kRideTypeNull);
     std::vector<PickerEntry> RideEntries();
-    bool Begin(ObjectEntryIndex index);
+    bool Begin(ObjectEntryIndex index, ride_type_t type = kRideTypeNull);
     bool CanResume(const RideManagement::Target& target);
     bool Resume(const RideManagement::Target& target);
     void End();
