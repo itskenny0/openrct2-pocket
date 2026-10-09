@@ -29,7 +29,27 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
     void Invalidate(EntityId id);
     std::optional<Target> Identify(EntityId id);
     const Guest* Resolve(const Target& target);
-    std::vector<Target> Roster();
+    enum class GroupMode
+    {
+        actions,
+        thoughts
+    };
+    struct Group
+    {
+        GroupMode mode{};
+        std::array<uint8_t, 12> arguments{};
+        std::string label;
+        size_t count{};
+        bool operator==(const Group&) const = default;
+    };
+    struct Filter
+    {
+        std::optional<Group> group;
+        bool tracked{};
+    };
+    std::vector<Target> Roster(const Filter& filter = {});
+    std::vector<Group> Groups(GroupMode mode);
+    ManagementPresentation GroupPresentation(GroupMode, const std::vector<Group>&, size_t selected);
     std::string Status(const Guest& guest);
     std::vector<std::string> Thoughts(const Guest& guest);
     std::vector<std::string> Inventory(const Guest& guest);

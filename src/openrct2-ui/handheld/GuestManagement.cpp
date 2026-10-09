@@ -34,11 +34,56 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
         const auto current = Identify(target.id);
         return current && *current == target ? getGameState().entities.tryGetEntity<Guest>(target.id) : nullptr;
     }
-    std::vector<Target> Roster()
+    static std::array<uint8_t, 12> Arguments(const Guest& guest, GroupMode mode)
+    {
+        std::array<uint8_t, 12> args{};
+        Formatter ft(args.data());
+        if (mode == GroupMode::actions)
+            formatPeepActionTo(guest, ft, true);
+        else if (guest.thoughts[0].type != PeepThoughtType::none && guest.thoughts[0].freshness <= 5)
+            PeepThoughtSetFormatArgs(&guest.thoughts[0], ft);
+        return args;
+    }
+    std::vector<Group> Groups(GroupMode mode)
+    {
+        std::vector<Group> groups;
+        for (const auto* guest : EntityList<Guest>())
+        {
+            if (guest->outsideOfPark)
+                continue;
+            const auto args = Arguments(*guest, mode);
+            StringId id{};
+            std::memcpy(&id, args.data(), sizeof(id));
+            if (id == kStringIdEmpty)
+                continue; // Same empty-group exclusion as desktop GuestList.
+            auto found = std::find_if(groups.begin(), groups.end(), [&](const auto& g) { return g.arguments == args; });
+            if (found == groups.end())
+                groups.push_back({ mode, args, FormatStringIDLegacy(STR_STRINGID, args.data()), 1 });
+            else
+                ++found->count;
+        }
+        std::stable_sort(groups.begin(), groups.end(), [](const auto& a, const auto& b) { return a.count > b.count; });
+        return groups;
+    }
+    ManagementPresentation GroupPresentation(GroupMode mode, const std::vector<Group>& groups, size_t selected)
+    {
+        ManagementPresentation model;
+        model.breadcrumb = "Guests / Native groups";
+        model.title = mode == GroupMode::actions ? "Action groups" : "Thought groups";
+        model.selected = selected;
+        for (const auto& g : groups)
+            model.rows.push_back(std::to_string(g.count) + " / " + g.label);
+        model.rows.push_back("Back to Guests");
+        if (groups.empty())
+            model.status = "No current groups";
+        return model;
+    }
+    std::vector<Target> Roster(const Filter& filter)
     {
         std::vector<Target> result;
         for (const auto* guest : EntityList<Guest>())
-            if (auto target = Identify(guest->id))
+            if (auto target = Identify(guest->id); target && (!filter.tracked || guest->peepFlags.has(PeepFlag::tracking))
+                && (!filter.group || Arguments(*guest, filter.group->mode) == filter.group->arguments))
                 result.push_back(*target);
         std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
             return a.peepId == b.peepId ? a.id < b.id : a.peepId < b.peepId;
@@ -201,7 +246,8 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
                             { "Heading here", std::to_string(getGameState().park.numGuestsHeadingForPark) },
                             { "Avg happiness",
                               count == 0 ? "Unavailable" : std::to_string(happiness * 100 / (count * 255)) + "%" } };
-            model.rows = { "Guest roster...", "Back to dashboard" };
+            model.rows = { "Guest roster...", "Back to dashboard", "Action groups...", "Thought groups...",
+                           "Tracked guests..." };
             return model;
         }
         if (view == View::roster)

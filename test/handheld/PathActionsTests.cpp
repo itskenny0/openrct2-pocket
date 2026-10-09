@@ -2637,6 +2637,22 @@ static void TestGuests(IContext& context, const std::string& profile, bool realU
     guest->giveItem(ShopItem::voucher);
     guest->voucherType = VOUCHER_TYPE_FOOD_OR_DRINK_FREE;
     guest->voucherShopItem = static_cast<ShopItemIndex>(ShopItem::burger);
+    const auto actions = G::Groups(G::GroupMode::actions);
+    size_t grouped = 0;
+    for (const auto& group : actions)
+    {
+        grouped += group.count;
+        Require(G::Roster({ group, false }).size() == group.count, "Native action group membership differs");
+    }
+    Require(grouped == roster.size(), "Native action group totals differ");
+    const auto thoughtGroups = G::Groups(G::GroupMode::thoughts);
+    const auto hungry = std::find_if(thoughtGroups.begin(), thoughtGroups.end(), [](const auto& group) {
+        return group.label.find("hungry") != std::string::npos;
+    });
+    Require(
+        hungry != thoughtGroups.end() && G::Roster({ *hungry, false }).size() == hungry->count,
+        "Native fresh thought group missing");
+    Require(G::GroupPresentation(G::GroupMode::thoughts, {}, 0).rows.size() == 1, "Empty thought group lacks return");
     std::array<uint8_t, sizeof(Guest)> bytes{};
     std::memcpy(bytes.data(), guest, sizeof(Guest));
     const auto cash = state.park.cash;
@@ -2714,6 +2730,17 @@ static void TestGuests(IContext& context, const std::string& profile, bool realU
             Require(W::HandheldGuestsIsOpen() && !W::HandheldDashboardRailFocused(), "Guests route unavailable");
         };
         open();
+        W::HandheldDashboardMove(0, 2);
+        press(H::Action::confirm);
+        Require(W::HandheldGuestsPresentation().title == "Action groups", "Held A skipped native groups");
+        press(H::Action::confirm);
+        Require(W::HandheldGuestsPresentation().title == "Filtered guests", "Group did not open native membership");
+        press(H::Action::confirm);
+        press(H::Action::back);
+        Require(W::HandheldGuestsPresentation().selected == 0, "Filtered roster identity focus lost");
+        press(H::Action::back);
+        Require(W::HandheldGuestsPresentation().title == "Action groups", "Filtered roster lost group parent");
+        press(H::Action::back);
         Require(W::HandheldGuestsPresentation().title == "Guests", "Guest overview selection spilled");
         press(H::Action::confirm);
         W::HandheldDashboardMove(0, 19);
