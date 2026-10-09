@@ -99,7 +99,7 @@ namespace OpenRCT2::Ui::Handheld::Mazes
     }
     bool CameraMode()
     {
-        return camera;
+        return camera && !review;
     }
     void ToggleCamera()
     {
@@ -207,7 +207,11 @@ namespace OpenRCT2::Ui::Handheld::Mazes
         GA::MazeSetTrackAction action(loc, !placed, target->id, mode);
         auto q = GA::Query(&action, getGameState());
         if (!execute || q.error != GA::Status::ok)
+        {
+            if (execute)
+                feedback = q.getErrorMessage();
             return q;
+        }
         busy = true;
         const auto token = revision;
         action.SetCallback([token, loc](const auto*, const GA::Result* result) {
@@ -278,7 +282,10 @@ namespace OpenRCT2::Ui::Handheld::Mazes
     void Turn(int delta)
     {
         if (!review)
+        {
             direction = (direction + delta) & 3;
+            feedback.clear();
+        }
         else
             ChooseRemoval();
     }
@@ -325,15 +332,22 @@ namespace OpenRCT2::Ui::Handheld::Mazes
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 108 }, "{MUTED}Height " + (cursor ? std::to_string(cursor->z / 8) : "Unavailable"));
         DrawModernText(rt, p + ScreenCoordsXY{ 10, 132 }, review ? "{MUTED}L/R Select option" : "{MUTED}X Move | Y Remove");
-        DrawModernText(rt, p + ScreenCoordsXY{ 10, 154 }, placed ? "{MUTED}B Finish / access" : "{MUTED}L2/R2 Height");
+        DrawModernText(
+            rt, p + ScreenCoordsXY{ 10, 154 },
+            review       ? "{MUTED}A Apply | B Cancel"
+                : placed ? "{MUTED}B Finish / access"
+                         : "{MUTED}L2/R2 Height");
         DrawModernText(rt, p + ScreenCoordsXY{ 10, 178 }, "{MUTED}SEL Camera | START");
         DrawActionStrip(rt, screen);
         DrawCommand(rt, { 8, screen.height - 21 }, 17, "A", review ? "Select" : "Build");
         DrawCommand(rt, { 112, screen.height - 21 }, 17, "B", review ? "Cancel" : "Leave");
         DrawCommand(rt, { 220, screen.height - 21 }, 30, "L/R", review ? "Choice" : (camera ? "Zoom" : "Direction"));
-        DrawCommand(rt, { 374, screen.height - 21 }, 17, "X", camera ? "Rotate" : "Move");
+        if (!review)
+            DrawCommand(rt, { 374, screen.height - 21 }, 17, "X", camera ? "Rotate" : "Move");
         const auto q = review ? Apply(GA::MazeBuildMode::fill, false) : Build(false);
-        if (q.error == GA::Status::ok)
+        if (!feedback.empty())
+            DrawContextMessage(rt, Layout::ContextAnchor(screen, kContextSize, true), feedback);
+        else if (q.error == GA::Status::ok)
             DrawCostBadge(rt, Layout::ContextAnchor(screen, kContextSize, true), FormatMoney(q.cost));
         else
             DrawContextMessage(

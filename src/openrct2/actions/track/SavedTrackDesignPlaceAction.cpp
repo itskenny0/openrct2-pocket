@@ -18,14 +18,23 @@ namespace OpenRCT2::GameActions
     }
     bool SavedTrackDesignPlaceAction::Eligible(const TrackDesign& design)
     {
-        if (!TrackConstructionSupport::Type(design.trackAndVehicle.rtdIndex) || design.trackElements.empty()
-            || !design.mazeElements.empty())
-            return false;
-        const auto stations = std::count_if(design.trackElements.begin(), design.trackElements.end(), [](const auto& piece) {
-            return piece.type == TrackElemType::endStation;
-        });
-        if (!stations || stations > Limits::kMaxStationsPerRide)
-            return false;
+        const bool maze = design.trackAndVehicle.rtdIndex == RIDE_TYPE_MAZE;
+        if (maze)
+        {
+            if (design.mazeElements.empty() || !design.trackElements.empty())
+                return false;
+        }
+        else
+        {
+            if (!TrackConstructionSupport::Type(design.trackAndVehicle.rtdIndex) || design.trackElements.empty()
+                || !design.mazeElements.empty())
+                return false;
+            const auto stations = std::count_if(
+                design.trackElements.begin(), design.trackElements.end(),
+                [](const auto& piece) { return piece.type == TrackElemType::endStation; });
+            if (!stations || stations > Limits::kMaxStationsPerRide)
+                return false;
+        }
         const auto index = GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(design.trackAndVehicle.vehicleObject);
         const auto* entry = GetRideEntryByIndex(index);
         if (!entry

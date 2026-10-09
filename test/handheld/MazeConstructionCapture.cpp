@@ -119,6 +119,8 @@ int main(int argc, char** argv)
         a.actions = { H::Action::confirm, H::Action::confirm };
         CoordsXYZ focus{ 800, 800, MapGetHighestZ({ 800, 800 }) };
         auto capture = [&](const char* name, bool modal = false) {
+            if (M::Active() && M::Target() && GetRide(M::Target()->id)->mazeTiles && M::Cursor())
+                M::Update(M::Cursor()->toTileStart());
             Viewport vp{};
             vp.width = 512;
             vp.height = 384;
@@ -225,7 +227,8 @@ int main(int argc, char** argv)
         controller.update(true, 1000);
         pump();
         controller.update(true, 1010);
-        Check(M::ReviewRemoval().error == GameActions::Status::ok, "Fill review failed");
+        M::ToggleCamera();
+        Check(M::ReviewRemoval().error == GameActions::Status::ok && !M::CameraMode(), "Fill review camera handoff failed");
         SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, 1);
         SDL_JoystickUpdate();
         pump();
@@ -240,11 +243,14 @@ int main(int argc, char** argv)
         SDL_JoystickDetachVirtual(device);
         Check(M::ReviewRemoval().error == GameActions::Status::ok, "Review after held A failed");
         capture("05-maze-cancel-first-removal.png");
-        M::ChooseRemoval();
+        H::Frame option;
+        option.actions = { H::Action::nextOption };
+        H::HandleExplorerInput(controller, option);
         capture("06-maze-removal-review.png");
         Check(M::Confirm().error == GameActions::Status::ok, "Fill failed");
         GameActions::ProcessQueue(state);
-        M::ToggleCamera();
+        if (!M::CameraMode())
+            M::ToggleCamera();
         capture("07-maze-dense-camera-controls.png");
         M::ToggleCamera();
         M::End();
@@ -270,6 +276,58 @@ int main(int argc, char** argv)
             GetRide(target.id)->getStation().entrance.isNull() == false
                 && GetRide(target.id)->getStation().exit.isNull() == false,
             "Access incomplete");
+        TrackDesign td;
+        TrackDesignState tds{};
+        Check(td.CreateTrackDesign(tds, *GetRide(target.id)).Successful, "Native maze design creation failed");
+        const auto tracks = std::filesystem::path(
+            context->GetPlatformEnvironment().GetDirectoryPath(DirBase::user, DirId::trackDesigns));
+        std::filesystem::create_directories(tracks);
+        const auto file = (tracks / "Pocket native maze.td6").string();
+        Check(RCT2::T6Exporter(td).SaveTrack(file.c_str()), "Maze design export failed");
+        TrackRepositoryScan();
+        Check(D::Begin(file), "Maze design rejected");
+        std::optional<CoordsXY> destination;
+        for (int y = 128; y < state.mapSize.y * 32 - 128 && !destination; y += 32)
+            for (int x = 256; x < state.mapSize.x * 32 - 128 && !destination; x += 32)
+                if (D::Query(CoordsXY{ x, y }).error == GameActions::Status::ok)
+                    destination = CoordsXY{ x, y };
+        Check(destination.has_value(), "Native maze design site unavailable");
+        focus = { *destination, MapGetHighestZ(*destination) };
+        D::UpdatePreview(*destination);
+        capture("11-maze-design-ghost.png");
+        D::Rotate();
+        D::UpdatePreview(*destination);
+        capture("12-maze-design-rotation.png");
+        D::ClearPreview();
+        if (D::Query(*destination).error != GameActions::Status::ok)
+        {
+            destination.reset();
+            for (int y = 128; y < state.mapSize.y * 32 - 128 && !destination; y += 32)
+                for (int x = 256; x < state.mapSize.x * 32 - 128 && !destination; x += 32)
+                    if (D::Query(CoordsXY{ x, y }).error == GameActions::Status::ok)
+                        destination = CoordsXY{ x, y };
+        }
+        Check(destination.has_value(), "Rotated maze site unavailable");
+        Check(D::Review(*destination), "Maze design review failed");
+        W::HandheldDesignReviewOpen();
+        capture("13-maze-design-cost-review.png", true);
+        H::Frame back;
+        back.actions = { H::Action::back };
+        H::HandleMenuInput(controller, back);
+        Check(!D::HasReview(), "Maze design review cancel failed");
+        Check(D::Review(*destination), "Second maze design review failed");
+        const auto designCash = state.park.cash, designCost = D::ReviewCost();
+        Check(
+            D::Confirm().error == GameActions::Status::ok && D::Confirm().error != GameActions::Status::ok,
+            "Maze design repeat guard failed");
+        GameActions::ProcessQueue(state);
+        Check(D::Completed() && state.park.cash == designCash - designCost, "Maze design execute cost failed");
+        const auto designTarget = *D::Completed();
+        D::End();
+        Check(M::CanResume(designTarget), "Design maze recovery failed");
+        Check(
+            !GetRide(designTarget.id)->getStation().entrance.isNull() && !GetRide(designTarget.id)->getStation().exit.isNull(),
+            "Native design access missing");
         const auto save = std::string(argv[4]) + "/profile/maze-validation.park";
         SaveFlags flags{};
         Check(ScenarioSave(state, save, flags) && context->LoadParkFromFile(save), "Maze reload failed");

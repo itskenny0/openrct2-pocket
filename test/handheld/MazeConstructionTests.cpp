@@ -1,15 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include <filesystem>
 #include <iostream>
+#include <openrct2-ui/handheld/Designs.h>
 #include <openrct2-ui/handheld/FlatRides.h>
 #include <openrct2-ui/handheld/Mazes.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
 #include <openrct2/OpenRCT2.h>
+#include <openrct2/PlatformEnvironment.h>
+#include <openrct2/actions/ResultWithMessage.h>
 #include <openrct2/actions/ride/MazeSetTrackAction.h>
 #include <openrct2/actions/ride/RideSetStatusAction.h>
 #include <openrct2/config/Config.h>
+#include <openrct2/rct2/T6Exporter.h>
 #include <openrct2/ride/FlatRidePlacement.h>
+#include <openrct2/ride/TrackDesignRepository.h>
 #include <openrct2/scenario/Scenario.h>
 #include <openrct2/world/TileElementsView.h>
 #include <openrct2/world/tile_element/SurfaceElement.h>
@@ -29,6 +34,15 @@ static uint16_t Walls(CoordsXYZ loc, RideId id)
         if (!e->isGhost() && e->getRideIndex() == id && e->getBaseZ() == loc.z && e->getTrackType() == TrackElemType::maze)
             return e->getMazeEntry();
     return 0xFFFF;
+}
+static size_t Ghosts()
+{
+    size_t count = 0;
+    for (int y = 32; y < 2016; y += 32)
+        for (int x = 32; x < 2016; x += 32)
+            for (auto* e : TileElementsView<>(CoordsXY{ x, y }))
+                count += e->isGhost();
+    return count;
 }
 int main(int argc, char** argv)
 {
@@ -122,6 +136,61 @@ int main(int argc, char** argv)
                           .has_value();
         Check(access, "Maze native adjacency unavailable");
         M::End();
+        namespace D = Ui::Handheld::Designs;
+        namespace F = Ui::Handheld::FlatRides;
+        Check(F::Resume(t), "Maze access recovery failed");
+        for (int n = 0; n < 2; n++)
+        {
+            std::optional<CoordsXY> accessTile;
+            for (int y = 288; y <= 384 && !accessTile; y += 32)
+                for (int x = 288; x <= 384 && !accessTile; x += 32)
+                    if (F::Action(CoordsXY{ x, y }, false).error == GA::Status::ok)
+                        accessTile = CoordsXY{ x, y };
+            Check(accessTile && F::Action(accessTile, true).error == GA::Status::ok, "Maze access execute failed");
+            GA::ProcessQueue(state);
+        }
+        F::End();
+        TrackDesign td;
+        TrackDesignState tds{};
+        Check(
+            td.CreateTrackDesign(tds, *GetRide(t.id)).Successful && !td.mazeElements.empty() && D::Eligible(td),
+            "Native maze export/eligibility failed");
+        auto invalid = td;
+        invalid.mazeElements.clear();
+        Check(!D::Eligible(invalid), "Empty maze design accepted");
+        const auto tracks = std::filesystem::path(
+            context->GetPlatformEnvironment().GetDirectoryPath(DirBase::user, DirId::trackDesigns));
+        std::filesystem::create_directories(tracks);
+        const auto file = (tracks / "Native maze regression.td6").string();
+        Check(RCT2::T6Exporter(td).SaveTrack(file.c_str()), "Maze export failed");
+        TrackRepositoryScan();
+        Check(!D::Entries().empty() && D::Begin(file), "Native maze design picker/import failed");
+        const CoordsXY designTile{ 960, 960 };
+        for (int turn = 0; turn < 4; turn++)
+        {
+            Check(D::Query(designTile).error == GA::Status::ok, "Maze rotation/native height failed");
+            D::UpdatePreview(designTile);
+            Check(Ghosts() > 0, "Maze ghost not created");
+            D::ClearPreview();
+            Check(Ghosts() == 0, "Maze ghosts survived cleanup");
+            D::Rotate();
+        }
+        D::SetScenery(false);
+        Check(D::Review(designTile), "Maze review failed");
+        const auto designCost = D::ReviewCost();
+        const auto designCash = state.park.cash;
+        D::CancelReview();
+        Check(state.park.cash == designCash && !D::HasReview(), "Maze review cancellation spent money");
+        Check(
+            D::Review(designTile) && D::Confirm().error == GA::Status::ok && D::Confirm().error != GA::Status::ok,
+            "Maze design confirm/repeat failed");
+        GA::ProcessQueue(state);
+        Check(
+            D::Completed() && GetRide(D::Completed()->id)->mazeTiles > 0 && state.park.cash == designCash - designCost,
+            "Native maze design accounting failed");
+        const auto designTarget = *D::Completed();
+        D::End();
+        Check(M::CanResume(designTarget), "Design maze recovery unavailable");
         const auto save = std::string(argv[2]) + "/maze.park";
         SaveFlags flags{};
         Check(ScenarioSave(state, save, flags) && context->LoadParkFromFile(save), "Maze save/reload failed");

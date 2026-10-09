@@ -50,3 +50,29 @@ Saved maze designs and special-family audit follow in separately validated phase
 All previously documented construction/editing/design-export/elevation/substitution
 and entrance/exit-ghost gaps remain. Exact canonical publications and final captures
 are recorded after publication, rather than predicting commit IDs.
+
+## Phase 2 — native maze saved designs
+
+SavedTrackDesignPlaceAction now distinguishes native maze designs (nonempty native
+maze elements, no conventional track elements) from conventional designs. Both
+require actual loaded matching vehicles, native type/object research and a loaded
+station object. Designs enumerates native maze repository entries and imports them
+through the existing native importer. No Pocket maze parser or geometry is added.
+
+Existing design rotation, automatic native terrain-fit height, optional scenery /
+native omitted-scenery warning, borrowed preview ride, query, native ghosts,
+Cancel-first cost review, exact-cost execution and completion/recovery are reused.
+Maze ghosts use native TrackDesignPlaceVirtual/TrackDesignPlace/MazePlaceTrackAction
+and native ghost removal; tests count ghosts before and after cleanup for all four
+orientations. Export in tests creates a genuine native design from action-built
+geometry; a player-facing export workflow remains missing.
+
+Validation: expanded MazeConstructionTests passes native access placement and
+native maze export/import/rotation/ghost-cleanup/cancel/repeat/execute/exact-cash/
+recovery. Factory Capers asset-backed production viewport/component captures pass
+native design ghost/rotation/review/execute and entrance/exit preservation. Manual
+elevation, substitution choices and player-facing export remain ordinary gaps.
+
+Publication: Phase 1 canonical `bbf017d6834c5f332e398b171b4651165456c5e2`,
+local `c6c6934a04fc3734ef3a77c741030f5b490a6e1f`, identical tree
+`5aee5e2e7dcf11881bdaa6efd956e502a9b2f1bf`.

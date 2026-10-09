@@ -162,8 +162,10 @@ The domain remains PARTIAL for editing/backward/selected-block controls, design
 breadth, covered/inverted variants and distinct maze/special geometry; no ordinary
 parity gap is removed from the 100% roadmap.
 
-Saved-design breadth checkpoint: compatible conventional native families and optional native design scenery are delivered in [RIDE-CONSTRUCTION-COMPLETION.md](RIDE-CONSTRUCTION-COMPLETION.md). Maze/flat design adapters, object substitution choice and broader editing remain ordinary parity gaps. Goal remains 100% ordinary gameplay.
+Saved-design breadth checkpoint: compatible conventional native families and optional native design scenery are delivered in [RIDE-CONSTRUCTION-COMPLETION.md](RIDE-CONSTRUCTION-COMPLETION.md). Native maze designs are now delivered in MAZE-SPECIAL-RIDE-COMPLETION.md; flat design adapters, object substitution choice and broader editing remain ordinary parity gaps. Goal remains 100% ordinary gameplay.
 
 Ride construction editing checkpoint: selected native block removal/refunds and brake/booster speed drafts, Cancel-first reviews, gap recovery and a Select-based Brick camera route are delivered. [RIDE-CONSTRUCTION-COMPLETION.md](RIDE-CONSTRUCTION-COMPLETION.md) records three independently validated published phases and 29 asset-backed captures. Overall ride construction remains PARTIAL: backward/disconnected-endpoint editing, maze/special adapters, additional parameters, variant controls and design export/manual elevation remain on the 100% ordinary-gameplay roadmap.
 
 Maze checkpoint: native researched object selection, half-cell build/move/fill, Cancel-first removal, access, existing-ride recovery and native persistence are delivered. Construction remains PARTIAL; [MAZE-SPECIAL-RIDE-COMPLETION.md](MAZE-SPECIAL-RIDE-COMPLETION.md) preserves exact remaining preview, geometry, design and operation-validation gaps. The goal remains 100% ordinary gameplay.
+
+Maze saved-design checkpoint: native import, exact loaded/researched object eligibility, four orientations, native height, ghosts/cleanup, scenery options, Cancel-first native cost review, execution and access/recovery are delivered. Export, manual elevation and substitutions remain partial.

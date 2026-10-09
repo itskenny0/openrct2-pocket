@@ -3,6 +3,7 @@
 
 #include "Currency.h"
 #include "FlatRides.h"
+#include "Mazes.h"
 
 #include <filesystem>
 #include <map>
@@ -111,11 +112,11 @@ namespace OpenRCT2::Ui::Handheld::Designs
             }
         };
         for (ride_type_t type = 0; type < RIDE_TYPE_COUNT; ++type)
-            if (TrackConstructionSupport::Type(type))
+            if (type == RIDE_TYPE_MAZE || TrackConstructionSupport::Type(type))
             {
                 collect(type, "");
                 for (ObjectEntryIndex i = 0; i < kMaxRideObjects; ++i)
-                    if (TrackConstructionSupport::Available(i, type))
+                    if ((type == RIDE_TYPE_MAZE && Mazes::Eligible(i)) || TrackConstructionSupport::Available(i, type))
                         if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject<RideObject>(i))
                             collect(type, std::string(object->GetObjectEntry().GetName()));
             }
