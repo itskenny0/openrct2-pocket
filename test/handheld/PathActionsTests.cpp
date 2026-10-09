@@ -1893,7 +1893,7 @@ static void TestStaff(IContext& context, const std::string& profile, bool realUi
     }
     roster = S::Roster();
     Require(
-        roster.size() >= 11 && S::Presentation(S::View::roster, roster.size() + 1, roster).rows.size() == roster.size() + 4,
+        roster.size() >= 11 && S::Presentation(S::View::roster, roster.size() + 1, roster).rows.size() == roster.size() + 6,
         "Full staff roster truncated");
     const auto stableRoster = roster;
     const auto afterHireCash = park.cash;

@@ -670,6 +670,67 @@ int main(int argc, char** argv)
         Require(!H::StaffPatrol::Active(), "Patrol cleanup leaked");
         std::cout << "SDL patrol inspector / width-held-A / Cancel-first clear / options recovery passed" << std::endl;
         wm->CloseByClass(WindowClass::handheldMenu);
+        W::HandheldStaffOpen(employee);
+        W::HandheldMenuMove(7);
+        press(H::Action::confirm);
+        Require(W::HandheldStaffPresentation().columns == 8, "Staff keyboard route failed");
+        const auto oldName = S::Resolve(employee)->getName();
+        press(H::Action::confirm);
+        Require(W::HandheldStaffPresentation().title == oldName + "A", "Held A typed twice");
+        W::HandheldMenuMove(46);
+        press(H::Action::confirm);
+        Require(
+            W::HandheldStaffPresentation().confirmation && W::HandheldStaffPresentation().selected == 1,
+            "Name review not Cancel-first");
+        press(H::Action::confirm);
+        Require(
+            S::Resolve(employee)->getName() == oldName && W::HandheldStaffPresentation().columns == 8,
+            "Name cancellation applied action");
+        W::HandheldMenuMove(46);
+        press(H::Action::confirm);
+        W::HandheldMenuMove(-1);
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Require(S::Resolve(employee)->getName() == oldName + "A", "SDL native staff name failed");
+        wm->CloseByClass(WindowClass::handheldMenu);
+        Require(objects.LoadObject("rct2.peep_animations.handyman"), "SDL handyman metadata missing");
+        std::optional<S::Target> handyman;
+        Require(
+            S::Hire(
+                StaffType::handyman, true,
+                [&](const auto*, const auto* response) {
+                    if (response->error == GameActions::Status::ok)
+                        handyman = S::Identify(
+                            response->template getData<GameActions::StaffHireNewActionResult>().StaffEntityId);
+                }).error
+                == GameActions::Status::ok,
+            "SDL uniform employee hire failed");
+        GameActions::ProcessQueue(state);
+        Require(handyman.has_value(), "SDL uniform target absent");
+        W::HandheldStaffOpen(*handyman);
+        W::HandheldMenuMove(8);
+        press(H::Action::confirm);
+        const auto oldColour = StaffGetColour(StaffType::handyman);
+        press(H::Action::confirm);
+        Require(StaffGetColour(StaffType::handyman) == oldColour, "Uniform draft applied prematurely");
+        W::HandheldMenuMove(1);
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Require(
+            EnumValue(StaffGetColour(StaffType::handyman)) == (EnumValue(oldColour) + 1) % 72,
+            "SDL uniform held-A/native apply failed");
+        W::HandheldStaffOpen();
+        W::HandheldMenuMove(S::Roster().size() + 3);
+        press(H::Action::confirm);
+        Require(
+            W::HandheldStaffPresentation().rows[S::Roster(StaffType::handyman).size() + 3] == "Filter: Handyman",
+            "SDL role filtering failed");
+        W::HandheldMenuMove(S::Roster(StaffType::handyman).size() + 4);
+        press(H::Action::confirm);
+        Require(W::HandheldStaffPresentation().stats.size() == 5, "SDL role wages/counts absent");
+        wm->CloseByClass(WindowClass::handheldMenu);
+        Require(S::Dismiss(*handyman, true).error == GameActions::Status::ok, "SDL uniform cleanup failed");
+        GameActions::ProcessQueue(state);
         Require(S::Dismiss(employee, true).error == GameActions::Status::ok, "SDL staff cleanup failed");
         GameActions::ProcessQueue(state);
         state.park.entrances = oldEntrances;

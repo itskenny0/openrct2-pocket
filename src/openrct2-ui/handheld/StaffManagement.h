@@ -2,6 +2,7 @@
 #pragma once
 #include "Currency.h"
 #include "ManagementPanel.h"
+#include "TextEntry.h"
 
 #include <openrct2/actions/GameActionRunner.h>
 #include <openrct2/entity/Staff.h>
@@ -26,14 +27,19 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         hire,
         dismissal,
         roles,
-        costumes
+        costumes,
+        summary
     };
     void Invalidate(EntityId id);
     bool Supported(StaffType type);
     std::string RoleName(StaffType type);
     std::vector<std::pair<ObjectEntryIndex, std::string>> Costumes();
     GameActions::Result SetCostume(const Target& target, ObjectEntryIndex baseline, ObjectEntryIndex value, bool execute);
-    std::vector<Target> Roster();
+    GameActions::Result SetUniform(const Target&, Drawing::Colour baseline, Drawing::Colour value, bool execute);
+    ManagementPresentation UniformPresentation(const Target&, Drawing::Colour value, size_t selected);
+    std::vector<Target> Roster(std::optional<StaffType> filter = {});
+    GameActions::Result SetName(const Target&, const std::string& baseline, const std::string& value, bool execute);
+    ManagementPresentation NamePresentation(const TextEntry&, size_t selected, bool review, const std::string& status = {});
     std::optional<Target> Identify(EntityId id);
     Staff* Resolve(const Target& target);
     std::vector<std::pair<uint8_t, std::string>> Orders(StaffType type);

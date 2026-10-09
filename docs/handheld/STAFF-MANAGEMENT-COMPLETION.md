@@ -35,13 +35,6 @@ because original animation sprites are absent; public fonts still render control
 Native entity-pool exhaustion, asset-backed animation and physical Brick are not
 claimed by these tests.
 
-## Remaining phases
-
-Patrol inspection/add/remove/clear and controller area selection; naming, role
-filtering and remaining ordinary information/operations depth. Existing construction
-and Ride Management remain regression contracts. Screenshots will use actual
-production components and native fixtures after validated source publication.
-
 ## Phase 2 — patrol editing
 
 Inspector → Patrol area enters a compact park tool. D-pad pans, A applies one
@@ -73,3 +66,43 @@ unverified. Naming, role filtering and uniforms are next; manual pickup remains
 an explicit ordinary-gameplay gap until implemented.
 
 Published Phase 1: `a6e4baa5782e00e5eaa3ffe092830982122592a1`.
+
+Published Phase 2: `bb17348865870388e860c5ca7b0c158aff9a2a56`.
+
+## Phase 3 — operations and information
+
+Staff Name reuses the eight-column 32-codepoint keyboard, retaining existing UTF-8
+and erasing complete codepoints. OK queries StaffSetNameAction and opens a Cancel-first
+review; cancellation retains the draft. Identity and native baseline name are checked
+again on apply. Clearing resets the native default name; an already-default empty draft
+is rejected. No employee field is written directly.
+
+Roster Filter cycles All, Handyman, Mechanic, Security, Entertainer. Native identity
+selection is retained during roster updates, and the existing two hire shortcuts and
+employee row offsets remain. Role counts / wages lists actual per-role counts and native
+monthly wages plus total; no-money parks show Not applicable. Orders and all role-specific
+work statistics use native data. Uniform colour changes apply to the entire native role
+(handyman, mechanic, security) through StaffSetColourAction, with loaded target identity,
+baseline and ordinary 72-colour validation. Entertainers use their costumes.
+
+Controls: D-pad navigates, A types/toggles/reviews/applies, B returns. Left/Right adjusts
+the selected uniform colour; keyboard D-pad uses native Pocket grid navigation. Hiring,
+dismissal, name and patrol-clear confirmations initially focus Cancel. Held A cannot
+cross a menu handoff or type/apply twice.
+
+Focused native tests pass all-role hiring, costs/wages/no-money, costume availability,
+patrol query/execute/add/remove/clear/stale/pending/bounds, Unicode naming, invalid lengths,
+role filtering, invalid/non-entertainer uniform selection, zero-cost uniform changes and
+native save/reload. SDL lifecycle exercises real controller/window routing for names,
+Cancel-first review, drafts, roles/costumes/patrol and existing construction/ride tools.
+
+## Ordinary functionality still incomplete
+
+Manual staff pickup/reposition and hiring without an automatic placement source remain
+missing. Native patrol effectiveness, staff animations, uniform sprite colours and work
+statistics accruing in a live asset-backed park need validation. Native entity-pool
+exhaustion has not been fixture-tested. No AArch64 build or physical TrimUI Brick test is
+claimed. Staff remains PARTIAL against the 100% ordinary-gameplay goal; delivered patrol,
+roles and operations do not erase these gaps. Existing construction gaps remain unchanged.
+
+Screenshots and final broader regression results are recorded below after capture review.

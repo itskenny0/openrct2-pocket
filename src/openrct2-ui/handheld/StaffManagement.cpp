@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "StaffManagement.h"
 
+#include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
 #include <openrct2/actions/peep/StaffFireAction.h>
 #include <openrct2/actions/peep/StaffHireNewAction.h>
+#include <openrct2/actions/peep/StaffSetColourAction.h>
 #include <openrct2/actions/peep/StaffSetCostumeAction.h>
+#include <openrct2/actions/peep/StaffSetNameAction.h>
 #include <openrct2/actions/peep/StaffSetOrdersAction.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/entity/EntityList.h>
@@ -61,6 +64,50 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         GameActions::StaffSetCostumeAction action(target.id, value);
         return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
     }
+    GameActions::Result SetUniform(const Target& target, Drawing::Colour baseline, Drawing::Colour value, bool execute)
+    {
+        if (!Resolve(target) || target.type == StaffType::entertainer || EnumValue(value) >= 72
+            || StaffGetColour(target.type) != baseline || value == baseline)
+            return Invalid("Uniform changed or unavailable");
+        GameActions::StaffSetColourAction action(target.type, value);
+        return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+    }
+    ManagementPresentation UniformPresentation(const Target& target, Drawing::Colour value, size_t selected)
+    {
+        ManagementPresentation model;
+        model.breadcrumb = "Staff / Role uniform";
+        model.title = RoleName(target.type) + " uniforms";
+        std::string name = "Special colour";
+        for (uint8_t i = 0; i < 72; ++i)
+            if (Windows::ColourDropDownIndexToColour(i) == value)
+                name = FmtString(FormatStringID(Windows::ColourDropDownIndexToName(i))).WithoutFormatTokens();
+        model.rows = { "Colour: " + name, "Apply to entire role", "Cancel" };
+        model.selected = selected;
+        model.status = "Left / Right changes colour";
+        return model;
+    }
+    GameActions::Result SetName(const Target& target, const std::string& baseline, const std::string& value, bool execute)
+    {
+        const auto* staff = Resolve(target);
+        if (!staff || staff->getName() != baseline || value == baseline || (value.empty() && !staff->name)
+            || TextEntry{ value }.Length() > TextEntry::limit)
+            return Invalid("Name changed or unavailable");
+        GameActions::StaffSetNameAction action(target.id, value);
+        return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+    }
+    ManagementPresentation NamePresentation(const TextEntry& entry, size_t selected, bool review, const std::string& status)
+    {
+        ManagementPresentation model;
+        model.breadcrumb = review ? "Staff / Review name" : "Staff / Name keyboard";
+        model.title = entry.text.empty() ? "Default name" : entry.text;
+        model.selected = selected;
+        model.rows = review ? std::vector<std::string>{ "Apply name", "Cancel" } : entry.Keys();
+        model.columns = review ? 1 : TextEntry::columns;
+        model.confirmation = review;
+        model.primaryAction = review ? "Confirm" : "Type";
+        model.status = status.empty() ? std::to_string(entry.Length()) + " / 32 characters" : status;
+        return model;
+    }
     std::optional<Target> Identify(EntityId id)
     {
         auto* staff = getGameState().entities.tryGetEntity<Staff>(id);
@@ -73,11 +120,11 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         const auto current = Identify(target.id);
         return current && *current == target ? getGameState().entities.tryGetEntity<Staff>(target.id) : nullptr;
     }
-    std::vector<Target> Roster()
+    std::vector<Target> Roster(std::optional<StaffType> filter)
     {
         std::vector<Target> result;
         for (auto* staff : EntityList<Staff>())
-            if (auto target = Identify(staff->id))
+            if (auto target = Identify(staff->id); target && (!filter || target->type == *filter))
                 result.push_back(*target);
         std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
             return a.type != b.type ? a.type < b.type : a.peepId < b.peepId;
@@ -179,9 +226,26 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
                 model.rows.push_back(staff ? staff->getName() : "Employee unavailable");
             }
             model.rows.push_back("Hire other role...");
+            model.rows.push_back("Filter role...");
+            model.rows.push_back("Role counts / wages...");
             model.rows.push_back("Back to dashboard");
             if (roster.empty())
                 model.status = "No staff employed";
+            return model;
+        }
+        if (view == View::summary)
+        {
+            model.title = "Staff counts / monthly wages";
+            money64 total = 0;
+            for (auto role : { StaffType::handyman, StaffType::mechanic, StaffType::security, StaffType::entertainer })
+            {
+                const auto count = Roster(role).size();
+                total += count * GetStaffWage(role);
+                model.stats.push_back({ RoleName(role), std::to_string(count) + " / " + wage(role) + " each" });
+            }
+            model.stats.push_back(
+                { "Monthly total", getGameState().park.flags.has(ParkFlag::noMoney) ? "Not applicable" : FormatMoney(total) });
+            model.rows = { "Back to roster" };
             return model;
         }
         if (view == View::roles)
@@ -221,10 +285,11 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
             model.stats = { { "Role", RoleName(target->type) },
                             { "Monthly wage", wage(target->type) },
                             { "Status", FormatStringIDLegacy(STR_STRINGID, ft.Data()) } };
-            model.rows = { "Locate",        Orders(target->type).empty() ? "No configurable orders" : "Orders...",
-                           "Statistics...", "Dismiss...",
-                           "Costume...",    "Back to roster",
-                           "Patrol area..." };
+            model.rows = { "Locate",           Orders(target->type).empty() ? "No configurable orders" : "Orders...",
+                           "Statistics...",    "Dismiss...",
+                           "Costume...",       "Back to roster",
+                           "Patrol area...",   "Name...",
+                           "Uniform colour..." };
         }
         else if (view == View::statistics)
         {

@@ -141,12 +141,53 @@ int main(int argc, char** argv)
         GameActions::ProcessQueue(state);
         P::End();
         Require(!P::Active(), "Patrol cleanup retained target");
+        const auto originalName = S::Resolve(hired.front())->getName();
+        Require(
+            S::SetName(hired.front(), originalName, "Mónica", false).error == GameActions::Status::ok
+                && S::Resolve(hired.front())->getName() == originalName,
+            "Name query mutated employee");
+        Require(
+            S::SetName(hired.front(), originalName, "Mónica", true).error == GameActions::Status::ok, "Name execute failed");
+        GameActions::ProcessQueue(state);
+        Require(
+            S::Resolve(hired.front())->getName() == "Mónica"
+                && S::SetName(hired.front(), originalName, "Other", true).error != GameActions::Status::ok,
+            "Stale name accepted");
+        Require(
+            S::SetName(hired.front(), "Mónica", std::string(33, 'x'), false).error != GameActions::Status::ok,
+            "Oversized name accepted");
+        for (const auto& t : hired)
+            Require(S::Roster(t.type).size() == 1, "Role filter differs");
+        const auto colour = StaffGetColour(hired.front().type);
+        const auto newColour = static_cast<Drawing::Colour>((EnumValue(colour) + 1) % 72);
+        Require(
+            S::SetUniform(hired.front(), colour, newColour, false).error == GameActions::Status::ok
+                && StaffGetColour(hired.front().type) == colour,
+            "Uniform query mutated state");
+        Require(
+            S::SetUniform(entertainer, colour, newColour, false).error != GameActions::Status::ok,
+            "Entertainer uniform accepted");
+        Require(
+            S::SetUniform(hired.front(), colour, static_cast<Drawing::Colour>(255), false).error != GameActions::Status::ok,
+            "Invalid uniform accepted");
+        Require(
+            S::SetUniform(hired.front(), colour, newColour, true).error == GameActions::Status::ok, "Uniform execute failed");
+        GameActions::ProcessQueue(state);
+        Require(
+            S::Resolve(hired.front())->tShirtColour == newColour && S::Resolve(hired.front())->trousersColour == newColour
+                && S::SetUniform(hired.front(), colour, newColour, true).error != GameActions::Status::ok
+                && state.park.cash == before,
+            "Uniform native application/stale/accounting failed");
         SaveFlags flags{};
         const auto save = std::string(argv[2]) + "/staff-completion.park";
         Require(ScenarioSave(state, save, flags) && context->LoadParkFromFile(save), "Staff save/reload failed");
         Require(
             S::Roster().size() == 4 && S::Resolve(entertainer)->animationObjectIndex == next && state.park.cash == before,
             "Staff role/costume save differs");
+        Require(
+            S::Resolve(hired.front())->getName() == "Mónica" && StaffGetColour(hired.front().type) == newColour
+                && P::Snapshot(hired.front()).size() == 4,
+            "Name/uniform/patrol save differs");
         for (const auto& t : S::Roster())
         {
             Require(S::Dismiss(t, true).error == GameActions::Status::ok, "Native role dismissal failed");
