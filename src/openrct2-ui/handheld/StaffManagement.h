@@ -43,7 +43,8 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
     std::optional<Target> Identify(EntityId id);
     Staff* Resolve(const Target& target);
     std::vector<std::pair<uint8_t, std::string>> Orders(StaffType type);
-    GameActions::Result Hire(StaffType type, bool execute, GameActions::GameAction::Callback_t callback = {});
+    GameActions::Result Hire(
+        StaffType type, bool execute, GameActions::GameAction::Callback_t callback = {}, bool manual = false);
     GameActions::Result SetOrders(const Target& target, uint8_t baseline, uint8_t value, bool execute);
     GameActions::Result Dismiss(const Target& target, bool execute);
     bool Locate(const Target& target);

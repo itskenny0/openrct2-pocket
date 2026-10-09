@@ -162,3 +162,15 @@ Next recommended milestone: Guest Management and Peep Placement Completion.
 Native guest grouping/filtering, supported naming/tracking and shared guest/staff
 pickup/repositioning close meaningful remaining ordinary-play gaps without
 repeating delivered staff roles, patrol, wages, uniforms or naming.
+
+
+## Guest/placement milestone follow-up
+
+GUEST-PLACEMENT-COMPLETION.md closes manual pickup/reposition and manual hiring
+without an automatic source through shared PeepPickupAction and StaffHireNewAction.
+All four role inspectors expose Pick up; role selection offers Automatic/Manual.
+Native old-X cancellation of a never-placed manual hire keeps that employee
+unplaced and on payroll, recoverable through Pick up or native dismissal. Existing
+orders, costumes, patrols and uniforms are retained. Earlier statements that this
+gap is missing describe the earlier checkpoint and are superseded here. Physical
+Brick/AArch64 validation and sustained staff patrol effectiveness remain unverified.

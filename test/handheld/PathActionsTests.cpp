@@ -13,6 +13,7 @@
 #include <openrct2-ui/handheld/MarketingManagement.h>
 #include <openrct2-ui/handheld/ParkOverview.h>
 #include <openrct2-ui/handheld/Paths.h>
+#include <openrct2-ui/handheld/PeepPlacement.h>
 #include <openrct2-ui/handheld/ResearchManagement.h>
 #include <openrct2-ui/handheld/RideManagement.h>
 #include <openrct2-ui/handheld/SceneryRemoval.h>
@@ -2065,11 +2066,20 @@ static void TestStaff(IContext& context, const std::string& profile, bool realUi
     const auto beforeDismissCash = park.cash;
     Require(
         S::Dismiss(handyman, false).error == GameActions::Status::ok && S::Resolve(handyman), "Dismiss query removed employee");
+    if (realUi)
+    {
+        Require(Ui::Handheld::BeginPeepPlacement({ {}, handyman }), "Dismiss pickup setup failed");
+        GameActions::ProcessQueue(state);
+    }
     Require(S::Dismiss(handyman, true).error == GameActions::Status::ok, "Dismiss failed");
     GameActions::ProcessQueue(state);
     Require(
         !S::Resolve(handyman) && park.cash == beforeDismissCash && S::Dismiss(handyman, true).error != GameActions::Status::ok,
         "Dismiss identity/refund incorrect");
+    if (realUi)
+        Require(
+            !Ui::Handheld::PeepPlacement::Active() && !Network::GetPickupPeep(Network::GetCurrentPlayerId()),
+            "Queued dismissal leaked native pickup or reentered queue");
     const auto persisted = S::Roster();
     std::vector<uint8_t> persistedOrders;
     for (const auto& entry : persisted)
@@ -2868,6 +2878,24 @@ static void TestGuests(IContext& context, const std::string& profile, bool realU
         press(H::Action::back);
         Require(W::HandheldGuestsPresentation().selected == 19, "Operations lost roster focus");
         press(H::Action::confirm);
+        W::HandheldMenuMove(9);
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        namespace P = H::PeepPlacement;
+        Require(P::Active() && guest->state == PeepState::picked && !W::HandheldGuestsIsOpen(), "Guest pickup route failed");
+        W::HandheldPeepPlacementOptionsOpen();
+        W::HandheldMenuMove(1);
+        press(H::Action::confirm);
+        press(H::Action::confirm);
+        Require(P::Active(), "Cancel-first pickup review canceled native pickup");
+        press(H::Action::back);
+        Require(P::Active(), "Placement options B lost context");
+        W::HandheldPeepPlacementOptionsOpen();
+        W::HandheldMenuMove(2);
+        press(H::Action::confirm);
+        Require(
+            !P::Active() && !Network::GetPickupPeep(Network::GetCurrentPlayerId()) && W::HandheldGuestsIsOpen(),
+            "Pickup recovery leaked owner or missed inspector");
         guest->outsideOfPark = true;
         press(H::Action::confirm);
         Require(
@@ -2892,7 +2920,29 @@ static void TestGuests(IContext& context, const std::string& profile, bool realU
         W::HandheldDashboardMove(0, 19);
         W::HandheldMenuConfirm();
     }
+    if (realUi)
+    {
+        W::HandheldMenuBack();
+        W::HandheldMenuBack();
+        W::HandheldMenuBack();
+        H::BeginPeepPlacement({ target, {} });
+        GameActions::ProcessQueue(state);
+        Require(H::PeepPlacement::Active(), "Autosave pickup setup failed");
+        SaveFlags pickupSaveFlags{};
+        pickupSaveFlags.set(SaveFlag::automatic);
+        Require(ScenarioSave(state, profile + "/picked-guest.park", pickupSaveFlags), "Pickup autosave failed");
+        Require(
+            !H::PeepPlacement::Active() && !Network::GetPickupPeep(Network::GetCurrentPlayerId()),
+            "Autosave retained pickup ownership");
+        H::BeginPeepPlacement({ target, {} });
+        GameActions::ProcessQueue(state);
+        Require(H::PeepPlacement::Active(), "Removal pickup setup failed");
+    }
     PeepEntityRemove(guest);
+    if (realUi)
+        Require(
+            !H::PeepPlacement::Active() && !Network::GetPickupPeep(Network::GetCurrentPlayerId()),
+            "Removed guest leaked pickup owner");
     if (!realUi)
         G::Invalidate(oldId); // Dummy WindowManager has no UI invalidation notification.
     Require(!G::Resolve(target) && !G::Locate(target), "Removed guest still resolved");

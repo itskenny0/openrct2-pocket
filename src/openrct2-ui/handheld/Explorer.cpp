@@ -98,6 +98,7 @@ namespace OpenRCT2::Ui::Handheld
 
     void BeginTerrain(bool raise)
     {
+        PeepPlacement::End();
         StaffPatrol::End();
         _ridePathAccess.reset();
         Paths::End();
@@ -144,6 +145,15 @@ namespace OpenRCT2::Ui::Handheld
     {
         BeginTerrain(true);
         _rightsTool = true;
+    }
+    bool BeginPeepPlacement(const PeepPlacement::Target& person)
+    {
+        BeginTerrain(true);
+        const auto result = PeepPlacement::Begin(person);
+        if (result.error == GameActions::Status::ok)
+            return true;
+        EndTerrain();
+        return false;
     }
     bool BeginStaffPatrol(const StaffManagement::Target& employee)
     {
@@ -307,6 +317,7 @@ namespace OpenRCT2::Ui::Handheld
 
     void EndTerrain()
     {
+        PeepPlacement::End();
         StaffPatrol::End();
         _ridePathAccess.reset();
         Trees::ClearPreview();
@@ -336,6 +347,7 @@ namespace OpenRCT2::Ui::Handheld
         ClearTerrainSelection();
     }
 
+    static ScreenCoordsXY Centre();
     static GameActions::Result TerrainAction(bool execute)
     {
         if (CustomTracks::Active())
@@ -344,6 +356,16 @@ namespace OpenRCT2::Ui::Handheld
             return Designs::Query(_terrainTile);
         if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
             return FlatRides::Action(_terrainTile, execute);
+        if (PeepPlacement::Active())
+        {
+            if (!_terrainTile)
+                return PeepPlacement::Place({}, execute);
+            const auto info = GetMapCoordinatesFromPos(
+                Centre(), { ViewportInteractionItem::footpath, ViewportInteractionItem::terrain });
+            return PeepPlacement::Place(
+                info.Element ? std::optional<CoordsXYZ>{ CoordsXYZ{ info.Loc, info.Element->getBaseZ() } } : std::nullopt,
+                execute);
+        }
         if (StaffPatrol::Active())
             return StaffPatrol::Action(_terrainTile, execute);
         if (_rightsTool)
@@ -622,6 +644,13 @@ namespace OpenRCT2::Ui::Handheld
             if (RideAccess::Inspect(target))
                 Windows::HandheldRideAccessOpen(target);
             input.suspend();
+        }
+        if (PeepPlacement::Active())
+        {
+            if (!PeepPlacement::Resolve(*PeepPlacement::target) || PeepPlacement::finished)
+                EndTerrain();
+            else
+                PeepPlacement::Preview(CanExplore() && ContextHasFocus(), Centre());
         }
         if (StaffPatrol::Active())
         {
@@ -903,8 +932,13 @@ namespace OpenRCT2::Ui::Handheld
                 else if ((_terrainActive || Paths::IsActive()) && CanExplore())
                 {
                     const auto access = _ridePathAccess;
+                    const auto person = PeepPlacement::target;
                     const auto employee = StaffPatrol::target;
                     EndTerrain();
+                    if (person && person->guest && GuestManagement::Resolve(*person->guest))
+                        Windows::HandheldGuestOpen(*person->guest);
+                    if (person && person->staff && StaffManagement::Resolve(*person->staff))
+                        Windows::HandheldStaffOpen(*person->staff);
                     if (employee && StaffManagement::Resolve(*employee))
                         Windows::HandheldStaffOpen(employee);
                     if (access && RideManagement::Resolve(*access))
@@ -923,6 +957,8 @@ namespace OpenRCT2::Ui::Handheld
                     Designs::Rotate();
                 else if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
                     FlatRides::Rotate();
+                else if (PeepPlacement::Active())
+                    Windows::HandheldPeepPlacementOptionsOpen();
                 else if (StaffPatrol::Active())
                     Windows::HandheldStaffPatrolOptionsOpen();
                 else if (_rightsTool)
@@ -1029,6 +1065,8 @@ namespace OpenRCT2::Ui::Handheld
                                 break;
                             else if (_shopTool)
                                 Windows::HandheldShopPickerOpen();
+                            else if (PeepPlacement::Active())
+                                Windows::HandheldPeepPlacementOptionsOpen();
                             else if (StaffPatrol::Active())
                                 StaffPatrol::Configure(1);
                             else if (_rightsTool)
@@ -1107,7 +1145,8 @@ namespace OpenRCT2::Ui::Handheld
         std::string costAmount;
         if (_terrainActive)
         {
-            status = Designs::Active()                                    ? "PLACE DESIGN"
+            status = PeepPlacement::Active()                              ? "PLACE PERSON"
+                : Designs::Active()                                       ? "PLACE DESIGN"
                 : FlatRides::CurrentStage() != FlatRides::Stage::inactive ? "PLACE RIDE"
                 : _shopTool                                               ? "PLACE SHOP"
                 : _treeTool                                               ? "PLACE TREE"
@@ -1162,6 +1201,8 @@ namespace OpenRCT2::Ui::Handheld
                     FlatRides::DrawPanel(rt, { ContextGetWidth(), height });
                 else if (_shopTool)
                     DrawShopOverlay(rt, Concept::kOrigin, Shops::Name(_shopIndex), Shops::Eligible(_shopIndex), _shopDirection);
+                else if (PeepPlacement::Active())
+                    PeepPlacement::DrawOverlay(rt, Concept::kOrigin);
                 else if (StaffPatrol::Active())
                     StaffPatrol::DrawOverlay(rt, Concept::kOrigin);
                 else if (_rightsTool)
@@ -1194,6 +1235,8 @@ namespace OpenRCT2::Ui::Handheld
             }
             else if (_shopTool)
                 DrawShopFooter(rt, { ContextGetWidth(), height });
+            else if (PeepPlacement::Active())
+                DrawConstructionFooter(rt, { ContextGetWidth(), height }, "Place", "Options");
             else if (StaffPatrol::Active())
                 DrawConstructionFooter(rt, { ContextGetWidth(), height }, "Apply", "Add/Remove");
             else if (_rightsTool)

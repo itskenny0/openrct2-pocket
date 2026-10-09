@@ -4,6 +4,7 @@
  *****************************************************************************/
 
 #pragma once
+#include "PeepPlacement.h"
 #include "RideManagement.h"
 #include "SceneryTools.h"
 #include "StaffManagement.h"
@@ -28,6 +29,7 @@ namespace OpenRCT2::Ui::Handheld
     void HandleExplorerInput(ControllerInput& input, const Frame& frame);
     void EndTerrain();
     bool BeginStaffPatrol(const StaffManagement::Target& employee);
+    bool BeginPeepPlacement(const PeepPlacement::Target&);
     void BeginTerrain(bool raise);
     void BeginWater(bool raise = true);
     void BeginSurface();
@@ -74,6 +76,8 @@ namespace OpenRCT2::Ui::Windows
     Handheld::ManagementPresentation HandheldRidesPresentation();
     bool HandheldGuestsIsOpen();
     Handheld::ManagementPresentation HandheldGuestsPresentation();
+    void HandheldGuestOpen(const Handheld::GuestManagement::Target&);
+    void HandheldPeepPlacementOptionsOpen();
     void HandheldStaffOpen(std::optional<Handheld::StaffManagement::Target> target = {});
     Handheld::ManagementPresentation HandheldStaffPresentation();
     bool HandheldStaffIsOpen();

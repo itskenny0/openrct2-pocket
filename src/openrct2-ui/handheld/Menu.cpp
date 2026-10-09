@@ -108,6 +108,8 @@ namespace OpenRCT2::Ui::Windows
         guestNameConfirm,
         guestTracking,
         guestPreferences,
+        peepOptions,
+        peepCancel,
         ridesRoster,
         ridesInspect,
         ridesAccess,
@@ -310,6 +312,7 @@ namespace OpenRCT2::Ui::Windows
         Drawing::Colour _staffUniformBaseline{}, _staffUniformDraft{};
         std::string _staffNameBaseline;
         std::optional<StaffType> _staffFilter;
+        bool _hireManual{};
         bool _staffBusy{};
         size_t _staffRosterFocus{};
         std::shared_ptr<int> _staffLifetime = std::make_shared<int>(0);
@@ -340,6 +343,14 @@ namespace OpenRCT2::Ui::Windows
                                                                 : View::dismissal;
             auto model = Handheld::StaffManagement::Presentation(
                 view, selected, _staffRoster, _staffTarget, _hireType, _ordersDraft, _status);
+            if (currentPage == Page::staffRoles)
+                model.rows.push_back(_hireManual ? "Placement: Manual" : "Placement: Automatic");
+            if (currentPage == Page::staffHire)
+            {
+                model.stats.back().second = _hireManual ? "Manual" : "Automatic";
+                const auto query = Handheld::StaffManagement::Hire(_hireType, false, {}, _hireManual);
+                model.status = query.error == GameActions::Status::ok ? _status : Handheld::Finances::Feedback(query);
+            }
             if (currentPage == Page::staff)
             {
                 model.rows[_staffRoster.size() + 3] = "Filter: "
@@ -463,9 +474,10 @@ namespace OpenRCT2::Ui::Windows
     public:
         bool constructionMenu() const
         {
-            return _page == Page::staffPatrolOptions || _page == Page::staffPatrolClear || _page == Page::rightsOptions
-                || _page == Page::rightsConfirm || _page == Page::areaOptions || _page == Page::sceneryOptions
-                || _page == Page::sceneryName || _page == Page::sceneryConfirm;
+            return _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
+                || _page == Page::staffPatrolClear || _page == Page::rightsOptions || _page == Page::rightsConfirm
+                || _page == Page::areaOptions || _page == Page::sceneryOptions || _page == Page::sceneryName
+                || _page == Page::sceneryConfirm;
         }
         void constructionMove(int x, int y)
         {
@@ -606,7 +618,8 @@ namespace OpenRCT2::Ui::Windows
             if (next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish
                 || next == Page::overviewConfirm || next == Page::ridesConfirm || next == Page::financeConfirm
                 || next == Page::marketingConfirm || next == Page::staffHire || next == Page::staffDismiss
-                || next == Page::staffNameConfirm || next == Page::guestNameConfirm || next == Page::guestTracking)
+                || next == Page::staffNameConfirm || next == Page::guestNameConfirm || next == Page::guestTracking
+                || next == Page::peepCancel)
                 _focus.move(1, 2); // destructive confirmations default to Cancel
             if (next == Page::researchConfirm)
                 _focus.move(static_cast<int32_t>(rows().size() - 1), rows().size());
@@ -726,6 +739,10 @@ namespace OpenRCT2::Ui::Windows
                              "Back to park" };
                 case Page::sceneryCategory:
                     return Handheld::SceneryTools::Categories();
+                case Page::peepOptions:
+                    return { "Resume placement", "Cancel placement...", "Back to person" };
+                case Page::peepCancel:
+                    return Handheld::PeepPlacement::CancelPresentation(_focus.index()).rows;
                 case Page::staffPatrolOptions:
                     return Handheld::StaffPatrol::Options();
                 case Page::staffPatrolClear:
@@ -847,6 +864,7 @@ namespace OpenRCT2::Ui::Windows
         void onOpen() override
         {
             Handheld::StaffPatrol::HideOverlay();
+            Drawing::pickupPeepClear();
             Handheld::Paths::ClearPreview();
             Handheld::Trees::ClearPreview();
             Handheld::SceneryTools::ClearPreview();
@@ -1288,6 +1306,17 @@ namespace OpenRCT2::Ui::Windows
         {
             page(Page::staffPatrolOptions);
         }
+        void openGuest(const Handheld::GuestManagement::Target& person)
+        {
+            _guestTarget = person;
+            _dashboard.section = Handheld::Dashboard::Section::guests;
+            _dashboard.focus = Handheld::Dashboard::Focus::content;
+            page(Page::guestInspect);
+        }
+        void openPeepOptions()
+        {
+            page(Page::peepOptions);
+        }
         void openStaff(std::optional<Handheld::StaffManagement::Target> target)
         {
             _staffTarget = target;
@@ -1320,6 +1349,13 @@ namespace OpenRCT2::Ui::Windows
             {
                 _staffTarget = Handheld::StaffManagement::Identify(
                     result.getData<GameActions::StaffHireNewActionResult>().StaffEntityId);
+                if (_hireManual && _staffTarget)
+                {
+                    const auto employee = *_staffTarget;
+                    close();
+                    Handheld::BeginPeepPlacement({ {}, employee });
+                    return;
+                }
                 page(_staffTarget ? Page::staffInspect : Page::staff);
             }
             invalidate();
@@ -1402,6 +1438,12 @@ namespace OpenRCT2::Ui::Windows
                 case Page::staffPatrolClear:
                     page(Page::staffPatrolOptions);
                     break;
+                case Page::peepCancel:
+                    page(Page::peepOptions);
+                    break;
+                case Page::peepOptions:
+                    close();
+                    return;
                 case Page::staffPatrolOptions:
                     close();
                     break;
@@ -1839,6 +1881,32 @@ namespace OpenRCT2::Ui::Windows
                         invalidate();
                     }
                     break;
+                case Page::peepOptions:
+                    if (choice == 1)
+                        page(Page::peepCancel);
+                    else if (choice == 2)
+                    {
+                        const auto person = Handheld::PeepPlacement::target;
+                        close();
+                        Handheld::EndTerrain();
+                        if (person && person->guest)
+                            HandheldGuestOpen(*person->guest);
+                        else if (person && person->staff)
+                            HandheldStaffOpen(*person->staff);
+                        return;
+                    }
+                    else
+                        close();
+                    break;
+                case Page::peepCancel:
+                    if (choice == 1)
+                        page(Page::peepOptions);
+                    else
+                    {
+                        close();
+                        Handheld::EndTerrain();
+                    }
+                    break;
                 case Page::staffPatrolOptions:
                     if (choice == 0)
                         close();
@@ -2064,6 +2132,8 @@ namespace OpenRCT2::Ui::Windows
                         _hireType = static_cast<StaffType>(choice);
                         page(Page::staffHire);
                     }
+                    else if (choice == 5)
+                        _hireManual = !_hireManual;
                     else
                         page(Page::staff);
                     break;
@@ -2096,7 +2166,8 @@ namespace OpenRCT2::Ui::Windows
                              request = _staffRequest](const GameActions::GameAction*, const GameActions::Result* response) {
                                 if (lifetime.lock() && request == _staffRequest)
                                     staffHired(*response);
-                            });
+                            },
+                            _hireManual);
                         if (result.error != GameActions::Status::ok)
                         {
                             _staffBusy = false;
@@ -2122,6 +2193,18 @@ namespace OpenRCT2::Ui::Windows
                             return;
                         }
                         _status = "Location unavailable";
+                    }
+                    else if (choice == 9)
+                    {
+                        const auto person = *_staffTarget;
+                        if (!Handheld::StaffManagement::Resolve(person)->canBePickedUp())
+                        {
+                            _status = "Person cannot be picked up now";
+                            break;
+                        }
+                        close();
+                        Handheld::BeginPeepPlacement({ {}, person });
+                        return;
                     }
                     else if (choice == 8)
                     {
@@ -2773,6 +2856,18 @@ namespace OpenRCT2::Ui::Windows
                         _guestTrackingValue = !_guestFlagsBaseline.has(PeepFlag::tracking);
                         page(Page::guestTracking);
                     }
+                    else if (choice == 9)
+                    {
+                        const auto person = *_guestTarget;
+                        if (!Handheld::GuestManagement::Resolve(person)->canBePickedUp())
+                        {
+                            _status = "Person cannot be picked up now";
+                            break;
+                        }
+                        close();
+                        Handheld::BeginPeepPlacement({ person, {} });
+                        return;
+                    }
                     else if (choice == 8)
                         page(Page::guestPreferences);
                     else
@@ -3273,6 +3368,12 @@ namespace OpenRCT2::Ui::Windows
                     "No shops available");
                 return;
             }
+            if (_page == Page::peepCancel)
+            {
+                Handheld::DrawManagementPanel(
+                    rt, { ContextGetWidth(), ContextGetHeight() }, Handheld::PeepPlacement::CancelPresentation(_focus.index()));
+                return;
+            }
             if (_page == Page::staffPatrolClear && _patrolDraft)
             {
                 Handheld::DrawManagementPanel(
@@ -3359,6 +3460,10 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::designConfirm:
                     title = "PLACE DESIGN?";
+                    break;
+                case Page::peepOptions:
+                case Page::peepCancel:
+                    title = "PERSON PLACEMENT";
                     break;
                 case Page::staffPatrolOptions:
                     title = "STAFF PATROL";
@@ -3703,6 +3808,18 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = OpenPanel())
             window->openStaffPatrolOptions();
+    }
+    void HandheldGuestOpen(const Handheld::GuestManagement::Target& person)
+    {
+        auto* window = OpenPanel();
+        if (window)
+            window->openGuest(person);
+    }
+    void HandheldPeepPlacementOptionsOpen()
+    {
+        auto* window = OpenPanel();
+        if (window)
+            window->openPeepOptions();
     }
     void HandheldStaffOpen(std::optional<Handheld::StaffManagement::Target> target)
     {

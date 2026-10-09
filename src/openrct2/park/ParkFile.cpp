@@ -2872,6 +2872,8 @@ int32_t ScenarioSave(GameState_t& gameState, u8string_view path, SaveFlags flags
         LOG_VERBOSE("saving game");
     }
 
+    auto pickupIntent = Intent(INTENT_ACTION_PREPARE_PEEP_SAVE);
+    ContextBroadcastIntent(&pickupIntent);
     gIsAutosave = flags.has(SaveFlag::automatic);
     if (!gIsAutosave)
     {

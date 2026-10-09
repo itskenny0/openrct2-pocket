@@ -142,7 +142,7 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
             return { { STAFF_ORDERS_INSPECT_RIDES, "Inspect rides" }, { STAFF_ORDERS_FIX_RIDES, "Fix rides" } };
         return {};
     }
-    GameActions::Result Hire(StaffType type, bool execute, GameActions::GameAction::Callback_t callback)
+    GameActions::Result Hire(StaffType type, bool execute, GameActions::GameAction::Callback_t callback, bool manual)
     {
         if (!Supported(type))
             return Invalid("Unsupported staff role");
@@ -156,14 +156,14 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         for (auto* guest : EntityList<Guest>())
             if (guest->state == PeepState::walking && MapGetPathElementAt(TileCoordsXYZ{ guest->nextLoc }))
                 canPosition = true;
-        if (!canPosition)
+        if (!manual && !canPosition)
             return Invalid("No automatic placement location");
         uint8_t orders = type == StaffType::mechanic ? STAFF_ORDERS_INSPECT_RIDES | STAFF_ORDERS_FIX_RIDES
             : type == StaffType::handyman ? STAFF_ORDERS_SWEEPING | STAFF_ORDERS_WATER_FLOWERS | STAFF_ORDERS_EMPTY_BINS
                                           : 0;
         if (type == StaffType::handyman && Config::Get().general.handymenMowByDefault)
             orders |= STAFF_ORDERS_MOWING;
-        GameActions::StaffHireNewAction action(true, type, animation, orders);
+        GameActions::StaffHireNewAction action(!manual, type, animation, orders);
         action.SetCallback(std::move(callback));
         return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
     }
@@ -285,11 +285,16 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
             model.stats = { { "Role", RoleName(target->type) },
                             { "Monthly wage", wage(target->type) },
                             { "Status", FormatStringIDLegacy(STR_STRINGID, ft.Data()) } };
-            model.rows = { "Locate",           Orders(target->type).empty() ? "No configurable orders" : "Orders...",
-                           "Statistics...",    "Dismiss...",
-                           "Costume...",       "Back to roster",
-                           "Patrol area...",   "Name...",
-                           "Uniform colour..." };
+            model.rows = { "Locate",
+                           Orders(target->type).empty() ? "No configurable orders" : "Orders...",
+                           "Statistics...",
+                           "Dismiss...",
+                           "Costume...",
+                           "Back to roster",
+                           "Patrol area...",
+                           "Name...",
+                           "Uniform colour...",
+                           "Pick up..." };
         }
         else if (view == View::statistics)
         {

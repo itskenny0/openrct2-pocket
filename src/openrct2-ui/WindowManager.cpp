@@ -587,6 +587,10 @@ public:
                 Handheld::Shops::RestorePreview();
                 Handheld::FlatRides::RestorePreview();
                 break;
+            case INTENT_ACTION_PREPARE_PEEP_SAVE:
+                if (Handheld::PeepPlacement::Active())
+                    Handheld::EndTerrain();
+                break;
             case INTENT_ACTION_REMOVE_PROVISIONAL_ELEMENTS:
                 ProvisionalElementsRemove();
                 break;
@@ -1081,6 +1085,12 @@ public:
     {
         if (cls == WindowClass::peep)
         {
+            if (const auto& target = Handheld::PeepPlacement::target)
+            {
+                const auto id = target->guest ? target->guest->id : target->staff->id;
+                if (id == number)
+                    Handheld::EndTerrain();
+            }
             HandheldStaffRemoved(number);
             Handheld::GuestManagement::Invalidate(number);
         }

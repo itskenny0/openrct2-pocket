@@ -317,7 +317,7 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
                 "Thoughts...",      "Spending...",
                 "Carried items...", "Back to roster",
                 "Name...",          guest->peepFlags.has(PeepFlag::tracking) ? "Tracking: On..." : "Tracking: Off...",
-                "Preferences..."
+                "Preferences...",   "Pick up..."
             };
         }
         else if (view == View::needs)
