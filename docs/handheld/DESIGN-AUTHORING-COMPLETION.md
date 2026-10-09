@@ -221,3 +221,10 @@ banners/furniture are not serialized through an invented format. AArch64, physic
 Brick, sustained special-family guest operation and broad routing remain unverified.
 The highest-value next milestone is native backward editing, ride variants and
 representative family operation, preserving all delivered authoring workflows.
+
+Advanced follow-up: ADVANCED-RIDE-EDITING-COMPLETION.md delivers conventional native
+rear-gap/backward core, covered/inverted variant eligibility and placement, Flying
+inverted-start stations and representative native Monorail/Dinghy/Flying circuit,
+access/Open/persistence validation. Earlier missing statements are superseded only
+for this scope. Complex/diagonal coverage, positive variant transitions, other special
+parameters, atomic/station/inverted replacement and sustained guest use remain PARTIAL.

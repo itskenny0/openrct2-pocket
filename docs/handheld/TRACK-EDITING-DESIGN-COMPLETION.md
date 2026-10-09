@@ -234,3 +234,10 @@ seat placement and guarded two-step selected-block removal/rebuild. Earlier expo
 seat and replacement gaps are superseded only to this scoped extent. Backward,
 variants, arbitrary scenery/substitutions and full desktop parity remain PARTIAL.
 See DESIGN-AUTHORING-COMPLETION.md for final tests, controls and capture provenance.
+
+Advanced follow-up: ADVANCED-RIDE-EDITING-COMPLETION.md delivers conventional native
+rear-gap/backward core, covered/inverted variant eligibility and placement, Flying
+inverted-start stations and representative native Monorail/Dinghy/Flying circuit,
+access/Open/persistence validation. Earlier missing statements are superseded only
+for this scope. Complex/diagonal coverage, positive variant transitions, other special
+parameters, atomic/station/inverted replacement and sustained guest use remain PARTIAL.

@@ -134,3 +134,61 @@ for these representative objects. It does not complete every transport/water/inv
 family, cover every special piece or establish live scenario guest use. Existing
 Mini Golf/maze opening and original Wooden natural queue use remain regression
 contracts. Full construction still remains PARTIAL toward 100% ordinary gameplay.
+
+## Phase 3 publication and final validation
+
+Canonical 60f1390003dfe86f4c638f66b3cf52158b132793; local
+d29bf6809bb4d5a6bd28905a7a3909d4133d8373; matching tree
+785de52feccfc6ceb65fff0634880b4368a94098. Each coherent phase was validated and
+published before the next. Final documentation publication is identified in the
+external capture manifest/report to avoid a self-referential commit hash.
+
+Final Release GUI/CLI PASS. Native/SDL suites PASS: RideConstructionTests,
+SeatRotationTests, FamilyOperationTests, MazeConstructionTests,
+MiniGolfConstructionTests, ConstructionTests, PathActionsTests,
+StaffCompletionTests, GuestCompletionTests and PresentationLifecycleTests.
+FamilyOperationTests also passes without original graphics. CTest input/launcher/
+save preservation PASS 3/3. Private African Diamond Mine DesignCapture,
+RideConstructionCapture, MazeConstructionCapture and original Wooden
+CustomCoasterCapture PASS. Existing Wooden natural queue evidence is retained;
+no sustained riding/throughput is inferred. New family tests use native actions
+following scenario fixture initialization; legacy regression restriction probes
+retain their existing reversible state checks and are not new simulation bypasses.
+
+## Capture package and visual inspection
+
+OpenRCT2-Pocket-Advanced-Ride-Captures.zip contains seventeen genuine 512×384 PNGs,
+a checksum/dimension/provenance manifest and next prompt. 01 selected block with
+actual variant/seat; 02 backward straight; 03 backward multi-tile turn; 04 backward
+slope; 05 inverted source preview; 06 covered utility; 07 covered ghost; 08 Flying
+inverted station; 09 Flying dense native piece picker; 10–12 Monorail/Dinghy/Flying
+completed circuits; 13–15 actual native Open inspectors; 16 native ownership error;
+17 Cancel-first native removal/rebuild refund review. All are initialized native
+fixtures with private original sprites and production native viewport/Pocket
+component rendering, not full gameplay frames or live scenario family operation.
+Only successful final fixture screens are packaged. Legacy failed-attempt captures
+are excluded. No mockups, composited fake UI, private archives, parks or designs.
+
+Every image was inspected for labels, focus, overlap, contrast, controls and panel
+position. Dense block controls paginate; picker ellipses use the selected full-width
+detail label. Native costs, refund and Open/profit information come from real state.
+Whole-frame HUD collision, physical 3.2-inch readability, AArch64, input mappings,
+performance and sustained family guests remain separate validation requirements.
+
+## Precise remaining scope and next milestone
+
+Backward core is delivered for conventional native gaps; exhaustive four-orientation,
+diagonal/complex slope/bank/section coverage remains. Covered/inverted core placement
+and native inverted-start stations are delivered; positive manual variant transitions
+and exhaustive covered slopes/turns across supported vehicles need dedicated coverage.
+Direct selected-seat/special parameter editing, atomic/station/inverted replacement,
+spatial block selection, arbitrary export scenery, vehicle substitution and other
+special ride families remain ordinary gameplay gaps. Maze/access ghosts and existing
+park construction, staff and guest gaps remain on their previous checkpoints.
+No gap is reclassified as unnecessary. Overall construction remains PARTIAL toward
+100% ordinary gameplay.
+
+Highest-value next subsystem: scenery and path construction parity, including native
+banner/style controls, useful loaded/researched category filtering and bulk removal,
+connected path starts from access endpoints and recoverable native undo/path networks.
+Preserve all delivered ride editing/authoring, family evidence and management systems.

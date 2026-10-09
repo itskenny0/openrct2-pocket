@@ -190,3 +190,10 @@ Follow-up: selected disconnected conventional component continuation, native
 placement speed drafts and exact manual saved-design elevation are now delivered;
 see TRACK-EDITING-DESIGN-COMPLETION.md. Backward/replacement/variants/player export
 and per-family operation remain ordinary gaps.
+
+Advanced follow-up: ADVANCED-RIDE-EDITING-COMPLETION.md delivers conventional native
+rear-gap/backward core, covered/inverted variant eligibility and placement, Flying
+inverted-start stations and representative native Monorail/Dinghy/Flying circuit,
+access/Open/persistence validation. Earlier missing statements are superseded only
+for this scope. Complex/diagonal coverage, positive variant transitions, other special
+parameters, atomic/station/inverted replacement and sustained guest use remain PARTIAL.
