@@ -270,3 +270,10 @@ SCENERY-PATH-PARITY-COMPLETION.md Phase 1 delivers researched loaded native scen
 group filtering and guarded Cancel-first banner no-entry/text/primary style and
 scrolling sign channel controls. Four-category placement and trees are preserved.
 Scenery and Paths remain PARTIAL; later phases/gaps are recorded in that checkpoint.
+
+Scenery parity Phase 2: native category-selective 1–64 tile area clearing with
+Cancel-first cost/refund review, copied full-object stale guards, native whole-large
+removal and path preservation/opt-in removal is delivered. Native multi-tile clear
+query accounting is corrected and regression-tested against execution. Connected
+access starts/undo, eyedropper, bulk placement and terrain surface colour remain
+PARTIAL; see SCENERY-PATH-PARITY-COMPLETION.md.

@@ -21,6 +21,7 @@
 #include "RightsTools.h"
 #include "SaveSlots.h"
 #include "SceneryTools.h"
+#include "SceneryClear.h"
 #include "ShopManagement.h"
 #include "Shops.h"
 #include "StaffManagement.h"
@@ -70,6 +71,8 @@ namespace OpenRCT2::Ui::Windows
         sceneryCategory,
         sceneryPicker,
         sceneryOptions,
+        sceneryClearOptions,
+        sceneryClearConfirm,
         sceneryGroups,
         sceneryStyle,
         sceneryStyleEditor,
@@ -248,6 +251,8 @@ namespace OpenRCT2::Ui::Windows
         Handheld::TextEntry _nameEntry;
         std::optional<Handheld::SceneryTools::Target> _signTarget;
         std::optional<Handheld::SceneryTools::StyleDraft> _signStyle;
+        std::optional<Handheld::SceneryClear::Draft> _clearDraft;
+        bool _clearReviewResumed{};
         std::optional<Handheld::RightsTools::Draft> _rightsDraft;
         bool _rightsReviewResumed{};
         size_t _rideGraphMetric{}, _rideGraphOffset{};
@@ -590,7 +595,7 @@ namespace OpenRCT2::Ui::Windows
                 || _page == Page::staffPatrolClear || _page == Page::rightsOptions || _page == Page::rightsConfirm
                 || _page == Page::areaOptions || _page == Page::sceneryOptions || _page == Page::sceneryName
                 || _page == Page::sceneryConfirm || _page == Page::sceneryGroups || _page == Page::sceneryStyle
-                || _page == Page::sceneryStyleEditor || _page == Page::sceneryStyleConfirm;
+                || _page == Page::sceneryStyleEditor || _page == Page::sceneryStyleConfirm || _page == Page::sceneryClearOptions || _page == Page::sceneryClearConfirm;
         }
         void constructionMove(int x, int y)
         {
@@ -610,6 +615,8 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::RightsTools::Configure(_focus.index(), x);
             else if (x && _page == Page::areaOptions)
                 Handheld::AreaTools::Configure(_focus.index(), x);
+            else if (x && _page == Page::sceneryClearOptions)
+                Handheld::SceneryClear::Configure(_focus.index(), x);
             else if (x && _page == Page::sceneryStyleEditor && _focus.index() == 0 && _signStyle)
                 Handheld::SceneryTools::AdjustStyle(*_signStyle, x);
             else if (x && _page == Page::sceneryOptions)
@@ -643,6 +650,11 @@ namespace OpenRCT2::Ui::Windows
 
         void page(Page next)
         {
+            if (_clearReviewResumed && next != Page::sceneryClearConfirm) {
+                if (_pausedHere && !(gGamePaused & GAME_PAUSED_NORMAL))
+                    PauseToggle();
+                _clearReviewResumed = false;
+            }
             if (_rightsReviewResumed && next != Page::rightsConfirm)
             {
                 if (_pausedHere && !(gGamePaused & GAME_PAUSED_NORMAL))
@@ -742,6 +754,15 @@ namespace OpenRCT2::Ui::Windows
             if (next == Page::researchConfirm)
                 _focus.move(static_cast<int32_t>(rows().size() - 1), rows().size());
             invalidate();
+        }
+        std::vector<Handheld::SceneryTools::Style> signStyles() const
+        {
+            std::vector<Handheld::SceneryTools::Style> result;
+            if (_signTarget)
+                for (auto style : {Handheld::SceneryTools::Style::noEntry, Handheld::SceneryTools::Style::textColour,
+                                   Handheld::SceneryTools::Style::mainColour})
+                    if (Handheld::SceneryTools::BeginStyle(*_signTarget, style)) result.push_back(style);
+            return result;
         }
         std::vector<std::string> rows() const
         {
@@ -887,6 +908,8 @@ namespace OpenRCT2::Ui::Windows
                     return _nameEntry.Keys();
                 case Page::sceneryConfirm:
                     return { "Apply text", "Cancel" };
+                case Page::sceneryClearOptions: return Handheld::SceneryClear::Options();
+                case Page::sceneryClearConfirm: return {"Clear native area", "Cancel"};
                 case Page::sceneryGroups:
                 {
                     std::vector<std::string> list;
@@ -895,7 +918,14 @@ namespace OpenRCT2::Ui::Windows
                     return list;
                 }
                 case Page::sceneryStyle:
-                    return {"No entry...", "Text colour...", "Primary colour...", "Back"};
+                    {
+                    std::vector<std::string> result;
+                    for (auto style : signStyles())
+                        result.push_back(style == Handheld::SceneryTools::Style::noEntry ? "No entry..."
+                            : style == Handheld::SceneryTools::Style::textColour ? "Text colour..." : "Primary colour...");
+                    result.push_back("Back");
+                    return result;
+                    }
                 case Page::sceneryStyleEditor:
                     return {_signStyle ? Handheld::SceneryTools::StyleValue(*_signStyle) : "Sign unavailable", "Review change", "Cancel"};
                 case Page::sceneryStyleConfirm:
@@ -1029,7 +1059,7 @@ namespace OpenRCT2::Ui::Windows
         void onClose() override
         {
             Handheld::DesignAuthoring::End();
-            if (_ridesReviewResumed || _rightsReviewResumed)
+            if (_ridesReviewResumed || _rightsReviewResumed || _clearReviewResumed)
                 _pausedHere = false; // Our pause was already released; retain any external pause.
             if (_page == Page::designConfirm && _focus.index() == 0)
                 Handheld::Designs::CancelReview();
@@ -1095,6 +1125,13 @@ namespace OpenRCT2::Ui::Windows
         void openAreaOptions()
         {
             page(Page::areaOptions);
+        }
+        void openSceneryClearOptions() {page(Page::sceneryClearOptions);}
+        void openSceneryClearReview(CoordsXY tile) {
+            if(_pausedHere && (gGamePaused & GAME_PAUSED_NORMAL)){PauseToggle();_clearReviewResumed=true;}
+            const auto query=Handheld::SceneryClear::Query(tile,Handheld::SceneryClear::settings);
+            _clearDraft=Handheld::SceneryClear::Begin(tile,Handheld::SceneryClear::settings);
+            if(_clearDraft){page(Page::sceneryClearConfirm);_focus.move(1,2);}else{page(Page::sceneryClearOptions);_status=query.getErrorMessage();}
         }
         void openSceneryStyle(const Handheld::SceneryTools::Target& target)
         {
@@ -1619,6 +1656,8 @@ namespace OpenRCT2::Ui::Windows
                 case Page::sceneryConfirm:
                     page(Page::sceneryName);
                     break;
+                case Page::sceneryClearConfirm: _clearDraft.reset(); close(); break;
+                case Page::sceneryClearOptions: close(); break;
                 case Page::sceneryGroups:
                 case Page::sceneryStyle:
                     page(Page::sceneryOptions);
@@ -2045,7 +2084,8 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::sceneryCategory:
-                    if (choice == 5)
+                    if (choice == 5) {close();Handheld::BeginSceneryClear();}
+                    else if (choice == 6)
                         page(Page::build);
                     else
                     {
@@ -2105,6 +2145,13 @@ namespace OpenRCT2::Ui::Windows
                         }
                     }
                     break;
+                case Page::sceneryClearOptions:
+                    if(choice==0)close();else{Handheld::SceneryClear::Configure(choice);invalidate();}break;
+                case Page::sceneryClearConfirm:
+                    if(choice==1){_clearDraft.reset();close();}
+                    else if(_clearDraft){const auto result=Handheld::SceneryClear::Action(*_clearDraft,true);
+                        if(result.error==GameActions::Status::ok){_clearDraft.reset();close();}else{_status=result.getErrorMessage();invalidate();}}
+                    break;
                 case Page::sceneryGroups:
                 {
                     const auto groups = Handheld::SceneryTools::Groups(Handheld::SceneryTools::Current().category);
@@ -2114,16 +2161,17 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 }
                 case Page::sceneryStyle:
-                    if (choice == 3) page(Page::sceneryOptions);
+                {
+                    const auto styles = signStyles();
+                    if (choice >= styles.size()) page(Page::sceneryOptions);
                     else if (_signTarget)
                     {
-                        _signStyle = Handheld::SceneryTools::BeginStyle(*_signTarget,
-                            choice == 0 ? Handheld::SceneryTools::Style::noEntry
-                            : choice == 1 ? Handheld::SceneryTools::Style::textColour : Handheld::SceneryTools::Style::mainColour);
+                        _signStyle = Handheld::SceneryTools::BeginStyle(*_signTarget, styles[choice]);
                         if (_signStyle) page(Page::sceneryStyleEditor);
                         else { _status = "Style unavailable for this sign"; invalidate(); }
                     }
                     break;
+                }
                 case Page::sceneryStyleEditor:
                     if (choice == 2) page(Page::sceneryStyle);
                     else if (_signStyle && choice == 0) { Handheld::SceneryTools::AdjustStyle(*_signStyle, 1); invalidate(); }
@@ -3889,6 +3937,9 @@ namespace OpenRCT2::Ui::Windows
                     Handheld::RightsTools::Presentation(*_rightsDraft, _focus.index(), _status));
                 return;
             }
+            if(_page==Page::sceneryClearConfirm && _clearDraft) {
+                Handheld::DrawManagementPanel(rt,{ContextGetWidth(),ContextGetHeight()},Handheld::SceneryClear::Presentation(*_clearDraft,_focus.index(),_status));return;
+            }
             if (_page == Page::sceneryStyleEditor || _page == Page::sceneryStyleConfirm)
             {
                 Handheld::ManagementPresentation model;
@@ -3990,6 +4041,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::areaOptions:
                     title = "AREA BRUSH OPTIONS";
                     break;
+                case Page::sceneryClearOptions: title="CLEAR AREA OPTIONS"; break;
                 case Page::sceneryGroups:
                     title = "SCENERY GROUP";
                     break;
@@ -4270,6 +4322,8 @@ namespace OpenRCT2::Ui::Windows
         if (auto* w = OpenPanel())
             w->openAreaOptions();
     }
+    void HandheldSceneryClearOptionsOpen() {if(auto* w=OpenPanel())w->openSceneryClearOptions();}
+    void HandheldSceneryClearReviewOpen(CoordsXY tile) {if(auto* w=OpenPanel())w->openSceneryClearReview(tile);}
     void HandheldSceneryStyleOpen(const Handheld::SceneryTools::Target& target)
     {
         if (auto* window = OpenPanel()) window->openSceneryStyle(target);

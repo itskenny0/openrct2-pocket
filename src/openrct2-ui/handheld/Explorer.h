@@ -35,6 +35,7 @@ namespace OpenRCT2::Ui::Handheld
     void BeginSurface();
     void BeginTrees();
     void BeginScenery();
+    void BeginSceneryClear();
     void BeginAreaTools();
     void BeginRightsTools();
     bool IsSceneryToolActive();
@@ -99,6 +100,8 @@ namespace OpenRCT2::Ui::Windows
     void HandheldSceneryOptionsOpen();
     void HandheldSceneryStyleOpen(const Handheld::SceneryTools::Target& target);
     void HandheldAreaOptionsOpen();
+    void HandheldSceneryClearOptionsOpen();
+    void HandheldSceneryClearReviewOpen(CoordsXY tile);
     void HandheldRightsOptionsOpen();
     void HandheldRightsReviewOpen(CoordsXY tile);
     bool HandheldConstructionMenuIsOpen();

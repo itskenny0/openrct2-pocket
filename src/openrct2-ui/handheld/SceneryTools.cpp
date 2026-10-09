@@ -99,7 +99,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     std::vector<std::string> Categories()
     {
         return { "Small scenery / trees", "Large scenery",  "Walls / fences",
-                 "Banners / signs",       "Path furniture", "Back to build" };
+                 "Banners / signs",       "Path furniture", "Clear area...", "Back to build" };
     }
     std::string Name(const Settings& s)
     {

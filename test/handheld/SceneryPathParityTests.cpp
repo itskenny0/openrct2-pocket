@@ -42,6 +42,7 @@ static void Check(bool ok, const char* message)
     if (!ok)
         throw std::runtime_error(message);
 }
+#include "SceneryClearWorkflowTests.h"
 int main(int argc, char** argv)
 {
     try
@@ -85,6 +86,8 @@ int main(int argc, char** argv)
             objects.LoadObject("rct2.terrain_surface.grass") && objects.LoadObject("rct2.terrain_edge.rock")
                 && objects.LoadObject("rct2.station.plain"),
             "Fixture terrain/station missing");
+        bool clearPanel = false;
+        CoordsXYZ captureFocus{ 656, 656, 32 };
         auto capture = [&](const char* name, bool menu) {
             const auto* output = std::getenv("POCKET_PARITY_CAPTURES");
             if (!output || argc != 4)
@@ -98,7 +101,7 @@ int main(int argc, char** argv)
             viewport.width = 512;
             viewport.height = 384;
             viewport.zoom = ZoomLevel{ 1 };
-            const auto focus = CoordsXYZ{ 656, 656, 32 };
+            const auto focus = captureFocus;
             const auto centre = Translate3DTo2DWithZ(0, focus);
             viewport.viewPos = centre - ScreenCoordsXY{ viewport.zoom.ApplyTo(310), viewport.zoom.ApplyTo(190) };
             ResetAllSpriteQuadrantPlacements();
@@ -106,6 +109,8 @@ int main(int argc, char** argv)
             ViewportRender(rt, &viewport);
             if (menu)
                 Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu)->onDraw(rt);
+            else if (clearPanel)
+                H::SceneryClear::DrawOverlay(rt, { 8, 8 });
             else
                 S::DrawOverlay(rt, { 8, 8 });
             Image image;
@@ -126,6 +131,8 @@ int main(int argc, char** argv)
             ScenerySetInvented({ type, index });
             return index;
         };
+        const auto largeObject = load("rct2.scenery_large.ssig4", SCENERY_TYPE_LARGE);
+        const auto smallObject = load("rct2.scenery_small.corroof2", SCENERY_TYPE_SMALL);
         const auto bannerObject = load("rct2.footpath_banner.bn1", SCENERY_TYPE_BANNER);
         const auto wallObject = load("rct2.scenery_wall.wallsign", SCENERY_TYPE_WALL);
         load("rct2.scenery_wall.wbr1a", SCENERY_TYPE_WALL);
@@ -249,6 +256,9 @@ int main(int argc, char** argv)
         Check(S::SetText(sign, "Changed after review", true).error == GameActions::Status::ok, "Text action failed");
         GameActions::ProcessQueue(state);
         Check(S::ApplyStyle(*stale, true).error != GameActions::Status::ok, "Changed sign text baseline accepted");
+        TestSceneryClear(
+            state, largeObject, smallObject, objects.GetLoadedObjectEntryIndex(surface),
+            objects.GetLoadedObjectEntryIndex(railings), controller, confirm, clearPanel, captureFocus, capture);
         SaveFlags flags{};
         auto save = std::string(argv[2]) + "/parity.park";
         Check(ScenarioSave(state, save, flags) && context->LoadParkFromFile(save), "Style save/reload failed");

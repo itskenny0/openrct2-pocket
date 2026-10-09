@@ -21,6 +21,7 @@
 #include "RightsTools.h"
 #include "SceneryRemoval.h"
 #include "SceneryTools.h"
+#include "SceneryClear.h"
 #include "ShopManagement.h"
 #include "Shops.h"
 #include "StaffPatrol.h"
@@ -68,6 +69,7 @@ namespace OpenRCT2::Ui::Handheld
     static ObjectEntryIndex _treeIndex = kObjectEntryIndexNull;
     static bool _sceneryRemovalTool{};
     static bool _sceneryTool{};
+    static bool _sceneryClearTool{};
     static bool _areaTool{};
     static bool _rightsTool{};
     static std::optional<SceneryTools::Target> _sceneryEdit;
@@ -123,6 +125,7 @@ namespace OpenRCT2::Ui::Handheld
         _colourTarget.reset();
         _sceneryRemovalTool = false;
         _sceneryTool = false;
+        _sceneryClearTool = false;
         _areaTool = false;
         _rightsTool = false;
         _sceneryEdit.reset();
@@ -172,6 +175,7 @@ namespace OpenRCT2::Ui::Handheld
         BeginTerrain(true);
         _areaTool = true;
     }
+    void BeginSceneryClear() { BeginTerrain(true); _sceneryClearTool = true; }
     void BeginScenery()
     {
         BeginTerrain(true);
@@ -364,6 +368,7 @@ namespace OpenRCT2::Ui::Handheld
         _colourTarget.reset();
         _sceneryRemovalTool = false;
         _sceneryTool = false;
+        _sceneryClearTool = false;
         _areaTool = false;
         _rightsTool = false;
         _sceneryEdit.reset();
@@ -399,6 +404,7 @@ namespace OpenRCT2::Ui::Handheld
             return RightsTools::Query(_terrainTile, RightsTools::settings);
         if (_areaTool)
             return AreaTools::Action(_terrainTile, AreaTools::settings, execute);
+        if (_sceneryClearTool) return SceneryClear::Query(_terrainTile, SceneryClear::settings);
         if (_sceneryTool)
         {
             const auto& settings = SceneryTools::Current();
@@ -754,6 +760,10 @@ namespace OpenRCT2::Ui::Handheld
                         gMapSelectPositionB = { r->getX2(), r->getY2() };
                     }
                 }
+                if (_sceneryClearTool) {
+                    const auto range=AreaTools::Range(_terrainTile,SceneryClear::settings.width,SceneryClear::settings.height);
+                    if(!range)_terrainTile.reset(); else {gMapSelectPositionA={range->getX1(),range->getY1()};gMapSelectPositionB={range->getX2(),range->getY2()};}
+                }
                 if (_areaTool)
                 {
                     const auto range = AreaTools::Range(_terrainTile, AreaTools::settings.width, AreaTools::settings.height);
@@ -1049,6 +1059,8 @@ namespace OpenRCT2::Ui::Handheld
                     Windows::HandheldRightsOptionsOpen();
                 else if (_areaTool)
                     Windows::HandheldAreaOptionsOpen();
+                else if (_sceneryClearTool)
+                    Windows::HandheldSceneryClearOptionsOpen();
                 else if (_sceneryTool)
                     Windows::HandheldSceneryOptionsOpen();
                 else if (_shopTool)
@@ -1072,6 +1084,8 @@ namespace OpenRCT2::Ui::Handheld
                             _terrainStatus = result.error == GameActions::Status::ok ? "Path change requested."
                                                                                      : result.getErrorMessage();
                         }
+                        else if (_sceneryClearTool && _terrainTile)
+                            Windows::HandheldSceneryClearReviewOpen(*_terrainTile);
                         else if (_rightsTool && _terrainTile)
                             Windows::HandheldRightsReviewOpen(*_terrainTile);
                         else if (_terrainActive)
@@ -1163,6 +1177,8 @@ namespace OpenRCT2::Ui::Handheld
                                 Windows::HandheldRightsOptionsOpen();
                             else if (_areaTool)
                                 Windows::HandheldAreaOptionsOpen();
+                            else if (_sceneryClearTool)
+                                Windows::HandheldSceneryClearOptionsOpen();
                             else if (_sceneryTool)
                                 Windows::HandheldSceneryOptionsOpen();
                             else if (_treeTool)
@@ -1313,6 +1329,8 @@ namespace OpenRCT2::Ui::Handheld
                         rt, Concept::kOrigin, "Terrain / Water",
                         AreaTools::operations[static_cast<size_t>(AreaTools::settings.operation)], "Area brush",
                         AreaTools::SizeName(AreaTools::settings), AreaTools::SelectionName(AreaTools::settings));
+                else if (_sceneryClearTool)
+                    SceneryClear::DrawOverlay(rt, Concept::kOrigin);
                 else if (_sceneryTool)
                     SceneryTools::DrawOverlay(rt, Concept::kOrigin);
                 else if (_treeTool)
@@ -1338,6 +1356,8 @@ namespace OpenRCT2::Ui::Handheld
                 DrawConstructionFooter(rt, { ContextGetWidth(), height }, "Apply", "Add/Remove");
             else if (_rightsTool)
                 DrawConstructionFooter(rt, { ContextGetWidth(), height }, "Review", "Options");
+            else if (_sceneryClearTool)
+                DrawConstructionFooter(rt, {ContextGetWidth(), height}, "Review", "Options");
             else if (_areaTool)
                 DrawConstructionFooter(rt, { ContextGetWidth(), height }, "Apply", "Brush");
             else if (_sceneryTool)
