@@ -1117,7 +1117,7 @@ namespace OpenRCT2::Ui::Handheld
                         {
                             Windows::HandheldDesignOptionsOpen();
                             input.suspend();
-                            break;
+                            return;
                         }
                         if (Paths::IsActive() && !Paths::IsConnected())
                         {

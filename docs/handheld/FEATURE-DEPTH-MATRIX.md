@@ -194,3 +194,10 @@ Design placement: exact manual elevation, automatic-height recovery and compact 
 options are delivered for supported conventional/maze designs. Native query/ghost/
 cost review/execute still own placement. Player-facing export/scenery selection and
 substitution choices remain PARTIAL; ordinary special-family operation is pending.
+
+Operation evidence follow-up: Mini Golf now passes a public-fixture action-built
+closed circuit, native access/Open and save/reload. Maze passes native opening in
+public tests and Factory Capers asset-backed capture. Sustained guest operation,
+asset-backed Mini Golf and transport/water-family operation remain unvalidated.
+Overall construction stays PARTIAL toward 100% ordinary gameplay; export,
+backward/replacement and variant parity remain on the roadmap.

@@ -164,6 +164,18 @@ int main(int argc, char** argv)
             GA::ProcessQueue(state);
         }
         F::End();
+        GameActions::RideSetStatusAction open(t.id, RideStatus::open);
+        const auto opening = GameActions::Query(&open, state);
+        if (opening.error != GameActions::Status::ok)
+            std::cerr << opening.getErrorMessage() << "\n";
+        Check(
+            opening.error == GameActions::Status::ok && GameActions::Execute(&open, state).error == GameActions::Status::ok,
+            "Native maze opening failed");
+        GameActions::ProcessQueue(state);
+        Check(GetRide(t.id)->status == RideStatus::open, "Native maze status not open");
+        GameActions::RideSetStatusAction close(t.id, RideStatus::closed);
+        Check(GameActions::Execute(&close, state).error == GameActions::Status::ok, "Native maze closing failed");
+        GameActions::ProcessQueue(state);
         TrackDesign td;
         TrackDesignState tds{};
         Check(

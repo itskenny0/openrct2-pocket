@@ -34,6 +34,7 @@
 #include <openrct2/actions/ride/RideCreateAction.h>
 #include <openrct2/actions/ride/RideDemolishAction.h>
 #include <openrct2/actions/ride/RideEntranceExitRemoveAction.h>
+#include <openrct2/actions/ride/RideSetStatusAction.h>
 #include <openrct2/actions/track/SequentialTrackPlaceAction.h>
 #include <openrct2/actions/track/TrackPlaceAction.h>
 #include <openrct2/audio/AudioContext.h>
@@ -292,6 +293,20 @@ int main(int argc, char** argv)
             GetRide(target.id)->getStation().entrance.isNull() == false
                 && GetRide(target.id)->getStation().exit.isNull() == false,
             "Access incomplete");
+        GameActions::RideSetStatusAction open(target.id, RideStatus::open);
+        const auto opening = GameActions::Query(&open, state);
+        if (opening.error != GameActions::Status::ok)
+            std::cerr << opening.getErrorMessage() << "\n";
+        Check(
+            opening.error == GameActions::Status::ok && GameActions::Execute(&open, state).error == GameActions::Status::ok,
+            "Asset-backed maze native opening failed");
+        GameActions::ProcessQueue(state);
+        W::HandheldRideOpen(target.id);
+        capture("15-native-maze-open-inspection.png", true);
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        GameActions::RideSetStatusAction close(target.id, RideStatus::closed);
+        Check(GameActions::Execute(&close, state).error == GameActions::Status::ok, "Asset-backed maze closing failed");
+        GameActions::ProcessQueue(state);
         TrackDesign td;
         TrackDesignState tds{};
         Check(td.CreateTrackDesign(tds, *GetRide(target.id)).Successful, "Native maze design creation failed");

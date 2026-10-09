@@ -188,3 +188,9 @@ work. The complete next prompt accompanies the capture deliverable and final rep
 Follow-up: manual saved-design elevation now uses shared native placement, exact
 height review and ghost cleanup; see TRACK-EDITING-DESIGN-COMPLETION.md. Player
 export/substitution and operation gaps remain.
+
+Operation follow-up: Mini Golf closed circuit/access/native Open and persistence
+pass public fixtures. Maze native opening passes public and Factory Capers
+asset-backed workflows; neither proves sustained guest use. Exact evidence and
+remaining asset-backed Mini Golf/transport/water gaps are recorded in
+TRACK-EDITING-DESIGN-COMPLETION.md.

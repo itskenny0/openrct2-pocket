@@ -302,7 +302,10 @@ int main(int argc, char** argv)
         D::UpdatePreview(*destination);
         focus = { *destination, MapGetHighestZ(*destination) };
         capture("07-saved-design-preview.png");
-        W::HandheldDesignOptionsOpen();
+        H::Frame options;
+        options.actions = { H::Action::contextPrimary, H::Action::confirm };
+        H::HandleExplorerInput(controller, options);
+        Check(!D::HasReview() && !D::HeightOffset(), "Design options action handoff repeated");
         W::HandheldMenuMove(1);
         H::HandleMenuInput(controller, a);
         Check(D::HeightOffset() == 16, "Controller manual height failed");

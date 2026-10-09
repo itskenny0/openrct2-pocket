@@ -99,3 +99,83 @@ is claimed or fabricated. Full Mini Golf/maze/transport/water operation is pendi
 Phase 2 published c9f62be479ce2e74c53440245dcd393adf987b7b;
 local c3ca773d104f5bfe381a92421e13b489c186942d;
 identical tree 6b105c58aee3348612c8a89fa812dfeaf7ac91a2.
+
+## Phase 4 — demonstrated operation and regression evidence (partial)
+
+MiniGolfConstructionTests now builds a native station/hole-A/four-corner closed
+course through the production editor and real actions, verifies every quoted
+construction cost, completes native entrances/exits, queries/executes
+RideSetStatusAction(open) and verifies Open survives save/reload. All five holes
+in four orientations remain covered separately. This is a public native fixture;
+asset-backed Mini Golf operation and sustained players are not claimed.
+
+MazeConstructionTests queries/executes native opening and closing after access.
+Factory Capers MazeConstructionCapture additionally opens the action-built maze
+using its existing researched objects/ownership/cash and captures the production
+ride inspector with actual Open status. No live research/cash/ownership/ride or
+map-element patches are used. Opening does not prove guest routing or throughput.
+Representative transport/water operation remains individually unvalidated.
+
+The design camera regression now exercises X → Design options → Rotate camera,
+asserting unchanged design orientation. A transition frame containing X and A
+opens options only; it cannot create a review or adjust height. Failed selected
+section handoff reports a native-compatible endpoint error instead of silently
+returning. Existing cancel/menu/ghost/input paths remain covered.
+
+### Final validation
+
+- Release GUI and CLI targets: successful build (existing host configuration).
+- RideConstructionTests: five native families, stations/turns/inversion where
+  compatible, disconnected forward recovery, speed placement/baselines/bounds,
+  costs/refunds, manual design height/ghost/execute and save/reload: PASS.
+- MazeConstructionTests: geometry, native actions, access, disconnected selection,
+  designs/manual height, opening/closing, guards and persistence: PASS.
+- MiniGolfConstructionTests: all five holes/four rotations, native closed course,
+  access, Open and persistence: PASS (public fixtures).
+- ConstructionTests, StaffCompletionTests, GuestCompletionTests,
+  PresentationLifecycleTests: PASS.
+- PathActionsTests with private assets/SDL dummy: PASS, including existing
+  management/construction/access/input and ghost lifecycle regression coverage.
+- Asset-backed RideConstructionCapture: Junior Factory Capers and Looping Build
+  your own Six Flags Magic Mountain: PASS, controller parameter/options handoff,
+  speed/removal review, native design previews, station/access and save/reload.
+- Asset-backed MazeConstructionCapture: Factory Capers: PASS, including native
+  Open inspection. Asset-backed DesignCapture: PASS, native design/research/ghost/
+  camera/cost/cancel/controller/stations/access/testing/persistence.
+- Original CustomCoasterCapture: PASS, action-built Wooden circuit, native opening,
+  elevated access and natural guest queue use through 30,000 ticks. This does not
+  establish sustained throughput for other offered families.
+- CTest: 3/3 PASS (controller input, launcher mapping and save lifecycle).
+
+### Captures and limits
+
+Deliverable: OpenRCT2-Pocket-Track-Editing-Design-Captures.zip, with actual 512×384
+PNGs and checksum/dimension/provenance manifest. Representative captures cover
+block roster, dense operations, selected continuation, placement-speed parameter,
+Cancel-first removal, invalid ownership, manual-height options/ghost/review and
+native maze Open inspection. Captures are asset-backed native X8 viewport plus
+production Pocket components/menus, not full SDL gameplay frames. Original
+archives, scenario/save files and generated TD6s are excluded. All packaged images
+are visually inspected; truncated essential options hint was fixed and regenerated.
+
+No capture of unimplemented export, replacement, backward or variants is included.
+Private Data/ObjData/Scenarios/Tracks were available for the above named scenes;
+Mini Golf full circuit uses public fixtures. AArch64 builds, physical Brick input,
+hardware rendering/performance and whole-frame HUD interactions remain untested.
+
+### Remaining ordinary gameplay scope
+
+Overall construction remains PARTIAL toward 100% ordinary gameplay. Remaining:
+backward and selected replacement; spatial conventional block selection; selected
+seat rotation/further parameters; covered/inverted/alternative variants and their
+native vehicle/station rules; player-facing tested/rated design export with
+scenery selection; manual native substitution/warning choices; unsupported flat/
+special design categories; entrance/exit and maze initial/segment ghosts; individual
+transport/water-family operation; asset-backed Mini Golf circuit/guest use and
+sustained maze use. Existing guest/staff/construction roadmap gaps remain intact.
+
+Phase 3 published e9f256775bbc47d9ce8e720ec73bf6e7c1d831fb;
+local 13084ebcf01aea36a6702d640f9314f0fe478499;
+identical tree 53ebad9e0d6d12e0df15ce0a4e6c36517a010694.
+Phase 4/final publication is recorded in a subsequent documentation checkpoint
+and the capture manifest to avoid a commit self-reference.

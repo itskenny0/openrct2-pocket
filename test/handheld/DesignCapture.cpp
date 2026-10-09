@@ -366,11 +366,16 @@ int main(int argc, char** argv)
         H::Frame rotateCamera;
         rotateCamera.actions = { H::Action::contextPrimary };
         H::HandleExplorerInput(controller, rotateCamera);
+        Ui::Windows::HandheldMenuMove(5);
+        H::HandleMenuInput(controller, selecting);
         Check(
             main->viewport->rotation != camera && H::Designs::Orientation() == orientation,
             "Design tool stole camera rotation");
         for (int i = 0; i < 3; ++i)
-            H::HandleExplorerInput(controller, rotateCamera);
+            H::HandleMenuInput(controller, selecting);
+        H::Frame optionsBack;
+        optionsBack.actions = { H::Action::back };
+        H::HandleMenuInput(controller, optionsBack);
         const auto zoom = main->viewport->zoom;
         H::Frame zoomOut;
         zoomOut.actions = { H::Action::previousOption };

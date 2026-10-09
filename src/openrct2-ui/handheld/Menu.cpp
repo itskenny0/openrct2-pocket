@@ -2620,7 +2620,9 @@ namespace OpenRCT2::Ui::Windows
                     {
                         const auto block = *_trackBlock;
                         close();
-                        Handheld::ResumeCustomTrackFrom(block.ride, block.origin, block.type);
+                        if (!Handheld::ResumeCustomTrackFrom(block.ride, block.origin, block.type))
+                            GetWindowManager()->ShowError(
+                                "Cannot continue section", "No compatible forward endpoint; select again");
                     }
                     else if (choice == 0)
                     {
