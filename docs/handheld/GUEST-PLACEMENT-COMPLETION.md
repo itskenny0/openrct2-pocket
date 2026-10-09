@@ -166,3 +166,10 @@ Highest-value next subsystem: ride construction breadth and native track editing
 starting with descriptor-driven additional coaster types and saved designs, then
 safe endpoint/block editing. Existing Wooden, flat rides, RideAccess and all
 completed management/construction/guest/staff behavior are regression contracts.
+
+Capture/readability follow-up published: `9740ce82777922c33f6bf4975e2efb219ffb55ea`
+(tree `03352279a542702648e8ab810576684f2637cad4`). The actual live capture run
+produced all thirteen PNGs, executed guest/staff placement and passed its native
+save/reload and accounting assertions. This documentation-only publication records
+that validated source checkpoint; its final head is reported with the downloadable
+ZIP and standalone next prompt.
