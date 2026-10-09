@@ -13,6 +13,7 @@
 #include "Designs.h"
 #include "FlatRides.h"
 #include "Hud.h"
+#include "Mazes.h"
 #include "Panel.h"
 #include "Paths.h"
 #include "RideAccess.h"
@@ -108,6 +109,7 @@ namespace OpenRCT2::Ui::Handheld
         FlatRides::End();
         Designs::End();
         CustomTracks::End();
+        Mazes::End();
         _terrainActive = true;
         _waterTool = false;
         _surfaceTool = false;
@@ -189,6 +191,21 @@ namespace OpenRCT2::Ui::Handheld
         _treeIndex = Trees::Next(kObjectEntryIndexNull);
     }
 
+    bool BeginMaze(ObjectEntryIndex index)
+    {
+        if (!Mazes::Eligible(index))
+            return false;
+        BeginTerrain(true);
+        return Mazes::Begin(index);
+    }
+    bool ResumeMaze(RideId id)
+    {
+        const auto target = RideManagement::Identify(id);
+        if (!target || !Mazes::CanResume(*target))
+            return false;
+        BeginTerrain(true);
+        return Mazes::Resume(*target);
+    }
     bool BeginCustomTrack(ObjectEntryIndex index, ride_type_t type)
     {
         if (!CustomTracks::Eligible(index, type))
@@ -326,6 +343,7 @@ namespace OpenRCT2::Ui::Handheld
         FlatRides::End();
         Designs::End();
         CustomTracks::End();
+        Mazes::End();
         _terrainActive = false;
         _waterTool = false;
         _surfaceTool = false;
@@ -767,6 +785,8 @@ namespace OpenRCT2::Ui::Handheld
                 }
             }
         }
+        if (Mazes::Active() && CanExplore() && ContextHasFocus())
+            Mazes::Update(_terrainTile);
         if (CustomTracks::Active() && CanExplore() && ContextHasFocus())
             CustomTracks::Update(_terrainTile);
         if (Designs::Active() && CanExplore() && ContextHasFocus())
@@ -812,6 +832,56 @@ namespace OpenRCT2::Ui::Handheld
         }
         if (HandleMenuInput(input, frame))
             return;
+        if (Mazes::Active() && CanExplore())
+        {
+            for (const auto action : frame.actions)
+            {
+                if (action == Action::openMenu)
+                    Windows::HandheldDashboardOpen();
+                else if (!Mazes::Busy())
+                {
+                    if (action == Action::confirm)
+                        Mazes::Confirm();
+                    else if (action == Action::back)
+                    {
+                        if (Mazes::Reviewing())
+                            Mazes::Cancel();
+                        else
+                        {
+                            const auto t = Mazes::Target();
+                            EndTerrain();
+                            if (t && RideManagement::Resolve(*t))
+                                Windows::HandheldRideOpen(t->id);
+                        }
+                    }
+                    else if (action == Action::previousOption || action == Action::nextOption)
+                    {
+                        if (Mazes::CameraMode())
+                            Windows::MainWindowZoom(action == Action::nextOption, false);
+                        else
+                            Mazes::Turn(action == Action::nextOption ? 1 : -1);
+                    }
+                    else if (action == Action::slopeDown || action == Action::slopeUp)
+                        Mazes::Height(action == Action::slopeUp ? 1 : -1);
+                    else if (action == Action::contextPrimary)
+                    {
+                        if (Mazes::CameraMode())
+                            Invoke(ShortcutId::kViewGeneralRotateClockwise);
+                        else
+                            Mazes::Move();
+                    }
+                    else if (action == Action::contextSecondary && !Mazes::Reviewing())
+                        Mazes::ReviewRemoval();
+                    else if (action == Action::openBuild)
+                        Mazes::ToggleCamera();
+                }
+                input.suspend();
+                break;
+            }
+            if (frame.panX || frame.panY)
+                InputScrollViewportSmooth({ frame.panX, frame.panY }, WindowGetMain());
+            return;
+        }
         if (CustomTracks::Active() && CanExplore())
         {
             for (const auto action : frame.actions)
@@ -1135,6 +1205,11 @@ namespace OpenRCT2::Ui::Handheld
         {
             DrawGameplayFooter(rt, { ContextGetWidth(), height }, "", false, false);
             DrawMapFocus(rt, c);
+            return;
+        }
+        if (Mazes::Active())
+        {
+            Mazes::DrawPanel(rt, { ContextGetWidth(), height });
             return;
         }
         if (CustomTracks::Active())

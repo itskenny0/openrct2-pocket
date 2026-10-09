@@ -5,6 +5,7 @@
 #include "CustomTracks.h"
 #include "Finances.h"
 #include "FlatRides.h"
+#include "Mazes.h"
 #include "RideAccess.h"
 #include "TextEntry.h"
 #include "TrackEditing.h"
@@ -1018,6 +1019,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.rows.push_back("Access / paths...");
             if (CustomTracks::CanResume(*target))
                 model.rows.push_back("Continue track...");
+            if (Mazes::CanResume(*target))
+                model.rows.push_back("Edit maze...");
             if (TrackEditing::Eligible(*target))
                 model.rows.push_back("Edit track blocks...");
             model.rows.push_back("Rename...");

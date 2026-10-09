@@ -82,6 +82,23 @@ namespace OpenRCT2::GameActions
 
     Result MazeSetTrackAction::Query(GameState_t& gameState, Park::ParkData& park) const
     {
+        const auto* checkedRide = GetRide(_rideIndex);
+        if (!checkedRide || checkedRide->type != RIDE_TYPE_MAZE)
+            return Result(Status::invalidParameters, STR_RIDE_CONSTRUCTION_CANT_CONSTRUCT_THIS_HERE, STR_ERR_RIDE_NOT_FOUND);
+        if (checkedRide->status != RideStatus::closed)
+            return Result(Status::notClosed, STR_RIDE_CONSTRUCTION_CANT_CONSTRUCT_THIS_HERE, STR_MUST_BE_CLOSED_FIRST);
+        if (checkedRide->flags.has(RideFlag::indestructibleTrack) || _loc.direction > 3 || (_loc.x & 15) || (_loc.y & 15)
+            || _mode > MazeBuildMode::fill || (_initialPlacement && _mode != MazeBuildMode::build))
+            return Result(Status::invalidParameters, STR_RIDE_CONSTRUCTION_CANT_CONSTRUCT_THIS_HERE, STR_ERR_INVALID_PARAMETER);
+        if (_mode == MazeBuildMode::fill && !_initialPlacement)
+        {
+            const auto previous = CoordsXYZ{ _loc.x - CoordsDirectionDelta[_loc.direction].x / 2,
+                                             _loc.y - CoordsDirectionDelta[_loc.direction].y / 2, _loc.z };
+            if (!LocationValid(previous) || !MapGetTrackElementAtOfTypeFromRide(previous, TrackElemType::maze, _rideIndex))
+                return Result(
+                    Status::invalidParameters, STR_RIDE_CONSTRUCTION_CANT_CONSTRUCT_THIS_HERE,
+                    STR_INVALID_SELECTION_OF_OBJECTS);
+        }
         auto res = Result();
 
         res.position = _loc + CoordsXYZ{ 8, 8, 0 };

@@ -39,6 +39,8 @@ namespace OpenRCT2::Ui::Handheld
     void BeginRightsTools();
     bool IsSceneryToolActive();
     std::optional<SceneryTools::Target> SceneryEditTarget();
+    bool BeginMaze(ObjectEntryIndex index);
+    bool ResumeMaze(RideId id);
     bool BeginCustomTrack(ObjectEntryIndex index, ride_type_t type = kRideTypeNull);
     bool ResumeCustomTrack(RideId id);
     bool BeginFlatRide(ObjectEntryIndex index);

@@ -63,6 +63,8 @@ namespace OpenRCT2::FlatRidePlacement
     // Shared regular-station recovery/access support; construction eligibility stays flat-only.
     inline bool SupportsStation(const Ride& ride)
     {
+        if (ride.type == RIDE_TYPE_MAZE)
+            return ride.mazeTiles > 0;
         if (Type(ride.subtype) == ride.type)
             return true;
         if (!TrackConstructionSupport::Type(ride.type))
@@ -87,6 +89,8 @@ namespace OpenRCT2::FlatRidePlacement
                 if (track->isGhost() || track->getRideIndex() != ride.id || track->getBaseZ() != station.getBaseZ()
                     || track->getStationIndex() != index)
                     continue;
+                if (ride.type == RIDE_TYPE_MAZE && track->getTrackType() == TrackElemType::maze)
+                    return CoordsXYZD{ tile, station.getBaseZ(), d };
                 const auto& ted = TrackMetadata::GetTrackElementDescriptor(track->getTrackType());
                 const auto sequence = track->getSequenceIndex();
                 if (sequence >= ted.sequenceData.numSequences)

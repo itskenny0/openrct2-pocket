@@ -10,6 +10,7 @@
 #include "GuestManagement.h"
 #include "ListFocus.h"
 #include "MarketingManagement.h"
+#include "Mazes.h"
 #include "Panel.h"
 #include "ParkOverview.h"
 #include "Paths.h"
@@ -781,6 +782,8 @@ namespace OpenRCT2::Ui::Windows
                         result.push_back("Access / paths...");
                     if (_ridesTarget && Handheld::CustomTracks::CanResume(*_ridesTarget))
                         result.push_back("Continue track...");
+                    if (_ridesTarget && Handheld::Mazes::CanResume(*_ridesTarget))
+                        result.push_back("Edit maze...");
                     if (_ridesTarget && Handheld::TrackEditing::Eligible(*_ridesTarget))
                         result.push_back("Edit track blocks...");
                     return result;
@@ -972,6 +975,8 @@ namespace OpenRCT2::Ui::Windows
         void refreshPicker(std::optional<Handheld::PickerIdentity> preferred = {})
         {
             auto rideEntries = Handheld::FlatRides::Entries();
+            auto mazes = Handheld::Mazes::Entries();
+            rideEntries.insert(rideEntries.end(), mazes.begin(), mazes.end());
             auto custom = Handheld::CustomTracks::RideEntries();
             rideEntries.insert(rideEntries.end(), custom.begin(), custom.end());
             _picker.setEntries(
@@ -1812,6 +1817,18 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::ridePicker:
+                    if (_picker.selected() && _picker.selected()->identity.key.starts_with("maze:"))
+                    {
+                        if (Handheld::BeginMaze(_picker.selected()->identity.index))
+                            close();
+                        else
+                        {
+                            refreshPicker();
+                            _status = "Maze unavailable";
+                            invalidate();
+                        }
+                        break;
+                    }
                     if (_picker.selected()
                         && (_picker.selected()->identity.key.starts_with("custom:")
                             || _picker.selected()->identity.key.starts_with("custom-type:")))
@@ -2690,6 +2707,13 @@ namespace OpenRCT2::Ui::Windows
                         }
                         break;
                     }
+                    if (choice < rows.size() && rows[choice] == "Edit maze...")
+                    {
+                        const auto t = *_ridesTarget;
+                        close();
+                        Handheld::ResumeMaze(t.id);
+                        break;
+                    }
                     if (choice == 0)
                     {
                         const auto target = *_ridesTarget;
@@ -3353,7 +3377,13 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::ride:
-                    if (_ridesTarget && choice < rows().size() && rows()[choice] == "Edit track blocks...")
+                    if (_ridesTarget && choice < rows().size() && rows()[choice] == "Edit maze...")
+                    {
+                        const auto t = *_ridesTarget;
+                        close();
+                        Handheld::ResumeMaze(t.id);
+                    }
+                    else if (_ridesTarget && choice < rows().size() && rows()[choice] == "Edit track blocks...")
                     {
                         if (_pausedHere && (gGamePaused & GAME_PAUSED_NORMAL))
                         {
