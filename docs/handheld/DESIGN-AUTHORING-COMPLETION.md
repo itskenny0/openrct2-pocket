@@ -47,9 +47,9 @@ exactly e84ead2956618c94d5526db887ae5254613bfe99. Esperanto remains untouched an
 Phase publications use canonical native parents, exact source-tree equality and
 expected_sha/force=false guarded fast-forward updates. Phase SHA table follows.
 
-## Current limitations / next phases
+## Phase 1 limitations (superseded in part by phases below)
 
-Export currently has no scenery selection. Manual individual/area scenery selection,
+At the phase 1 checkpoint export had no scenery selection. Manual individual/area scenery selection,
 substitution choices, covered/inverted/alternative variants, seat rotation and other
 special parameters, backward construction and selected-block replacement remain
 ordinary gaps. Native maze/conventional placement, manual elevation, disconnected
@@ -175,3 +175,49 @@ ordinary gaps. This phase completes a usable two-step workflow, not full desktop
 Phase 3: canonical 4e59a4901d53026382b1d81aee0ac83100ada1e4;
 local 445efae0780e69bab332b67f9dd84cf35d19e316;
 matching tree 12007b7d84164142edd5deddea2bfa2eb9491b9f.
+
+
+## Final implementation publication and validation
+
+Phase 4: canonical 9777437e90ef2175e23e862584d236a7e32abbe0;
+local e2e1fd69e8f2a7bfea3b046b19866d912dcfed96;
+matching tree 2424175695a4c223cc9fd290c4bc8fbcf372f2ff.
+All four implementation phases were published independently before subsequent work.
+The final documentation-only publication is identified in the delivered manifest and
+final report; it does not change the validated implementation.
+
+Final Release GUI/CLI build PASS. Nine native/SDL suites PASS: RideConstructionTests,
+MazeConstructionTests, MiniGolfConstructionTests, ConstructionTests, PathActionsTests,
+StaffCompletionTests, GuestCompletionTests, PresentationLifecycleTests and
+SeatRotationTests. Input/launcher/save-preservation CTest checks PASS 3/3.
+Asset-backed DesignCapture, RideConstructionCapture, MazeConstructionCapture and
+CustomCoasterCapture PASS using privately supplied Mines of Africa assets. The ride
+capture validates Stand-up Roller Coaster / Ostrich Trains controller construction.
+The Wooden regression observes natural queue use, not sustained riding/throughput.
+No live research, cash, ownership or ratings were patched to obtain these results.
+
+## Delivered capture set
+
+OpenRCT2-Pocket-Design-Authoring-Captures.zip contains twelve genuine 512×384 PNGs
+and a checksum/dimension/provenance manifest. Screens 01–07 show naming, native
+export/overwrite review, completion, nearby selection, individual exclusion and dense
+scenery paging in the actual African Diamond Mine scenario. Screens 08–12 show seat
+preview/picker, removal/rebuild confirmation, the gap preview and native invalid
+placement in an initialized Multi-dimension native fixture with private original
+sprites. These are production native viewport plus Pocket component captures,
+not full SDL gameplay frames. Every delivered image was inspected for clipping,
+overlap, focus, controls and HUD collisions. No material presentation defect remains.
+No private archives, parks or generated test designs are packaged.
+
+## Remaining ordinary gameplay gaps
+
+Construction remains PARTIAL toward the explicit 100% ordinary gameplay goal.
+Arbitrary outside-nearby/spatial scenery selection, placement substitution choices,
+covered/inverted/alternative variants, selected-seat changes and other special
+parameters remain. Backward construction, atomic replacement, station/inverted or
+no-predecessor replacement, spatial block selection and broader per-family operation
+are still missing. Native export format limitations remain explicit; unsupported
+banners/furniture are not serialized through an invented format. AArch64, physical
+Brick, sustained special-family guest operation and broad routing remain unverified.
+The highest-value next milestone is native backward editing, ride variants and
+representative family operation, preserving all delivered authoring workflows.

@@ -230,3 +230,10 @@ Cancel-first removal/rebuild. Native refund is explicit; the original supported 
 resumes at the gap and A builds only by player intent. Multi-sequence predecessor
 and stale/quote guards pass native tests. Backward, atomic/station/inverted replacement,
 covered/alternative variants and broader operation remain PARTIAL on the 100% roadmap.
+
+Final authoring validation: Release GUI/CLI, nine native/SDL suites, CTest 3/3 and
+four private-asset capture/regression workflows PASS. Twelve genuine 512×384
+viewport/component captures accompany DESIGN-AUTHORING-COMPLETION.md. Stand-up
+construction and original Wooden natural queue use are evidenced; sustained special
+ride throughput, AArch64 and physical Brick remain unverified. Overall construction
+and design authoring remain PARTIAL with precise ordinary gaps retained.

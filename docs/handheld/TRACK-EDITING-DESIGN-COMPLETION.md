@@ -227,3 +227,10 @@ Follow-up: DESIGN-AUTHORING-COMPLETION.md delivers player-facing native tested/r
 export with safe naming, overwrite review, source/file guards and repository refresh.
 Earlier export-gap statements describe that checkpoint and are superseded only for
 this delivered scope; scenery authoring and other editing/variant gaps remain.
+
+Native authoring follow-up through canonical 9777437e90ef2175e23e862584d236a7e32abbe0
+adds tested/rated native export, nearby scenery inclusion/exclusion, bounded native
+seat placement and guarded two-step selected-block removal/rebuild. Earlier export,
+seat and replacement gaps are superseded only to this scoped extent. Backward,
+variants, arbitrary scenery/substitutions and full desktop parity remain PARTIAL.
+See DESIGN-AUTHORING-COMPLETION.md for final tests, controls and capture provenance.
