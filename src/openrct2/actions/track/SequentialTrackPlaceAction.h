@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
+#include "../../ride/TrackConstructionSupport.h"
 #include "TrackPlaceAction.h"
 namespace OpenRCT2::GameActions
 {
@@ -16,6 +17,8 @@ namespace OpenRCT2::GameActions
         bool _first{}, _chain{}, _noMoney{}, _remove{};
         bool _selected{}, _speedChange{}, _sourceInverted{};
         uint8_t _baselineSpeed{}, _baselineSeat{}, _newSpeed{}, _placementSpeed{ 6 }, _placementSeat{};
+        bool _guardPrevious{};
+        TrackConstructionSupport::BlockSnapshot _previous{};
         money64 _cost{ kMoney64Undefined };
 
     public:
@@ -49,6 +52,11 @@ namespace OpenRCT2::GameActions
         void SetPlacementSeat(uint8_t seat)
         {
             _placementSeat = seat;
+        }
+        void GuardPrevious(const TrackConstructionSupport::BlockSnapshot& previous)
+        {
+            _guardPrevious = true;
+            _previous = previous;
         }
         void AcceptParameters(GameActionParameterVisitor&) final;
         void Serialise(DataSerialiser&) final;

@@ -134,3 +134,44 @@ Seat placement does not establish Multi-dimension circuit/operation/guest routin
 Phase 2: canonical 086bd7e248307a332a4354e870256028d1849d72;
 local f54788d9384eb5cd4d0bfc9ab71507429c03fce7;
 matching tree a82e58b15dec0abfa98427f1d03d54a58c56c121.
+
+## Phase 4 — guarded selected-block removal/rebuild (partial editing parity)
+
+Closed compatible conventional rides expose Replace block when a real connected
+predecessor exists. Native trackBlockGetPrevious, TrackIsConnectedByShape and TED
+sequence clearance normalize the predecessor across multi-tile pieces; snapshots
+retain coordinates/type/speed/seat/chain/inverted data, never live map pointers.
+Station blocks, inverted blocks/predecessors and missing/self predecessors are not
+offered through this adapter. Maze half-cell geometry remains separate.
+
+Review is Cancel-first, shows the native refund and explicitly states removal leaves
+a gap. Confirmation revalidates selected ride/block, predecessor, native quote and
+closure/object/date/view baselines. SequentialTrackPlaceAction carries the predecessor
+snapshot through parameter visitation/serialization and checks it again on native
+query/execute, preventing a queued stale predecessor from passing a UI-only guard.
+Native TrackRemoveAction owns removal, accounting, station/circuit/guest effects.
+
+Only successful removal resumes the existing editor from the predecessor's native
+forward gap, restoring the supported original piece, speed, seat and chain draft.
+The player explicitly presses A to build, or chooses another native-compatible piece.
+No replacement is automatically created. Cancelling before confirmation preserves
+track/cash; leaving after confirmed removal preserves the native gap/refund, recoverable
+through the existing block roster after menus/load. Normal endpoint undo and explicit
+selected removal remain; replacement is not an atomic transaction or dedicated undo.
+
+Release GUI/CLI PASS. RideConstructionTests PASS: five-family multi-tile predecessor
+normalization, native straight→brake→straight replacements, exact costs/refunds,
+stale predecessor/quote/native-action guards, repeat prevention, disconnected recovery
+and native save/reload alongside all prior coverage. SeatRotationTests SDL/native
+PASS: Cancel-first replacement, unchanged cancel, explicit removal with no auto-build,
+restored seat draft, explicit rebuild and persistence, genuine native invalid bounds.
+Three new production fixture captures inspect cleanly (review, gap ghost, invalid
+ownership/bounds feedback); prior seat captures regenerated with actual endpoint framing.
+
+Backward construction, atomic replacement, station/inverted replacement, spatial block
+selection, covered/alternative/inverted variants and broad per-family operation remain
+ordinary gaps. This phase completes a usable two-step workflow, not full desktop parity.
+
+Phase 3: canonical 4e59a4901d53026382b1d81aee0ac83100ada1e4;
+local 445efae0780e69bab332b67f9dd84cf35d19e316;
+matching tree 12007b7d84164142edd5deddea2bfa2eb9491b9f.

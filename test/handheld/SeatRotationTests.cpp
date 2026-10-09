@@ -7,6 +7,7 @@
 #include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/handheld/CustomTracks.h>
 #include <openrct2-ui/handheld/Explorer.h>
+#include <openrct2-ui/handheld/RideAccess.h>
 #include <openrct2-ui/handheld/TrackEditing.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
@@ -100,7 +101,8 @@ int main(int argc, char** argv)
             viewport.width = 512;
             viewport.height = 384;
             viewport.zoom = ZoomLevel{ 1 };
-            const auto centre = Translate3DTo2DWithZ(0, CoordsXYZ{ 656, 656, 32 });
+            const auto focus = C::Endpoint() ? CoordsXYZ(*C::Endpoint()) + CoordsXYZ{ 16, 16, 0 } : CoordsXYZ{ 656, 656, 32 };
+            const auto centre = Translate3DTo2DWithZ(0, focus);
             viewport.viewPos = centre - ScreenCoordsXY{ viewport.zoom.ApplyTo(310), viewport.zoom.ApplyTo(190) };
             ResetAllSpriteQuadrantPlacements();
             Drawing::UpdatePaletteEffects();
@@ -187,6 +189,57 @@ int main(int argc, char** argv)
         Check(
             GameActions::Query(&staleRemoval, state).error == GameActions::Status::ok, "Valid selected seat baseline rejected");
         H::EndTerrain();
+        auto openReplacement = [&] {
+            W::HandheldRideOpen(ride.id);
+            W::HandheldMenuMove(3 + (H::RideAccess::Supported(ride) ? 1 : 0) + (C::CanResume(ride) ? 1 : 0));
+            H::HandleMenuInput(controller, confirm);
+            const auto currentBlocks = H::TrackEditing::Blocks(ride);
+            const auto selected = std::find_if(
+                currentBlocks.begin(), currentBlocks.end(), [&](const auto& b) { return b.origin == seatBlock.origin; });
+            Check(selected != currentBlocks.end(), "Replacement selected block missing");
+            W::HandheldMenuMove(std::distance(currentBlocks.begin(), selected));
+            H::HandleMenuInput(controller, confirm);
+            const auto rows = W::HandheldRidesPresentation().rows;
+            const auto replacement = std::find(rows.begin(), rows.end(), "Replace block...");
+            Check(replacement != rows.end(), "Replacement control unavailable");
+            W::HandheldMenuMove(std::distance(rows.begin(), replacement));
+            H::HandleMenuInput(controller, confirm);
+            Check(
+                W::HandheldRidesPresentation().confirmation && W::HandheldRidesPresentation().selected == 0,
+                "Replacement removal not Cancel-first");
+        };
+        const auto replacementCash = state.park.cash;
+        openReplacement();
+        capture("authoring-10-replacement-confirmation.png", true);
+        H::HandleMenuInput(controller, confirm);
+        Check(H::TrackEditing::Valid(seatBlock) && state.park.cash == replacementCash, "Cancelled replacement removed block");
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        openReplacement();
+        W::HandheldMenuMove(1);
+        H::HandleMenuInput(controller, confirm);
+        GameActions::ProcessQueue(state);
+        Check(
+            !H::TrackEditing::Valid(seatBlock) && C::Active() && C::PlacementSeat() == 10
+                && H::TrackEditing::Blocks(ride).size() == seatBlocks.size() - 1,
+            "Replacement removal/recovery/autobuild failed");
+        C::Update({});
+        capture("authoring-11-replacement-gap-preview.png", false);
+        quote = C::Action(false);
+        Check(
+            quote.error == GameActions::Status::ok && C::Action(true).error == GameActions::Status::ok,
+            "Explicit replacement build failed");
+        GameActions::ProcessQueue(state);
+        Check(H::TrackEditing::Valid(seatBlock), "Replacement did not preserve native seat/geometry");
+        H::EndTerrain();
+        Check(H::BeginCustomTrack(GetRide(ride.id)->subtype, ride.type), "Invalid placement fixture begin failed");
+        GameActions::ProcessQueue(getGameState());
+        C::Update(CoordsXY{ 0, 0 });
+        Check(
+            C::Action(false).error != GameActions::Status::ok && C::Action(true).error != GameActions::Status::ok,
+            "Native invalid bounds accepted");
+        capture("authoring-12-native-invalid-placement.png", false);
+        H::EndTerrain();
+        GameActions::ProcessQueue(getGameState());
         const auto file = std::string(argv[2]) + "/seat-rotation.park";
         SaveFlags flags{};
         Check(ScenarioSave(state, file, flags) && context->LoadParkFromFile(file), "Seat save/reload failed");

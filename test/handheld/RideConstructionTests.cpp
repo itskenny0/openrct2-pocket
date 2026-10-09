@@ -121,6 +121,24 @@ int main(int argc, char** argv)
             Check(turn.error == GameActions::Status::ok, "Native turn query failed");
             Check(C::Action(true).error == GameActions::Status::ok, "Turn failed");
             GameActions::ProcessQueue(state);
+            const auto nativeTurnType = C::Selection();
+            Check(C::Select(TrackElemType::flat), "Post-turn native straight unavailable");
+            const auto postTurnOrigin = *C::Endpoint();
+            Check(
+                C::Action(false).error == GameActions::Status::ok && C::Action(true).error == GameActions::Status::ok,
+                "Post-turn native straight failed");
+            GameActions::ProcessQueue(state);
+            const auto componentBlocks = Ui::Handheld::TrackEditing::Blocks(*C::Target());
+            const auto postTurn = std::find_if(
+                componentBlocks.begin(), componentBlocks.end(), [&](const auto& b) { return b.origin == postTurnOrigin; });
+            Check(postTurn != componentBlocks.end(), "Post-turn block missing");
+            const auto predecessor = Ui::Handheld::TrackEditing::Previous(*postTurn);
+            Check(
+                predecessor && predecessor->type == nativeTurnType && Ui::Handheld::TrackEditing::Valid(*predecessor)
+                    && Ui::Handheld::TrackEditing::Replace(*postTurn, *predecessor).error == GameActions::Status::ok,
+                "Multi-sequence predecessor/refund normalization failed");
+            Check(C::Undo(true).error == GameActions::Status::ok, "Post-turn native undo failed");
+            GameActions::ProcessQueue(state);
             const auto refund = C::Undo(false);
             const auto before = state.park.cash;
             Check(
@@ -218,6 +236,60 @@ int main(int argc, char** argv)
         blocks = E::Blocks(*original);
         brake = findBrake();
         Check(brake.speed == 8, "Native brake value not changed");
+        // Two-step native replacement: removal is explicit, followed by an explicit native build.
+        auto replacementBlock = *std::find_if(
+            blocks.begin(), blocks.end(), [](const auto& b) { return b.type == TrackElemType::flat; });
+        for (const auto replacementType : { TrackElemType::brakes, TrackElemType::flat })
+        {
+            C::End();
+            Check(E::CanReplace(replacementBlock), "Native replacement predecessor unavailable");
+            const auto previous = *E::Previous(replacementBlock);
+            Check(E::Valid(previous), "Native predecessor origin normalization failed");
+            const auto replacementCash = state.park.cash;
+            const auto refund = E::Replace(replacementBlock, previous);
+            auto stalePrevious = previous;
+            ++stalePrevious.seat;
+            GameActions::SequentialTrackPlaceAction stalePredecessorAction(
+                replacementBlock.ride.id, replacementBlock.type, replacementBlock.origin, replacementBlock.chain, false,
+                replacementBlock.origin, replacementBlock.type);
+            stalePredecessorAction.UseSelectedRemoval(replacementBlock.speed, replacementBlock.inverted, replacementBlock.seat);
+            stalePredecessorAction.GuardPrevious(
+                { previous.origin, previous.type, previous.speed, stalePrevious.seat, previous.chain, previous.inverted });
+            Check(
+                GameActions::Query(&stalePredecessorAction, state).error != GameActions::Status::ok,
+                "Native action accepted changed predecessor");
+            Check(
+                refund.error == GameActions::Status::ok
+                    && E::Replace(replacementBlock, stalePrevious).error != GameActions::Status::ok
+                    && E::Replace(replacementBlock, previous, refund.cost + 1, true).error != GameActions::Status::ok,
+                "Replacement stale predecessor/quote accepted");
+            Check(
+                E::Replace(replacementBlock, previous, refund.cost, true).error == GameActions::Status::ok,
+                "Native replacement removal failed");
+            GameActions::ProcessQueue(state);
+            Check(
+                !E::Valid(replacementBlock) && E::Valid(previous) && state.park.cash == replacementCash - refund.cost
+                    && E::Replace(replacementBlock, previous, refund.cost, true).error != GameActions::Status::ok,
+                "Replacement refund/repeat guard failed");
+            Check(
+                C::ResumeFrom(previous.ride, std::pair{ previous.origin, previous.type }) && C::Select(replacementType),
+                "Replacement gap recovery failed");
+            const auto replacementQuote = C::Action(false);
+            Check(
+                replacementQuote.error == GameActions::Status::ok && C::Action(true).error == GameActions::Status::ok,
+                "Explicit native replacement placement failed");
+            GameActions::ProcessQueue(state);
+            Check(
+                state.park.cash == replacementCash - refund.cost - replacementQuote.cost,
+                "Replacement native accounting failed");
+            const auto updated = E::Blocks(*original);
+            const auto matching = std::find_if(
+                updated.begin(), updated.end(), [&](const auto& b) { return b.origin == replacementBlock.origin; });
+            Check(matching != updated.end() && matching->type == replacementType, "Replacement native geometry missing");
+            replacementBlock = *matching;
+        }
+        C::End();
+        blocks = E::Blocks(*original);
         // Remove a middle block with a following brake; endpoint-only undo must reject it.
         const auto middle = *std::find_if(
             blocks.begin(), blocks.end(), [](const auto& b) { return b.type == TrackElemType::flat; });

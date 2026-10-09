@@ -2,9 +2,14 @@
 #pragma once
 #include "../GameState.h"
 #include "../management/Research.h"
+#include "../world/tile_element/TileElement.h"
+#include "../world/tile_element/TrackElement.h"
 #include "RideData.h"
 #include "RideEntry.h"
+#include "Track.h"
 #include "TrackData.h"
+#include "TrackIteration.h"
+#include "ted/TrackElementDescriptor.h"
 
 #include <algorithm>
 namespace OpenRCT2::TrackConstructionSupport
@@ -46,5 +51,35 @@ namespace OpenRCT2::TrackConstructionSupport
                 if (Available(index, type))
                     return type;
         return kRideTypeNull;
+    }
+    struct BlockSnapshot
+    {
+        CoordsXYZD origin{};
+        TrackElemType type{};
+        uint8_t speed{}, seat{};
+        bool chain{}, inverted{};
+        bool operator==(const BlockSnapshot&) const = default;
+    };
+    inline std::optional<BlockSnapshot> Previous(const CoordsXYE& input)
+    {
+        TrackBeginEnd previous{};
+        if (!trackBlockGetPrevious(input, &previous) || !previous.begin_element
+            || !TrackIsConnectedByShape(previous.begin_element, input.element))
+            return {};
+        const auto* element = previous.begin_element->asTrack();
+        if (!element || element->isGhost() || !Piece(element->getTrackType()))
+            return {};
+        const auto& ted = TrackMetadata::GetTrackElementDescriptor(element->getTrackType());
+        if (element->getSequenceIndex() >= ted.sequenceData.numSequences)
+            return {};
+        const auto& clearance = ted.sequenceData.sequences[element->getSequenceIndex()].clearance;
+        const auto xy = CoordsXY{ previous.end_x, previous.end_y }
+            - CoordsXY{ clearance.x, clearance.y }.rotate(element->getDirection());
+        return BlockSnapshot{ { xy, element->getBaseZ() - clearance.z, element->getDirection() },
+                              element->getTrackType(),
+                              element->getBrakeBoosterSpeed(),
+                              element->getSeatRotation(),
+                              element->hasChain(),
+                              element->isInverted() };
     }
 } // namespace OpenRCT2::TrackConstructionSupport

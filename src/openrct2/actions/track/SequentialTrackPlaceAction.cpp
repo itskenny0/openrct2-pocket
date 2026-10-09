@@ -67,6 +67,16 @@ namespace OpenRCT2::GameActions
         visitor.Visit("sourceInverted", _sourceInverted);
         visitor.Visit("placementSpeed", _placementSpeed);
         visitor.Visit("placementSeat", _placementSeat);
+        visitor.Visit("guardPrevious", _guardPrevious);
+        visitor.Visit("previousX", _previous.origin.x);
+        visitor.Visit("previousY", _previous.origin.y);
+        visitor.Visit("previousZ", _previous.origin.z);
+        visitor.Visit("previousDirection", _previous.origin.direction);
+        visitor.Visit("previousType", _previous.type);
+        visitor.Visit("previousSpeed", _previous.speed);
+        visitor.Visit("previousSeat", _previous.seat);
+        visitor.Visit("previousChain", _previous.chain);
+        visitor.Visit("previousInverted", _previous.inverted);
     }
     void SequentialTrackPlaceAction::Serialise(DataSerialiser& stream)
     {
@@ -75,7 +85,9 @@ namespace OpenRCT2::GameActions
                << DS_TAG(_sourceType) << DS_TAG(_first) << DS_TAG(_chain) << DS_TAG(_cost) << DS_TAG(_noMoney)
                << DS_TAG(_remove) << DS_TAG(_selected) << DS_TAG(_speedChange) << DS_TAG(_baselineSpeed) << DS_TAG(_newSpeed)
                << DS_TAG(_baselineSeat) << DS_TAG(_sourceInverted) << DS_TAG(_placementSeat) << DS_TAG(_placementSpeed)
-               << DS_TAG(_expectedType) << DS_TAG(_expectedView);
+               << DS_TAG(_expectedType) << DS_TAG(_expectedView) << DS_TAG(_guardPrevious) << DS_TAG(_previous.origin)
+               << DS_TAG(_previous.type) << DS_TAG(_previous.speed) << DS_TAG(_previous.seat) << DS_TAG(_previous.chain)
+               << DS_TAG(_previous.inverted);
     }
     Result SequentialTrackPlaceAction::Query(GameState_t& state, Park::ParkData&) const
     {
@@ -93,6 +105,8 @@ namespace OpenRCT2::GameActions
             || (!state.cheats.ignoreResearchStatus && (!RideTypeIsInvented(ride->type) || !RideEntryIsInvented(_object))))
             return invalid();
         if (ride->type != _expectedType || ride->overallView != _expectedView)
+            return invalid();
+        if (_guardPrevious && (!_selected || !_remove || _first))
             return invalid();
         if (_selected && !_remove && !_speedChange)
             return invalid();
@@ -138,6 +152,13 @@ namespace OpenRCT2::GameActions
                 && (_origin != _source || found->hasChain() != _chain || found->isInverted() != _sourceInverted
                     || found->getBrakeBoosterSpeed() != _baselineSpeed || found->getSeatRotation() != _baselineSeat))
                 return invalid();
+            if (_guardPrevious)
+            {
+                const auto previous = TrackConstructionSupport::Previous(
+                    { xy, const_cast<TileElement*>(reinterpret_cast<const TileElement*>(found)) });
+                if (!previous || *previous != _previous)
+                    return invalid();
+            }
             if (_speedChange)
             {
                 if (!_selected || _remove || !trackTypeHasSpeedSetting(_sourceType) || _newSpeed > kMaximumTrackSpeed

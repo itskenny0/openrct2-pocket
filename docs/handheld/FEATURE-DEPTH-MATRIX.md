@@ -224,3 +224,9 @@ Select-picker controls and matching query/ghost/execute; native shared-bit speed
 restrictions are retained. Native save persistence and selected seat baseline guards
 pass. Covered/inverted variants, selected seat editing and other parameters remain
 PARTIAL. See DESIGN-AUTHORING-COMPLETION.md for exact native dependencies/validation.
+
+Selected conventional blocks with native connected predecessors now offer guarded
+Cancel-first removal/rebuild. Native refund is explicit; the original supported draft
+resumes at the gap and A builds only by player intent. Multi-sequence predecessor
+and stale/quote guards pass native tests. Backward, atomic/station/inverted replacement,
+covered/alternative variants and broader operation remain PARTIAL on the 100% roadmap.

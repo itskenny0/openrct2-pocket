@@ -78,6 +78,50 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
                 return true;
         return false;
     }
+    inline std::optional<Block> Previous(const Block& block)
+    {
+        if (!Valid(block))
+            return {};
+        const auto& c = TrackMetadata::GetTrackElementDescriptor(block.type).sequenceData.sequences[0].clearance;
+        const auto xy = CoordsXY(block.origin) + CoordsXY{ c.x, c.y }.rotate(block.origin.direction);
+        for (auto* e : TileElementsView<TrackElement>(xy))
+            if (!e->isGhost() && e->getRideIndex() == block.ride.id && e->getTrackType() == block.type
+                && e->getSequenceIndex() == 0 && e->getDirection() == block.origin.direction
+                && e->getBaseZ() == block.origin.z + c.z)
+            {
+                const auto previous = TrackConstructionSupport::Previous({ xy, reinterpret_cast<TileElement*>(e) });
+                if (previous)
+                    return Block{ block.ride,     previous->origin, previous->type,    previous->speed,
+                                  previous->seat, previous->chain,  previous->inverted };
+            }
+        return {};
+    }
+    inline bool CanReplace(const Block& block)
+    {
+        const auto previous = Previous(block);
+        return previous && Valid(*previous) && block.origin != previous->origin && !block.inverted && !previous->inverted
+            && block.type != TrackElemType::beginStation && block.type != TrackElemType::middleStation
+            && block.type != TrackElemType::endStation;
+    }
+    inline GameActions::Result Replace(
+        const Block& block, const Block& previous, money64 cost = kMoney64Undefined, bool execute = false,
+        GameActions::GameAction::Callback_t callback = {})
+    {
+        if (!CanReplace(block) || !Valid(previous) || Previous(block) != previous)
+        {
+            GameActions::Result error;
+            error.error = GameActions::Status::disallowed;
+            error.errorMessage = "Block or predecessor changed; select again";
+            return error;
+        }
+        GameActions::SequentialTrackPlaceAction action(
+            block.ride.id, block.type, block.origin, block.chain, false, block.origin, block.type, cost);
+        action.UseSelectedRemoval(block.speed, block.inverted, block.seat);
+        action.GuardPrevious(
+            { previous.origin, previous.type, previous.speed, previous.seat, previous.chain, previous.inverted });
+        action.SetCallback(std::move(callback));
+        return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+    }
     inline GameActions::Result Change(
         const Block& block, std::optional<uint8_t> speed, money64 cost = kMoney64Undefined, bool execute = false)
     {
