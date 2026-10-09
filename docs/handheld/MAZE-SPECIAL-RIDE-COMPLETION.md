@@ -124,3 +124,63 @@ and native persistence. SDL dummy hardware-renderer warnings are expected; PNGs
 use the native X8 renderer and production panels. No sustained maze/Mini Golf guest
 operation, other family operation, AArch64 execution or physical Brick behavior is
 claimed. Original assets, archives, parks and generated TD6 test designs stay private.
+
+## Published phase checkpoints
+
+| Phase | Canonical GitHub commit | Local safety commit | Exact source tree |
+| --- | --- | --- | --- |
+| Maze construction/access | bbf017d6834c5f332e398b171b4651165456c5e2 | c6c6934a04fc3734ef3a77c741030f5b490a6e1f | 5aee5e2e7dcf11881bdaa6efd956e502a9b2f1bf |
+| Maze saved designs/review | e3770c0482dff4dc0e580068623ec10e677c02a2 | c79f7c4cc464864ff6aeb44d015790aacb1fd15e | b43f9fb88b881ae73fbbc508a12d915244f0796e |
+| Cell selection / special-family audit | bf05719e3457fca5831a4aad2f5df48b7bc839a8 | 6ea751b0a49d0d902ed01224991430dcbed5c6ca | 5548d13e823ab76b13fc174d36b69b8360816d6b |
+
+Each publication checked current canonical parent, exact local/canonical source-tree
+equality and guarded expected_sha / force=false fast-forward update. Local safety
+history remains intact. The final documentation publication is identified by its
+exact SHA in the delivered ZIP manifest and final report, avoiding self-reference.
+
+## Capture deliverable
+
+OpenRCT2-Pocket-Maze-Special-Ride-Captures.zip contains 14 genuine 512×384 PNGs,
+checksum/dimension/provenance manifest and a README. All are Factory Capers native
+asset-backed viewports with production Pocket components/menus. They are not full
+SDL game frames and do not verify HUD overlap in a complete gameplay presentation.
+The public native Mini Golf tests are geometry fixtures; no Mini Golf gameplay
+capture or sustained operation is claimed.
+
+| PNG | Actual feature |
+| --- | --- |
+| 01-maze-object-picker | Loaded/researched maze among native ride objects |
+| 02-maze-initial-placement | Native placement footprint, height and queried cost |
+| 03-maze-invalid-placement | Native ownership rejection |
+| 04-maze-segment-wall-editing | Native multi-cell directional build/walls and cost |
+| 05-maze-cancel-first-removal | Cancel is the initial selected removal choice |
+| 06-maze-removal-review | Explicit remove choice, native zero-cost fill semantics |
+| 07-maze-dense-camera-controls | Compact camera/quarter selection controls and feedback |
+| 08-existing-maze-recovery | Production resumed maze editor |
+| 09-maze-entrance | Native entrance placement stage |
+| 10-maze-exit | Native exit stage with action-built entrance visible |
+| 11-maze-design-ghost | Native ghost of exported/imported maze and access |
+| 12-maze-design-rotation | Rotated native ghost at a queried valid site |
+| 13-maze-design-cost-review | Production Cancel-first native design purchase review |
+| 14-existing-maze-cell-picker | Native existing tile/corner selection |
+
+All captures were inspected. Removed overlong panel text, clarified review controls,
+hid disabled commands, made review override camera mode, showed native corner index
+and preserved native error feedback. A rotated design was recaptured at a valid
+native site; invalid placement was not presented as a successful preview.
+
+## Remaining ordinary gameplay / next subsystem
+
+Construction stays PARTIAL. Maze individual segment/initial object ghosts and
+entrance/exit placement ghosts remain missing. Sustained maze and Mini Golf guest
+operation, other transport/water/special ride families, backward/disconnected
+conventional endpoints, replacement and covered/inverted variants, further native
+piece parameters, manual design elevation, player-facing export and substitution
+choices remain on the 100% roadmap. Scene assets cannot establish AArch64/Brick
+behavior or sustained routing/performance without further evidence.
+
+Recommended next milestone: complete native track editing and design authoring,
+with backward/selected geometry recovery, replacement/parameters, manual design
+elevation/export and asset-backed Mini Golf/transport/water operation validation.
+Do not redo the delivered maze, design, ride-management, staff, guest or construction
+work. The complete next prompt accompanies the capture deliverable and final report.

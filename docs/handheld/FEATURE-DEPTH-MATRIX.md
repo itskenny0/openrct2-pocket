@@ -171,3 +171,11 @@ Maze checkpoint: native researched object selection, half-cell build/move/fill, 
 Maze saved-design checkpoint: native import, exact loaded/researched object eligibility, four orientations, native height, ghosts/cleanup, scenery options, Cancel-first native cost review, execution and access/recovery are delivered. Export, manual elevation and substitutions remain partial.
 
 Maze recovery: native existing tile/quarter selection now reaches disconnected maze sections. Mini Golf all five holes/four orientations, multi-tile actions, costs/refunds, undo/recovery and persistence pass public native fixtures with the existing adapter. Full Mini Golf operation and transport/water family asset-backed validation remain PARTIAL.
+
+Maze/special final checkpoint: three independently validated publications culminate
+in implementation bf05719e3457fca5831a4aad2f5df48b7bc839a8; see
+[MAZE-SPECIAL-RIDE-COMPLETION.md](MAZE-SPECIAL-RIDE-COMPLETION.md) for canonical/local
+tree equality, 14 native asset-backed captures, all regression results and precise
+gaps. Overall ride construction and special-family parity remain PARTIAL toward
+100% ordinary gameplay, including ghosts, further editing/design authoring and
+individual family operation validation.
