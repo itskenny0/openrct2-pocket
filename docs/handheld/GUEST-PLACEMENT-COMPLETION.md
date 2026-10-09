@@ -31,3 +31,26 @@ first-thought groups, empty groups, held-A handoff, filtered roster focus and pa
 recovery, while existing guest read-only and all construction/ride regressions pass.
 The live scenario capture runner loads the uploaded assets and simulates native
 visitors successfully; final captures will extend this runner for new operations.
+
+## Phase 2 — naming, tracking and preferences
+
+Guest Name reuses the bounded eight-column UTF-8-aware keyboard and Cancel-first
+review. GuestSetNameAction retains native naming/Easter-egg behavior. Identity,
+name baseline, codepoint limit, repeated/default reset are validated. Tracking uses
+GuestSetFlagsAction, toggling only tracking from a revalidated full flag baseline;
+other native flags are preserved. Tracking has an explicit Cancel-first review and
+feeds the tracked roster. Draft/review pages cannot switch into Dashboard rail focus.
+
+Preferences adds native preferred intensity, nausea tolerance, favourite ride and
+time in park using the same values and localized formatters as desktop Guest.
+Existing needs, spending, thoughts/items and full-text inspection remain intact.
+Ride history list and persistent viewport following are still ordinary guest gaps.
+Phase 3 pickup/placement remains pending.
+
+Phase 1 published: `c2ac887c8af13496c523c35d5d74eb7fbf4a350a`.
+Phase 2 validation: Release GUI build, focused native GuestCompletionTests and
+full asset-backed native/SDL PathActionsTests pass. Native checks cover Unicode,
+invalid length, stale/default names, tracking queries/other flags, filtered counts,
+preferences, native accounting and save/reload. SDL checks exercise naming keyboard,
+held-A prevention, modal rail exclusion, Cancel-first review/draft recovery, native
+name/tracking apply and preserved roster focus.

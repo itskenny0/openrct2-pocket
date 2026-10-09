@@ -2831,6 +2831,43 @@ static void TestGuests(IContext& context, const std::string& profile, bool realU
         press(H::Action::confirm);
         W::HandheldDashboardMove(0, 19);
         press(H::Action::confirm);
+        const auto nameBaseline = guest->getName();
+        W::HandheldDashboardMove(0, 6);
+        press(H::Action::confirm);
+        Require(W::HandheldGuestsPresentation().columns == 8, "Guest keyboard missing");
+        press(H::Action::confirm);
+        Require(W::HandheldGuestsPresentation().title == nameBaseline + "A", "Held A typed twice");
+        press(H::Action::openBuild);
+        Require(!W::HandheldDashboardRailFocused(), "Guest keyboard leaked to rail");
+        W::HandheldMenuMove(46);
+        press(H::Action::confirm);
+        Require(
+            W::HandheldGuestsPresentation().confirmation && W::HandheldGuestsPresentation().selected == 1,
+            "Guest name review not Cancel-first");
+        press(H::Action::confirm);
+        Require(
+            guest->getName() == nameBaseline && W::HandheldGuestsPresentation().columns == 8,
+            "Guest name cancellation applied/discarded draft");
+        W::HandheldMenuMove(46);
+        press(H::Action::confirm);
+        W::HandheldMenuMove(-1);
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Require(guest->getName() == nameBaseline + "A", "Native guest name UI failed");
+        W::HandheldMenuMove(7);
+        press(H::Action::confirm);
+        Require(W::HandheldGuestsPresentation().selected == 1, "Guest tracking not Cancel-first");
+        press(H::Action::confirm);
+        Require(!guest->peepFlags.has(PeepFlag::tracking), "Tracking cancel applied flags");
+        W::HandheldMenuMove(7);
+        press(H::Action::confirm);
+        W::HandheldMenuMove(-1);
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Require(guest->peepFlags.has(PeepFlag::tracking) && G::Roster({ {}, true }).size() == 1, "Native tracking UI failed");
+        press(H::Action::back);
+        Require(W::HandheldGuestsPresentation().selected == 19, "Operations lost roster focus");
+        press(H::Action::confirm);
         guest->outsideOfPark = true;
         press(H::Action::confirm);
         Require(

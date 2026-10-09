@@ -104,6 +104,10 @@ namespace OpenRCT2::Ui::Windows
         guestInventory,
         guestText,
         guestGroups,
+        guestName,
+        guestNameConfirm,
+        guestTracking,
+        guestPreferences,
         ridesRoster,
         ridesInspect,
         ridesAccess,
@@ -209,6 +213,9 @@ namespace OpenRCT2::Ui::Windows
         Handheld::GuestManagement::Filter _guestFilter;
         Page _guestRosterParent = Page::guests;
         Page _guestTextParent = Page::guestThoughts;
+        std::string _guestNameBaseline;
+        PeepFlags _guestFlagsBaseline{};
+        bool _guestTrackingValue{};
         std::string _guestText;
         size_t _guestTextPage{};
         std::vector<Handheld::RideManagement::Target> _ridesRoster;
@@ -385,15 +392,27 @@ namespace OpenRCT2::Ui::Windows
         {
             return _page == Page::guests || _page == Page::guestRoster || _page == Page::guestInspect
                 || _page == Page::guestNeeds || _page == Page::guestThoughts || _page == Page::guestSpending
-                || _page == Page::guestInventory || _page == Page::guestText || _page == Page::guestGroups;
+                || _page == Page::guestInventory || _page == Page::guestText || _page == Page::guestGroups
+                || _page == Page::guestName || _page == Page::guestNameConfirm || _page == Page::guestTracking
+                || _page == Page::guestPreferences;
         }
         Handheld::ManagementPresentation guestPresentationFor(Page current, size_t selected) const
         {
             using Handheld::GuestManagement::View;
+            if (current == Page::guestName || current == Page::guestNameConfirm)
+            {
+                auto model = Handheld::StaffManagement::NamePresentation(
+                    _nameEntry, selected, current == Page::guestNameConfirm, _status);
+                model.breadcrumb = current == Page::guestName ? "Guests / Name keyboard" : "Guests / Review name";
+                return model;
+            }
+            if (current == Page::guestTracking && _guestTarget)
+                return Handheld::GuestManagement::TrackingPresentation(*_guestTarget, _guestTrackingValue, selected);
             if (current == Page::guestGroups)
                 return Handheld::GuestManagement::GroupPresentation(_guestGroupMode, _guestGroups, selected);
             const auto view = current == Page::guests ? View::overview
                 : current == Page::guestRoster        ? View::roster
+                : current == Page::guestPreferences   ? View::preferences
                 : current == Page::guestInspect       ? View::inspection
                 : current == Page::guestNeeds         ? View::needs
                 : current == Page::guestThoughts      ? View::thoughts
@@ -587,7 +606,7 @@ namespace OpenRCT2::Ui::Windows
             if (next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish
                 || next == Page::overviewConfirm || next == Page::ridesConfirm || next == Page::financeConfirm
                 || next == Page::marketingConfirm || next == Page::staffHire || next == Page::staffDismiss
-                || next == Page::staffNameConfirm)
+                || next == Page::staffNameConfirm || next == Page::guestNameConfirm || next == Page::guestTracking)
                 _focus.move(1, 2); // destructive confirmations default to Cancel
             if (next == Page::researchConfirm)
                 _focus.move(static_cast<int32_t>(rows().size() - 1), rows().size());
@@ -651,6 +670,10 @@ namespace OpenRCT2::Ui::Windows
                 case Page::guestInventory:
                 case Page::guestText:
                 case Page::guestGroups:
+                case Page::guestName:
+                case Page::guestNameConfirm:
+                case Page::guestTracking:
+                case Page::guestPreferences:
                     return guestsPresentation().rows;
                 case Page::marketing:
                 case Page::marketingActive:
@@ -1127,12 +1150,14 @@ namespace OpenRCT2::Ui::Windows
         {
             return _page == Page::dashboard || _page == Page::overview || _page == Page::finances || _page == Page::staff
                 || _page == Page::staffInspect || _page == Page::staffStats || _page == Page::research
-                || _page == Page::marketing || _page == Page::marketingActive || guestManagement() || _page == Page::ridesRoster
-                || _page == Page::ridesInspect || _page == Page::ridesAccess || _page == Page::ridesGraphs
-                || _page == Page::ridesStations || _page == Page::ridesCustomers || _page == Page::ridesEarnings
-                || _page == Page::ridesStats || _page == Page::ridesVehicles || _page == Page::ridesAppearance
-                || _page == Page::ridesMusic || _page == Page::ridesDispatch || _page == Page::ridesOperations
-                || _page == Page::ridesMaintenance;
+                || _page == Page::marketing || _page == Page::marketingActive
+                || (guestManagement() && _page != Page::guestName && _page != Page::guestNameConfirm
+                    && _page != Page::guestTracking)
+                || _page == Page::ridesRoster || _page == Page::ridesInspect || _page == Page::ridesAccess
+                || _page == Page::ridesGraphs || _page == Page::ridesStations || _page == Page::ridesCustomers
+                || _page == Page::ridesEarnings || _page == Page::ridesStats || _page == Page::ridesVehicles
+                || _page == Page::ridesAppearance || _page == Page::ridesMusic || _page == Page::ridesDispatch
+                || _page == Page::ridesOperations || _page == Page::ridesMaintenance;
         }
         void enterDashboardContent()
         {
@@ -1236,7 +1261,7 @@ namespace OpenRCT2::Ui::Windows
                     _staffUniformDraft = static_cast<Drawing::Colour>((EnumValue(_staffUniformDraft) + x + 72) % 72);
                 invalidate();
             }
-            else if (_page == Page::ridesName || _page == Page::staffName)
+            else if (_page == Page::ridesName || _page == Page::staffName || _page == Page::guestName)
             {
                 const auto current = _focus.index();
                 const auto next = _nameEntry.Move(current, x, y);
@@ -1493,6 +1518,12 @@ namespace OpenRCT2::Ui::Windows
                         _guestTarget && Handheld::GuestManagement::Resolve(*_guestTarget) ? _guestTextParent
                                                                                           : Page::guestRoster);
                     break;
+                case Page::guestNameConfirm:
+                    page(Page::guestName);
+                    break;
+                case Page::guestName:
+                case Page::guestTracking:
+                case Page::guestPreferences:
                 case Page::guestNeeds:
                 case Page::guestThoughts:
                 case Page::guestSpending:
@@ -2730,6 +2761,20 @@ namespace OpenRCT2::Ui::Windows
                         _status = "Location unavailable";
                         invalidate();
                     }
+                    else if (choice == 6)
+                    {
+                        _guestNameBaseline = Handheld::GuestManagement::Resolve(*_guestTarget)->getName();
+                        _nameEntry = { _guestNameBaseline };
+                        page(Page::guestName);
+                    }
+                    else if (choice == 7)
+                    {
+                        _guestFlagsBaseline = Handheld::GuestManagement::Resolve(*_guestTarget)->peepFlags;
+                        _guestTrackingValue = !_guestFlagsBaseline.has(PeepFlag::tracking);
+                        page(Page::guestTracking);
+                    }
+                    else if (choice == 8)
+                        page(Page::guestPreferences);
                     else
                         page(
                             choice == 1       ? Page::guestNeeds
@@ -2738,6 +2783,38 @@ namespace OpenRCT2::Ui::Windows
                                 : choice == 4 ? Page::guestInventory
                                               : Page::guestRoster);
                     break;
+                case Page::guestName:
+                    if (choice == 47)
+                        page(Page::guestInspect);
+                    else if (choice == 46 && _guestTarget)
+                    {
+                        const auto result = Handheld::GuestManagement::SetName(
+                            *_guestTarget, _guestNameBaseline, _nameEntry.text, false);
+                        if (result.error == GameActions::Status::ok)
+                            page(Page::guestNameConfirm);
+                        else
+                            _status = Handheld::Finances::Feedback(result);
+                    }
+                    else
+                        _nameEntry.Press(choice);
+                    break;
+                case Page::guestNameConfirm:
+                case Page::guestTracking:
+                    if (choice == 1)
+                        page(_page == Page::guestTracking ? Page::guestInspect : Page::guestName);
+                    else if (_guestTarget)
+                    {
+                        const auto result = _page == Page::guestTracking
+                            ? Handheld::GuestManagement::SetTracking(
+                                  *_guestTarget, _guestFlagsBaseline, _guestTrackingValue, true)
+                            : Handheld::GuestManagement::SetName(*_guestTarget, _guestNameBaseline, _nameEntry.text, true);
+                        if (result.error == GameActions::Status::ok)
+                            page(Page::guestInspect);
+                        else
+                            _status = Handheld::Finances::Feedback(result);
+                    }
+                    break;
+                case Page::guestPreferences:
                 case Page::guestNeeds:
                 case Page::guestSpending:
                     page(

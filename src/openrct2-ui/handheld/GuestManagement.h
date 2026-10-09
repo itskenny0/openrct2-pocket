@@ -3,6 +3,7 @@
 #include "Currency.h"
 #include "ManagementPanel.h"
 
+#include <openrct2/actions/GameActionRunner.h>
 #include <openrct2/entity/Guest.h>
 
 namespace OpenRCT2::Ui::Handheld::GuestManagement
@@ -24,8 +25,12 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
         thoughts,
         spending,
         inventory,
-        text
+        text,
+        preferences
     };
+    GameActions::Result SetName(const Target&, const std::string& baseline, const std::string& value, bool execute);
+    GameActions::Result SetTracking(const Target&, PeepFlags baseline, bool value, bool execute);
+    ManagementPresentation TrackingPresentation(const Target&, bool value, size_t selected);
     void Invalidate(EntityId id);
     std::optional<Target> Identify(EntityId id);
     const Guest* Resolve(const Target& target);
