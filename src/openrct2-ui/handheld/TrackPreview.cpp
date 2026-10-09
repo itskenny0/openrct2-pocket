@@ -39,7 +39,7 @@ namespace OpenRCT2::Ui::Handheld
     }
     bool TrackPreview::place(
         ObjectEntryIndex index, ride_type_t type, CoordsXYZD origin, TrackElemType piece, SelectedLiftAndInverted flags,
-        uint8_t speed)
+        uint8_t speed, uint8_t seat)
     {
         clear();
         _ride = std::make_unique<ShopPlacement::PreviewRide>(index, type);
@@ -49,7 +49,7 @@ namespace OpenRCT2::Ui::Handheld
             return false;
         }
         _type = piece == TrackElemType::none ? GetRideTypeDescriptor(type).StartTrackPiece : piece;
-        auto place = GameActions::TrackPlaceAction(id(), _type, type, origin, speed, 0, 0, flags, false);
+        auto place = GameActions::TrackPlaceAction(id(), _type, type, origin, speed, 0, seat, flags, false);
         place.SetFlags(
             { GameActions::CommandFlag::ghost, GameActions::CommandFlag::noSpend,
               GameActions::CommandFlag::allowDuringPaused });

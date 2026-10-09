@@ -21,7 +21,7 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
         RideManagement::Target ride;
         CoordsXYZD origin;
         TrackElemType type;
-        uint8_t speed;
+        uint8_t speed, seat;
         bool chain, inverted;
         bool operator==(const Block&) const = default;
     };
@@ -50,6 +50,7 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
                               { xy, e->getBaseZ() - c.z, e->getDirection() },
                               e->getTrackType(),
                               e->getBrakeBoosterSpeed(),
+                              e->getSeatRotation(),
                               e->hasChain(),
                               e->isInverted() });
                     }
@@ -73,7 +74,7 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
             if (!e->isGhost() && e->getRideIndex() == block.ride.id && e->getTrackType() == block.type
                 && e->getSequenceIndex() == 0 && e->getDirection() == block.origin.direction
                 && e->getBaseZ() == block.origin.z + c.z && e->hasChain() == block.chain && e->isInverted() == block.inverted
-                && e->getBrakeBoosterSpeed() == block.speed)
+                && e->getBrakeBoosterSpeed() == block.speed && e->getSeatRotation() == block.seat)
                 return true;
         return false;
     }
@@ -90,9 +91,9 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
         GameActions::SequentialTrackPlaceAction action(
             block.ride.id, block.type, block.origin, block.chain, false, block.origin, block.type, cost);
         if (speed)
-            action.UseSpeedChange(block.speed, *speed, block.inverted);
+            action.UseSpeedChange(block.speed, *speed, block.inverted, block.seat);
         else
-            action.UseSelectedRemoval(block.speed, block.inverted);
+            action.UseSelectedRemoval(block.speed, block.inverted, block.seat);
         return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
     }
 } // namespace OpenRCT2::Ui::Handheld::TrackEditing

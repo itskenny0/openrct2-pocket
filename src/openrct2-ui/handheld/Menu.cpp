@@ -1892,6 +1892,14 @@ namespace OpenRCT2::Ui::Windows
                             Handheld::CustomTracks::ToggleCamera();
                             close();
                         }
+                        else if (key.starts_with("seat-"))
+                        {
+                            const auto currentSeat = Handheld::CustomTracks::PlacementSeat();
+                            const auto value = key == "seat-reset" ? 4 : key == "seat-minus" ? std::max<int>(0, currentSeat - 1)
+                                : std::min<int>(15, currentSeat + 1);
+                            if (Handheld::CustomTracks::SetPlacementSeat(value)) close();
+                            else { _status = "Seat rotation unavailable"; invalidate(); }
+                        }
                         else if (Handheld::CustomTracks::Select(static_cast<TrackElemType>(std::stoi(key))))
                             close();
                         else

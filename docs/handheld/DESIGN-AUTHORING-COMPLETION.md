@@ -98,3 +98,39 @@ remain precise ordinary scope/validation gaps. No full design-authoring parity c
 | Tested/rated export | 90480687ceb6e7c7b05ec2e60aa6e69de498c917 | 5bb23969ecba119ddc4e75b33eda5bd4c53a2753 | 85cbd89213963053c210a0022f8b138933057b5c |
 
 Nearby-selection publication will be recorded in the following validated checkpoint.
+
+## Phase 3 — native seat-rotation placement (partial parameter parity)
+
+Applicable rides advertise hasSeatRotation through native RTD. Select → Track pieces
+now offers Seat -, Seat + and Seat default (4); values are strictly 0–15. Existing
+bank/chain/speed and Brick camera utilities remain. Unsupported rides/pieces do not
+show these options. Desktop's TD6 shared-bit rule is mirrored: ordinary brake/booster
+speed pieces omit seat controls; block brakes and newer native pieces may support both.
+The displayed value is the native rotation index, not an invented degree conversion.
+
+Native SequentialTrackPlaceAction visits/serializes the immutable placement value,
+rejects unsupported/out-of-range parameters and forwards it to native TrackPlaceAction
+for both query and execute. TrackPreview uses the same value; changing it removes the
+old ghost. Busy/queued construction rejects draft changes. Native map elements and
+park saves own persistence. Selected block snapshots and removal/speed actions now
+also retain/revalidate native seat baselines.
+
+Release GUI/CLI PASS; RideConstructionTests five-family existing regression PASS.
+SeatRotationTests PASS against real Multi-dimension native actions: default/bounds,
+valid versus invalid strict action, queried cost, ghost without cash, station/straight
+native stored values, busy lock, held-A picker handoff, unsupported family/shared-speed
+visibility, stale selected seat/action rejection and native save/reload. Initialized
+64×64 native scenario fixture uses private original sprites for two production viewport/
+component captures; these are labelled fixture captures, not a live scenario operation.
+Both inspected for controls, focus, clipping and readability.
+
+Covered/inverted/alternative variants, selected seat changes and other special
+parameters remain ordinary gaps. Desktop selected-seat editing calls
+GetTrackElementOriginAndApplyChanges with TrackElementSetFlag::seatRotation, rather
+than an existing validated seat action. Pocket does not copy that direct-write route.
+A dedicated native validated action or removal/rebuild workflow is required.
+Seat placement does not establish Multi-dimension circuit/operation/guest routing.
+
+Phase 2: canonical 086bd7e248307a332a4354e870256028d1849d72;
+local f54788d9384eb5cd4d0bfc9ab71507429c03fce7;
+matching tree a82e58b15dec0abfa98427f1d03d54a58c56c121.

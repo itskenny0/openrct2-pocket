@@ -218,3 +218,9 @@ inclusion/exclusion, no-scenery reset, counts and locked cost-free export review
 Native multi-tile grouping, bounds/conversion and object-format rules remain authoritative;
 changed source/scenery rejects. Arbitrary outside-nearby/spatial selection and vehicle
 substitution remain PARTIAL; see DESIGN-AUTHORING-COMPLETION.md.
+
+Seat rotation placement is delivered for native RTD-eligible pieces through bounded
+Select-picker controls and matching query/ghost/execute; native shared-bit speed
+restrictions are retained. Native save persistence and selected seat baseline guards
+pass. Covered/inverted variants, selected seat editing and other parameters remain
+PARTIAL. See DESIGN-AUTHORING-COMPLETION.md for exact native dependencies/validation.

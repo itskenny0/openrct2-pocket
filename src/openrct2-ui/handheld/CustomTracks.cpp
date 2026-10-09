@@ -31,7 +31,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     using namespace TrackMetadata;
     static bool active{}, busy{}, camera{}, chain{}, createdHere{};
     static int32_t stationOffset{};
-    static uint8_t placementSpeed{ 6 };
+    static uint8_t placementSpeed{ 6 }, placementSeat{ 4 };
     static uint32_t depth{};
     static uint64_t revision{};
     static std::optional<RideManagement::Target> target, completed;
@@ -49,7 +49,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     {
         Block block;
         bool chain;
-        uint8_t speed;
+        uint8_t speed, seat;
         bool operator==(const Preview&) const = default;
     };
     static std::optional<Block> previous, anchor;
@@ -296,6 +296,13 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             entry.drawPreview = [type](Drawing::RenderTarget& rt) { DrawPiecePreview(rt, type); };
             result.push_back(std::move(entry));
         }
+        if (SeatSupported())
+            for (const auto& option : { std::pair{ "seat-minus", "Seat -" }, std::pair{ "seat-plus", "Seat +" },
+                                        std::pair{ "seat-reset", "Seat default" } })
+                result.push_back(
+                    { { ObjectType::ride, kObjectEntryIndexNull, option.first },
+                      std::string(option.second) + " (" + std::to_string(placementSeat) + ")",
+                      ZoomLevel{ 0 } });
         result.push_back(
             { { ObjectType::ride, kObjectEntryIndexNull, "camera" },
               camera ? "Piece controls" : "Camera controls",
@@ -337,6 +344,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         createdHere = false;
         stationOffset = 0;
         placementSpeed = 6;
+        placementSeat = 4;
         active = false;
         busy = false;
         target.reset();
@@ -443,7 +451,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         FocusEndpoint();
         if (!Supported(selected))
             for (const auto& entry : Pieces())
-                if (entry.identity.key != "leave" && entry.identity.key != "camera")
+                if (entry.identity.key.front() >= '0' && entry.identity.key.front() <= '9')
                 {
                     selected = static_cast<TrackElemType>(std::stoi(entry.identity.key));
                     break;
@@ -491,7 +499,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         int index = it == slopes.end() ? 2 : it - slopes.begin();
         const auto desired = slopes[std::clamp(index + (direction > 0 ? 1 : -1), 0, 4)];
         for (const auto& e : Pieces())
-            if (e.identity.key != "leave" && e.identity.key != "camera")
+            if (e.identity.key.front() >= '0' && e.identity.key.front() <= '9')
             {
                 auto type = static_cast<TrackElemType>(std::stoi(e.identity.key));
                 const auto& ted = GetTrackElementDescriptor(type);
@@ -515,6 +523,23 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         placementSpeed = speed;
         return true;
     }
+    bool SeatSupported()
+    {
+        const auto* ride = target ? RideManagement::Resolve(*target) : nullptr;
+        return active && ride && TrackConstructionSupport::SeatRotation(ride->type, selected);
+    }
+    uint8_t PlacementSeat()
+    {
+        return placementSeat;
+    }
+    bool SetPlacementSeat(uint8_t seat)
+    {
+        if (!SeatSupported() || busy || seat > 15)
+            return false;
+        ClearPreview();
+        placementSeat = seat;
+        return true;
+    }
     void Bank()
     {
         if (trackTypeHasSpeedSetting(selected))
@@ -528,7 +553,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         size_t index = it == banks.end() ? 0 : it - banks.begin();
         for (size_t offset = 1; offset <= banks.size(); ++offset)
             for (const auto& e : Pieces())
-                if (e.identity.key != "leave" && e.identity.key != "camera")
+                if (e.identity.key.front() >= '0' && e.identity.key.front() <= '9')
                 {
                     auto type = static_cast<TrackElemType>(std::stoi(e.identity.key));
                     const auto& ted = GetTrackElementDescriptor(type);
@@ -586,12 +611,14 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         auto query = GA::SequentialTrackPlaceAction(
             target->id, request->type, request->origin, chain, !previous, source.origin, source.type);
         query.SetPlacementSpeed(trackTypeHasSpeedSetting(request->type) ? placementSpeed : 6);
+        query.SetPlacementSeat(SeatSupported() ? placementSeat : 0);
         auto q = GA::Query(&query, getGameState());
         if (!execute || q.error != GA::Status::ok)
             return q;
         auto action = GA::SequentialTrackPlaceAction(
             target->id, request->type, request->origin, chain, !previous, source.origin, source.type, q.cost);
         action.SetPlacementSpeed(trackTypeHasSpeedSetting(request->type) ? placementSpeed : 6);
+        action.SetPlacementSeat(SeatSupported() ? placementSeat : 0);
         ClearPreview();
         busy = true;
         const auto token = revision;
@@ -614,7 +641,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                 {
                     selected = TrackElemType::flat;
                     for (const auto& e : Pieces())
-                        if (e.identity.key != "leave" && e.identity.key != "camera")
+                        if (e.identity.key.front() >= '0' && e.identity.key.front() <= '9')
                         {
                             auto t = static_cast<TrackElemType>(std::stoi(e.identity.key));
                             if (t == TrackElemType::flat)
@@ -671,7 +698,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                     selected = TrackElemType::endStation;
                 if (!Supported(selected))
                     for (const auto& entry : Pieces())
-                        if (entry.identity.key != "leave" && entry.identity.key != "camera")
+                        if (entry.identity.key.front() >= '0' && entry.identity.key.front() <= '9')
                         {
                             selected = static_cast<TrackElemType>(std::stoi(entry.identity.key));
                             break;
@@ -712,7 +739,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             ClearPreview();
             return;
         }
-        const Preview next{ *request, chain, trackTypeHasSpeedSetting(request->type) ? placementSpeed : uint8_t{ 6 } };
+        const Preview next{ *request, chain, trackTypeHasSpeedSetting(request->type) ? placementSpeed : uint8_t{ 6 },
+                            SeatSupported() ? placementSeat : uint8_t{ 0 } };
         if (ghost && *ghost == next)
             return;
         ClearPreview();
@@ -720,7 +748,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         if (chain)
             flags.set(LiftHillAndInverted::liftHill);
         auto* ride = RideManagement::Resolve(*target);
-        if (nativePreview.place(ride->subtype, ride->type, request->origin, request->type, flags, next.speed))
+        if (nativePreview.place(ride->subtype, ride->type, request->origin, request->type, flags, next.speed, next.seat))
             ghost = next;
     }
     void RemovePreviewTemporarily()
@@ -775,7 +803,11 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             std::string("{MUTED}Chain ") + (ChainAllowed() ? (chain ? "On" : "Off") : "Unavailable"));
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 152 }, "{MUTED}Height " + (endpoint ? std::to_string(endpoint->z / 8) : "Unavailable"));
-        DrawModernText(rt, p + ScreenCoordsXY{ 10, 180 }, camera ? "{GOLD}Camera controls" : "{MUTED}SEL Pieces / camera");
+        DrawModernText(
+            rt, p + ScreenCoordsXY{ 10, 180 },
+            camera                ? "{GOLD}Camera controls"
+                : SeatSupported() ? "{MUTED}Seat " + std::to_string(placementSeat) + " / SEL options"
+                                  : "{MUTED}SEL Pieces / camera");
         DrawModernText(rt, p + ScreenCoordsXY{ 10, 208 }, "{MUTED}L2/R2 Slope | SEL Pieces");
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;

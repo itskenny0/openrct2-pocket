@@ -24,6 +24,9 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     void Slope(int direction);
     uint8_t PlacementSpeed();
     bool SetPlacementSpeed(uint8_t speed);
+    bool SeatSupported();
+    uint8_t PlacementSeat();
+    bool SetPlacementSeat(uint8_t seat);
     void Bank();
     void Chain();
     std::vector<PickerEntry> Pieces();

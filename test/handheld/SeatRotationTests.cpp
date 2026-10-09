@@ -1,0 +1,205 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Native initialized scenario fixture; construction and editing use real actions.
+#include <SDL.h>
+#include <filesystem>
+#include <iostream>
+#include <openrct2-ui/UiContext.h>
+#include <openrct2-ui/handheld/ControllerInput.h>
+#include <openrct2-ui/handheld/CustomTracks.h>
+#include <openrct2-ui/handheld/Explorer.h>
+#include <openrct2-ui/handheld/TrackEditing.h>
+#include <openrct2-ui/windows/Windows.h>
+#include <openrct2/Context.h>
+#include <openrct2/GameState.h>
+#include <openrct2/Input.h>
+#include <openrct2/OpenRCT2.h>
+#include <openrct2/PlatformEnvironment.h>
+#include <openrct2/audio/AudioContext.h>
+#include <openrct2/config/Config.h>
+#include <openrct2/core/Imaging.h>
+#include <openrct2/drawing/Palette.h>
+#include <openrct2/drawing/X8DrawingEngine.h>
+#include <openrct2/paint/Paint.h>
+#include <openrct2/park/ParkFile.h>
+#include <openrct2/scenario/Scenario.h>
+#include <openrct2/ui/UiContext.h>
+#include <openrct2/ui/WindowManager.h>
+#include <openrct2/world/tile_element/SurfaceElement.h>
+using namespace OpenRCT2;
+namespace H = Ui::Handheld;
+namespace C = H::CustomTracks;
+namespace W = Ui::Windows;
+static void Check(bool ok, const char* message)
+{
+    if (!ok)
+        throw std::runtime_error(message);
+}
+int main(int argc, char** argv)
+{
+    try
+    {
+        if (argc != 3 && argc != 4)
+            return 2;
+        SDL_setenv("OPENRCT2_HANDHELD", "1", 1);
+        SDL_setenv("SDL_VIDEODRIVER", "dummy", 0);
+        SDL_setenv("SDL_AUDIODRIVER", "dummy", 0);
+        gCustomOpenRCT2DataPath = argv[1];
+        gCustomUserDataPath = argv[2];
+        gOpenRCT2Headless = true;
+        gOpenRCT2NoGraphics = argc != 4;
+        auto env = CreatePlatformEnvironment();
+        if (argc == 4)
+            env->SetBasePath(DirBase::rct2, argv[3]);
+        auto ui = Ui::CreateUiContext(*env);
+        auto context = CreateContext(std::move(env), Audio::CreateDummyAudioContext(), std::move(ui));
+        Config::SetDefaults();
+        if (argc == 4)
+            Config::Get().general.rct2Path = argv[3];
+        Config::Get().general.windowWidth = 512;
+        Config::Get().general.windowHeight = 384;
+        Config::Get().general.windowScale = 1;
+        Check(context->Initialise(), "Context failed");
+        context->GetUiContext().CreateWindow();
+        auto& state = getGameState();
+        gameStateInitAll(state, { 64, 64 });
+        gLegacyScene = LegacyScene::playing;
+        Check(W::MainOpen(), "Fixture viewport missing");
+        WindowGetMain()->onResize();
+        InputSetState(InputState::normal);
+        Ui::GetWindowManager()->CloseByClass(WindowClass::progressWindow);
+        state.park.cash = 10000000;
+        state.park.flags.unset(ParkFlag::noMoney, ParkFlag::noMoneyScenario);
+        for (int y = 32; y < 2016; y += 32)
+            for (int x = 32; x < 2016; x += 32)
+                MapGetSurfaceElementAt(CoordsXY{ x, y })->setOwnership({ OwnershipFlag::landOwned });
+        auto& objects = context->GetObjectManager();
+        Check(
+            objects.LoadObject("rct2.terrain_surface.grass") && objects.LoadObject("rct2.terrain_edge.rock")
+                && objects.LoadObject("rct2.station.plain"),
+            "Fixture terrain/station missing");
+        auto* object = objects.LoadObject("rct2.ride.arrx");
+        Check(object, "Native seat-rotation vehicle missing");
+        const auto index = objects.GetLoadedObjectEntryIndex(object);
+        RideTypeSetInvented(RIDE_TYPE_MULTI_DIMENSION_ROLLER_COASTER);
+        RideEntrySetInvented(index);
+        Check(H::BeginCustomTrack(index, RIDE_TYPE_MULTI_DIMENSION_ROLLER_COASTER), "Native seat ride begin failed");
+        GameActions::ProcessQueue(state);
+        C::Update(CoordsXY{ 640, 640 });
+        Check(C::SeatSupported() && C::PlacementSeat() == 4, "Native default seat rotation missing");
+        Check(!C::SetPlacementSeat(16) && C::SetPlacementSeat(9), "Seat bounds not enforced");
+        auto capture = [&](const char* name, bool menu) {
+            const auto* output = std::getenv("POCKET_SEAT_CAPTURES");
+            if (!output || argc != 4)
+                return;
+            std::filesystem::create_directories(output);
+            Drawing::X8DrawingEngine engine(context->GetUiContext());
+            engine.Resize(512, 384);
+            engine.BeginDraw();
+            auto& rt = *engine.getRT();
+            Viewport viewport{};
+            viewport.width = 512;
+            viewport.height = 384;
+            viewport.zoom = ZoomLevel{ 1 };
+            const auto centre = Translate3DTo2DWithZ(0, CoordsXYZ{ 656, 656, 32 });
+            viewport.viewPos = centre - ScreenCoordsXY{ viewport.zoom.ApplyTo(310), viewport.zoom.ApplyTo(190) };
+            ResetAllSpriteQuadrantPlacements();
+            Drawing::UpdatePaletteEffects();
+            ViewportRender(rt, &viewport);
+            if (menu)
+                Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu)->onDraw(rt);
+            else
+                C::DrawPanel(rt, { 512, 384 });
+            Image image;
+            image.Width = 512;
+            image.Height = 384;
+            image.Depth = 8;
+            image.Stride = rt.LineStride();
+            image.Palette = Drawing::gPalette;
+            const auto* bytes = reinterpret_cast<uint8_t*>(rt.bits);
+            image.Pixels.assign(bytes, bytes + rt.LineStride() * rt.height);
+            Imaging::WriteToFile((std::filesystem::path(output) / name).string(), image, ImageFormat::png);
+            engine.EndDraw();
+        };
+        const auto cash = state.park.cash;
+        C::Update(CoordsXY{ 640, 640 });
+        capture("authoring-08-seat-rotation-preview.png", false);
+        Check(state.park.cash == cash, "Seat ghost charged cash");
+        auto quote = C::Action(false);
+        Check(
+            quote.error == GameActions::Status::ok && C::Action(true).error == GameActions::Status::ok,
+            "Native seat station query/execute failed");
+        Check(!C::SetPlacementSeat(2), "Busy parameter changed");
+        GameActions::ProcessQueue(state);
+        const auto ride = *C::Target();
+        bool stationSeat = false;
+        for (auto* e : TileElementsView<TrackElement>(CoordsXY{ 640, 640 }))
+            if (!e->isGhost() && e->getRideIndex() == ride.id)
+                stationSeat = e->getSeatRotation() == 9;
+        Check(stationSeat && state.park.cash == cash - quote.cost, "Native seat value/cost mismatch");
+        Check(C::Select(TrackElemType::flat), "Seat straight unavailable");
+        const auto endpoint = *C::Endpoint();
+        auto invalid = GameActions::SequentialTrackPlaceAction(
+            ride.id, TrackElemType::flat, endpoint, false, false, H::TrackEditing::Blocks(ride).front().origin,
+            TrackElemType::endStation);
+        invalid.SetPlacementSeat(10);
+        Check(GameActions::Query(&invalid, state).error == GameActions::Status::ok, "Native valid seat baseline rejected");
+        invalid.SetPlacementSeat(16);
+        Check(GameActions::Query(&invalid, state).error != GameActions::Status::ok, "Native action accepted invalid seat");
+        H::ControllerInput controller;
+        H::Frame confirm;
+        confirm.actions = { H::Action::confirm, H::Action::confirm };
+        W::HandheldTrackPiecePickerOpen();
+        const auto pieces = C::Pieces();
+        const auto option = std::find_if(
+            pieces.begin(), pieces.end(), [](const auto& e) { return e.identity.key == "seat-plus"; });
+        Check(option != pieces.end(), "Applicable seat control missing");
+        const auto row = std::distance(pieces.begin(), option);
+        for (int n = 0; n < row / 3; ++n)
+            W::HandheldObjectPickerMove(0, 1);
+        for (int n = 0; n < row % 3; ++n)
+            W::HandheldObjectPickerMove(1, 0);
+        capture("authoring-09-seat-rotation-picker.png", true);
+        H::HandleMenuInput(controller, confirm);
+        Check(
+            C::PlacementSeat() == 10 && !Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu),
+            "Held-A seat utility failed or repeated");
+        quote = C::Action(false);
+        Check(
+            quote.error == GameActions::Status::ok && C::Action(true).error == GameActions::Status::ok, "Seat straight failed");
+        GameActions::ProcessQueue(state);
+        Check(
+            !TrackConstructionSupport::SeatRotation(RIDE_TYPE_WOODEN_ROLLER_COASTER, TrackElemType::flat)
+                && !TrackConstructionSupport::SeatRotation(ride.type, TrackElemType::brakes),
+            "Unsupported seat control exposed");
+        const auto seatBlocks = H::TrackEditing::Blocks(ride);
+        const auto seatBlock = *std::find_if(
+            seatBlocks.begin(), seatBlocks.end(), [](const auto& b) { return b.type == TrackElemType::flat; });
+        auto staleSeat = seatBlock;
+        staleSeat.seat = 9;
+        Check(
+            !H::TrackEditing::Valid(staleSeat) && H::TrackEditing::Change(staleSeat, {}).error != GameActions::Status::ok,
+            "Selected stale seat baseline accepted");
+        GameActions::SequentialTrackPlaceAction staleRemoval(
+            ride.id, seatBlock.type, seatBlock.origin, seatBlock.chain, false, seatBlock.origin, seatBlock.type);
+        staleRemoval.UseSelectedRemoval(seatBlock.speed, seatBlock.inverted, 9);
+        Check(GameActions::Query(&staleRemoval, state).error != GameActions::Status::ok, "Action stale seat baseline accepted");
+        staleRemoval.UseSelectedRemoval(seatBlock.speed, seatBlock.inverted, 10);
+        Check(
+            GameActions::Query(&staleRemoval, state).error == GameActions::Status::ok, "Valid selected seat baseline rejected");
+        H::EndTerrain();
+        const auto file = std::string(argv[2]) + "/seat-rotation.park";
+        SaveFlags flags{};
+        Check(ScenarioSave(state, file, flags) && context->LoadParkFromFile(file), "Seat save/reload failed");
+        bool savedSeat = false;
+        for (auto* e : TileElementsView<TrackElement>(endpoint))
+            if (!e->isGhost() && e->getRideIndex() == ride.id)
+                savedSeat = e->getSeatRotation() == 10;
+        Check(savedSeat, "Native seat parameter not persisted");
+        std::cout << "Native seat rotation bounds/query/ghost/execute/controller/held-A/cost/persistence passed\n";
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+        return 1;
+    }
+}

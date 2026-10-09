@@ -4,6 +4,7 @@
 #include "../management/Research.h"
 #include "RideData.h"
 #include "RideEntry.h"
+#include "TrackData.h"
 
 #include <algorithm>
 namespace OpenRCT2::TrackConstructionSupport
@@ -22,6 +23,12 @@ namespace OpenRCT2::TrackConstructionSupport
     {
         return type < TrackElemType::count && type != TrackElemType::maze
             && !(type >= TrackElemType::flatTrack1x4A && type <= TrackElemType::flatTrack3x3);
+    }
+    // Desktop TD6 sharing rules: ordinary speed pieces share their seat bits.
+    inline bool SeatRotation(ride_type_t ride, TrackElemType piece)
+    {
+        return Type(ride) && Piece(piece) && GetRideTypeDescriptor(ride).flags.has(RtdFlag::hasSeatRotation)
+            && (!trackTypeHasSpeedSetting(piece) || piece == TrackElemType::blockBrakes || piece > TrackElemType::highestAlias);
     }
     inline bool Available(ObjectEntryIndex index, ride_type_t type)
     {
