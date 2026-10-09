@@ -137,6 +137,7 @@ namespace OpenRCT2::Ui::Windows
         ridesAppearance,
         ridesName,
         designName,
+        designScenery,
         designExport,
         ridesPrice,
         ridesConfirm,
@@ -285,7 +286,7 @@ namespace OpenRCT2::Ui::Windows
             return trackManagement() || _page == Page::ridesRoster || _page == Page::ridesInspect || _page == Page::ridesGraphs
                 || _page == Page::ridesStations || _page == Page::ridesCustomers || _page == Page::ridesEarnings
                 || _page == Page::ridesStats || _page == Page::ridesVehicles || _page == Page::ridesName
-                || _page == Page::designName || _page == Page::designExport
+                || _page == Page::designName || _page == Page::designScenery || _page == Page::designExport
                 || _page == Page::ridesAppearance || _page == Page::ridesMusic || _page == Page::ridesDispatch
                 || _page == Page::ridesOperations || _page == Page::ridesMaintenance || _page == Page::ridesAccess
                 || _page == Page::ridesPrice || _page == Page::ridesConfirm;
@@ -338,12 +339,27 @@ namespace OpenRCT2::Ui::Windows
                 }
                 return model;
             }
+            if (current == Page::designScenery)
+            {
+                Handheld::ManagementPresentation model;
+                model.breadcrumb = "Rides / Save / Scenery";
+                model.title = "DESIGN SCENERY";
+                model.stats.emplace_back("Selected", std::to_string(Handheld::DesignAuthoring::SceneryCount()));
+                model.rows = { "Name / export...", "Select native nearby", "No scenery" };
+                for (size_t i = 0; i < Handheld::DesignAuthoring::sceneryBaseline.size(); ++i)
+                    model.rows.push_back(Handheld::DesignAuthoring::SceneryLabel(i));
+                model.selected = selected;
+                model.primaryAction = selected >= 3 ? "Toggle" : "Choose";
+                model.status = _status.empty() ? "Native nearby selection; A toggles" : _status;
+                return model;
+            }
             if (current == Page::designExport)
             {
                 Handheld::ManagementPresentation model;
                 model.breadcrumb = "Rides / Save design";
                 model.title = Handheld::DesignAuthoring::Overwrite() ? "OVERWRITE DESIGN?" : "EXPORT DESIGN?";
                 model.bodyLines.push_back("File: " + Handheld::DesignAuthoring::Filename());
+                model.bodyLines.push_back("Scenery: " + std::to_string(Handheld::DesignAuthoring::SceneryCount()));
                 model.rows = { "Cancel", "Export design" };
                 model.confirmation = true;
                 model.selected = selected;
@@ -658,11 +674,11 @@ namespace OpenRCT2::Ui::Windows
                 _marketingTargets = Handheld::MarketingManagement::Targets(_marketingDraft->type);
             if (next != Page::marketingEditor && next != Page::marketingTargets && next != Page::marketingConfirm)
                 _marketingDraft.reset();
-            if ((_page == Page::designName || _page == Page::designExport)
-                && next != Page::designName && next != Page::designExport)
+            if ((_page == Page::designName || _page == Page::designScenery || _page == Page::designExport)
+                && next != Page::designName && next != Page::designScenery && next != Page::designExport)
                 Handheld::DesignAuthoring::End();
             _page = next;
-            if (next == Page::ridesName || next == Page::designName || next == Page::designExport)
+            if (next == Page::ridesName || next == Page::designName || next == Page::designScenery || next == Page::designExport)
             {
                 _dashboard.focus = Handheld::Dashboard::Focus::content;
                 _dashboard.section = Handheld::Dashboard::Section::rides;
@@ -751,6 +767,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ridesVehicles:
                 case Page::ridesName:
                 case Page::designName:
+                case Page::designScenery:
                 case Page::designExport:
                 case Page::ridesAppearance:
                 case Page::ridesMusic:
@@ -1636,6 +1653,9 @@ namespace OpenRCT2::Ui::Windows
                     page(Page::designName);
                     break;
                 case Page::designName:
+                    page(Page::designScenery);
+                    break;
+                case Page::designScenery:
                     page(Page::ridesInspect);
                     break;
                 case Page::ridesName:
@@ -2733,7 +2753,7 @@ namespace OpenRCT2::Ui::Windows
                         if (result.error == GameActions::Status::ok)
                         {
                             _nameEntry = { Handheld::DesignAuthoring::DefaultName() };
-                            page(Page::designName);
+                            page(Page::designScenery);
                         }
                         else _status = result.getErrorMessage();
                         invalidate();
@@ -2980,8 +3000,18 @@ namespace OpenRCT2::Ui::Windows
                             : _ridesTarget && Handheld::RideManagement::Resolve(*_ridesTarget) ? Page::ridesInspect
                                                                                                : Page::ridesRoster);
                     break;
+                case Page::designScenery:
+                    if (choice == 0) page(Page::designName);
+                    else
+                    {
+                        const auto result = choice < 3 ? Handheld::DesignAuthoring::SetNearby(choice == 1)
+                            : Handheld::DesignAuthoring::ToggleScenery(choice - 3);
+                        _status = result.error == GameActions::Status::ok ? "Native scenery selection updated" : result.getErrorMessage();
+                        invalidate();
+                    }
+                    break;
                 case Page::designName:
-                    if (choice == 47) page(Page::ridesInspect);
+                    if (choice == 47) page(Page::designScenery);
                     else if (choice == 46)
                     {
                         const auto result = Handheld::DesignAuthoring::Review(_nameEntry.text);

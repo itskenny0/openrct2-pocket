@@ -59,3 +59,42 @@ Data/ObjData/Tracks. Captures are production native X8 viewport plus Pocket comp
 renders, not complete SDL gameplay frames or physical Brick captures. AArch64,
 physical Brick, sustained routing and per-family operation remain unverified.
 Private archives, parks and generated designs are excluded from publication/delivery.
+
+## Phase 2 — native nearby scenery authoring (partial desktop parity)
+
+Save design now opens Design scenery: Name/export, Select native nearby, No scenery,
+then a paged native-object roster. D-pad selects; A toggles inclusion (+/-) for one
+native descriptor. The actual selected count appears in options and final review.
+The native nearby helper selects normal paths, this ride's queues, small scenery,
+walls and large scenery within its own native distance/eligibility rules. Large
+scenery aggregation/deduplication and path legacy mapping remain native. Unsupported
+native object formats are not independently serialized by Pocket.
+
+TrackDesignSaveSelectNearbyScenery and CreateTrackDesignScenery supply native
+selection, relative rotation/height, size limits and TD6/TD7 conversion. Only copied
+object/coordinate/flags/colour descriptors survive menu transitions. Each action and
+export recreates the full native nearby set; changes even to an excluded entry reject
+the old selection. Individual selection changes are locked during review. Native
+selection pointers/descriptors are cleared synchronously after collecting/converting,
+including failures. An active desktop scenery selection is rejected, not overwritten.
+
+Release GUI/CLI PASS; expanded real-asset DesignCapture PASS: actual 276-entry nearby
+selection, one-entry exclusion, native scenery export/import exact membership,
+out-of-range rejection, reviewed draft lock, native colour-action stale rejection,
+cleanup and controller paging/toggling/Cancel-first/overwrite. All seven new 512×384
+production-native viewport/component captures inspected: readable full filename,
+counts, gold focus and dense last-page scenery; no clipping/overlap/footer collisions.
+
+Existing native missing-scenery placement warnings/omit option, automatic/manual
+height, scenery ghosts and access recovery remain unchanged. Vehicle substitutions
+are not exposed: the current strict action requires the exact loaded/researched
+vehicle, so a safe substitution review/action dependency remains. Arbitrary scenery
+outside native nearby selection, spatial selection/overlay/locate, banners/furniture
+not supported by native design export, and per-family scene round-trip coverage
+remain precise ordinary scope/validation gaps. No full design-authoring parity claim.
+
+| Phase | Canonical | Local | Matching tree |
+| --- | --- | --- | --- |
+| Tested/rated export | 90480687ceb6e7c7b05ec2e60aa6e69de498c917 | 5bb23969ecba119ddc4e75b33eda5bd4c53a2753 | 85cbd89213963053c210a0022f8b138933057b5c |
+
+Nearby-selection publication will be recorded in the following validated checkpoint.

@@ -35,6 +35,7 @@
 #include <openrct2/core/Imaging.h>
 #include <openrct2/core/File.h>
 #include <openrct2/actions/ride/RideSetAppearanceAction.h>
+#include <openrct2/actions/scenery/SmallScenerySetColourAction.h>
 #include <openrct2/drawing/Palette.h>
 #include <openrct2/drawing/X8DrawingEngine.h>
 #include <openrct2/entity/EntityList.h>
@@ -649,6 +650,41 @@ int main(int argc, char** argv)
         const auto refreshed = H::Designs::Entries();
         Check(std::any_of(refreshed.begin(), refreshed.end(), [&](const auto& e) { return e.identity.key == output.string(); }),
             "Export missing from repository refresh");
+        Check(A::Begin(*identity).error == GameActions::Status::ok && A::SetNearby(true).error == GameActions::Status::ok,
+            "Native nearby scenery unavailable");
+        const auto nearbyCount = A::SceneryCount();
+        Check(nearbyCount > 0 && _trackSavedTileElementsDesc.empty() && A::Valid(), "Native scenery selection/cleanup failed");
+        Check(A::ToggleScenery(0).error == GameActions::Status::ok && A::SceneryCount() == nearbyCount - 1,
+            "Individual native scenery exclusion failed");
+        Check(A::ToggleScenery(nearbyCount).error != GameActions::Status::ok, "Out-of-range scenery selection accepted");
+        Check(A::Review("Native scenery subset").error == GameActions::Status::ok, "Scenery export review failed");
+        Check(A::SetNearby(false).error != GameActions::Status::ok && A::ToggleScenery(0).error != GameActions::Status::ok,
+            "Reviewed scenery draft changed");
+        const auto sceneryOutput = tracks / A::Filename();
+        Check(A::Confirm().error == GameActions::Status::ok, "Native scenery export failed");
+        const auto sceneryRoundtrip = TrackDesignImport(sceneryOutput.string().c_str());
+        Check(sceneryRoundtrip && sceneryRoundtrip->sceneryElements.size() == nearbyCount - 1 && _trackSavedTileElementsDesc.empty(),
+            "Native scenery export/import membership failed");
+        Check(A::Begin(*identity).error == GameActions::Status::ok && A::SetNearby(true).error == GameActions::Status::ok,
+            "Scenery stale review unavailable");
+        const auto scenerySource = A::sceneryBaseline;
+        const auto small = std::find_if(scenerySource.begin(), scenerySource.end(), [](const auto& e) {
+            return e.sceneryObject.GetType() == ObjectType::smallScenery;
+        });
+        if (small != scenerySource.end())
+        {
+            Check(A::Review("Stale scenery").error == GameActions::Status::ok, "Native scenery review unavailable");
+            const auto objectIndex = context->GetObjectManager().GetLoadedObjectEntryIndex(small->sceneryObject);
+            GameActions::SmallScenerySetColourAction sceneryColour(small->loc, small->getQuadrant(), objectIndex,
+                static_cast<Drawing::Colour>((static_cast<uint8_t>(small->primaryColour) + 1) % 32), small->secondaryColour,
+                small->tertiaryColour);
+            Check(GameActions::Execute(&sceneryColour, authorState).error == GameActions::Status::ok, "Native scenery change failed");
+            GameActions::ProcessQueue(authorState);
+            Check(!A::Valid() && A::Confirm().error != GameActions::Status::ok && _trackSavedTileElementsDesc.empty(),
+                "Changed scenery exported from stale selection");
+            std::cout << "Native scenery stale colour baseline passed" << std::endl;
+        }
+        A::End();
         const auto originalBytes = File::ReadAllBytes(output.string());
         Check(A::Begin(*identity).error == GameActions::Status::ok && A::Review("Café Native").error == GameActions::Status::ok
             && A::Overwrite(), "Overwrite review unavailable");
@@ -684,6 +720,18 @@ int main(int argc, char** argv)
             for (auto i = rows.begin(); i != exportEntry; ++i) Ui::Windows::HandheldMenuMove(1);
             H::HandleMenuInput(controller, selecting);
             Check(A::Active() && !A::HasReview(), "Held-A opened export review");
+            Check(Ui::Windows::HandheldRidesPresentation().title == "DESIGN SCENERY", "Native scenery options missing");
+            Ui::Windows::HandheldMenuMove(1); H::HandleMenuInput(controller, selecting);
+            Check(A::SceneryCount() > 0 && _trackSavedTileElementsDesc.empty(), "Controller nearby scenery failed");
+            capture("authoring-05-native-scenery-options.png", 6);
+            Ui::Windows::HandheldMenuMove(2); H::HandleMenuInput(controller, selecting);
+            capture("authoring-06-native-scenery-selection.png", 6);
+            const auto sceneryRows = Ui::Windows::HandheldRidesPresentation().rows.size();
+            for (size_t i = 3; i + 1 < sceneryRows; ++i) Ui::Windows::HandheldMenuMove(1);
+            capture("authoring-07-dense-native-scenery.png", 6);
+            for (size_t i = 1; i < sceneryRows; ++i) Ui::Windows::HandheldMenuMove(-1);
+            H::HandleMenuInput(controller, selecting);
+
         };
         auto moveKey = [&](size_t key) { auto current = Ui::Windows::HandheldRidesPresentation().selected;
             while (current != key) { Ui::Windows::HandheldMenuMove(current < key ? 1 : -1); current = Ui::Windows::HandheldRidesPresentation().selected; }

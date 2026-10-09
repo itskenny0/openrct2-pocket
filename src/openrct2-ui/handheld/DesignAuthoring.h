@@ -6,8 +6,10 @@
 #include <filesystem>
 #include <openrct2/Context.h>
 #include <openrct2/PlatformEnvironment.h>
+#include <openrct2/actions/ResultWithMessage.h>
 #include <openrct2/core/File.h>
 #include <openrct2/core/MemoryStream.h>
+#include <openrct2/object/ObjectManager.h>
 #include <openrct2/rct2/T6Exporter.h>
 #include <openrct2/ride/TrackDesignRepository.h>
 
@@ -23,6 +25,54 @@ namespace OpenRCT2::Ui::Handheld::DesignAuthoring
     inline RideStatus status{};
     inline std::string sourceName;
     inline uint64_t serial{};
+    inline bool nearby{};
+    inline std::vector<TrackDesignSceneryElement> sceneryBaseline;
+    inline std::vector<bool> selectedScenery;
+    inline bool SameScenery(
+        const std::vector<TrackDesignSceneryElement>& left, const std::vector<TrackDesignSceneryElement>& right)
+    {
+        if (left.size() != right.size())
+            return false;
+        for (size_t i = 0; i < left.size(); ++i)
+        {
+            auto copy = left[i];
+            if (copy != right[i])
+                return false;
+        }
+        return true;
+    }
+    inline std::vector<TrackDesignSceneryElement> Collect(RideId id)
+    {
+        if (gTrackDesignSaveMode || !_trackSavedTileElementsDesc.empty())
+            throw std::runtime_error("Native desktop scenery selection is active");
+        TrackDesignSaveInit();
+        try
+        {
+            TrackDesignSaveSelectNearbyScenery(id);
+            auto result = _trackSavedTileElementsDesc;
+            TrackDesignSaveInit();
+            return result;
+        }
+        catch (...)
+        {
+            TrackDesignSaveInit();
+            throw;
+        }
+    }
+    inline size_t SceneryCount()
+    {
+        return std::count(selectedScenery.begin(), selectedScenery.end(), true);
+    }
+    inline std::string SceneryLabel(size_t index)
+    {
+        if (index >= sceneryBaseline.size())
+            return "Scenery unavailable";
+        const auto& element = sceneryBaseline[index];
+        const auto* object = GetContext()->GetObjectManager().GetLoadedObject(element.sceneryObject);
+        const auto name = object ? object->GetName() : std::string(element.sceneryObject.GetName());
+        return std::string(selectedScenery[index] ? "+ " : "- ") + name + " / " + std::to_string(element.loc.x / 32) + ","
+            + std::to_string(element.loc.y / 32);
+    }
 
     inline GameActions::Result Error(std::string message)
     {
@@ -37,7 +87,29 @@ namespace OpenRCT2::Ui::Handheld::DesignAuthoring
         if (!ride || !ride->flags.has(RideFlag::tested) || !RideHasRatings(*ride))
             return nullptr;
         TrackDesignState state{};
-        return ride->saveToTrackDesign(state);
+        auto result = ride->saveToTrackDesign(state);
+        if (result && nearby)
+        {
+            const auto fresh = Collect(source.id);
+            if (!SameScenery(fresh, sceneryBaseline))
+                throw std::runtime_error("Nearby scenery changed; reopen Save design");
+            for (size_t i = 0; i < fresh.size(); ++i)
+                if (selectedScenery[i])
+                    _trackSavedTileElementsDesc.push_back(fresh[i]);
+            try
+            {
+                const auto scenery = result->CreateTrackDesignScenery(state);
+                TrackDesignSaveInit();
+                if (!scenery.Successful)
+                    throw std::runtime_error(FormatStringID(scenery.Message));
+            }
+            catch (...)
+            {
+                TrackDesignSaveInit();
+                throw;
+            }
+        }
+        return result;
     }
     // Compare the actual native exported payload, never struct padding or map pointers.
     inline std::vector<uint8_t> Bytes(const TrackDesign& source)
@@ -81,6 +153,9 @@ namespace OpenRCT2::Ui::Handheld::DesignAuthoring
         target.reset();
         design.reset();
         baseline.clear();
+        nearby = false;
+        sceneryBaseline.clear();
+        selectedScenery.clear();
     }
     inline GameActions::Result Begin(const RideManagement::Target& source)
     {
@@ -95,6 +170,57 @@ namespace OpenRCT2::Ui::Handheld::DesignAuthoring
             const auto* ride = RideManagement::Resolve(source);
             status = ride->status;
             sourceName = ride->getName();
+            return {};
+        }
+        catch (const std::exception& e)
+        {
+            End();
+            return Error(e.what());
+        }
+    }
+    inline GameActions::Result SetNearby(bool value)
+    {
+        if (reviewed)
+            return Error("Cancel export review before changing scenery");
+        if (!Valid())
+            return Error("Ride or scenery changed; reopen Save design");
+        try
+        {
+            const auto fresh = value ? Collect(target->id) : std::vector<TrackDesignSceneryElement>{};
+            nearby = value;
+            sceneryBaseline = fresh;
+            selectedScenery.assign(fresh.size(), true);
+            design = Capture(*target);
+            if (!design)
+            {
+                End();
+                return Error("Native design unavailable");
+            }
+            baseline = Bytes(*design);
+            return {};
+        }
+        catch (const std::exception& e)
+        {
+            End();
+            return Error(e.what());
+        }
+    }
+    inline GameActions::Result ToggleScenery(size_t index)
+    {
+        if (reviewed || index >= selectedScenery.size())
+            return Error("Scenery selection unavailable");
+        if (!Valid())
+            return Error("Ride or scenery changed; reopen Save design");
+        selectedScenery[index] = !selectedScenery[index];
+        try
+        {
+            design = Capture(*target);
+            if (!design)
+            {
+                End();
+                return Error("Native design unavailable");
+            }
+            baseline = Bytes(*design);
             return {};
         }
         catch (const std::exception& e)

@@ -212,3 +212,9 @@ UTF-8 keyboard, Cancel-first export/overwrite, native T6Exporter round-trip and
 repository refresh with source/file stale guards. See DESIGN-AUTHORING-COMPLETION.md.
 Scenery authoring, substitution choices, variants/seat parameters and backward/
 replacement editing remain PARTIAL; the 100% ordinary-gameplay goal is unchanged.
+
+Native scenery authoring now offers native nearby selection plus individual descriptor
+inclusion/exclusion, no-scenery reset, counts and locked cost-free export review.
+Native multi-tile grouping, bounds/conversion and object-format rules remain authoritative;
+changed source/scenery rejects. Arbitrary outside-nearby/spatial selection and vehicle
+substitution remain PARTIAL; see DESIGN-AUTHORING-COMPLETION.md.
