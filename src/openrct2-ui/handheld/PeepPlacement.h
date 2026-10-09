@@ -150,7 +150,7 @@ namespace OpenRCT2::Ui::Handheld::PeepPlacement
         const auto* peep = target ? Resolve(*target) : nullptr;
         DrawConstructionOverlay(
             rt, pos, "Place person", peep ? peep->getName() : "Person unavailable",
-            busy ? "Native action pending" : "A: Place / B: Cancel", "Native land / path rules", "Select: Placement options");
+            busy ? "Native action pending" : "A: Place / B: Cancel", "Land or path", "Select: Options");
     }
     inline ManagementPresentation CancelPresentation(size_t selected)
     {

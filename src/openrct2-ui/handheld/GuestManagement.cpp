@@ -13,6 +13,7 @@
 #include <openrct2/interface/Window.h>
 #include <openrct2/interface/WindowBase.h>
 #include <openrct2/localisation/Formatter.h>
+#include <openrct2/localisation/Formatting.h>
 #include <openrct2/localisation/StringIds.h>
 #include <openrct2/peep/PeepActionFormat.h>
 #include <openrct2/ride/Ride.h>
@@ -349,7 +350,7 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
             }
             else
                 ft.Add<uint16_t>(max);
-            model.bodyLines.push_back(FormatStringIDLegacy(intensityId, ft.Data()));
+            model.bodyLines.push_back(FmtString(FormatStringIDLegacy(intensityId, ft.Data())).WithoutFormatTokens());
             constexpr StringId tolerances[] = { STR_PEEP_STAT_NAUSEA_TOLERANCE_NONE, STR_PEEP_STAT_NAUSEA_TOLERANCE_LOW,
                                                 STR_PEEP_STAT_NAUSEA_TOLERANCE_AVERAGE, STR_PEEP_STAT_NAUSEA_TOLERANCE_HIGH };
             model.stats = { { "Nausea tolerance", FormatStringID(tolerances[EnumValue(guest->nauseaTolerance) & 3]) } };
@@ -365,7 +366,8 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
             {
                 ft = Formatter();
                 ft.Add<uint16_t>(((getGameState().currentTicks - guest->getParkEntryTime()) >> 11) & 0xffff);
-                model.bodyLines.push_back(FormatStringIDLegacy(STR_GUEST_STAT_TIME_IN_PARK, ft.Data()));
+                model.bodyLines.push_back(
+                    FmtString(FormatStringIDLegacy(STR_GUEST_STAT_TIME_IN_PARK, ft.Data())).WithoutFormatTokens());
             }
             model.rows = { "Back to guest" };
         }

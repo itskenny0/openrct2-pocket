@@ -114,3 +114,55 @@ ConstructionTests, SDL PresentationLifecycleTests and all three CTest checks
 (input, launcher, save preservation) also pass. The SDL suite additionally fires a
 picked-up employee through StaffFireAction, proving removal cleanup does not
 reenter the native action queue. Invalid native queries log expected diagnostics.
+
+
+Phase 3 published: `d2560b32eacbe848dd09a8c8f2d14ebdfcb0abfe`.
+The capture/presentation follow-up strips desktop colour/font tokens from native
+preferences text so it remains readable on indigo, and shortens placement hints.
+
+## Genuine asset-backed captures
+
+`test/handheld/GuestPlacementCapture.cpp` and
+`tools/handheld/render_guest_placement.py` load the supplied African Diamond Mine
+scenario (native park name Mines of Africa), open permitted rides/the park and run
+native simulation until at least twenty visitors arrive, then waits a bounded
+8192 ticks for a naturally occurring first-thought group. No fixture visitors, invented
+needs/thoughts, scene composition or original-asset redistribution is used. Native
+actions name/track one visitor and hire a handyman. The 32-character name stresses
+real worst-case layout; name review uses a different native-queried keyboard draft.
+Models and pixels use production GuestManagement, StaffManagement, PeepPlacement,
+Dashboard/HUD/ManagementPanel, X8DrawingEngine and native viewport/sprites.
+Cancellation uses the actual compact panel, not a Dashboard substitute. Draft and
+review footers obey the production modal rail rules.
+
+Thirteen 512×384 PNGs: action groups; first-thought groups; filtered roster;
+inspection; keyboard; name review; tracking review; preferences; guest placement;
+unowned-land placement error; Cancel-first native pickup review; staff placement;
+and dense inspection with Pick up focused. Native guest/staff placement executes
+after its capture; save/reload validates names, tracking, the placed employee and
+unchanged native cash/expenditure. This proves asset-backed loading/rendering and
+these exercised actions, not sustained routing/patrol effectiveness or hardware.
+
+Every final PNG is visually inspected. A low-contrast native preferences formatter
+was corrected; controls, gold focus, modal panel positions, full 32-character
+Dashboard titles and HUD boundaries are readable. Compact placement titles use
+intentional ellipsis. Captures are packaged with a manifest/checksums in
+`OpenRCT2-Pocket-Guest-Placement-Captures.zip`; no supplied ZIPs/assets are included.
+
+## Publication history
+
+| Phase | Canonical GitHub commit |
+| --- | --- |
+| Native groups/filters | `c2ac887c8af13496c523c35d5d74eb7fbf4a350a` |
+| Naming/tracking/preferences | `6f75764192280015e84865e9b43338d0e2af3ece` |
+| Shared placement/manual hiring/lifecycle | `d2560b32eacbe848dd09a8c8f2d14ebdfcb0abfe` |
+
+Each phase was a local safety commit followed by a guarded fast-forward canonical
+publication with equal source-tree SHA. The local history is not rewritten.
+Capture follow-up publication is identified by the commit containing this section;
+its exact SHA is recorded in the final delivery/ZIP manifest and next prompt.
+
+Highest-value next subsystem: ride construction breadth and native track editing,
+starting with descriptor-driven additional coaster types and saved designs, then
+safe endpoint/block editing. Existing Wooden, flat rides, RideAccess and all
+completed management/construction/guest/staff behavior are regression contracts.

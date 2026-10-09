@@ -1,6 +1,6 @@
 # Desktop versus Pocket feature depth
 
-Living roadmap, source audit 2026-10-08. Baseline: published Pocket b21dd2d.
+Living roadmap, source audit 2026-10-09. Baseline: published Pocket b21dd2d.
 COMPLETE means the named player task is effectively represented, not literal desktop parity.
 PARTIAL domains list their gaps below. MISSING means no Pocket player flow. DEFERRED is a deliberate scope choice.
 Native references are relative to src/: desktop windows under openrct2-ui/windows,
@@ -66,7 +66,7 @@ Complexity refers to implementation, not the number of desktop controls.
 First: Ride Details / Operations / Maintenance / demolition. Next: vehicle and
 mode-specific dispatch depth as one complete ride configuration workflow, unless
 hardware feedback identifies a blocker. Terrain/rights, scenery category and path furniture core are now delivered;
-continue with Staff patrol/roles while retaining documented construction parity gaps. Keyboard and arbitrary browsing
+Staff roles/patrol and shared guest/staff pickup are now delivered. Next: ride construction breadth and native track editing while retaining documented construction/guest parity gaps. Keyboard and arbitrary browsing
 are cross-cutting completeness tasks, not reasons to redesign the shell.
 Update this document in each depth checkpoint. Treat COMPLETE tasks as regression
 contracts. Public component captures do not prove asset-backed coaster operation.
@@ -139,3 +139,15 @@ phases, controller mappings, exact published phase SHAs, regression evidence and
 eleven genuine 512×384 component captures. Broader scenery/terrain/connected-path
 parity remains PARTIAL; land/rights purchase and furniture placement/removal core
 are complete within the named scope. The 100% ordinary-gameplay goal is unchanged.
+
+
+## Guest / placement checkpoint
+
+See GUEST-PLACEMENT-COMPLETION.md: native action/first-thought groups and tracked
+filter, stable filtered rosters, guest naming/tracking/preferences, shared
+PeepPickupAction placement/cancel and manual staff hiring are delivered. Native,
+asset-backed SDL and actual 512×384 park-rendered captures cover the milestone.
+Guest domain remains PARTIAL for ride history, persistent follow, broader desktop
+filter entry points/map display and filter restoration after closing into placement.
+Staff pickup/manual-hire gap is closed; hardware/routing/patrol validation remains
+explicitly limited. The 100% ordinary-gameplay goal and construction gaps remain.
