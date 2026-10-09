@@ -163,3 +163,5 @@ breadth, covered/inverted variants and distinct maze/special geometry; no ordina
 parity gap is removed from the 100% roadmap.
 
 Saved-design breadth checkpoint: compatible conventional native families and optional native design scenery are delivered in [RIDE-CONSTRUCTION-COMPLETION.md](RIDE-CONSTRUCTION-COMPLETION.md). Maze/flat design adapters, object substitution choice and broader editing remain ordinary parity gaps. Goal remains 100% ordinary gameplay.
+
+Ride construction editing checkpoint: selected native block removal/refunds and brake/booster speed drafts, Cancel-first reviews, gap recovery and a Select-based Brick camera route are delivered. [RIDE-CONSTRUCTION-COMPLETION.md](RIDE-CONSTRUCTION-COMPLETION.md) records three independently validated published phases and 29 asset-backed captures. Overall ride construction remains PARTIAL: backward/disconnected-endpoint editing, maze/special adapters, additional parameters, variant controls and design export/manual elevation remain on the 100% ordinary-gameplay roadmap.

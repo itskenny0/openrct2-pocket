@@ -261,7 +261,9 @@ int main(int argc, char** argv)
             if (C::Select(TrackElemType::leftVerticalLoop))
             {
                 C::Update({});
+                focus.z += 64;
                 capture("06-inversion-preview.png");
+                focus.z -= 64;
             }
             Check(C::Undo().error == GameActions::Status::ok, "Approach undo failed");
             GameActions::ProcessQueue(state);
@@ -363,7 +365,9 @@ int main(int argc, char** argv)
 
         Check(E::Blocks(target).size() == blocks.size(), "Cancel removed block");
         H::HandleMenuInput(controller, b);
-        capture("12-dense-track-list.png", true);
+        W::HandheldMenuMove(std::distance(blocks.begin(), brakeIt));
+        H::HandleMenuInput(controller, a);
+        capture("12-dense-block-operations.png", true);
         Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
         Check(F::Resume(target), "Native station completion unavailable");
         for (int phase = 0; phase < 2; ++phase)

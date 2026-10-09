@@ -684,7 +684,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         Box(rt, p, { 164, 238 });
         Heading(rt, p + ScreenCoordsXY{ 10, 12 }, StationPlacement() ? "Place station" : "Build track");
         Rule(rt, p + ScreenCoordsXY{ 8, 38 }, 148);
-        Row(rt, p + ScreenCoordsXY{ 8, 48 }, PieceName(selected), Icon::path, true);
+        Box(rt, p + ScreenCoordsXY{ 8, 48 }, { 148, 28 }, true);
+        DrawStrongText(rt, p + ScreenCoordsXY{ 14, 57 }, "{BLACK}" + PieceName(selected), 136);
         const auto& d = GetTrackElementDescriptor(selected).definition;
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 86 },
