@@ -3,6 +3,7 @@
 #include <SDL.h>
 #include <iostream>
 #include <openrct2-ui/UiContext.h>
+#include <openrct2-ui/handheld/AreaTools.h>
 #include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/Hud.h>
@@ -551,6 +552,17 @@ int main(int argc, char** argv)
         Require(H::IsSceneryToolActive(), "Scenery options cancel lost tool");
         H::EndTerrain();
         std::cout << "SDL scenery category / picker / duplicate A / options-return passed" << std::endl;
+        H::BeginAreaTools();
+        W::HandheldAreaOptionsOpen();
+        W::HandheldMenuMove(2);
+        const auto brushWidth = H::AreaTools::settings.width;
+        press(H::Action::confirm);
+        Require(H::AreaTools::settings.width == brushWidth + 1, "Duplicate A resized brush twice");
+        W::HandheldConstructionMove(-1, 0);
+        Require(H::AreaTools::settings.width == brushWidth, "Brush left adjustment failed");
+        press(H::Action::back);
+        H::EndTerrain();
+        std::cout << "SDL area brush / duplicate A / bounded adjustment / return passed" << std::endl;
         SaveFlags flags{};
         const auto save = std::string(argv[2]) + "/hud-lifecycle.park";
         Require(ScenarioSave(state, save, flags), "HUD fixture save failed");

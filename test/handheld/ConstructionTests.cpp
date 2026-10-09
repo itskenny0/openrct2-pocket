@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Public object metadata/native park fixture. No original sprites or live coaster assets.
 #include <iostream>
+#include <openrct2-ui/handheld/AreaTools.h>
 #include <openrct2-ui/handheld/SceneryTools.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
@@ -204,6 +205,78 @@ int main(int argc, char** argv)
             std::cout << "Native " << S::CategoryName(c.category)
                       << " / query-research-bounds-ghost-ownership-colour-removal-persistence passed\n";
         }
+        namespace A = Ui::Handheld::AreaTools;
+        const CoordsXY areaTile{ 736, 736 };
+        A::Settings area;
+        area.width = 2;
+        area.height = 2;
+        Require(
+            !A::Range(CoordsXY{ 32, 32 }, 3, 3) && !A::Range(CoordsXY{ 33, 32 }, 1, 1) && !A::Range(areaTile, 65, 1),
+            "Brush bounds clamped/redirected");
+        A::Settings single;
+        Require(A::Action(areaTile, single, true).error == GameActions::Status::ok, "Mixed-height seed native raise failed");
+        GameActions::ProcessQueue(state);
+        const auto mixedHeight = MapGetSurfaceElementAt(areaTile)->getBaseZ();
+        for (auto operation : { A::Operation::raise, A::Operation::lower, A::Operation::smoothRaise, A::Operation::smoothLower,
+                                A::Operation::waterRaise, A::Operation::waterLower })
+        {
+            area.operation = operation;
+            const auto before = state.park.cash;
+            const auto q = A::Action(areaTile, area, false);
+            Require(q.error == GameActions::Status::ok && state.park.cash == before, "Area query failed/charged");
+            Require(A::Action(areaTile, area, true).error == GameActions::Status::ok, "Area native execute failed");
+            GameActions::ProcessQueue(state);
+            Require(state.park.cash == before - q.cost && Ghosts() == 0, "Area exact native cash/ghost differs");
+        }
+        area.operation = A::Operation::raise;
+        area.selection = 1;
+        Require(A::Action(areaTile, area, true).error == GameActions::Status::ok, "Native corner operation failed");
+        GameActions::ProcessQueue(state);
+        area.selection = 5;
+        Require(A::Action(areaTile, area, true).error == GameActions::Status::ok, "Native edge operation failed");
+        GameActions::ProcessQueue(state);
+        const auto funds = state.park.cash;
+        state.park.cash = 0;
+        area.selection = 0;
+        Require(A::Action(areaTile, area, false).error != GameActions::Status::ok, "Area funds bypassed");
+        state.park.cash = funds;
+        for (auto t : { areaTile, areaTile + CoordsXY{ 32, 0 }, areaTile + CoordsXY{ 0, 32 }, areaTile + CoordsXY{ 32, 32 } })
+            MapGetSurfaceElementAt(t)->setOwnership({});
+        Require(A::Action(areaTile, area, false).error != GameActions::Status::ok, "Area ownership bypassed");
+        for (auto t : { areaTile, areaTile + CoordsXY{ 32, 0 }, areaTile + CoordsXY{ 0, 32 }, areaTile + CoordsXY{ 32, 32 } })
+            MapGetSurfaceElementAt(t)->setOwnership({ OwnershipFlag::landOwned });
+        auto* sand = objects.LoadObject("rct2.terrain_surface.sand");
+        auto* edge = objects.LoadObject("rct2.terrain_edge.wood_red");
+        Require(sand && edge, "Area paint metadata missing");
+        area.operation = A::Operation::paint;
+        area.surface = objects.GetLoadedObjectEntryIndex(sand);
+        area.edge = objects.GetLoadedObjectEntryIndex(edge);
+        const auto beforePaint = state.park.cash;
+        const auto pq = A::Action(areaTile, area, false);
+        Require(pq.error == GameActions::Status::ok, "Area style query failed");
+        const auto height = MapGetSurfaceElementAt(areaTile)->getBaseZ();
+        const auto water = MapGetSurfaceElementAt(areaTile)->getWaterHeight();
+        Require(A::Action(areaTile, area, true).error == GameActions::Status::ok, "Area style execute failed");
+        GameActions::ProcessQueue(state);
+        for (auto t : { areaTile, areaTile + CoordsXY{ 32, 0 }, areaTile + CoordsXY{ 0, 32 }, areaTile + CoordsXY{ 32, 32 } })
+            Require(
+                MapGetSurfaceElementAt(t)->getSurfaceObjectIndex() == area.surface
+                    && MapGetSurfaceElementAt(t)->getEdgeObjectIndex() == area.edge,
+                "Area style footprint differs");
+        Require(
+            MapGetSurfaceElementAt(areaTile)->getBaseZ() == height
+                && MapGetSurfaceElementAt(areaTile)->getWaterHeight() == water && state.park.cash == beforePaint - pq.cost,
+            "Area painting changed height/water/accounting");
+        SaveFlags areaFlags{};
+        const auto areaSave = std::string(argv[2]) + "/area.park";
+        const auto areaCash = state.park.cash;
+        Require(ScenarioSave(state, areaSave, areaFlags) && context->LoadParkFromFile(areaSave), "Area save/reload failed");
+        Require(
+            state.park.cash == areaCash && MapGetSurfaceElementAt(areaTile)->getBaseZ() == height
+                && MapGetSurfaceElementAt(areaTile)->getEdgeObjectIndex() == area.edge && mixedHeight > 0,
+            "Area persistence differs");
+        std::cout << "Native area terrain / mixed heights / smoothing / corner-edge / water / style-footprint / "
+                     "bounds-ownership-funds / cash-persistence passed\n";
         std::cout << "Pocket park construction native checks passed\n";
         return 0;
     }

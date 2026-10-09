@@ -55,9 +55,35 @@ and scenery-group tabs. Ghost recreation currently favours validation correctnes
 over caching; physical Brick preview performance still needs measurement. Full
 ordinary scenery parity is therefore PARTIAL, not inferred from visible menus.
 
+## Phase 2: Area terrain and water — delivered requested core
+
+Build → Terrain / Water adds a rectangular 1–64 × 1–64 tile brush. Y/Select opens
+operations, width/height, native corner/edge/whole-tile selection, and loaded
+surface/edge choices. Left/Right adjusts, A applies a menu change or one park edit,
+B returns/exits. D-pad/camera/zoom and all original single-tile shortcuts remain.
+MapRange is validated before native clamping; off-map footprints are unavailable.
+Native map selection displays the rectangle and the effective selection type;
+water/style operations use the whole area, regardless of terrain corner choice.
+
+LandRaiseAction/LandLowerAction, LandSmoothAction, WaterRaiseAction/WaterLowerAction
+and SurfaceSetStyleAction own all shaping, mixed-height selection, smoothing reach,
+water clearance, price, ownership and pause rules. Smoothing can affect neighbouring
+terrain as native desktop smoothing does. Native area tools may skip unowned tiles;
+Pocket does not invent atomicity or claim those tiles were changed. Painting uses
+selected loaded styles and centre-tile native colours; null styles stay unchanged.
+No landscaping algorithm or map mutation is introduced. Selection has no serialized
+state or placement ghost; all existing ghost/tool cleanup applies on entry/exit.
+
+Validation: Release GUI/CLI, native 2×2 mixed-height raising/lowering, native smooth
+raise/lower, corners/edges, water raise/lower, surface/edge footprint, exact cash,
+funds, all-unowned rejection, invalid bounds and native save/reload; SDL brush
+options, duplicate-A resize, Left adjustment and return. Original single-tile tools
+remain regression contracts. Native landscaping interference tests remain in the
+existing suite. Terrain colour choice controls and a drag-from-two-corners selector
+are still future depth; rectangular dimension selection already covers areas.
+
 ## Remaining planned phases
 
-2. Area terrain/water/paint, brushes and native smoothing/edges.
 3. Native land and construction-rights inspection and Cancel-first purchasing.
 4. Path furniture and sequential connected ground/elevated construction.
 
@@ -66,4 +92,5 @@ ordinary scenery parity is therefore PARTIAL, not inferred from visible menus.
 Genuine native component captures and the required PNG ZIP will be produced after
 validated source publication. Only implemented screens will be captured. Public
 metadata fixtures will be labelled; no AI world art or fabricated park backdrop.
-Exact validated pushed commits are recorded in a subsequent documentation checkpoint.
+Phase 1: `1ad489b600a872c6894a953760a0e81698213a6f`. Later validated pushed
+commits are recorded in a subsequent documentation checkpoint.

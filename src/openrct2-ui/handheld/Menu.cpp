@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+#include "AreaTools.h"
 #include "Currency.h"
 #include "CustomTracks.h"
 #include "Dashboard.h"
@@ -61,6 +62,7 @@ namespace OpenRCT2::Ui::Windows
         sceneryCategory,
         sceneryPicker,
         sceneryOptions,
+        areaOptions,
         sceneryName,
         sceneryConfirm,
         shopPicker,
@@ -390,7 +392,8 @@ namespace OpenRCT2::Ui::Windows
     public:
         bool constructionMenu() const
         {
-            return _page == Page::sceneryOptions || _page == Page::sceneryName || _page == Page::sceneryConfirm;
+            return _page == Page::areaOptions || _page == Page::sceneryOptions || _page == Page::sceneryName
+                || _page == Page::sceneryConfirm;
         }
         void constructionMove(int x, int y)
         {
@@ -401,6 +404,8 @@ namespace OpenRCT2::Ui::Windows
             }
             else if (y)
                 move(y);
+            else if (x && _page == Page::areaOptions)
+                Handheld::AreaTools::Configure(_focus.index(), x);
             else if (x && _page == Page::sceneryOptions)
                 Handheld::SceneryTools::Configure(_focus.index(), x);
             invalidate();
@@ -601,10 +606,13 @@ namespace OpenRCT2::Ui::Windows
                 case Page::customChoice:
                     return { "Custom build", "Saved designs...", "Back" };
                 case Page::build:
-                    return { "Raise land", "Lower land",         "Paths", "Water",          "Surface",    "Remove scenery",
-                             "Trees",      "Shops / Facilities", "Rides", "Wooden designs", "Scenery...", "Back to park" };
+                    return { "Raise land",  "Lower land",         "Paths", "Water",          "Surface",    "Remove scenery",
+                             "Trees",       "Shops / Facilities", "Rides", "Wooden designs", "Scenery...", "Terrain / Water...",
+                             "Back to park" };
                 case Page::sceneryCategory:
                     return { "Small scenery / trees", "Large scenery", "Walls / fences", "Banners / signs", "Back to build" };
+                case Page::areaOptions:
+                    return Handheld::AreaTools::Options();
                 case Page::sceneryName:
                     return _nameEntry.Keys();
                 case Page::sceneryConfirm:
@@ -765,6 +773,10 @@ namespace OpenRCT2::Ui::Windows
                     : _page == Page::sceneryPicker ? Handheld::SceneryTools::Entries(Handheld::SceneryTools::Current().category)
                                                    : Handheld::TreePickerEntries(),
                 preferred);
+        }
+        void openAreaOptions()
+        {
+            page(Page::areaOptions);
         }
         void openSceneryOptions()
         {
@@ -1186,6 +1198,9 @@ namespace OpenRCT2::Ui::Windows
                 case Page::sceneryPicker:
                     page(Page::sceneryOptions);
                     break;
+                case Page::areaOptions:
+                    close();
+                    break;
                 case Page::sceneryName:
                     page(Page::sceneryOptions);
                     break;
@@ -1595,8 +1610,22 @@ namespace OpenRCT2::Ui::Windows
                         invalidate();
                     }
                     break;
+                case Page::areaOptions:
+                    if (choice == 0)
+                        close();
+                    else
+                    {
+                        Handheld::AreaTools::Configure(choice);
+                        invalidate();
+                    }
+                    break;
                 case Page::build:
-                    if (choice == 10)
+                    if (choice == 11)
+                    {
+                        close();
+                        Handheld::BeginAreaTools();
+                    }
+                    else if (choice == 10)
                         page(Page::sceneryCategory);
                     else if (choice == 9)
                         openDesignPicker(true);
@@ -2791,6 +2820,9 @@ namespace OpenRCT2::Ui::Windows
                 case Page::designConfirm:
                     title = "PLACE DESIGN?";
                     break;
+                case Page::areaOptions:
+                    title = "AREA BRUSH OPTIONS";
+                    break;
                 case Page::sceneryCategory:
                     title = "SCENERY CATEGORY";
                     break;
@@ -3044,6 +3076,11 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* w = static_cast<HandheldMenuWindow*>(GetWindowManager()->FindByClass(WindowClass::handheldMenu)))
             w->constructionMove(x, y);
+    }
+    void HandheldAreaOptionsOpen()
+    {
+        if (auto* w = OpenPanel())
+            w->openAreaOptions();
     }
     void HandheldSceneryOptionsOpen()
     {
