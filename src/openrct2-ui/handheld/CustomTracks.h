@@ -20,6 +20,9 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     bool StationPlacement();
     bool CameraMode();
     bool Backward();
+    bool PlacementInverted();
+    bool ToggleInverted();
+    bool ToggleCovered();
     void ToggleCamera();
     void Rotate();
     bool Select(TrackElemType type);

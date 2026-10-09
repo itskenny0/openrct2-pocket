@@ -50,3 +50,53 @@ Remaining gaps: covered/inverted variants, backward diagonal/complex-family exha
 coverage, selected-seat controls, atomic/station/inverted replacement, spatial selection,
 arbitrary export scenery/substitutions and broad operation/hardware validation.
 Publication SHAs are recorded in subsequent checkpoints and the final manifest.
+
+## Phase 1 publication
+
+Canonical cf29892a2ebf51badcd8d3d95f1edcd6adf01142; local
+1b101fbc6ab16a6918b64d80134b585f4e5c94d2; matching tree
+4494b6fffe333252e3b31fab2598e110a8d12796. Guarded fast-forward publication
+preserves canonical native parent history and all local history.
+
+## Phase 2 — native covered and inverted variant placement
+
+Covered availability follows TED alternativeType back to the original piece and
+native Covered paint groups plus loaded vehicle sprite support. The ordinary
+vehicle/group check cannot validate covered descriptors solely through their flat
+placeholder group. Native mappings are cached from immutable TED metadata. Select
+picker offers Covered track / Open track only when that alternative connects.
+The native covered type itself supplies costs, footprint, query, ghost and execution.
+
+Inverted variants require the native hasInvertedVariant flag, appropriate native
+inverted paint groups, vehicle sprite groups and TrackGetActualBank2 compatibility.
+Native startConstructionInverted now supplies initial station defaults and the
+correct station-group eligibility (Flying previously failed regular station filtering).
+Existing source variants are retained through forward and backward recovery. Draft
+variant toggling is offered only when a native-compatible alternative piece exists;
+otherwise it is withheld. Native supported transitions remain in the piece picker.
+No native vehicle support or track groups are invented/unlocked. Selected blocks
+show native variant and applicable seat index. Existing selected removal/rebuild
+allows explicit seat changes through the existing picker after removal; no direct
+selected-seat flag write or new atomic replacement is claimed.
+
+SequentialTrackPlaceAction serializes the placement inverted flag and passes it
+unchanged to native TrackPlaceAction query/execute. Preview identity includes it.
+Connections on both sides use native actual-bank calculation, including sources
+and closing connections. Source speed/seat/chain/inverted baselines are now guarded
+for forward construction as well as backward construction. Busy draft changes
+reject and clear previews only after successful changes. Removal uses the real
+source variant even if the player changed the outgoing draft. Native saves retain
+covered types and inverted/seat flags; Pocket serializes no gameplay state.
+
+Expanded SeatRotationTests cover Dinghy covered controller utility/held-A,
+query/ghost/execute, return to open draft, native removal/rebuild, unsupported inverted
+requests, actual Multi-dimension native inverted source placement, forward/backward
+extension/undo, Flying inverted-start station/straight and native variant persistence.
+The Multi-dimension object lacks a compatible normal transition through its actual
+sprite groups at the tested endpoint: the utility is withheld and rejected, not
+advertised as usable. Native descriptors/actions remain authoritative.
+
+Remaining: exhaustive covered slopes/curves, positive variant-toggle/transition
+coverage for other eligible objects, selected-seat direct adjustment, other special
+parameters, atomic/station/inverted replacement, diagonal/complex backward coverage,
+arbitrary design scenery/substitutions and broad operation/hardware parity.

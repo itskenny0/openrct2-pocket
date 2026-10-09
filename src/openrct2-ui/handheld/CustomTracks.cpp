@@ -29,7 +29,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
 {
     namespace GA = GameActions;
     using namespace TrackMetadata;
-    static bool active{}, busy{}, camera{}, chain{}, createdHere{}, backward{};
+    static bool active{}, busy{}, camera{}, chain{}, createdHere{}, backward{}, placementInverted{};
     static std::optional<TrackConstructionSupport::BlockSnapshot> sourceBaseline;
     static int32_t stationOffset{};
     static uint8_t placementSpeed{ 6 }, placementSeat{ 4 };
@@ -51,6 +51,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         Block block;
         bool chain;
         uint8_t speed, seat;
+        bool inverted;
         bool operator==(const Preview&) const = default;
     };
     static std::optional<Block> previous, anchor;
@@ -149,8 +150,6 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             const auto& ted = GetTrackElementDescriptor(e->getTrackType());
             if (backward)
             {
-                if (e->isInverted())
-                    return false;
                 const auto snapshot = TrackConstructionSupport::Previous(current);
                 if (!snapshot)
                 {
@@ -173,7 +172,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                                                 | (ted.coordinates.rotationBegin & 4))
                                                ^ 2) };
                     pitch = ted.definition.pitchStart;
-                    roll = ted.definition.rollStart;
+                    roll = TrackGetActualBank2(ride->type, e->isInverted(), ted.definition.rollStart);
+                    placementInverted = e->isInverted();
                     return true;
                 }
                 const auto& c = GetTrackElementDescriptor(snapshot->type).sequenceData.sequences[0].clearance;
@@ -202,8 +202,13 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                 const auto origin = CoordsXY(current) - CoordsXY{ firstSequence.x, firstSequence.y }.rotate(e->getDirection());
                 previous = Block{ { origin, e->getBaseZ() - firstSequence.z, e->getDirection() }, e->getTrackType() };
                 endpoint = CoordsXYZD{ next.x, next.y, z, static_cast<Direction>(direction) };
+                sourceBaseline = TrackConstructionSupport::BlockSnapshot{
+                    previous->origin,     previous->type, e->getBrakeBoosterSpeed(),
+                    e->getSeatRotation(), e->hasChain(),  e->isInverted()
+                };
                 pitch = ted.definition.pitchEnd;
-                roll = ted.definition.rollEnd;
+                roll = TrackGetActualBank2(ride->type, e->isInverted(), ted.definition.rollEnd);
+                placementInverted = e->isInverted();
                 return true;
             }
             if (!TrackIsConnectedByShape(current.element, next.element))
@@ -253,15 +258,14 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     {
         return completed;
     }
-    static bool Supported(TrackElemType type)
+    static bool Supported(TrackElemType type, bool variant = placementInverted)
     {
         if (!TrackConstructionSupport::Piece(type))
             return false;
         const auto& ted = GetTrackElementDescriptor(type);
-        const auto group = ted.definition.group;
         const auto* ride = target ? RideManagement::Resolve(*target) : nullptr;
-        if (!ride || !Eligible(ride->subtype, ride->type) || !ride->getRideTypeDescriptor().SupportsTrackGroup(group)
-            || !RideEntryGetSupportedTrackPieces(*GetRideEntryByIndex(ride->subtype))[static_cast<size_t>(group)]
+        if (!ride || !Eligible(ride->subtype, ride->type)
+            || !TrackConstructionSupport::Supported(*ride, *GetRideEntryByIndex(ride->subtype), type, variant)
             || ted.sequenceData.numSequences == 0)
             return false;
         // Loaded vehicle support and native TED endpoint geometry filter all
@@ -269,14 +273,59 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         if (StationPlacement())
             return type == TrackElemType::endStation;
         return endpoint
-            && (backward ? ted.definition.pitchEnd == pitch && ted.definition.rollEnd == roll
+            && (backward ? ted.definition.pitchEnd == pitch
+                        && TrackGetActualBank2(ride->type, variant, ted.definition.rollEnd) == roll
                         && (ted.coordinates.rotationEnd & 4) == (endpoint->direction & 4)
-                         : ted.definition.pitchStart == pitch && ted.definition.rollStart == roll
+                         : ted.definition.pitchStart == pitch
+                        && TrackGetActualBank2(ride->type, variant, ted.definition.rollStart) == roll
                         && (ted.coordinates.rotationBegin & 4) == (endpoint->direction & 4));
+    }
+    bool PlacementInverted()
+    {
+        return active && placementInverted;
+    }
+    bool ToggleInverted()
+    {
+        const auto* ride = target ? RideManagement::Resolve(*target) : nullptr;
+        if (!active || busy || !ride || !ride->getRideTypeDescriptor().flags.has(RtdFlag::hasInvertedVariant))
+            return false;
+        const auto old = placementInverted;
+        placementInverted = !placementInverted;
+        if (!Supported(selected))
+        {
+            auto alternative = TrackElemType::none;
+            for (int i = 0; i < static_cast<int>(TrackElemType::count); ++i)
+                if (Supported(static_cast<TrackElemType>(i)))
+                {
+                    alternative = static_cast<TrackElemType>(i);
+                    break;
+                }
+            if (alternative == TrackElemType::none)
+            {
+                placementInverted = old;
+                return false;
+            }
+            selected = alternative;
+        }
+        ClearPreview();
+        chain = false;
+        return true;
+    }
+    bool ToggleCovered()
+    {
+        if (!active || busy)
+            return false;
+        const auto base = TrackConstructionSupport::CoveredBase(selected);
+        const auto next = base.value_or(GetTrackElementDescriptor(selected).alternativeType);
+        if (next == TrackElemType::none || !Supported(next))
+            return false;
+        return Select(next);
     }
     std::string PieceName(TrackElemType type)
     {
         const auto& ted = GetTrackElementDescriptor(type);
+        if (const auto base = TrackConstructionSupport::CoveredBase(type))
+            return PieceName(*base) + " / covered";
         if (type == TrackElemType::endStation || type == TrackElemType::beginStation || type == TrackElemType::middleStation)
             return "Station";
         const auto native = FormatStringIDLegacy(ted.description, nullptr);
@@ -349,6 +398,23 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             entry.drawPreview = [type](Drawing::RenderTarget& rt) { DrawPiecePreview(rt, type); };
             result.push_back(std::move(entry));
         }
+        const auto coveredBase = TrackConstructionSupport::CoveredBase(selected);
+        const auto coveredNext = coveredBase.value_or(GetTrackElementDescriptor(selected).alternativeType);
+        if (coveredNext != TrackElemType::none && Supported(coveredNext))
+            result.push_back(
+                { { ObjectType::ride, kObjectEntryIndexNull, "covered" },
+                  coveredBase ? "Open track" : "Covered track",
+                  ZoomLevel{ 0 } });
+        bool alternativeAvailable = false;
+        if (const auto* ride = target ? RideManagement::Resolve(*target) : nullptr;
+            ride && ride->getRideTypeDescriptor().flags.has(RtdFlag::hasInvertedVariant))
+            for (int i = 0; i < static_cast<int>(TrackElemType::count); ++i)
+                alternativeAvailable |= Supported(static_cast<TrackElemType>(i), !placementInverted);
+        if (alternativeAvailable)
+            result.push_back(
+                { { ObjectType::ride, kObjectEntryIndexNull, "inverted" },
+                  placementInverted ? "Use normal variant" : "Use inverted variant",
+                  ZoomLevel{ 0 } });
         if (SeatSupported())
             for (const auto& option : { std::pair{ "seat-minus", "Seat -" }, std::pair{ "seat-plus", "Seat +" },
                                         std::pair{ "seat-reset", "Seat default" } })
@@ -408,6 +474,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         depth = 0;
         camera = false;
         backward = false;
+        placementInverted = false;
         sourceBaseline.reset();
         ++revision;
     }
@@ -426,6 +493,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         busy = true;
         createdHere = true;
         selected = TrackElemType::endStation;
+        placementInverted = GetRideTypeDescriptor(type).flags.has(RtdFlag::startConstructionInverted);
         chain = false;
         feedback.clear();
         const auto token = revision;
@@ -676,6 +744,9 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             target->id, request->type, request->origin, chain, !previous, source.origin, source.type);
         query.SetPlacementSpeed(trackTypeHasSpeedSetting(request->type) ? placementSpeed : 6);
         query.SetPlacementSeat(SeatSupported() ? placementSeat : 0);
+        query.SetPlacementInverted(placementInverted);
+        if (sourceBaseline && !backward)
+            query.GuardSource(*sourceBaseline);
         if (backward)
         {
             if (!sourceBaseline)
@@ -689,6 +760,9 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             target->id, request->type, request->origin, chain, !previous, source.origin, source.type, q.cost);
         action.SetPlacementSpeed(trackTypeHasSpeedSetting(request->type) ? placementSpeed : 6);
         action.SetPlacementSeat(SeatSupported() ? placementSeat : 0);
+        action.SetPlacementInverted(placementInverted);
+        if (sourceBaseline && !backward)
+            action.GuardSource(*sourceBaseline);
         if (backward)
             action.UseBackward(*sourceBaseline);
         ClearPreview();
@@ -741,6 +815,9 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         auto query = GA::SequentialTrackPlaceAction(
             target->id, block.type, block.origin, false, false, block.origin, block.type);
         query.UseRemoval();
+        query.SetPlacementInverted(sourceBaseline ? sourceBaseline->inverted : placementInverted);
+        if (sourceBaseline && !backward)
+            query.GuardSource(*sourceBaseline);
         if (backward && sourceBaseline)
             query.UseBackward(*sourceBaseline);
         if (backward)
@@ -755,6 +832,9 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         auto remove = GA::SequentialTrackPlaceAction(
             target->id, block.type, block.origin, false, false, block.origin, block.type, q.cost);
         remove.UseRemoval();
+        remove.SetPlacementInverted(sourceBaseline ? sourceBaseline->inverted : placementInverted);
+        if (sourceBaseline && !backward)
+            remove.GuardSource(*sourceBaseline);
         if (backward && sourceBaseline)
             remove.UseBackward(*sourceBaseline);
         const auto token = revision;
@@ -822,13 +902,15 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             return;
         }
         const Preview next{ *request, chain, trackTypeHasSpeedSetting(request->type) ? placementSpeed : uint8_t{ 6 },
-                            SeatSupported() ? placementSeat : uint8_t{ 0 } };
+                            SeatSupported() ? placementSeat : uint8_t{ 0 }, placementInverted };
         if (ghost && *ghost == next)
             return;
         ClearPreview();
         SelectedLiftAndInverted flags{};
         if (chain)
             flags.set(LiftHillAndInverted::liftHill);
+        if (placementInverted)
+            flags.set(LiftHillAndInverted::inverted);
         auto* ride = RideManagement::Resolve(*target);
         if (nativePreview.place(ride->subtype, ride->type, request->origin, request->type, flags, next.speed, next.seat))
             ghost = next;
@@ -893,9 +975,11 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             rt, p + ScreenCoordsXY{ 10, 152 }, "{MUTED}Height " + (endpoint ? std::to_string(endpoint->z / 8) : "Unavailable"));
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 180 },
-            camera                ? "{GOLD}Camera controls"
-                : SeatSupported() ? "{MUTED}Seat " + std::to_string(placementSeat) + " / SEL options"
-                                  : "{MUTED}SEL Pieces / camera");
+            camera ? "{GOLD}Camera controls"
+                : SeatSupported()
+                ? "{MUTED}Seat " + std::to_string(placementSeat) + (placementInverted ? " / Inv" : " / SEL options")
+                : placementInverted ? "{MUTED}Inverted / SEL options"
+                                    : "{MUTED}SEL Pieces / camera");
         DrawModernText(rt, p + ScreenCoordsXY{ 10, 208 }, "{MUTED}L2/R2 Slope | SEL Pieces");
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;

@@ -14,7 +14,7 @@ namespace OpenRCT2::GameActions
         CoordsXY _expectedView{};
         CoordsXYZD _origin{}, _source{};
         TrackElemType _piece{}, _sourceType{};
-        bool _first{}, _chain{}, _noMoney{}, _remove{};
+        bool _first{}, _chain{}, _noMoney{}, _remove{}, _placementInverted{};
         bool _selected{}, _speedChange{}, _sourceInverted{};
         uint8_t _baselineSpeed{}, _baselineSeat{}, _newSpeed{}, _placementSpeed{ 6 }, _placementSeat{};
         bool _guardPrevious{}, _backward{}, _guardSource{};
@@ -46,6 +46,10 @@ namespace OpenRCT2::GameActions
             _sourceInverted = inverted;
             _baselineSeat = seat;
         }
+        void SetPlacementInverted(bool inverted)
+        {
+            _placementInverted = inverted;
+        }
         void SetPlacementSpeed(uint8_t speed)
         {
             _placementSpeed = speed;
@@ -58,6 +62,11 @@ namespace OpenRCT2::GameActions
         {
             _guardPrevious = true;
             _previous = previous;
+        }
+        void GuardSource(const TrackConstructionSupport::BlockSnapshot& source)
+        {
+            _guardSource = true;
+            _sourceSnapshot = source;
         }
         void UseBackward(const TrackConstructionSupport::BlockSnapshot& source)
         {

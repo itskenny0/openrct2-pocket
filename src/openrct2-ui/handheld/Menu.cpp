@@ -312,6 +312,10 @@ namespace OpenRCT2::Ui::Windows
                 else if (_trackBlock && Handheld::TrackEditing::Valid(*_trackBlock))
                 {
                     model.stats.emplace_back("Block", Handheld::TrackEditing::Label(*_trackBlock));
+                    model.stats.emplace_back("Variant", _trackBlock->inverted ? "Inverted" :
+                        TrackConstructionSupport::CoveredBase(_trackBlock->type) ? "Covered" : "Normal");
+                    if (TrackConstructionSupport::SeatRotation(_trackBlock->ride.type,_trackBlock->type))
+                        model.stats.emplace_back("Seat", std::to_string(_trackBlock->seat));
                     if (trackTypeHasSpeedSetting(_trackBlock->type))
                         model.stats.emplace_back(
                             "Speed", FormatStringID(STR_VELOCITY, static_cast<uint16_t>((_trackSpeed * 9) >> 2)));
@@ -1898,6 +1902,11 @@ namespace OpenRCT2::Ui::Windows
                         {
                             Handheld::CustomTracks::ToggleCamera();
                             close();
+                        }
+                        else if (key == "covered" || key == "inverted")
+                        {
+                            const auto ok=key=="covered" ? Handheld::CustomTracks::ToggleCovered() : Handheld::CustomTracks::ToggleInverted();
+                            if (ok) close(); else { _status="Variant cannot connect here"; invalidate(); }
                         }
                         else if (key.starts_with("seat-"))
                         {

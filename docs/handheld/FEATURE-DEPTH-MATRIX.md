@@ -243,3 +243,10 @@ delivered through block rosters, TED/native traversal and strict query/execute s
 baselines. Straight, multi-tile turn, slope, held-A, native cost/refund/undo and save
 coverage pass. Complex/diagonal/inverted family coverage and full editing parity remain
 PARTIAL; see ADVANCED-RIDE-EDITING-COMPLETION.md. No ordinary gap is removed.
+
+Advanced variants: native covered mappings/base groups and inverted paint/vehicle
+eligibility, actual-bank connections, inverted-start Flying station defaults and
+forward/backward source-variant recovery are delivered. Native query/ghost/execute,
+controller covered utility, unsupported inversion, undo and save persistence pass.
+Positive transition and exhaustive family/variant coverage, direct selected-seat
+adjustment and other special parameters remain PARTIAL; see advanced checkpoint.

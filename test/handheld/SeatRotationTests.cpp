@@ -83,6 +83,16 @@ int main(int argc, char** argv)
         const auto index = objects.GetLoadedObjectEntryIndex(object);
         RideTypeSetInvented(RIDE_TYPE_MULTI_DIMENSION_ROLLER_COASTER);
         RideEntrySetInvented(index);
+        auto* dinghyObject = objects.LoadObject("rct2.ride.ding1");
+        Check(dinghyObject, "Native covered-track vehicle missing");
+        const auto dinghyIndex = objects.GetLoadedObjectEntryIndex(dinghyObject);
+        RideTypeSetInvented(RIDE_TYPE_DINGHY_SLIDE);
+        RideEntrySetInvented(dinghyIndex);
+        auto* flyingObject = objects.LoadObject("rct2.ride.bmair");
+        Check(flyingObject, "Native Flying vehicle missing");
+        const auto flyingIndex = objects.GetLoadedObjectEntryIndex(flyingObject);
+        RideTypeSetInvented(RIDE_TYPE_FLYING_ROLLER_COASTER);
+        RideEntrySetInvented(flyingIndex);
         Check(H::BeginCustomTrack(index, RIDE_TYPE_MULTI_DIMENSION_ROLLER_COASTER), "Native seat ride begin failed");
         GameActions::ProcessQueue(state);
         C::Update(CoordsXY{ 640, 640 });
@@ -276,6 +286,112 @@ int main(int argc, char** argv)
         GameActions::ProcessQueue(state);
         H::EndTerrain();
         Check(!C::Backward() && H::TrackEditing::Valid(seatBlock), "Backward return-to-park damaged forward context");
+        // A native action creates a disconnected inverted source. Resume must
+        // preserve its native variant and apply actual bank connection semantics.
+        SelectedLiftAndInverted invertedFlags{};
+        invertedFlags.set(LiftHillAndInverted::inverted);
+        const CoordsXYZD invertedOrigin{ 1408, 640, 160, 0 };
+        GameActions::TrackPlaceAction invertedSource(
+            ride.id, TrackElemType::flat, ride.type, invertedOrigin, 6, 0, 7, invertedFlags, false);
+        Check(
+            GameActions::Query(&invertedSource, state).error == GameActions::Status::ok
+                && GameActions::Execute(&invertedSource, state).error == GameActions::Status::ok,
+            "Native inverted fixture action failed");
+        GameActions::ProcessQueue(state);
+        Check(
+            H::ResumeCustomTrackFrom(*H::RideManagement::Identify(ride.id), invertedOrigin, TrackElemType::flat)
+                && C::PlacementInverted() && C::Select(TrackElemType::flat),
+            "Inverted source resume failed");
+        C::Update({});
+        capture("advanced-05-inverted-native-preview.png", false);
+        auto invertedEndpoint = *C::Endpoint();
+        quote = C::Action(false);
+        Check(
+            quote.error == GameActions::Status::ok && C::Action(true).error == GameActions::Status::ok,
+            "Inverted matching query/execute failed");
+        GameActions::ProcessQueue(state);
+        bool invertedStored = false;
+        for (auto* e : TileElementsView<TrackElement>(invertedEndpoint))
+            invertedStored |= !e->isGhost() && e->getRideIndex() == ride.id && e->isInverted();
+        Check(invertedStored, "Native inverted flag missing");
+        const auto variantPieces = C::Pieces();
+        Check(
+            std::none_of(variantPieces.begin(), variantPieces.end(), [](const auto& e) { return e.identity.key == "inverted"; })
+                && !C::ToggleInverted() && C::PlacementInverted(),
+            "Unavailable normal transition exposed or changed draft");
+        Check(C::Undo().error == GameActions::Status::ok, "Inverted undo failed");
+        GameActions::ProcessQueue(state);
+        H::EndTerrain();
+        Check(
+            H::ResumeCustomTrackFrom(*H::RideManagement::Identify(ride.id), invertedOrigin, TrackElemType::flat, true)
+                && C::Backward() && C::PlacementInverted(),
+            "Inverted backward recovery failed");
+        Check(
+            C::Select(TrackElemType::flat) && C::Action(true).error == GameActions::Status::ok,
+            "Inverted backward placement failed");
+        GameActions::ProcessQueue(state);
+        Check(C::Undo().error == GameActions::Status::ok, "Inverted backward undo failed");
+        GameActions::ProcessQueue(state);
+        H::EndTerrain();
+        Check(H::BeginCustomTrack(dinghyIndex, RIDE_TYPE_DINGHY_SLIDE), "Covered native ride begin failed");
+        GameActions::ProcessQueue(state);
+        C::Update(CoordsXY{ 1408, 1408 });
+        Check(C::Action(true).error == GameActions::Status::ok, "Covered native station failed");
+        GameActions::ProcessQueue(state);
+        const auto coveredRide = *C::Target();
+        Check(C::Select(TrackElemType::flat), "Covered base unavailable");
+        auto unsupportedVariant = GameActions::SequentialTrackPlaceAction(
+            coveredRide.id, TrackElemType::flat, *C::Endpoint(), false, false,
+            H::TrackEditing::Blocks(coveredRide).front().origin, TrackElemType::endStation);
+        unsupportedVariant.SetPlacementInverted(true);
+        Check(
+            GameActions::Query(&unsupportedVariant, state).error != GameActions::Status::ok,
+            "Strict action accepted unavailable inverted variant");
+        W::HandheldTrackPiecePickerOpen();
+        auto coveredPieces = C::Pieces();
+        auto coveredOption = std::find_if(
+            coveredPieces.begin(), coveredPieces.end(), [](const auto& e) { return e.identity.key == "covered"; });
+        Check(coveredOption != coveredPieces.end(), "Covered utility absent");
+        auto coveredRow = std::distance(coveredPieces.begin(), coveredOption);
+        for (int n = 0; n < coveredRow / 3; ++n)
+            W::HandheldObjectPickerMove(0, 1);
+        for (int n = 0; n < coveredRow % 3; ++n)
+            W::HandheldObjectPickerMove(1, 0);
+        capture("advanced-06-covered-native-picker.png", true);
+        H::HandleMenuInput(controller, confirm);
+        Check(
+            C::Selection() == TrackElemType::flatCovered && !Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu),
+            "Held-A covered utility failed");
+        C::Update({});
+        capture("advanced-07-covered-native-preview.png", false);
+        const auto coveredOrigin = *C::Endpoint();
+        quote = C::Action(false);
+        Check(
+            quote.error == GameActions::Status::ok && C::Action(true).error == GameActions::Status::ok,
+            "Covered native placement failed");
+        GameActions::ProcessQueue(state);
+        Check(!C::ToggleInverted(), "Unsupported inverted variant exposed");
+        Check(C::ToggleCovered() && C::Selection() == TrackElemType::flat, "Covered draft did not return to native open piece");
+        Check(C::Undo().error == GameActions::Status::ok, "Covered native removal failed");
+        GameActions::ProcessQueue(state);
+        Check(C::ToggleCovered() && C::Action(true).error == GameActions::Status::ok, "Covered persistence rebuild failed");
+        GameActions::ProcessQueue(state);
+        H::EndTerrain();
+        Check(H::BeginCustomTrack(flyingIndex, RIDE_TYPE_FLYING_ROLLER_COASTER), "Native inverted-start ride unavailable");
+        GameActions::ProcessQueue(state);
+        C::Update(CoordsXY{ 1408, 1024 });
+        Check(C::PlacementInverted(), "Native inverted-start descriptor ignored");
+        capture("advanced-08-flying-inverted-station.png", false);
+        Check(C::Action(true).error == GameActions::Status::ok, "Native inverted-start station failed");
+        GameActions::ProcessQueue(state);
+        Check(C::Select(TrackElemType::flat) && C::PlacementInverted(), "Inverted-start forward geometry unavailable");
+        C::Update({});
+        W::HandheldTrackPiecePickerOpen();
+        capture("advanced-09-flying-native-piece-picker.png", true);
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        Check(C::Action(true).error == GameActions::Status::ok, "Flying native inverted straight failed");
+        GameActions::ProcessQueue(state);
+        H::EndTerrain();
         Check(H::BeginCustomTrack(GetRide(ride.id)->subtype, ride.type), "Invalid placement fixture begin failed");
         GameActions::ProcessQueue(getGameState());
         C::Update(CoordsXY{ 0, 0 });
@@ -293,6 +409,13 @@ int main(int argc, char** argv)
             if (!e->isGhost() && e->getRideIndex() == ride.id)
                 savedSeat = e->getSeatRotation() == 10;
         Check(savedSeat, "Native seat parameter not persisted");
+        bool savedCovered = false, savedInverted = false;
+        for (auto* e : TileElementsView<TrackElement>(coveredOrigin))
+            savedCovered |= !e->isGhost() && e->getRideIndex() == coveredRide.id
+                && e->getTrackType() == TrackElemType::flatCovered;
+        for (auto* e : TileElementsView<TrackElement>(invertedOrigin))
+            savedInverted |= !e->isGhost() && e->getRideIndex() == ride.id && e->isInverted() && e->getSeatRotation() == 7;
+        Check(savedCovered && savedInverted, "Native variants did not persist");
         std::cout << "Native seat rotation bounds/query/ghost/execute/controller/held-A/cost/persistence passed\n";
     }
     catch (const std::exception& e)

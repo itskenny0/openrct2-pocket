@@ -22,7 +22,9 @@ namespace OpenRCT2::TrackConstructionSupport
             return false;
         const auto& d = GetRideTypeDescriptor(type);
         return d.flags.has(RtdFlag::hasTrack) && !d.flags.hasAny(RtdFlag::isShopOrFacility, RtdFlag::hasSinglePieceStation)
-            && d.StartTrackPiece == TrackElemType::endStation && d.SupportsTrackGroup(TrackGroup::stationEnd);
+            && d.StartTrackPiece == TrackElemType::endStation
+            && getTrackDrawerDescriptor(d, d.flags.has(RtdFlag::startConstructionInverted))
+                   .Regular.SupportsTrackGroup(TrackGroup::stationEnd);
     }
     inline bool Piece(TrackElemType type)
     {
@@ -51,6 +53,34 @@ namespace OpenRCT2::TrackConstructionSupport
                 if (Available(index, type))
                     return type;
         return kRideTypeNull;
+    }
+    inline std::optional<TrackElemType> CoveredBase(TrackElemType piece)
+    {
+        static const auto bases = [] {
+            std::array<TrackElemType, static_cast<size_t>(TrackElemType::count)> result{};
+            result.fill(TrackElemType::none);
+            for (int i = 0; i < static_cast<int>(TrackElemType::count); ++i)
+            {
+                const auto alternative = TrackMetadata::GetTrackElementDescriptor(static_cast<TrackElemType>(i))
+                                             .alternativeType;
+                if (alternative < TrackElemType::count && result[static_cast<size_t>(alternative)] == TrackElemType::none)
+                    result[static_cast<size_t>(alternative)] = static_cast<TrackElemType>(i);
+            }
+            return result;
+        }();
+        if (piece >= TrackElemType::count || bases[static_cast<size_t>(piece)] == TrackElemType::none)
+            return {};
+        return bases[static_cast<size_t>(piece)];
+    }
+    inline bool Supported(const Ride& ride, const RideObjectEntry& entry, TrackElemType piece, bool inverted)
+    {
+        if (!Piece(piece) || (inverted && !ride.getRideTypeDescriptor().flags.has(RtdFlag::hasInvertedVariant)))
+            return false;
+        const auto base = CoveredBase(piece);
+        const auto& ted = TrackMetadata::GetTrackElementDescriptor(base.value_or(piece));
+        const auto drawer = getTrackDrawerDescriptor(ride.getRideTypeDescriptor(), inverted);
+        return (base ? drawer.Covered : drawer.Regular).SupportsTrackGroup(ted.definition.group)
+            && RideEntryGetSupportedTrackPieces(entry)[static_cast<size_t>(ted.definition.group)];
     }
     struct BlockSnapshot
     {
