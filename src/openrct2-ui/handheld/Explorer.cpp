@@ -11,6 +11,7 @@
 #include "Currency.h"
 #include "CustomTracks.h"
 #include "Designs.h"
+#include "DesignAuthoring.h"
 #include "FlatRides.h"
 #include "Hud.h"
 #include "Mazes.h"
@@ -108,6 +109,7 @@ namespace OpenRCT2::Ui::Handheld
         Shops::ClearPreview();
         FlatRides::End();
         Designs::End();
+        DesignAuthoring::End();
         CustomTracks::End();
         Mazes::End();
         _terrainActive = true;

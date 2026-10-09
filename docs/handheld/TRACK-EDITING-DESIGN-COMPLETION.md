@@ -222,3 +222,8 @@ Highest-value next work: native player-facing tested/rated design authoring with
 scenery selection, plus the remaining backward/replacement and variant editing
 adapters, with independent validated publication and operation evidence. Do not
 repeat delivered selected forward recovery/speed/manual elevation.
+
+Follow-up: DESIGN-AUTHORING-COMPLETION.md delivers player-facing native tested/rated
+export with safe naming, overwrite review, source/file guards and repository refresh.
+Earlier export-gap statements describe that checkpoint and are superseded only for
+this delivered scope; scenery authoring and other editing/variant gaps remain.

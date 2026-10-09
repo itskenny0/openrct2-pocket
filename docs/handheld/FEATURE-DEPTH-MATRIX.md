@@ -206,3 +206,9 @@ Track editing/design follow-up comprises four validated implementation publicati
 through 0a915988a0264402ff50a161430efd9ed5b1b715 with canonical/local tree equality.
 The new checkpoint preserves exact remaining ordinary gaps and 14 genuine
 asset-backed viewport/component captures. No full gameplay-completeness claim.
+
+Native design authoring follow-up: player-facing tested/rated export now uses the
+UTF-8 keyboard, Cancel-first export/overwrite, native T6Exporter round-trip and
+repository refresh with source/file stale guards. See DESIGN-AUTHORING-COMPLETION.md.
+Scenery authoring, substitution choices, variants/seat parameters and backward/
+replacement editing remain PARTIAL; the 100% ordinary-gameplay goal is unchanged.

@@ -4,6 +4,7 @@
 #include "CustomTracks.h"
 #include "Dashboard.h"
 #include "Designs.h"
+#include "DesignAuthoring.h"
 #include "Explorer.h"
 #include "Finances.h"
 #include "FlatRides.h"
@@ -135,6 +136,8 @@ namespace OpenRCT2::Ui::Windows
         ridesMusic,
         ridesAppearance,
         ridesName,
+        designName,
+        designExport,
         ridesPrice,
         ridesConfirm,
         research,
@@ -282,6 +285,7 @@ namespace OpenRCT2::Ui::Windows
             return trackManagement() || _page == Page::ridesRoster || _page == Page::ridesInspect || _page == Page::ridesGraphs
                 || _page == Page::ridesStations || _page == Page::ridesCustomers || _page == Page::ridesEarnings
                 || _page == Page::ridesStats || _page == Page::ridesVehicles || _page == Page::ridesName
+                || _page == Page::designName || _page == Page::designExport
                 || _page == Page::ridesAppearance || _page == Page::ridesMusic || _page == Page::ridesDispatch
                 || _page == Page::ridesOperations || _page == Page::ridesMaintenance || _page == Page::ridesAccess
                 || _page == Page::ridesPrice || _page == Page::ridesConfirm;
@@ -334,7 +338,20 @@ namespace OpenRCT2::Ui::Windows
                 }
                 return model;
             }
-            if (current == Page::ridesName)
+            if (current == Page::designExport)
+            {
+                Handheld::ManagementPresentation model;
+                model.breadcrumb = "Rides / Save design";
+                model.title = Handheld::DesignAuthoring::Overwrite() ? "OVERWRITE DESIGN?" : "EXPORT DESIGN?";
+                model.bodyLines.push_back("File: " + Handheld::DesignAuthoring::Filename());
+                model.rows = { "Cancel", "Export design" };
+                model.confirmation = true;
+                model.selected = selected;
+                model.status = _status.empty() ? "Native tested / rated design" : _status;
+                model.primaryAction = "Choose";
+                return model;
+            }
+            if (current == Page::ridesName || current == Page::designName)
             {
                 Handheld::ManagementPresentation model;
                 model.breadcrumb = "Name / Keyboard";
@@ -641,8 +658,11 @@ namespace OpenRCT2::Ui::Windows
                 _marketingTargets = Handheld::MarketingManagement::Targets(_marketingDraft->type);
             if (next != Page::marketingEditor && next != Page::marketingTargets && next != Page::marketingConfirm)
                 _marketingDraft.reset();
+            if ((_page == Page::designName || _page == Page::designExport)
+                && next != Page::designName && next != Page::designExport)
+                Handheld::DesignAuthoring::End();
             _page = next;
-            if (next == Page::ridesName)
+            if (next == Page::ridesName || next == Page::designName || next == Page::designExport)
             {
                 _dashboard.focus = Handheld::Dashboard::Focus::content;
                 _dashboard.section = Handheld::Dashboard::Section::rides;
@@ -730,6 +750,8 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ridesAccess:
                 case Page::ridesVehicles:
                 case Page::ridesName:
+                case Page::designName:
+                case Page::designExport:
                 case Page::ridesAppearance:
                 case Page::ridesMusic:
                 case Page::ridesDispatch:
@@ -958,6 +980,7 @@ namespace OpenRCT2::Ui::Windows
         }
         void onClose() override
         {
+            Handheld::DesignAuthoring::End();
             if (_ridesReviewResumed || _rightsReviewResumed)
                 _pausedHere = false; // Our pause was already released; retain any external pause.
             if (_page == Page::designConfirm && _focus.index() == 0)
@@ -1363,7 +1386,7 @@ namespace OpenRCT2::Ui::Windows
                     _staffUniformDraft = static_cast<Drawing::Colour>((EnumValue(_staffUniformDraft) + x + 72) % 72);
                 invalidate();
             }
-            else if (_page == Page::ridesName || _page == Page::staffName || _page == Page::guestName)
+            else if (_page == Page::ridesName || _page == Page::designName || _page == Page::staffName || _page == Page::guestName)
             {
                 const auto current = _focus.index();
                 const auto next = _nameEntry.Move(current, x, y);
@@ -1607,6 +1630,13 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::ridesInspect:
                     page(Page::ridesRoster);
+                    break;
+                case Page::designExport:
+                    Handheld::DesignAuthoring::CancelReview();
+                    page(Page::designName);
+                    break;
+                case Page::designName:
+                    page(Page::ridesInspect);
                     break;
                 case Page::ridesName:
                     page(_ridesTarget && _ridesTarget->shop ? Page::shop : Page::ridesInspect);
@@ -2697,6 +2727,18 @@ namespace OpenRCT2::Ui::Windows
                         break;
                     }
 
+                    if (choice < rows.size() && rows[choice] == "Save design...")
+                    {
+                        const auto result = Handheld::DesignAuthoring::Begin(*_ridesTarget);
+                        if (result.error == GameActions::Status::ok)
+                        {
+                            _nameEntry = { Handheld::DesignAuthoring::DefaultName() };
+                            page(Page::designName);
+                        }
+                        else _status = result.getErrorMessage();
+                        invalidate();
+                        break;
+                    }
                     if (choice == rows.size() - 8)
                     {
                         _ridesDraft = Handheld::RideManagement::BeginName(*_ridesTarget);
@@ -2937,6 +2979,32 @@ namespace OpenRCT2::Ui::Windows
                             : choice == 2                                                      ? Page::ridesGraphs
                             : _ridesTarget && Handheld::RideManagement::Resolve(*_ridesTarget) ? Page::ridesInspect
                                                                                                : Page::ridesRoster);
+                    break;
+                case Page::designName:
+                    if (choice == 47) page(Page::ridesInspect);
+                    else if (choice == 46)
+                    {
+                        const auto result = Handheld::DesignAuthoring::Review(_nameEntry.text);
+                        if (result.error == GameActions::Status::ok) page(Page::designExport);
+                        else _status = result.getErrorMessage();
+                        invalidate();
+                    }
+                    else { _nameEntry.Press(choice); invalidate(); }
+                    break;
+                case Page::designExport:
+                    if (choice == 0)
+                    {
+                        Handheld::DesignAuthoring::CancelReview();
+                        page(Page::designName);
+                    }
+                    else
+                    {
+                        const auto filename = Handheld::DesignAuthoring::Filename();
+                        const auto result = Handheld::DesignAuthoring::Confirm();
+                        page(Page::ridesInspect);
+                        _status = result.error == GameActions::Status::ok ? "Saved " + filename : result.getErrorMessage();
+                        invalidate();
+                    }
                     break;
                 case Page::ridesName:
                     if (choice == 47)

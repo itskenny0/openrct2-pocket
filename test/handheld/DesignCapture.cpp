@@ -9,6 +9,7 @@
 #include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/handheld/Dashboard.h>
 #include <openrct2-ui/handheld/Designs.h>
+#include <openrct2-ui/handheld/DesignAuthoring.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/FlatRides.h>
 #include <openrct2-ui/handheld/Paths.h>
@@ -32,6 +33,8 @@
 #include <openrct2/audio/AudioContext.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/core/Imaging.h>
+#include <openrct2/core/File.h>
+#include <openrct2/actions/ride/RideSetAppearanceAction.h>
 #include <openrct2/drawing/Palette.h>
 #include <openrct2/drawing/X8DrawingEngine.h>
 #include <openrct2/entity/EntityList.h>
@@ -622,6 +625,91 @@ int main(int argc, char** argv)
             identity && H::RideAccess::Inspect(*identity) && GetRide(id)->status == RideStatus::testing
                 && state.park.cash == savedCash && elements(true) == 0,
             "Design save identity/status/access/cash failed");
+        namespace A = H::DesignAuthoring;
+        auto& authorState = getGameState();
+        Check(identity && A::Begin(*identity).error != GameActions::Status::ok, "Unrated export accepted");
+        if (GameIsPaused()) PauseToggle();
+        for (int ticks = 0; ticks < 50000 && (!GetRide(id)->flags.has(RideFlag::tested) || !RideHasRatings(*GetRide(id))); ++ticks)
+            gameStateUpdateLogic();
+        identity = H::RideManagement::Identify(id);
+        Check(identity && A::Begin(*identity).error == GameActions::Status::ok && A::Valid(), "Native tested/rated export unavailable");
+        const auto exportCash = authorState.park.cash;
+        Check(A::Review("../escape").error != GameActions::Status::ok && !A::HasReview(), "Unsafe filename accepted");
+        Check(A::Review("").error != GameActions::Status::ok, "Empty filename accepted");
+        Check(A::Review("Café Native").error == GameActions::Status::ok, "UTF-8 name rejected");
+        const auto output = tracks / A::Filename();
+        A::CancelReview();
+        Check(!std::filesystem::exists(output) && authorState.park.cash == exportCash, "Cancelled export wrote file or cash");
+        Check(A::Review("Café Native").error == GameActions::Status::ok && A::Confirm().error == GameActions::Status::ok,
+            "Native design export failed");
+        Check(A::Confirm().error != GameActions::Status::ok, "Repeated export accepted");
+        auto roundtrip = TrackDesignImport(output.string().c_str());
+        Check(roundtrip && roundtrip->trackAndVehicle.rtdIndex == GetRide(id)->type && !roundtrip->trackElements.empty(),
+            "Export/import round-trip failed");
+        const auto refreshed = H::Designs::Entries();
+        Check(std::any_of(refreshed.begin(), refreshed.end(), [&](const auto& e) { return e.identity.key == output.string(); }),
+            "Export missing from repository refresh");
+        const auto originalBytes = File::ReadAllBytes(output.string());
+        Check(A::Begin(*identity).error == GameActions::Status::ok && A::Review("Café Native").error == GameActions::Status::ok
+            && A::Overwrite(), "Overwrite review unavailable");
+        A::CancelReview();
+        Check(File::ReadAllBytes(output.string()) == originalBytes, "Cancelled overwrite changed file");
+        Check(A::Review("Café Native").error == GameActions::Status::ok, "Stale-file review unavailable");
+        auto changedBytes = originalBytes; changedBytes.push_back(0);
+        File::WriteAllBytes(output.string(), changedBytes.data(), changedBytes.size());
+        Check(A::Confirm().error != GameActions::Status::ok && File::ReadAllBytes(output.string()) == changedBytes,
+            "Changed destination overwritten");
+        File::WriteAllBytes(output.string(), originalBytes.data(), originalBytes.size());
+        Check(A::Review("Café Native").error == GameActions::Status::ok, "Stale-source review unavailable");
+        GameActions::RideSetAppearanceAction recolour(id, GameActions::RideSetAppearanceType::trackColourMain,
+            (static_cast<uint8_t>(GetRide(id)->trackColours[0].main) + 1) % 32, 0);
+        Check(GameActions::Execute(&recolour, authorState).error == GameActions::Status::ok, "Native source change failed");
+        GameActions::ProcessQueue(authorState);
+        Check(!A::Valid() && A::Confirm().error != GameActions::Status::ok, "Changed ride exported from stale review");
+        A::End();
+        auto departed = *identity; ++departed.generation;
+        Check(A::Begin(departed).error != GameActions::Status::ok, "Reused identity exported");
+        auto openExport = [&] {
+            Ui::Windows::HandheldDashboardOpen();
+            Ui::Windows::HandheldDashboardMove(0, 1);
+            H::HandleMenuInput(controller, selecting);
+            const auto exportRoster = H::RideManagement::Roster();
+            const auto exportRow = std::find(exportRoster.begin(), exportRoster.end(), *identity);
+            Check(exportRow != exportRoster.end(), "Export ride missing from roster");
+            for (auto i = exportRoster.begin(); i != exportRow; ++i) Ui::Windows::HandheldMenuMove(1);
+            H::HandleMenuInput(controller, selecting);
+            const auto rows = Ui::Windows::HandheldRidesPresentation().rows;
+            const auto exportEntry = std::find(rows.begin(), rows.end(), "Save design...");
+            Check(exportEntry != rows.end(), "Export control missing");
+            for (auto i = rows.begin(); i != exportEntry; ++i) Ui::Windows::HandheldMenuMove(1);
+            H::HandleMenuInput(controller, selecting);
+            Check(A::Active() && !A::HasReview(), "Held-A opened export review");
+        };
+        auto moveKey = [&](size_t key) { auto current = Ui::Windows::HandheldRidesPresentation().selected;
+            while (current != key) { Ui::Windows::HandheldMenuMove(current < key ? 1 : -1); current = Ui::Windows::HandheldRidesPresentation().selected; }
+        };
+        viewFocus = *H::RideManagement::Location(*identity);
+        openExport();
+        capture("authoring-01-native-name-keyboard.png", 6);
+        moveKey(46); H::HandleMenuInput(controller, selecting);
+        Check(A::HasReview() && Ui::Windows::HandheldRidesPresentation().selected == 0, "Export review not Cancel-first");
+        capture("authoring-02-native-export-review.png", 6);
+        const auto uiOutput = tracks / A::Filename();
+        const auto uiBefore = A::Existing(uiOutput);
+        H::HandleMenuInput(controller, selecting);
+        Check(A::Active() && !A::HasReview() && A::Existing(uiOutput) == uiBefore, "Cancel-first wrote export");
+        moveKey(46); H::HandleMenuInput(controller, selecting);
+        Ui::Windows::HandheldMenuMove(1); H::HandleMenuInput(controller, selecting);
+        Check(!A::Active() && std::filesystem::exists(uiOutput) && authorState.park.cash == exportCash,
+            "Controller native export failed");
+        capture("authoring-03-native-export-complete.png", 6);
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        openExport(); moveKey(46); H::HandleMenuInput(controller, selecting);
+        Check(A::Overwrite() && Ui::Windows::HandheldRidesPresentation().selected == 0, "Overwrite not Cancel-first");
+        capture("authoring-04-native-overwrite-review.png", 6);
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        Check(!A::Active(), "Menu close retained export context");
+        std::cout << "Native design authoring eligibility/UTF-8/round-trip/repository/stale file/stale source/controller/cancel passed" << std::endl;
         std::cout << "Native design "
                      "picker/research/paging/ghost/rotation/cash/cancel/input/stations/access/testing/save-reload passed"
                   << std::endl;
