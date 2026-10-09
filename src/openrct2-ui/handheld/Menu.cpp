@@ -329,8 +329,12 @@ namespace OpenRCT2::Ui::Windows
             auto model = Handheld::StaffManagement::Presentation(
                 view, selected, _staffRoster, _staffTarget, _hireType, _ordersDraft, _status);
             if (currentPage == Page::staff)
+            {
                 model.rows[_staffRoster.size() + 3] = "Filter: "
                     + (_staffFilter ? Handheld::StaffManagement::RoleName(*_staffFilter) : "All staff");
+                if (_staffFilter && _staffRoster.empty() && _status.empty())
+                    model.status = "No employees in this role";
+            }
             return model;
         }
         Handheld::ManagementPresentation staffPresentation() const

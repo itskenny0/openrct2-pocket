@@ -62,7 +62,7 @@ query-only behavior, invalid bounds/alignment, pending repeat guard, individual
 removal, stale clear, clear/repeat and 2×2 save/reload. SDL inspector-to-park route,
 duplicate-A brush adjustment, Cancel-first clear, native clear and options recovery
 pass. Original-sprite patrol rendering/effectiveness and physical Brick remain
-unverified. Naming, role filtering and uniforms are next; manual pickup remains
+unverified. Phase 3 below adds naming, role filtering and uniforms; manual pickup remains
 an explicit ordinary-gameplay gap until implemented.
 
 Published Phase 1: `a6e4baa5782e00e5eaa3ffe092830982122592a1`.
@@ -105,4 +105,47 @@ exhaustion has not been fixture-tested. No AArch64 build or physical TrimUI Bric
 claimed. Staff remains PARTIAL against the 100% ordinary-gameplay goal; delivered patrol,
 roles and operations do not erase these gaps. Existing construction gaps remain unchanged.
 
-Screenshots and final broader regression results are recorded below after capture review.
+Published Phase 3: `46debcb732dd583728008a833814343894422b7f`.
+
+## Final regression and capture evidence
+
+Release GUI and CLI targets build successfully. StaffCompletionTests passes all four
+roles, native wage charging, costume availability/invalid object, patrol geometry and
+save/reload, names including default reset/repeat guards, filters and all three native
+uniform roles. PresentationLifecycleTests passes real SDL controller/window routes,
+held-A handoff, Cancel-first hire/name/patrol clear, costume application, uniform draft/apply,
+role filter/wage summaries and menu recovery. Existing PathActionsTests passes full
+construction, RideAccess/queues, Ride Management, guest/staff, finance/research/marketing,
+HUD lifecycle and native save/reload. ConstructionTests passes scenery categories,
+furniture, sequential elevated paths, area terrain/water and land/rights. CTest input,
+launcher and save preservation: 3/3 pass. Expected missing private DAT/POB warnings
+remain in public-object fixtures; no original-asset rendering claim follows.
+
+`test/handheld/StaffCompletionPreview.h` initializes a legal public-metadata scenario,
+hires 12 employees through native actions, names one through StaffSetNameAction and
+adds a native 4×3 patrol rectangle. `PanelPreview.cpp` captures production Dashboard,
+StaffManagement, StaffPatrol, HUD and compact menu components through X8DrawingEngine,
+using public native fonts/palette. No AI images, backdrop composites or presentation-only
+simulation values are used. World/animation sprites are unavailable: these are
+component fixtures, not asset-backed park captures. Native patrol coverage on the map
+is not visually validated by the blank world area in these images.
+
+The ZIP contains fifteen genuine 512×384 PNGs:
+
+- staff-depth-roles: four-role hiring picker.
+- staff-depth-roster and staff-depth-filter: twelve actual employees, pagination and security filter.
+- staff-depth-inspection and staff-depth-orders: native role/status/wage and handyman order draft.
+- staff-depth-costumes: loaded elephant/tiger costume names and current selection.
+- staff-depth-summary and staff-depth-uniform: native counts/monthly wage totals and role-wide colour control.
+- staff-depth-patrol and staff-depth-patrol-remove: compact add/remove brush controls and native HUD.
+- staff-depth-patrol-options: actual 4×3 area settings.
+- staff-depth-patrol-clear: Cancel-first review of twelve native patrol tiles.
+- staff-depth-name and staff-depth-name-review: bounded keyboard and Cancel-first naming review.
+- staff-depth-dense: 32-character native employee name and paginated inspection controls.
+
+Every screen was visually inspected for clipping/overlap, focus, panels, controls and
+HUD collisions. Long labels ellipsize deliberately; no material production layout
+collision was found. The capture fixture annotation initially overlapped the patrol
+HUD; it was moved outside the HUD and those captures regenerated. Original-sprite
+patrol overlays, animation, live workload effectiveness, AArch64 and physical Brick
+remain unverified. Captures ship as OpenRCT2-Pocket-Staff-Captures.zip with a manifest.

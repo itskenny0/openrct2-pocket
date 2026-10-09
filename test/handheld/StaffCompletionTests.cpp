@@ -178,6 +178,24 @@ int main(int argc, char** argv)
                 && S::SetUniform(hired.front(), colour, newColour, true).error != GameActions::Status::ok
                 && state.park.cash == before,
             "Uniform native application/stale/accounting failed");
+        for (const auto& t : { hired[1], hired[2] })
+        {
+            const auto base = StaffGetColour(t.type);
+            const auto value = static_cast<Drawing::Colour>((EnumValue(base) + 1) % 72);
+            Require(S::SetUniform(t, base, value, true).error == GameActions::Status::ok, "Native role uniform failed");
+            GameActions::ProcessQueue(state);
+            Require(
+                S::Resolve(t)->tShirtColour == value && S::Resolve(t)->trousersColour == value, "Native role clothing differs");
+        }
+        Require(S::SetName(hired.front(), "Mónica", "", true).error == GameActions::Status::ok, "Default name reset failed");
+        GameActions::ProcessQueue(state);
+        const auto defaultName = S::Resolve(hired.front())->getName();
+        Require(
+            !S::Resolve(hired.front())->name
+                && S::SetName(hired.front(), defaultName, "", false).error != GameActions::Status::ok,
+            "Repeated default name accepted");
+        Require(S::SetName(hired.front(), defaultName, "Mónica", true).error == GameActions::Status::ok, "Name restore failed");
+        GameActions::ProcessQueue(state);
         SaveFlags flags{};
         const auto save = std::string(argv[2]) + "/staff-completion.park";
         Require(ScenarioSave(state, save, flags) && context->LoadParkFromFile(save), "Staff save/reload failed");
@@ -196,7 +214,7 @@ int main(int argc, char** argv)
         }
         Require(S::Roster().empty() && state.park.cash == before, "Dismissal invented refund");
         std::cout << "Native all staff roles / loaded costumes / invalid-role-object / query-stale-repeat / wages-no-money / "
-                     "dismissal-save passed\n";
+                     "patrol-name-uniform-filter-dismissal-save passed\n";
     }
     catch (const std::exception& error)
     {

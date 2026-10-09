@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Native 512x384 overlay capture; optional backdrop is an explicitly labelled layout composite.
 #include "ConstructionPreview.h"
+#include "StaffCompletionPreview.h"
 
 #include <fstream>
 #include <openrct2-ui/handheld/CustomTracks.h>
@@ -37,7 +38,8 @@ int main(int argc, char** argv)
     gCustomOpenRCT2DataPath = argv[1];
     auto context = CreateContext();
     Config::SetDefaults();
-    if (std::string(argv[3]).starts_with("ride-depth") || std::string(argv[3]).starts_with("park-build"))
+    if (std::string(argv[3]).starts_with("ride-depth") || std::string(argv[3]).starts_with("park-build")
+        || std::string(argv[3]).starts_with("staff-depth"))
     {
         gOpenRCT2Headless = true;
         gOpenRCT2NoGraphics = true;
@@ -46,6 +48,8 @@ int main(int argc, char** argv)
         gameStateInitAll(getGameState(), { 16, 16 });
         if (std::string(argv[3]).starts_with("park-build"))
             ConstructionPreview::Setup();
+        if (std::string(argv[3]).starts_with("staff-depth"))
+            StaffCompletionPreview::Setup();
         gOpenRCT2NoGraphics = false;
     }
     GfxLoadG2PalettesFontsTracks();
@@ -119,7 +123,9 @@ int main(int argc, char** argv)
                     && rt.bits[y * rt.LineStride() + x] != before[y * rt.LineStride() + x])
                     return 6; // HUD text/icons must not escape the reserved native rectangle.
     }
-    if (page.starts_with("park-build"))
+    if (page.starts_with("staff-depth"))
+        StaffCompletionPreview::Draw(rt, page);
+    else if (page.starts_with("park-build"))
         ConstructionPreview::Draw(rt, page);
     else if (std::string(argv[3]) == "terrain" || std::string(argv[3]) == "terrain-lower")
     {
@@ -207,6 +213,8 @@ int main(int argc, char** argv)
         auto* object = context->GetObjectManager().LoadObject(fixtureObject);
         if (!object)
             return 8;
+        if (std::string(argv[3]).starts_with("staff-depth"))
+            StaffCompletionPreview::Setup();
         gOpenRCT2NoGraphics = false;
         const auto objectIndex = context->GetObjectManager().GetLoadedObjectEntryIndex(object);
         GameActions::RideCreateAction create(
