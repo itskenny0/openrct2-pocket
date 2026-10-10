@@ -12,7 +12,7 @@ Release GUI/CLI rebuild PASS. ParkMapInformationTests PASS with native initializ
 
 Publication starts from canonical 7b99544ee1aaf037046fb8659cf5129e7ed1ccf3 / tree 2e7d6d92d9ba8e4e5378f26f2694442cca13ae15. This workspace had reverted to staff source; exact GitHub blob recovery produced local safety cd94db316c8ff93cca61b697a6a0de7c5cad69ea with that same tree without modifying Esperanto. Subsequent validated phase commits are recorded in the next checkpoint update to avoid self-referential commit hashes.
 
-Remaining phases: native news/awards/history; map-linked subjects and recovery. Map currently has no peep markers/roster links. No AArch64, physical Brick performance/input, sustained routing or full SDL gameplay-frame validation is claimed. Captures use production rendering and private supplied assets; archives, scenario parks and generated private designs are excluded from publication.
+At Phase 1 the planned news/history and peep/roster follow-ons were pending; Phases 2–3 below deliver them. No AArch64, physical Brick performance/input, sustained routing or full SDL gameplay-frame validation is claimed. Captures use production rendering and private supplied assets; archives, scenario parks and generated private designs are excluded from publication.
 
 ## Phase 2 — native news, awards and histories
 
@@ -26,4 +26,22 @@ Focused native/SDL regression PASS: native message add/archive/remove APIs, exac
 | --- | --- | --- | --- |
 | Native map | 7a6f491bead20fc5af287fcfc4f46367f6fe982e | 20376377a8179fb607596c005e381f818ade3636 | ca1548cc53df0771c4f71814d7310ab21127708a |
 
-Phase 2 publication identifiers are recorded in the following documentation checkpoint. Remaining: map-linked subjects/filters and inspection recovery; news subject inspection links; broader ordinary notification/history settings retained on the roadmap.
+Phase 2 publication identifiers are recorded in the following documentation checkpoint. At Phase 2 the subject/inspection follow-on was pending; Phase 3 below delivers it. Broader ordinary notification/history settings remain on the roadmap.
+
+## Phase 3 — native subjects, inspection and recovery
+
+Y cycles terrain/ownership, rides/paths, guests and staff. Native map transforms and native CoordsXY::rotate(-cameraRotation) keep D-pad on camera-relative isometric tile axes, with all interior tiles reachable; cardinal steps follow the native tile diamond rather than a virtual pointer. Select opens actual subjects: rides, all/tracked guests, or all/handyman/mechanic/security/entertainer staff. Native map marker colours/coordinates are shared with Map.cpp entity helpers; no entity flags/positions are written to draw overlays. Native ownership labels distinguish owned, owned rights, land/rights for sale and unavailable land.
+
+Subject rows recheck live membership while preserving selected native identity where possible. Show on map retains zoom/mode/filter; Inspect reuses existing guest/staff/ride panels (news shops reuse shop management). Back restores the subject/news detail and map context. Explicit locate returns to park. Target identity generations and native location eligibility reject departed/reused staff/guests/rides; no raw entity/map pointers survive reviews. Existing map/news transient state is discarded on load/exit; native camera/save state remains native.
+
+News detail now links eligible ride/guest/staff inspection with guarded recovery; non-inspectable financial/award/research/campaign subjects remain explicitly unavailable. Copied native news text is displayed through the native format-token parser, preserving text/UTF-8 and paragraph breaks while neutralising native colours/newlines in one-line roster rows. Baselines keep original raw data unchanged. Awards similarly use neutral Pocket text; graphs keep native dates and white labels on dark panels.
+
+Expanded ParkMapInformationTests PASS: native camera-relative movement at all four rotations; native guest/peep overlay coordinates, tracking query/execute and live membership, actual staff hire/fire and role membership, missing/reused generation rejection, native ride creation and inspection, map show/inspect/back recovery, SDL virtual held-A handoff with no auto-locate, native news subject links/disable/expiry, native maximum 1001x1001 resize (2048 tile refresh budget), shrink/clamp, load cleanup and native persistence. Initial scenario metadata/guests/research are fixture setup; gameplay changes use native actions/APIs.
+
+| Published phase | Canonical SHA | Local safety SHA | Matching tree |
+| --- | --- | --- | --- |
+| News/awards/history | 5de5e7e288673eb7a233ea2a21bf64b8d83cc21e | a619d62e41dfeafc5278ba7eba0a150025ec3a79 (after b313ef1f10ab1fd39155db2d2ecdb7a08b5e3f2e) | e75c311c4666b3cbbe0ff11b17eed2db422f7bfa |
+
+Phase 3 identifiers are recorded in the final validation checkpoint; final SHA is recorded externally to avoid self-reference. Publication always verifies remote/native parent, exact source-tree equality and expected_sha/force=false fast-forward update. Esperanto is excluded from commits.
+
+Remaining ordinary gaps: moving train overlay, richer ride-category/peep task filters, persistent follow, native scenario/editor map resizing/entry/spawn tools, notification settings/acknowledgement, research/finance/campaign news subject handoffs and finance histories/research finished-item catalog. No native historical award log exists in currentAwards; none is invented. Source parity remains PARTIAL; the 100% goal and all prior construction/management gaps remain explicit.

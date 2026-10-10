@@ -1284,6 +1284,24 @@ namespace OpenRCT2::Ui::Windows
             viewport->ViewWidth() / kCoordsXYStep, viewport->ViewHeight() / kCoordsXYHalfTile } };
     }
 
+    std::vector<NativeMiniMapMarker> NativeMiniMapPeepMarkers(bool employees, bool tracked, int role)
+    {
+        std::vector<NativeMiniMapMarker> result;
+        if (employees)
+        {
+            for (const auto* staff : EntityList<Staff>())
+                if (staff->x != kLocationNull && (role < 0 || EnumValue(staff->assignedStaffType) == role))
+                    result.push_back({ NativeMiniMapCoords({ staff->x, staff->y }), StaffMapColour });
+        }
+        else
+        {
+            for (const auto* guest : EntityList<Guest>())
+                if (guest->x != kLocationNull && (!tracked || guest->peepFlags.has(PeepFlag::tracking)))
+                    result.push_back({ NativeMiniMapCoords({ guest->x, guest->y }), GuestMapColour });
+        }
+        return result;
+    }
+
     WindowBase* MapOpen()
     {
         try

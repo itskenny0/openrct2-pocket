@@ -188,3 +188,5 @@ missing as a Pocket player workflow in the matrix. Reuse native map rendering,
 legends, object/peep overlays, news/awards and park histories; link existing locate,
 roster and construction flows rather than repeating delivered features. Retain
 all unfinished ordinary construction, design, guest and staff functionality.
+
+Continuation (2026-10-10): the recommended native Park Map and Information core now has controller navigation, native map/peep layers, linked subject inspection, news/awards and park history graphs. See PARK-MAP-INFORMATION-COMPLETION.md and the updated matrix; construction gaps above are unchanged.

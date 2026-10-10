@@ -71,9 +71,18 @@ namespace OpenRCT2::Graph
                 // Draw month text
                 auto ft = Formatter();
                 ft.Add<StringId>(DateGameShortMonthNames[DateGetMonth((yearOver32 / 4) + MONTH_COUNT)]);
-                drawText(
-                    rt, screenCoords - ScreenCoordsXY{ 0, 14 }, STR_GRAPH_LABEL, ft,
-                    { darkBackground ? Colour::white : Colour::black, FontStyle::small, TextAlignment::centre });
+                if (darkBackground)
+                {
+                    const auto label = FormatStringIDLegacy(STR_GRAPH_LABEL, ft.Data());
+                    drawText(
+                        rt, screenCoords - ScreenCoordsXY{ 0, 14 },
+                        "{WHITE}" + FmtString(std::string_view{ label }).WithoutFormatTokens(),
+                        { FontStyle::small, TextAlignment::centre });
+                }
+                else
+                    drawText(
+                        rt, screenCoords - ScreenCoordsXY{ 0, 14 }, STR_GRAPH_LABEL, ft,
+                        { FontStyle::small, TextAlignment::centre });
                 // Draw month tick mark
                 Rectangle::fill(
                     rt, { screenCoords - ScreenCoordsXY{ 0, 4 }, screenCoords - ScreenCoordsXY{ 0, 1 } }, PaletteIndex::pi10);

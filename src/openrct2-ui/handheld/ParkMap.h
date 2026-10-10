@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "ConceptStyle.h"
+#include "MapSubjects.h"
 
 #include <openrct2-ui/windows/NativeMap.h>
 #include <openrct2/GameState.h>
@@ -18,6 +19,7 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
         TileCoordsXY size{};
         uint8_t rotation = 255;
         bool rides{};
+        int mode{}, filter{};
         int zoom = 1;
         int extent{}, next{};
         std::vector<Drawing::PaletteIndex> pixels;
@@ -46,12 +48,14 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
         }
         void Move(int x, int y)
         {
-            focus += CoordsXY{ x * 32, y * 32 };
+            focus += CoordsXY{ y * 32, x * 32 }.rotate(-GetCurrentRotation());
             Clamp();
         }
         void Mode()
         {
-            rides = !rides;
+            mode = (mode + 1) % 4;
+            rides = mode == 1;
+            filter = 0;
             rotation = 255;
         }
         void Update()
@@ -91,7 +95,13 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
     {
         Concept::Box(rt, { 8, 8 }, { 496, 348 });
         DrawModernText(rt, { 20, 24 }, "{GOLD}Park map", {}, 150, true);
-        DrawModernText(rt, { 20, 53 }, state.rides ? "Rides / paths" : "Terrain / ownership", {}, 150);
+        DrawModernText(
+            rt, { 20, 53 },
+            state.mode == 2       ? "Guests / terrain"
+                : state.mode == 3 ? "Staff / terrain"
+                : state.rides     ? "Rides / paths"
+                                  : "Terrain / ownership",
+            {}, 150);
         DrawModernText(
             rt, { 20, 77 }, "Tile " + std::to_string(state.focus.x / 32) + ", " + std::to_string(state.focus.y / 32), {}, 150);
         DrawModernText(rt, { 20, 99 }, "Map " + std::to_string(state.size.x) + " x " + std::to_string(state.size.y), {}, 150);
@@ -106,13 +116,18 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
             : surface->hasOwnership(OwnershipFlag::constructionRightsForSale) ? "Rights for sale"
                                                                               : "Land unavailable";
         DrawModernText(rt, { 20, 173 }, ownership, {}, 150);
-        DrawModernText(rt, { 20, 204 }, "{GOLD}Legend", {}, 150, true);
-        const std::vector<std::string> legend = state.rides
+        DrawModernText(rt, { 20, state.mode >= 2 ? 218 : 204 }, "{GOLD}Legend", {}, 150, true);
+        std::vector<std::string> legend = state.rides
             ? std::vector<std::string>{ "Rides: brown", "Shops: bright colours", "Paths: light grey", "Water: blue" }
             : std::vector<std::string>{ "Native surface colours", "Paths: grey", "Water: blue", "Unowned: dim edge",
                                         "White box: viewport" };
+        if (state.mode >= 2)
+        {
+            legend[0] = state.mode == 2 ? "Guests: native pink" : "Staff: native green";
+            DrawModernText(rt, { 20, 193 }, MapSubjects::FilterName(state.mode, state.filter), {}, 150);
+        }
         for (size_t i = 0; i < legend.size(); ++i)
-            DrawModernText(rt, { 20, 229 + static_cast<int>(i) * 22 }, legend[i], {}, 150);
+            DrawModernText(rt, { 20, (state.mode >= 2 ? 243 : 229) + static_cast<int>(i) * 22 }, legend[i], {}, 150);
         const ScreenCoordsXY origin{ 180, 48 };
         constexpr int width = 312, height = 284;
         Concept::Box(rt, origin - ScreenCoordsXY{ 2, 2 }, { width + 4, height + 4 });
@@ -155,12 +170,25 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
                 GfxDrawLine(rt, { { a.x, b.y }, a }, colour);
             }
         }
+        if (state.mode >= 2)
+            for (const auto& peep : Windows::NativeMiniMapPeepMarkers(
+                     state.mode == 3, state.mode == 2 && state.filter != 0, state.mode == 3 ? state.filter - 1 : -1))
+            {
+                const auto point = project(peep.position);
+                if (point.x >= origin.x && point.x < origin.x + width - 1 && point.y >= origin.y
+                    && point.y < origin.y + height - 1)
+                    for (int y = 0; y < 2; ++y)
+                        for (int x = 0; x < 2; ++x)
+                            if (point.x + x >= rt.x && point.x + x < rt.x + rt.width && point.y + y >= rt.y
+                                && point.y + y < rt.y + rt.height)
+                                rt.bits[(point.y + y - rt.y) * rt.LineStride() + point.x + x - rt.x] = peep.colour;
+            }
         const auto marker = project(focus);
         const auto gold = static_cast<Drawing::PaletteIndex>(PocketPalette::selection);
         GfxDrawLine(rt, { marker - ScreenCoordsXY{ 5, 0 }, marker + ScreenCoordsXY{ 5, 0 } }, gold);
         GfxDrawLine(rt, { marker - ScreenCoordsXY{ 0, 5 }, marker + ScreenCoordsXY{ 0, 5 } }, gold);
         DrawModernText(rt, { 186, 24 }, state.ready ? "Gold cross: selected tile" : "Updating native map...", {}, 300);
         Concept::Box(rt, { 8, 359 }, { 496, 25 });
-        DrawModernText(rt, { 16, 369 }, "D-pad Move  A Locate  X Rotate  Y Map  L/R Zoom  B Back", {}, 480);
+        DrawModernText(rt, { 16, 369 }, "D-pad Tiles  A Locate  X Rotate  Y Map  L/R Zoom  Sel Subjects  B Back", {}, 480);
     }
 } // namespace OpenRCT2::Ui::Handheld::ParkMap

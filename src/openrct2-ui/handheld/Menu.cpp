@@ -16,6 +16,7 @@
 #include "ParkOverview.h"
 #include "ParkMap.h"
 #include "ParkInformation.h"
+#include "MapSubjects.h"
 #include "Paths.h"
 #include "ResearchManagement.h"
 #include "RideAccess.h"
@@ -100,6 +101,8 @@ namespace OpenRCT2::Ui::Windows
         parkNewsDetail,
         parkAwards,
         parkHistory,
+        mapSubjects,
+        mapSubject,
         finances,
         financeEditor,
         financeConfirm,
@@ -225,14 +228,38 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::ParkInformation::NewsTarget> _parkNewsTarget;
         size_t _parkNewsPage{}, _parkNewsFocus{};
         bool _parkGuestHistory{};
+        std::vector<Handheld::MapSubjects::Target> _mapSubjects;
+        std::optional<Handheld::MapSubjects::Target> _mapTarget;
+        size_t _mapSubjectsFocus{};
+        bool _mapInspection{};
+        Page _mapInspectionReturn = Page::mapSubject;
+        void inspectMapSubject(const Handheld::MapSubjects::Target& target, Page parent)
+        {
+            if (!Handheld::MapSubjects::Current(target)) { _status = "Subject departed or changed"; invalidate(); return; }
+            std::visit([&](const auto& person) {
+                using T = std::decay_t<decltype(person)>;
+                if constexpr (std::is_same_v<T, Handheld::GuestManagement::Target>) openGuest(person);
+                else if constexpr (std::is_same_v<T, Handheld::StaffManagement::Target>)
+                { _dashboard.section = Handheld::Dashboard::Section::staff; openStaff(person); }
+                else
+                { _ridesTarget = person; _dashboard.section = Handheld::Dashboard::Section::rides;
+                  _dashboard.focus = Handheld::Dashboard::Focus::content;
+                  if (person.shop) { _shop = Handheld::ShopManagement::Capture(person.id); page(Page::shop); }
+                  else page(Page::ridesInspect); }
+            }, target);
+            _mapInspection = true;
+            _mapInspectionReturn = parent;
+        }
         bool parkInformation() const
         {
-            return _page == Page::parkNews || _page == Page::parkNewsDetail || _page == Page::parkAwards
+            return _page == Page::mapSubjects || _page == Page::mapSubject || _page == Page::parkNews || _page == Page::parkNewsDetail || _page == Page::parkAwards
                 || _page == Page::parkHistory;
         }
         Handheld::ManagementPresentation parkInformationPresentation() const
         {
             using namespace Handheld::ParkInformation;
+            if (_page == Page::mapSubjects) return Handheld::MapSubjects::Presentation(_mapSubjects, _parkMap.mode, _parkMap.filter, _focus.index());
+            if (_page == Page::mapSubject && _mapTarget) return Handheld::MapSubjects::Detail(*_mapTarget, _focus.index(), _status);
             if (_page == Page::parkNews) return NewsPresentation(_parkNews, _focus.index());
             if (_page == Page::parkNewsDetail && _parkNewsTarget) return NewsDetail(*_parkNewsTarget, _parkNewsPage, _focus.index(), _status);
             if (_page == Page::parkAwards) return Awards(_focus.index());
@@ -617,6 +644,19 @@ namespace OpenRCT2::Ui::Windows
         }
 
     public:
+        void parkMapSubjects()
+        {
+            if (_page != Page::parkMap) return;
+            _mapSubjects = Handheld::MapSubjects::Roster(_parkMap.mode, _parkMap.filter);
+            page(Page::mapSubjects);
+            if (_mapTarget)
+            {
+                const auto found = std::find(_mapSubjects.begin(), _mapSubjects.end(), *_mapTarget);
+                if (found != _mapSubjects.end()) _focus.move(static_cast<int>(found - _mapSubjects.begin()), rows().size());
+            }
+        }
+        Handheld::ManagementPresentation mapSubjectsModel() const { return parkInformationPresentation(); }
+        CoordsXY mapFocus() const { return _parkMap.focus; }
         bool parkMapOpen() const { return _page == Page::parkMap; }
         void parkMapControl(int control)
         {
@@ -840,6 +880,8 @@ namespace OpenRCT2::Ui::Windows
                     return { "Review change...", "Cancel" };
                 case Page::financeConfirm:
                     return { "Apply", "Cancel" };
+                case Page::mapSubjects:
+                case Page::mapSubject:
                 case Page::parkNews:
                 case Page::parkNewsDetail:
                 case Page::parkAwards:
@@ -1287,6 +1329,18 @@ namespace OpenRCT2::Ui::Windows
         {
             if (_page == Page::parkMap) { _parkMap.Update(); invalidate(); }
             if (parkInformation()) invalidate();
+            if (_page == Page::mapSubjects)
+            {
+                const auto updated = Handheld::MapSubjects::Roster(_parkMap.mode, _parkMap.filter);
+                if (updated != _mapSubjects)
+                {
+                    const auto selected = _focus.index() < _mapSubjects.size()
+                        ? std::optional<Handheld::MapSubjects::Target>{_mapSubjects[_focus.index()]} : std::nullopt;
+                    const auto found = selected ? std::find(updated.begin(), updated.end(), *selected) : updated.end();
+                    const auto row = found == updated.end() ? std::min(_focus.index(), updated.size()) : static_cast<size_t>(found - updated.begin());
+                    _mapSubjects = updated; _focus = {}; _focus.move(static_cast<int>(row), rows().size());
+                }
+            }
             if (_page == Page::ridesRoster)
             {
                 const auto updated = Handheld::RideManagement::Roster();
@@ -1678,8 +1732,24 @@ namespace OpenRCT2::Ui::Windows
         }
         void back()
         {
+            if (_mapInspection && (_page == Page::guestInspect || _page == Page::staffInspect || _page == Page::ridesInspect
+                || _page == Page::guestRoster || _page == Page::staff || _page == Page::ridesRoster || _page == Page::shop))
+            {
+                _mapInspection = false;
+                _dashboard.section = Handheld::Dashboard::Section::overview;
+                _dashboard.focus = Handheld::Dashboard::Focus::content;
+                page(_mapInspectionReturn);
+                return;
+            }
             switch (_page)
             {
+                case Page::mapSubject:
+                    page(Page::mapSubjects);
+                    _focus.move(static_cast<int>(_mapSubjectsFocus), rows().size());
+                    break;
+                case Page::mapSubjects:
+                    page(Page::parkMap);
+                    break;
                 case Page::parkNewsDetail:
                     page(Page::parkNews);
                     _focus.move(static_cast<int>(_parkNewsFocus), rows().size());
@@ -1688,6 +1758,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::parkAwards:
                 case Page::parkHistory:
                 case Page::parkMap:
+                    _dashboard.section = Handheld::Dashboard::Section::overview;
                     page(Page::overview);
                     break;
                 case Page::sceneryCategory:
@@ -2813,6 +2884,31 @@ namespace OpenRCT2::Ui::Windows
                         invalidate();
                     }
                     break;
+                case Page::mapSubjects:
+                    if (choice < _mapSubjects.size())
+                    { _mapTarget = _mapSubjects[choice]; _mapSubjectsFocus = choice; page(Page::mapSubject); }
+                    else if (choice == _mapSubjects.size() && _parkMap.mode >= 2)
+                    {
+                        _parkMap.filter = (_parkMap.filter + 1) % (_parkMap.mode == 2 ? 2 : 5);
+                        _mapSubjects = Handheld::MapSubjects::Roster(_parkMap.mode, _parkMap.filter);
+                        _focus = {}; invalidate();
+                    }
+                    else page(Page::parkMap);
+                    break;
+                case Page::mapSubject:
+                    if (choice == 1 && _mapTarget) inspectMapSubject(*_mapTarget, Page::mapSubject);
+                    else if ((choice == 0 || choice == 2) && _mapTarget)
+                    {
+                        const auto location = Handheld::MapSubjects::Location(*_mapTarget);
+                        if (location && MapIsLocationValid(*location))
+                        {
+                            if (choice == 0) { _parkMap.focus = *location; _parkMap.Clamp(); page(Page::parkMap); }
+                            else if (auto* main = WindowGetMain()) { close(); WindowScrollToLocation(*main, *location); }
+                        }
+                        else { _status = "Subject departed or location unavailable"; invalidate(); }
+                    }
+                    else back();
+                    break;
                 case Page::parkNews:
                     if (choice < _parkNews.size())
                     {
@@ -2824,7 +2920,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::parkNewsDetail:
                     if (choice == 0 && _parkNewsTarget)
                     {
-                        const auto count = Handheld::GuestManagement::TextLines(_parkNewsTarget->item.text).size();
+                        const auto count = Handheld::GuestManagement::TextLines(Handheld::ParkInformation::PlainText(_parkNewsTarget->item.text)).size();
                         _parkNewsPage = (_parkNewsPage + 1) % std::max<size_t>(1, (count + 5) / 6); invalidate();
                     }
                     else if (choice == 1 && _parkNewsTarget)
@@ -2833,6 +2929,13 @@ namespace OpenRCT2::Ui::Windows
                         if (location && WindowGetMain())
                         { auto* main = WindowGetMain(); close(); WindowScrollToLocation(*main, *location); }
                         else { _status = "News expired or subject unavailable"; invalidate(); }
+                    }
+                    else if (choice == 2 && _parkNewsTarget)
+                    {
+                        if (!Handheld::ParkInformation::SubjectCurrent(*_parkNewsTarget)) { _status = "News subject unavailable"; invalidate(); }
+                        else if (_parkNewsTarget->ride) inspectMapSubject(*_parkNewsTarget->ride, Page::parkNewsDetail);
+                        else if (_parkNewsTarget->guest) inspectMapSubject(*_parkNewsTarget->guest, Page::parkNewsDetail);
+                        else if (_parkNewsTarget->staff) inspectMapSubject(*_parkNewsTarget->staff, Page::parkNewsDetail);
                     }
                     else back();
                     break;
@@ -4467,6 +4570,20 @@ namespace OpenRCT2::Ui::Windows
         return window && static_cast<const HandheldMenuWindow*>(window)->picker()
             ? static_cast<const HandheldMenuWindow*>(window)->pickerFocus()
             : kObjectEntryIndexNull;
+    }
+    Handheld::ManagementPresentation HandheldParkMapSubjectsPresentation()
+    {
+        const auto* w = static_cast<HandheldMenuWindow*>(GetWindowManager()->FindByClass(WindowClass::handheldMenu));
+        return w ? w->mapSubjectsModel() : Handheld::ManagementPresentation{};
+    }
+    std::optional<CoordsXY> HandheldParkMapLocation()
+    {
+        const auto* w = static_cast<HandheldMenuWindow*>(GetWindowManager()->FindByClass(WindowClass::handheldMenu));
+        return w && w->parkMapOpen() ? std::optional<CoordsXY>{w->mapFocus()} : std::nullopt;
+    }
+    void HandheldParkMapSubjects()
+    {
+        if (auto* w = static_cast<HandheldMenuWindow*>(GetWindowManager()->FindByClass(WindowClass::handheldMenu))) w->parkMapSubjects();
     }
     bool HandheldParkMapIsOpen()
     {

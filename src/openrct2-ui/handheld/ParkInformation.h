@@ -17,6 +17,22 @@
 
 namespace OpenRCT2::Ui::Handheld::ParkInformation
 {
+    inline std::string PlainText(const std::string& text, bool oneLine = false)
+    {
+        std::string result;
+        for (const auto& token : FmtString(std::string_view{ text }))
+        {
+            if (token.IsLiteral())
+                result += token.text;
+            else if (token.kind == FormatToken::newline || token.kind == FormatToken::newlineSmall)
+                result += oneLine ? ' ' : '\n';
+        }
+        if (oneLine)
+            for (auto& ch : result)
+                if (ch == '\n' || ch == '\r' || ch == '\t')
+                    ch = ' ';
+        return result;
+    }
     struct NewsTarget
     {
         News::Item item;
@@ -66,7 +82,7 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
     }
     inline bool SubjectCurrent(const NewsTarget& target)
     {
-        return Current(target)
+        return Current(target) && !target.item.hasButton()
             && ((target.ride && RideManagement::Resolve(*target.ride))
                 || (target.guest && GuestManagement::Resolve(*target.guest))
                 || (target.staff && StaffManagement::Resolve(*target.staff)));
@@ -104,7 +120,7 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
         model.title = "Park news";
         model.selected = selected;
         for (const auto& target : list)
-            model.rows.push_back(std::string(target.archived ? "Archive: " : "Recent: ") + target.item.text);
+            model.rows.push_back(std::string(target.archived ? "Archive: " : "Recent: ") + PlainText(target.item.text, true));
         if (list.empty())
         {
             model.rows = { "Refresh" };
@@ -121,12 +137,13 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
         ManagementPresentation model;
         model.breadcrumb = "Overview / Park news";
         model.title = Current(target) ? Date(target.item) : "News item expired";
-        const auto lines = GuestManagement::TextLines(target.item.text);
+        const auto lines = GuestManagement::TextLines(PlainText(target.item.text));
         const auto pages = std::max<size_t>(1, (lines.size() + 5) / 6);
         const auto first = std::min(page, pages - 1) * 6;
         for (size_t i = first; i < std::min(first + 6, lines.size()); ++i)
             model.bodyLines.push_back(lines[i]);
-        model.rows = { "Next text page", Location(target) ? "Locate subject" : "Location unavailable", "Back to news" };
+        model.rows = { "Next text page", Location(target) ? "Locate subject" : "Location unavailable",
+                       SubjectCurrent(target) ? "Inspect subject" : "Subject unavailable", "Back to news" };
         model.selected = selected;
         model.status = status.empty() ? "Text page " + std::to_string(first / 6 + 1) + " / " + std::to_string(pages) : status;
         return model;
@@ -141,7 +158,7 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
             if (award.time && award.type < AwardType::count)
                 model.rows.push_back(
                     std::string(AwardIsPositive(award.type) ? "Positive: " : "Negative: ")
-                    + FormatStringIDLegacy(AwardGetText(award.type), nullptr));
+                    + PlainText(FormatStringIDLegacy(AwardGetText(award.type), nullptr), true));
         if (model.rows.empty())
             model.status = "No active native awards";
         else

@@ -6,22 +6,29 @@
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/handheld/Explorer.h>
+#include <openrct2-ui/handheld/MapSubjects.h>
 #include <openrct2-ui/handheld/ParkInformation.h>
 #include <openrct2-ui/handheld/ParkMap.h>
+#include <openrct2-ui/handheld/ParkOverview.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
+#include <openrct2/Game.h>
 #include <openrct2/GameState.h>
 #include <openrct2/Input.h>
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/PlatformEnvironment.h>
 #include <openrct2/actions/GameActionRunner.h>
 #include <openrct2/actions/general/MapChangeSizeAction.h>
+#include <openrct2/actions/peep/StaffFireAction.h>
+#include <openrct2/actions/ride/RideCreateAction.h>
 #include <openrct2/audio/AudioContext.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/core/Imaging.h>
 #include <openrct2/drawing/Palette.h>
 #include <openrct2/drawing/X8DrawingEngine.h>
 #include <openrct2/interface/Window.h>
+#include <openrct2/management/Research.h>
+#include <openrct2/object/ObjectManager.h>
 #include <openrct2/park/ParkFile.h>
 #include <openrct2/scenario/Scenario.h>
 #include <openrct2/ui/UiContext.h>
@@ -68,6 +75,62 @@ int main(int argc, char** argv)
         WindowGetMain()->onResize();
         InputSetState(InputState::normal);
         Ui::GetWindowManager()->CloseByClass(WindowClass::progressWindow);
+        Check(context->GetObjectManager().LoadObject("rct2.peep_animations.guest"), "Fixture guest object missing");
+        for (int i = 0; i < 2; ++i)
+        {
+            auto* guest = Guest::generate({ 640 + i * 32, 640, 16 });
+            Check(guest, "Fixture guest generation failed");
+            guest->outsideOfPark = false;
+            guest->setParkEntryTime(state.currentTicks);
+        }
+        state.park.entrances.push_back({ 64, 64, 16, 0 }); // Initial native scenario placement source.
+        Check(context->GetObjectManager().LoadObject("rct2.peep_animations.handyman"), "Fixture staff object missing");
+        auto* wooden = context->GetObjectManager().LoadObject("rct2.ride.ptct1");
+        Check(
+            wooden && context->GetObjectManager().LoadObject("rct2.station.plain")
+                && context->GetObjectManager().LoadObject("rct2.terrain_surface.grass")
+                && context->GetObjectManager().LoadObject("rct2.terrain_edge.rock"),
+            "Fixture ride/terrain metadata missing");
+        const auto woodenIndex = context->GetObjectManager().GetLoadedObjectEntryIndex(wooden);
+        RideTypeSetInvented(RIDE_TYPE_WOODEN_ROLLER_COASTER);
+        RideEntrySetInvented(woodenIndex); // Initial scenario research fixture.
+        auto capture = [&](const char* name) {
+            const auto* output = std::getenv("POCKET_MAP_CAPTURES");
+            if (!output || argc != 4)
+                return;
+            std::filesystem::create_directories(output);
+            // SDL dummy has no hardware texture. Activate the existing native software context
+            // to update its camera; capture pixels with the production X8 raster renderer.
+            if (auto* native = dynamic_cast<Drawing::X8DrawingEngine*>(context->GetDrawingEngine()))
+            {
+                native->Drawing::X8DrawingEngine::Resize(512, 384);
+                native->Drawing::X8DrawingEngine::BeginDraw();
+                if (auto* main = WindowGetMain())
+                    ViewportUpdatePosition(main);
+                native->Drawing::X8DrawingEngine::EndDraw();
+            }
+            Drawing::X8DrawingEngine engine(context->GetUiContext());
+            engine.Resize(512, 384);
+            engine.BeginDraw();
+            Drawing::UpdatePaletteEffects();
+            auto& rt = *engine.getRT();
+            // Genuine native scenario viewport with the production Pocket page drawn by its real window.
+            if (auto* main = WindowGetMain(); main && main->viewport)
+            {
+                ViewportRender(rt, main->viewport);
+            }
+            Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu)->onDraw(rt);
+            Image image;
+            image.Width = 512;
+            image.Height = 384;
+            image.Depth = 8;
+            image.Stride = rt.LineStride();
+            image.Palette = Drawing::gPalette;
+            const auto* bytes = reinterpret_cast<uint8_t*>(rt.bits);
+            image.Pixels.assign(bytes, bytes + rt.LineStride() * rt.height);
+            Imaging::WriteToFile((std::filesystem::path(output) / name).string(), image, ImageFormat::png);
+            engine.EndDraw();
+        };
         H::ParkMap::State map;
         map.Begin();
         for (int i = 0; i < 4; ++i)
@@ -81,7 +144,8 @@ int main(int argc, char** argv)
                 Check(p.x > 0 && p.y >= 0 && p.x < map.extent && p.y < map.extent, "Native coordinate outside raster");
                 Check(map.pixels[p.y * map.extent + p.x] == c[1], "Cache colour differs from desktop map");
             }
-        map.Move(-10000, 10000);
+        map.focus = { -10000, 100000 };
+        map.Clamp();
         Check(map.focus == CoordsXY{ 32, 46 * 32 }, "Focus escaped map bounds");
         map.Mode();
         Check(map.rotation == 255, "Mode retained stale raster");
@@ -106,6 +170,11 @@ int main(int argc, char** argv)
             H::HandleMenuInput(input, frame);
             map.Update();
             Check(map.rotation == GetCurrentRotation(), "Rotation cache stale");
+            map.focus = { 32 * 32, 24 * 32 };
+            const auto before = W::NativeMiniMapCoords(map.focus);
+            map.Move(1, 0);
+            const auto after = W::NativeMiniMapCoords(map.focus);
+            Check(after.x == before.x + 1 && after.y == before.y + 1, "Native camera-relative tile navigation differs");
         }
         H::Frame move;
         move.navigateX = 1;
@@ -131,6 +200,10 @@ int main(int argc, char** argv)
         map.Update();
         Check(map.size == state.mapSize && map.extent == 164, "Changed dimensions retained cache");
         namespace I = H::ParkInformation;
+        Check(
+            I::PlainText("{RED}Río{NEWLINE}Second", true) == "Río Second"
+                && I::PlainText("{RED}Río{NEWLINE}Second") == "Río\nSecond",
+            "Native formatting escaped into list/detail presentation");
         Check(I::NewsList().empty(), "Native initial news should be empty");
         Check(I::NewsPresentation({}, 0).status == "No native park messages", "Empty news state missing");
         const uint32_t assoc = 640u | (640u << 16);
@@ -177,34 +250,211 @@ int main(int argc, char** argv)
         W::HandheldMenuBack();
         Check(W::HandheldOverviewIsOpen(), "History Back failed");
         Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        namespace M = H::MapSubjects;
+        const auto guests = M::Roster(2, 0);
+        Check(guests.size() == 2 && M::Roster(2, 1).empty(), "Map guest filter membership differs");
+        const auto guest = std::get<H::GuestManagement::Target>(guests.front());
+        Check(
+            H::GuestManagement::SetTracking(guest, H::GuestManagement::Resolve(guest)->peepFlags, true, true).error
+                == GameActions::Status::ok,
+            "Native tracking action failed");
+        GameActions::ProcessQueue(state);
+        Check(
+            M::Roster(2, 1).size() == 1 && W::NativeMiniMapPeepMarkers(false, true, -1).size() == 1,
+            "Tracked map filter differs");
+        auto stale = guest;
+        ++stale.generation;
+        Check(!M::Current(stale) && !M::Location(stale), "Reused map target accepted");
+        const auto markers = W::NativeMiniMapPeepMarkers(false, false, -1);
+        Check(
+            markers.size() == 2 && markers.front().position == W::NativeMiniMapCoords({ 640, 640 }),
+            "Native peep overlay coordinate differs");
+        Check(
+            H::StaffManagement::Hire(StaffType::handyman, true).error == GameActions::Status::ok,
+            "Native hire for map roster failed");
+        GameActions::ProcessQueue(state);
+        const auto staff = M::Roster(3, 0);
+        Check(staff.size() == 1 && M::Roster(3, 1).size() == 1 && M::Roster(3, 2).empty(), "Map role filters differ");
+        const auto employee = std::get<H::StaffManagement::Target>(staff.front());
+        openMap();
+        W::HandheldParkMapControl(0);
+        W::HandheldParkMapControl(0);
+        H::Frame subjects;
+        subjects.actions = { H::Action::openBuild };
+        H::HandleMenuInput(input, subjects);
+        Check(W::HandheldParkMapSubjectsPresentation().rows[0] == M::Name(guests.front()), "Map guest roster entry failed");
+        H::HandleMenuInput(input, confirm);
+        H::HandleMenuInput(input, confirm);
+        Check(
+            W::HandheldParkMapIsOpen() && W::HandheldParkMapLocation() == std::optional<CoordsXY>{ { 640, 640 } },
+            "Show subject on map failed");
+        const auto focus = W::HandheldParkMapLocation();
+        H::HandleMenuInput(input, subjects);
+        H::HandleMenuInput(input, confirm);
+        W::HandheldMenuMove(1);
+        H::HandleMenuInput(input, confirm);
+        Check(W::HandheldGuestsIsOpen(), "Map guest inspection handoff failed");
+        W::HandheldMenuBack();
+        W::HandheldMenuBack();
+        W::HandheldMenuBack();
+        Check(W::HandheldParkMapIsOpen() && W::HandheldParkMapLocation() == focus, "Inspection lost map context");
+        W::HandheldParkMapControl(0);
+        H::HandleMenuInput(input, subjects);
+        H::HandleMenuInput(input, confirm);
+        W::HandheldMenuMove(1);
+        H::HandleMenuInput(input, confirm);
+        Check(W::HandheldStaffIsOpen(), "Map staff inspection handoff failed");
+        W::HandheldMenuBack();
+        GameActions::StaffFireAction fire(employee.id);
+        Check(GameActions::Execute(&fire, state).error == GameActions::Status::ok, "Native map stale target setup failed");
+        GameActions::ProcessQueue(state);
+        Check(!M::Current(employee) && !M::Location(employee), "Departed staff map target accepted");
+        W::HandheldMenuMove(1);
+        H::HandleMenuInput(input, confirm);
+        Check(!W::HandheldStaffIsOpen(), "Departed map subject inspected");
+        capture("fixture-14-stale-subject.png");
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        openMap();
+        W::HandheldParkMapControl(0);
+        W::HandheldParkMapControl(0);
+        H::HandleMenuInput(input, subjects);
+        W::HandheldMenuMove(2);
+        H::HandleMenuInput(input, confirm);
+        Check(
+            W::HandheldParkMapSubjectsPresentation().title == "Tracked guests"
+                && W::HandheldParkMapSubjectsPresentation().stats[0].second == "1",
+            "Controller tracked filter differs");
+        Check(
+            H::GuestManagement::SetTracking(guest, H::GuestManagement::Resolve(guest)->peepFlags, false, true).error
+                == GameActions::Status::ok,
+            "Native filter membership change failed");
+        GameActions::ProcessQueue(state);
+        Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu)->onUpdate();
+        Check(W::HandheldParkMapSubjectsPresentation().stats[0].second == "0", "Live map filter retained departed membership");
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        News::AddItemToQueue(state.park.newsItems, News::ItemType::peep, "Native subject fixture", guest.id.ToUnderlying());
+        auto subjectNews = I::NewsList();
+        const auto found = std::find_if(
+            subjectNews.begin(), subjectNews.end(), [&](const auto& item) { return item.guest && item.guest->id == guest.id; });
+        Check(found != subjectNews.end() && I::SubjectCurrent(*found), "Native news subject identity missing");
+        const auto reviewed = *found;
+        W::HandheldDashboardOpen();
+        W::HandheldDashboardMove(1, 0);
+        H::HandleMenuInput(input, confirm);
+        W::HandheldMenuMove(3);
+        H::HandleMenuInput(input, confirm);
+        W::HandheldMenuMove(static_cast<int>(found - subjectNews.begin()));
+        H::HandleMenuInput(input, confirm);
+        W::HandheldMenuMove(2);
+        H::HandleMenuInput(input, confirm);
+        Check(W::HandheldGuestsIsOpen(), "News inspection handoff failed");
+        W::HandheldMenuBack();
+        Check(W::HandheldParkMapSubjectsPresentation().breadcrumb == "Overview / Park news", "News inspection recovery failed");
+        News::DisableNewsItems(state.park.newsItems, News::ItemType::peep, guest.id.ToUnderlying());
+        Check(!I::SubjectCurrent(reviewed) && !I::Location(reviewed), "Disabled/stale native subject accepted");
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        GameActions::RideCreateAction create(
+            RIDE_TYPE_WOODEN_ROLLER_COASTER, woodenIndex, 0, 0, 0, RideInspection::every30Minutes);
+        const auto created = GameActions::Execute(&create, state);
+        Check(created.error == GameActions::Status::ok, "Native ride creation for map membership failed");
+        GameActions::ProcessQueue(state);
+        Check(M::Roster(1, 0).size() == 1, "Native ride map roster differs");
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        openMap();
+        W::HandheldParkMapControl(0);
+        H::HandleMenuInput(input, subjects);
+        H::HandleMenuInput(input, confirm);
+        W::HandheldMenuMove(1);
+        H::HandleMenuInput(input, confirm);
+        Check(W::HandheldRidesIsOpen(), "Map ride inspection handoff failed");
+        W::HandheldMenuBack();
+        Check(
+            W::HandheldParkMapSubjectsPresentation().title == M::Name(M::Roster(1, 0).front()),
+            "Ride inspection return failed");
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        W::HandheldDashboardOpen();
+        W::HandheldDashboardMove(1, 0);
+        H::HandleMenuInput(input, confirm);
+        W::HandheldMenuMove(2);
+        Check(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) == 0, "Virtual controller init failed");
+        const auto device = SDL_JoystickAttachVirtual(
+            SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);
+        Check(device >= 0, "Virtual controller missing");
+        auto* joystick = SDL_JoystickOpen(device);
+        Check(joystick, "Virtual joystick missing");
+        auto pump = [&] {
+            SDL_Event e;
+            while (SDL_PollEvent(&e))
+                input.handleEvent(e);
+        };
+        pump();
+        input.update(true, 100);
+        pump();
+        input.update(true, 110);
+        SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, 1);
+        SDL_JoystickUpdate();
+        pump();
+        const auto pressed = input.update(true, 120);
+        Check(!pressed.actions.empty(), "Mapped A missing");
+        H::HandleMenuInput(input, pressed);
+        Check(W::HandheldParkMapIsOpen(), "Held-A entry failed");
+        const auto held = input.update(true, 130);
+        Check(held.actions.empty(), "Held A repeated into map");
+        H::HandleMenuInput(input, held);
+        Check(W::HandheldParkMapIsOpen(), "Held A automatically located tile");
+        SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, 0);
+        SDL_JoystickUpdate();
+        pump();
+        input.update(true, 140);
+        SDL_JoystickClose(joystick);
+        SDL_JoystickDetachVirtual(device);
+        pump();
+        input.suspend();
+        GameActions::MapChangeSizeAction large({ 1001, 1001 });
+        Check(GameActions::Execute(&large, state).error == GameActions::Status::ok, "Native maximum map resize failed");
+        GameActions::ProcessQueue(state);
+        map.Update();
+        Check(map.extent == 2006 && map.next == 2048 && !map.ready, "Large map did not respect incremental budget");
+        map.focus = { 100000, 100000 };
+        map.Clamp();
+        Check(map.focus == CoordsXY{ 999 * 32, 999 * 32 }, "Large map focus escaped bounds");
+        GameActions::MapChangeSizeAction shrink({ 80, 56 });
+        Check(GameActions::Execute(&shrink, state).error == GameActions::Status::ok, "Native map shrink failed");
+        GameActions::ProcessQueue(state);
+        map.Update();
+        Check(map.extent == 164 && map.focus == CoordsXY{ 78 * 32, 54 * 32 }, "Shrunk map focus/cache not clamped");
         SaveFlags flags{};
         const auto save = std::string(argv[2]) + "/map.park";
         Check(ScenarioSave(state, save, flags) && context->LoadParkFromFile(save), "Map save/reload failed");
+        Check(!W::HandheldParkMapIsOpen(), "Load retained transient map menu");
         map.Update();
         Check(map.size == state.mapSize, "Map dimensions not recovered");
         if (const auto* scenario = std::getenv("POCKET_MAP_SCENARIO"))
-            Check(context->LoadParkFromFile(scenario), "Capture scenario failed");
+        {
+            Check(context->LoadParkFromFile(scenario, false, true), "Capture scenario failed");
+            if (!state.park.flags.has(ParkFlag::parkOpen))
+            {
+                auto status = H::ParkOverview::Begin();
+                if (status)
+                {
+                    status->open = true;
+                    Check(
+                        H::ParkOverview::Action(*status, true).error == GameActions::Status::ok,
+                        "Native capture park opening failed");
+                    GameActions::ProcessQueue(state);
+                }
+            }
+            // Observe the supplied scenario through native simulation; never populate capture metrics manually.
+            for (int i = 0; i < 16384; ++i)
+                gameStateUpdateLogic();
+            std::cout << "Capture native scenario guests=" << state.park.numGuestsInPark << " news=" << I::NewsList().size()
+                      << " awards=" << state.park.currentAwards.size() << "\n";
+        }
         if (const auto* output = std::getenv("POCKET_MAP_CAPTURES"); output && argc == 4)
         {
             std::filesystem::create_directories(output);
-            auto capture = [&](const char* name) {
-                Drawing::X8DrawingEngine engine(context->GetUiContext());
-                engine.Resize(512, 384);
-                engine.BeginDraw();
-                Drawing::UpdatePaletteEffects();
-                auto& rt = *engine.getRT();
-                Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu)->onDraw(rt);
-                Image image;
-                image.Width = 512;
-                image.Height = 384;
-                image.Depth = 8;
-                image.Stride = rt.LineStride();
-                image.Palette = Drawing::gPalette;
-                const auto* bytes = reinterpret_cast<uint8_t*>(rt.bits);
-                image.Pixels.assign(bytes, bytes + rt.LineStride() * rt.height);
-                Imaging::WriteToFile((std::filesystem::path(output) / name).string(), image, ImageFormat::png);
-                engine.EndDraw();
-            };
+
             Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
             openMap();
             auto* menu = Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu);
@@ -218,6 +468,35 @@ int main(int argc, char** argv)
             W::HandheldParkMapControl(2);
             W::HandheldConstructionMove(4, 2);
             capture("map-03-zoom.png");
+            W::HandheldParkMapControl(0);
+            menu->onUpdate();
+            capture("map-09-guests.png");
+            H::Frame subjectFrame;
+            subjectFrame.actions = { H::Action::openBuild };
+            H::HandleMenuInput(input, subjectFrame);
+            capture("map-10-subject-roster.png");
+            if (!M::Roster(2, 0).empty())
+            {
+                H::HandleMenuInput(input, confirm);
+                capture("map-11-subject-detail.png");
+                H::HandleMenuInput(input, confirm);
+                menu->onUpdate();
+                capture("map-15-located-subject.png");
+                H::HandleMenuInput(input, subjectFrame);
+                H::HandleMenuInput(input, confirm);
+                W::HandheldMenuMove(1);
+                H::HandleMenuInput(input, confirm);
+                capture("map-12-inspection.png");
+                W::HandheldMenuBack();
+                W::HandheldMenuBack();
+            }
+            W::HandheldMenuBack();
+            W::HandheldParkMapControl(0);
+            menu->onUpdate();
+            capture("map-13-staff.png");
+            H::HandleMenuInput(input, subjectFrame);
+            capture("map-16-staff-roster.png");
+            W::HandheldMenuBack();
             W::HandheldMenuBack();
             W::HandheldMenuMove(3);
             H::HandleMenuInput(input, confirm);
