@@ -15,6 +15,7 @@
 #include "Panel.h"
 #include "ParkOverview.h"
 #include "ParkMap.h"
+#include "ParkInformation.h"
 #include "Paths.h"
 #include "ResearchManagement.h"
 #include "RideAccess.h"
@@ -95,6 +96,10 @@ namespace OpenRCT2::Ui::Windows
         overview,
         overviewConfirm,
         parkMap,
+        parkNews,
+        parkNewsDetail,
+        parkAwards,
+        parkHistory,
         finances,
         financeEditor,
         financeConfirm,
@@ -216,6 +221,23 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::Finances::Draft> _financeDraft;
         std::optional<Handheld::ParkOverview::Draft> _overviewDraft;
         Handheld::ParkMap::State _parkMap;
+        std::vector<Handheld::ParkInformation::NewsTarget> _parkNews;
+        std::optional<Handheld::ParkInformation::NewsTarget> _parkNewsTarget;
+        size_t _parkNewsPage{}, _parkNewsFocus{};
+        bool _parkGuestHistory{};
+        bool parkInformation() const
+        {
+            return _page == Page::parkNews || _page == Page::parkNewsDetail || _page == Page::parkAwards
+                || _page == Page::parkHistory;
+        }
+        Handheld::ManagementPresentation parkInformationPresentation() const
+        {
+            using namespace Handheld::ParkInformation;
+            if (_page == Page::parkNews) return NewsPresentation(_parkNews, _focus.index());
+            if (_page == Page::parkNewsDetail && _parkNewsTarget) return NewsDetail(*_parkNewsTarget, _parkNewsPage, _focus.index(), _status);
+            if (_page == Page::parkAwards) return Awards(_focus.index());
+            return History(_parkGuestHistory, _focus.index());
+        }
         bool _overviewBusy{};
         uint64_t _overviewRequest{};
         std::shared_ptr<int> _overviewLifetime = std::make_shared<int>(0);
@@ -655,7 +677,7 @@ namespace OpenRCT2::Ui::Windows
                                      size.height };
             const ScreenSize bounds = (_page == Page::staffPatrolClear || _page == Page::rightsConfirm
                                        || _page == Page::sceneryName || _page == Page::sceneryConfirm
-                                       || _page == Page::parkMap || _page == Page::pathOptions || picker() || shopManagement() || managementShell())
+                                       || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement() || managementShell())
                 ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
                 : information() ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 }
                                 : target;
@@ -663,7 +685,7 @@ namespace OpenRCT2::Ui::Windows
             WindowSetPosition(
                 *this,
                 (_page == Page::staffPatrolClear || _page == Page::rightsConfirm || _page == Page::sceneryName
-                 || _page == Page::sceneryConfirm || _page == Page::parkMap || _page == Page::pathOptions || picker() || shopManagement()
+                 || _page == Page::sceneryConfirm || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement()
                  || managementShell())
                     ? ScreenCoordsXY{ 0, 0 }
                     : ScreenCoordsXY{ 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
@@ -818,6 +840,11 @@ namespace OpenRCT2::Ui::Windows
                     return { "Review change...", "Cancel" };
                 case Page::financeConfirm:
                     return { "Apply", "Cancel" };
+                case Page::parkNews:
+                case Page::parkNewsDetail:
+                case Page::parkAwards:
+                case Page::parkHistory:
+                    return parkInformationPresentation().rows;
                 case Page::parkMap:
                     return { "Locate tile" };
                 case Page::overview:
@@ -1259,6 +1286,7 @@ namespace OpenRCT2::Ui::Windows
         void onUpdate() override
         {
             if (_page == Page::parkMap) { _parkMap.Update(); invalidate(); }
+            if (parkInformation()) invalidate();
             if (_page == Page::ridesRoster)
             {
                 const auto updated = Handheld::RideManagement::Roster();
@@ -1652,6 +1680,13 @@ namespace OpenRCT2::Ui::Windows
         {
             switch (_page)
             {
+                case Page::parkNewsDetail:
+                    page(Page::parkNews);
+                    _focus.move(static_cast<int>(_parkNewsFocus), rows().size());
+                    break;
+                case Page::parkNews:
+                case Page::parkAwards:
+                case Page::parkHistory:
                 case Page::parkMap:
                     page(Page::overview);
                     break;
@@ -2778,6 +2813,36 @@ namespace OpenRCT2::Ui::Windows
                         invalidate();
                     }
                     break;
+                case Page::parkNews:
+                    if (choice < _parkNews.size())
+                    {
+                        _parkNewsTarget = _parkNews[choice]; _parkNewsFocus = choice; _parkNewsPage = 0;
+                        page(Page::parkNewsDetail);
+                    }
+                    else { _parkNews = Handheld::ParkInformation::NewsList(); invalidate(); }
+                    break;
+                case Page::parkNewsDetail:
+                    if (choice == 0 && _parkNewsTarget)
+                    {
+                        const auto count = Handheld::GuestManagement::TextLines(_parkNewsTarget->item.text).size();
+                        _parkNewsPage = (_parkNewsPage + 1) % std::max<size_t>(1, (count + 5) / 6); invalidate();
+                    }
+                    else if (choice == 1 && _parkNewsTarget)
+                    {
+                        const auto location = Handheld::ParkInformation::Location(*_parkNewsTarget);
+                        if (location && WindowGetMain())
+                        { auto* main = WindowGetMain(); close(); WindowScrollToLocation(*main, *location); }
+                        else { _status = "News expired or subject unavailable"; invalidate(); }
+                    }
+                    else back();
+                    break;
+                case Page::parkAwards:
+                    if (choice + 1 == rows().size()) page(Page::overview);
+                    break;
+                case Page::parkHistory:
+                    if (choice == 0) { _parkGuestHistory = !_parkGuestHistory; invalidate(); }
+                    else page(Page::overview);
+                    break;
                 case Page::parkMap:
                     if (auto* main = WindowGetMain())
                     {
@@ -2787,7 +2852,13 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::overview:
-                    if (choice == 2)
+                    if (choice >= 3 && choice <= 5)
+                    {
+                        Handheld::EndTerrain();
+                        _parkNews = Handheld::ParkInformation::NewsList();
+                        page(choice == 3 ? Page::parkNews : choice == 4 ? Page::parkAwards : Page::parkHistory);
+                    }
+                    else if (choice == 2)
                     {
                         Handheld::EndTerrain();
                         _parkMap.Begin();
@@ -3885,6 +3956,16 @@ namespace OpenRCT2::Ui::Windows
         void onDraw(RenderTarget& rt) override
         {
             if (_page == Page::parkMap) { Handheld::ParkMap::Draw(rt, _parkMap); return; }
+            if (parkInformation())
+            {
+                auto model = parkInformationPresentation();
+                if (_page == Page::parkHistory) model.bodyLines.assign(10, "");
+                Handheld::DrawManagementContent(rt, {8, 8}, {496, 348}, model);
+                if (_page == Page::parkHistory) Handheld::ParkInformation::DrawHistory(rt, _parkGuestHistory);
+                Handheld::Concept::Box(rt, {8, 359}, {496, 25});
+                Handheld::DrawModernText(rt, {16, 369}, "D-pad Select   A Choose   B Back   Start Back", {}, 480);
+                return;
+            }
             if (managementShell())
             {
                 Handheld::ManagementPresentation model;

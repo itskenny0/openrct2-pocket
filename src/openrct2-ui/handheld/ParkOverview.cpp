@@ -124,7 +124,7 @@ namespace OpenRCT2::Ui::Handheld::ParkOverview
         model.bodyLines.push_back("Objective: " + Outcome());
         model.rows = { StatusPermitted() ? (park.flags.has(ParkFlag::parkOpen) ? "Close park..." : "Open park...")
                                          : "Park status locked",
-                       Finances::Available(Finances::Field::admission) ? "Admission / Finances..." : "Admission unavailable", "Park map..." };
+                       Finances::Available(Finances::Field::admission) ? "Admission / Finances..." : "Admission unavailable", "Park map...", "Park news...", "Park awards...", "Park history..." };
         return model;
     }
 } // namespace OpenRCT2::Ui::Handheld::ParkOverview

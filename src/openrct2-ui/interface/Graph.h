@@ -36,6 +36,7 @@ namespace OpenRCT2::Graph
         int32_t xStepPx;
         int32_t yLabelStepPx;
         ColourWithFlags lineCol;
+        bool darkBackground{}; // Pocket panels; desktop keeps its existing black labels.
 
         void RecalculateLayout(const ScreenRect newBounds, const int32_t newNumYLabels, const int32_t newNumPoints)
         {

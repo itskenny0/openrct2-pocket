@@ -6,6 +6,7 @@
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/handheld/Explorer.h>
+#include <openrct2-ui/handheld/ParkInformation.h>
 #include <openrct2-ui/handheld/ParkMap.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
@@ -25,6 +26,7 @@
 #include <openrct2/scenario/Scenario.h>
 #include <openrct2/ui/UiContext.h>
 #include <openrct2/ui/WindowManager.h>
+#include <openrct2/world/Park.h>
 using namespace OpenRCT2;
 namespace H = Ui::Handheld;
 namespace W = Ui::Windows;
@@ -128,6 +130,53 @@ int main(int argc, char** argv)
         GameActions::ProcessQueue(state);
         map.Update();
         Check(map.size == state.mapSize && map.extent == 164, "Changed dimensions retained cache");
+        namespace I = H::ParkInformation;
+        Check(I::NewsList().empty(), "Native initial news should be empty");
+        Check(I::NewsPresentation({}, 0).status == "No native park messages", "Empty news state missing");
+        const uint32_t assoc = 640u | (640u << 16);
+        News::AddItemToQueue(state.park.newsItems, News::ItemType::blank, "Native fixture location message", assoc);
+        auto news = I::NewsList();
+        Check(news.size() == 1 && !news[0].archived && I::Current(news[0]), "Native news ordering/membership failed");
+        const auto location = I::Location(news[0]);
+        Check(location && location->x == 640 && location->y == 640, "Native news location failed");
+        auto changed = news[0];
+        changed.item.text += " changed";
+        Check(!I::Current(changed) && !I::Location(changed), "Stale news text accepted");
+        News::CloseCurrentItem(state.park.newsItems);
+        Check(!I::Current(news[0]), "Moved news retained recent baseline");
+        news = I::NewsList();
+        Check(news.size() == 1 && news[0].archived && I::Current(news[0]), "Archived news missing");
+        News::RemoveItem(state.park.newsItems, News::ItemHistoryStart);
+        Check(!I::Current(news[0]) && !I::Location(news[0]), "Expired archived message accepted");
+        Check(I::Awards(0).status == "No active native awards", "Empty awards missing");
+        AwardGrant(AwardType::bestStaff);
+        Check(
+            I::Awards(0).rows.size() == 2 && I::Awards(0).rows[0].starts_with("Positive:"), "Native award information missing");
+        Check(state.park.ratingHistory[0] == kParkRatingHistoryUndefined, "Fixture history unexpectedly defined");
+        Park::UpdateHistories(state.park);
+        Check(
+            state.park.ratingHistory[0] == state.park.rating && state.park.ratingHistory[1] == kParkRatingHistoryUndefined,
+            "Native history order/undefined samples changed");
+        const auto history = I::History(false, 0);
+        Check(history.stats[0].second == std::to_string(state.park.rating), "History invented current rating");
+        W::HandheldDashboardOpen();
+        W::HandheldDashboardMove(1, 0);
+        H::HandleMenuInput(input, confirm);
+        W::HandheldMenuMove(3);
+        H::HandleMenuInput(input, confirm);
+        H::HandleMenuInput(input, confirm);
+        W::HandheldMenuBack();
+        W::HandheldMenuBack();
+        Check(W::HandheldOverviewIsOpen(), "News Back failed to recover Overview");
+        W::HandheldMenuMove(4);
+        H::HandleMenuInput(input, confirm);
+        W::HandheldMenuBack();
+        W::HandheldMenuMove(5);
+        H::HandleMenuInput(input, confirm);
+        H::HandleMenuInput(input, confirm);
+        W::HandheldMenuBack();
+        Check(W::HandheldOverviewIsOpen(), "History Back failed");
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
         SaveFlags flags{};
         const auto save = std::string(argv[2]) + "/map.park";
         Check(ScenarioSave(state, save, flags) && context->LoadParkFromFile(save), "Map save/reload failed");
@@ -169,6 +218,27 @@ int main(int argc, char** argv)
             W::HandheldParkMapControl(2);
             W::HandheldConstructionMove(4, 2);
             capture("map-03-zoom.png");
+            W::HandheldMenuBack();
+            W::HandheldMenuMove(3);
+            H::HandleMenuInput(input, confirm);
+            capture("information-04-news.png");
+            const auto nativeNews = I::NewsList();
+            if (!nativeNews.empty())
+            {
+                H::HandleMenuInput(input, confirm);
+                capture("information-05-news-details.png");
+                W::HandheldMenuBack();
+            }
+            W::HandheldMenuBack();
+            W::HandheldMenuMove(4);
+            H::HandleMenuInput(input, confirm);
+            capture("information-06-awards.png");
+            W::HandheldMenuBack();
+            W::HandheldMenuMove(5);
+            H::HandleMenuInput(input, confirm);
+            capture("information-07-rating-history.png");
+            H::HandleMenuInput(input, confirm);
+            capture("information-08-guest-history.png");
         }
         H::EndTerrain();
         std::cout << "Native map raster/bounds/rotation/resize/save and SDL navigation/locate passed\n";
