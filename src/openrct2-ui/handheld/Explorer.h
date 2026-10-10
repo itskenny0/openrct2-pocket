@@ -104,6 +104,8 @@ namespace OpenRCT2::Ui::Windows
     void HandheldSceneryClearReviewOpen(CoordsXY tile);
     void HandheldRightsOptionsOpen();
     void HandheldRightsReviewOpen(CoordsXY tile);
+    bool HandheldParkMapIsOpen();
+    void HandheldParkMapControl(int control);
     bool HandheldConstructionMenuIsOpen();
     void HandheldConstructionMove(int x, int y);
     void HandheldShopPickerOpen();

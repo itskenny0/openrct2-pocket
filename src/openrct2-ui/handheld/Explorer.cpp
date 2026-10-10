@@ -611,7 +611,15 @@ namespace OpenRCT2::Ui::Handheld
                 Windows::HandheldMenuMove(frame.navigateY);
             for (const auto action : frame.actions)
             {
-                if (action == Action::confirm)
+                if (Windows::HandheldParkMapIsOpen() && action == Action::contextPrimary)
+                    Invoke(ShortcutId::kViewGeneralRotateClockwise);
+                else if (Windows::HandheldParkMapIsOpen() && action == Action::contextSecondary)
+                    Windows::HandheldParkMapControl(0);
+                else if (Windows::HandheldParkMapIsOpen() && action == Action::previousOption)
+                    Windows::HandheldParkMapControl(-1);
+                else if (Windows::HandheldParkMapIsOpen() && action == Action::nextOption)
+                    Windows::HandheldParkMapControl(1);
+                else if (action == Action::confirm)
                     Windows::HandheldMenuConfirm();
                 else if (action == Action::openBuild && Windows::HandheldDashboardIsOpen())
                     Windows::HandheldDashboardSwitchPane();

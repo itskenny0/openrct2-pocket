@@ -14,6 +14,7 @@
 #include "Mazes.h"
 #include "Panel.h"
 #include "ParkOverview.h"
+#include "ParkMap.h"
 #include "Paths.h"
 #include "ResearchManagement.h"
 #include "RideAccess.h"
@@ -93,6 +94,7 @@ namespace OpenRCT2::Ui::Windows
         dashboard,
         overview,
         overviewConfirm,
+        parkMap,
         finances,
         financeEditor,
         financeConfirm,
@@ -213,6 +215,7 @@ namespace OpenRCT2::Ui::Windows
         std::optional<money64> _priceDraft;
         std::optional<Handheld::Finances::Draft> _financeDraft;
         std::optional<Handheld::ParkOverview::Draft> _overviewDraft;
+        Handheld::ParkMap::State _parkMap;
         bool _overviewBusy{};
         uint64_t _overviewRequest{};
         std::shared_ptr<int> _overviewLifetime = std::make_shared<int>(0);
@@ -592,9 +595,18 @@ namespace OpenRCT2::Ui::Windows
         }
 
     public:
+        bool parkMapOpen() const { return _page == Page::parkMap; }
+        void parkMapControl(int control)
+        {
+            if (!parkMapOpen()) return;
+            if (control == 0) _parkMap.Mode();
+            else _parkMap.zoom = std::clamp(_parkMap.zoom + control, 1, 8);
+            _parkMap.Update();
+            invalidate();
+        }
         bool constructionMenu() const
         {
-            return _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
+            return _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
                 || _page == Page::staffPatrolClear || _page == Page::rightsOptions || _page == Page::rightsConfirm
                 || _page == Page::areaOptions || _page == Page::sceneryOptions || _page == Page::sceneryName
                 || _page == Page::sceneryConfirm || _page == Page::sceneryGroups || _page == Page::sceneryStyle
@@ -602,6 +614,12 @@ namespace OpenRCT2::Ui::Windows
         }
         void constructionMove(int x, int y)
         {
+            if (_page == Page::parkMap)
+            {
+                _parkMap.Move(x, y);
+                invalidate();
+                return;
+            }
             if (_page == Page::sceneryName)
             {
                 const auto next = _nameEntry.Move(_focus.index(), x, y);
@@ -637,7 +655,7 @@ namespace OpenRCT2::Ui::Windows
                                      size.height };
             const ScreenSize bounds = (_page == Page::staffPatrolClear || _page == Page::rightsConfirm
                                        || _page == Page::sceneryName || _page == Page::sceneryConfirm
-                                       || _page == Page::pathOptions || picker() || shopManagement() || managementShell())
+                                       || _page == Page::parkMap || _page == Page::pathOptions || picker() || shopManagement() || managementShell())
                 ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
                 : information() ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 }
                                 : target;
@@ -645,7 +663,7 @@ namespace OpenRCT2::Ui::Windows
             WindowSetPosition(
                 *this,
                 (_page == Page::staffPatrolClear || _page == Page::rightsConfirm || _page == Page::sceneryName
-                 || _page == Page::sceneryConfirm || _page == Page::pathOptions || picker() || shopManagement()
+                 || _page == Page::sceneryConfirm || _page == Page::parkMap || _page == Page::pathOptions || picker() || shopManagement()
                  || managementShell())
                     ? ScreenCoordsXY{ 0, 0 }
                     : ScreenCoordsXY{ 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
@@ -800,6 +818,8 @@ namespace OpenRCT2::Ui::Windows
                     return { "Review change...", "Cancel" };
                 case Page::financeConfirm:
                     return { "Apply", "Cancel" };
+                case Page::parkMap:
+                    return { "Locate tile" };
                 case Page::overview:
                 case Page::overviewConfirm:
                     return overviewPresentation().rows;
@@ -1238,6 +1258,7 @@ namespace OpenRCT2::Ui::Windows
         }
         void onUpdate() override
         {
+            if (_page == Page::parkMap) { _parkMap.Update(); invalidate(); }
             if (_page == Page::ridesRoster)
             {
                 const auto updated = Handheld::RideManagement::Roster();
@@ -1631,6 +1652,9 @@ namespace OpenRCT2::Ui::Windows
         {
             switch (_page)
             {
+                case Page::parkMap:
+                    page(Page::overview);
+                    break;
                 case Page::sceneryCategory:
                     page(Page::build);
                     break;
@@ -2754,8 +2778,22 @@ namespace OpenRCT2::Ui::Windows
                         invalidate();
                     }
                     break;
+                case Page::parkMap:
+                    if (auto* main = WindowGetMain())
+                    {
+                        const auto location = _parkMap.focus;
+                        close();
+                        WindowScrollToLocation(*main, CoordsXYZ{ location, MapGetHighestZ(location) });
+                    }
+                    break;
                 case Page::overview:
-                    if (choice == 0)
+                    if (choice == 2)
+                    {
+                        Handheld::EndTerrain();
+                        _parkMap.Begin();
+                        page(Page::parkMap);
+                    }
+                    else if (choice == 0)
                     {
                         _overviewDraft = Handheld::ParkOverview::Begin();
                         if (_overviewDraft)
@@ -3846,6 +3884,7 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
+            if (_page == Page::parkMap) { Handheld::ParkMap::Draw(rt, _parkMap); return; }
             if (managementShell())
             {
                 Handheld::ManagementPresentation model;
@@ -4347,6 +4386,15 @@ namespace OpenRCT2::Ui::Windows
         return window && static_cast<const HandheldMenuWindow*>(window)->picker()
             ? static_cast<const HandheldMenuWindow*>(window)->pickerFocus()
             : kObjectEntryIndexNull;
+    }
+    bool HandheldParkMapIsOpen()
+    {
+        auto* w = static_cast<HandheldMenuWindow*>(GetWindowManager()->FindByClass(WindowClass::handheldMenu));
+        return w && w->parkMapOpen();
+    }
+    void HandheldParkMapControl(int control)
+    {
+        if (auto* w = static_cast<HandheldMenuWindow*>(GetWindowManager()->FindByClass(WindowClass::handheldMenu))) w->parkMapControl(control);
     }
     bool HandheldConstructionMenuIsOpen()
     {
