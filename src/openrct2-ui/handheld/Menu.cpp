@@ -7,6 +7,7 @@
 #include "DesignAuthoring.h"
 #include "Explorer.h"
 #include "Finances.h"
+#include "FinanceInformation.h"
 #include "FlatRides.h"
 #include "GuestManagement.h"
 #include "ListFocus.h"
@@ -104,6 +105,7 @@ namespace OpenRCT2::Ui::Windows
         mapSubjects,
         mapSubject,
         finances,
+        financeLedger,
         financeEditor,
         financeConfirm,
         staff,
@@ -250,14 +252,16 @@ namespace OpenRCT2::Ui::Windows
             _mapInspection = true;
             _mapInspectionReturn = parent;
         }
+        Handheld::FinanceInformation::Ledger _ledger;
         bool parkInformation() const
         {
-            return _page == Page::mapSubjects || _page == Page::mapSubject || _page == Page::parkNews || _page == Page::parkNewsDetail || _page == Page::parkAwards
+            return _page == Page::financeLedger || _page == Page::mapSubjects || _page == Page::mapSubject || _page == Page::parkNews || _page == Page::parkNewsDetail || _page == Page::parkAwards
                 || _page == Page::parkHistory;
         }
         Handheld::ManagementPresentation parkInformationPresentation() const
         {
             using namespace Handheld::ParkInformation;
+            if (_page == Page::financeLedger) return Handheld::FinanceInformation::LedgerPresentation(_ledger, _focus.index());
             if (_page == Page::mapSubjects) return Handheld::MapSubjects::Presentation(_mapSubjects, _parkMap.mode, _parkMap.filter, _focus.index());
             if (_page == Page::mapSubject && _mapTarget) return Handheld::MapSubjects::Detail(*_mapTarget, _focus.index(), _status);
             if (_page == Page::parkNews) return NewsPresentation(_parkNews, _focus.index());
@@ -668,7 +672,7 @@ namespace OpenRCT2::Ui::Windows
         }
         bool constructionMenu() const
         {
-            return _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
+            return _page == Page::financeLedger || _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
                 || _page == Page::staffPatrolClear || _page == Page::rightsOptions || _page == Page::rightsConfirm
                 || _page == Page::areaOptions || _page == Page::sceneryOptions || _page == Page::sceneryName
                 || _page == Page::sceneryConfirm || _page == Page::sceneryGroups || _page == Page::sceneryStyle
@@ -676,6 +680,12 @@ namespace OpenRCT2::Ui::Windows
         }
         void constructionMove(int x, int y)
         {
+            if (_page == Page::financeLedger)
+            {
+                if (x) _ledger.Move(x);
+                if (y) move(y);
+                invalidate(); return;
+            }
             if (_page == Page::parkMap)
             {
                 _parkMap.Move(x, y);
@@ -880,6 +890,7 @@ namespace OpenRCT2::Ui::Windows
                     return { "Review change...", "Cancel" };
                 case Page::financeConfirm:
                     return { "Apply", "Cancel" };
+                case Page::financeLedger:
                 case Page::mapSubjects:
                 case Page::mapSubject:
                 case Page::parkNews:
@@ -1328,7 +1339,7 @@ namespace OpenRCT2::Ui::Windows
         void onUpdate() override
         {
             if (_page == Page::parkMap) { _parkMap.Update(); invalidate(); }
-            if (parkInformation()) invalidate();
+            if (parkInformation()) { _ledger.Clamp(); invalidate(); }
             if (_page == Page::mapSubjects)
             {
                 const auto updated = Handheld::MapSubjects::Roster(_parkMap.mode, _parkMap.filter);
@@ -1743,6 +1754,8 @@ namespace OpenRCT2::Ui::Windows
             }
             switch (_page)
             {
+                case Page::financeLedger:
+                    page(Page::finances); break;
                 case Page::mapSubject:
                     page(Page::mapSubjects);
                     _focus.move(static_cast<int>(_mapSubjectsFocus), rows().size());
@@ -2840,8 +2853,14 @@ namespace OpenRCT2::Ui::Windows
                             _status = Handheld::Finances::Feedback(result);
                     }
                     break;
+                case Page::financeLedger:
+                    if (choice == 14) _ledger.Move(-1);
+                    else if (choice == 15) _ledger.Move(1);
+                    else if (choice == 16) page(Page::finances);
+                    invalidate(); break;
                 case Page::finances:
-                    if (choice == 2)
+                    if (choice == 3) { _ledger.Begin(); page(Page::financeLedger); }
+                    else if (choice == 2)
                         page(Page::dashboard);
                     else
                     {

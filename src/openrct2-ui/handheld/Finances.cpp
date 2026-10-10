@@ -97,7 +97,7 @@ namespace OpenRCT2::Ui::Handheld::Finances
                            Available(Field::admission) ? "Admission price..."
                                : noMoney               ? "No-money park"
                                                        : "Admission locked",
-                           "Back to dashboard" };
+                           "Back to dashboard", "Expenditure ledger..." };
             return model;
         }
         const bool loan = draft->field == Field::loan;
