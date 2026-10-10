@@ -116,7 +116,7 @@ namespace OpenRCT2::Ui::Handheld::ResearchManagement
                               state.park.flags.has(ParkFlag::noMoney) ? "No-money park" : Funding(state.researchFundingLevel) },
                             { "Monthly cost", Cost(state.researchFundingLevel) } };
             model.rows = { FundingAvailable() || AvailableCategories() ? "Funding / priorities..." : "Settings unavailable",
-                           "Back to dashboard" };
+                           "Back to dashboard", "Invention catalog..." };
             if (model.status.empty() && finished)
                 model.status = "No projects remaining";
             return model;

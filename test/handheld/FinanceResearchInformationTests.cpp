@@ -11,6 +11,7 @@
 #include <openrct2-ui/handheld/ParkInformation.h>
 #include <openrct2-ui/handheld/ParkMap.h>
 #include <openrct2-ui/handheld/ParkOverview.h>
+#include <openrct2-ui/handheld/ResearchCatalog.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
 #include <openrct2/Game.h>
@@ -205,26 +206,109 @@ int main(int argc, char** argv)
         if (argc == 4)
         {
             // Native graph raster regression: a missing record must not connect its neighbours.
-            Drawing::X8DrawingEngine engine(context->GetUiContext()); engine.Resize(512,384); engine.BeginDraw();
-            auto& rt=*engine.getRT();
-            const money64 samples[]={1000,kMoney64Undefined,-1000,0};
+            Drawing::X8DrawingEngine engine(context->GetUiContext());
+            engine.Resize(512, 384);
+            engine.BeginDraw();
+            auto& rt = *engine.getRT();
+            const money64 samples[] = { 1000, kMoney64Undefined, -1000, 0 };
             Graph::GraphProperties<money64> props{};
-            props.series=samples; props.min=-2000; props.max=2000; props.hoverIdx=-1;
-            props.darkBackground=true; props.lineCol=ColourWithFlags{Drawing::Colour::grey};
-            props.RecalculateLayout({{100,100},{190,190}},4,4);
-            auto crossesGap=[&] {
-                const auto* pixels=reinterpret_cast<const uint8_t*>(rt.bits);
-                for(int y=140;y<151;++y) if(pixels[y*rt.LineStride()+160]==21) return true;
+            props.series = samples;
+            props.min = -2000;
+            props.max = 2000;
+            props.hoverIdx = -1;
+            props.darkBackground = true;
+            props.lineCol = ColourWithFlags{ Drawing::Colour::grey };
+            props.RecalculateLayout({ { 100, 100 }, { 190, 190 } }, 4, 4);
+            auto crossesGap = [&] {
+                const auto* pixels = reinterpret_cast<const uint8_t*>(rt.bits);
+                for (int y = 140; y < 151; ++y)
+                    if (pixels[y * rt.LineStride() + 160] == 21)
+                        return true;
                 return false;
             };
-            std::fill_n(reinterpret_cast<uint8_t*>(rt.bits),rt.LineStride()*rt.height,uint8_t{118});
-            Graph::DrawFinanceGraph(rt,props);
-            Check(crossesGap(),"Native graph fixture did not expose continuity baseline");
-            std::fill_n(reinterpret_cast<uint8_t*>(rt.bits),rt.LineStride()*rt.height,uint8_t{118});
-            props.breakOnMissing=true; Graph::DrawFinanceGraph(rt,props);
-            Check(!crossesGap(),"Native finance graph bridged an undefined record");
+            std::fill_n(reinterpret_cast<uint8_t*>(rt.bits), rt.LineStride() * rt.height, uint8_t{ 118 });
+            Graph::DrawFinanceGraph(rt, props);
+            Check(crossesGap(), "Native graph fixture did not expose continuity baseline");
+            std::fill_n(reinterpret_cast<uint8_t*>(rt.bits), rt.LineStride() * rt.height, uint8_t{ 118 });
+            props.breakOnMissing = true;
+            Graph::DrawFinanceGraph(rt, props);
+            Check(!crossesGap(), "Native finance graph bridged an undefined record");
             engine.EndDraw();
         }
+        // Separate native research scenario initialized before progression/actions.
+        namespace R = H::ResearchCatalog;
+        gameStateInitAll(state, { 32, 32 });
+        gLegacyScene = LegacyScene::playing;
+        const auto* object = context->GetObjectManager().LoadObject("rct2.ride.ptct1");
+        const auto* other = context->GetObjectManager().LoadObject("rct2.ride.mono1");
+        Check(object && other, "Research fixture metadata missing");
+        const auto index = context->GetObjectManager().GetLoadedObjectEntryIndex(object);
+        const auto otherIndex = context->GetObjectManager().GetLoadedObjectEntryIndex(other);
+        const ResearchItem pending(
+            Research::EntryType::ride, index, RIDE_TYPE_WOODEN_ROLLER_COASTER, ResearchCategory::rollercoaster,
+            RESEARCH_ENTRY_FLAG_FIRST_OF_TYPE);
+        const ResearchItem finished(
+            Research::EntryType::ride, otherIndex, RIDE_TYPE_MONORAIL, ResearchCategory::transport,
+            RESEARCH_ENTRY_FLAG_FIRST_OF_TYPE);
+        state.researchItemsInvented = {
+            finished, finished,
+            ResearchItem(Research::EntryType::ride, 65530, RIDE_TYPE_MONORAIL, ResearchCategory::transport, 0)
+        };
+        state.researchItemsUninvented = { pending };
+        state.researchFundingLevel = 3;
+        state.researchPriorities = 0x7f;
+        state.researchProgressStage = RESEARCH_STAGE_INITIAL_RESEARCH;
+        SetEveryRideEntryNotInvented();
+        SetEveryRideTypeNotInvented();
+        RideEntrySetInvented(otherIndex);
+        RideTypeSetInvented(RIDE_TYPE_MONORAIL);
+        Check(
+            R::Roster(0).size() == 3 && R::Roster(1).size() == 3 && R::Roster(3).empty(),
+            "Native catalog category/count mismatch");
+        const auto targets = R::Roster(0);
+        Check(
+            targets[0].occurrence == 0 && targets[1].occurrence == 1 && R::Invented(finished),
+            "Native duplicate/availability mismatch");
+        Check(R::Current(targets[2]) && !R::Loaded(targets[2].item), "Missing object record discarded or unsafe");
+        // Native progression, never ResearchFinishItem or manual unlock during gameplay.
+        for (int i = 0; i < 1000 && !RideEntryIsInvented(index); ++i)
+        {
+            state.currentTicks += 32;
+            ResearchUpdate();
+        }
+        Check(
+            RideEntryIsInvented(index) && R::Roster(3).size() == 1 && R::Invented(pending),
+            "Native unlock absent from catalog");
+        W::HandheldDashboardOpen();
+        W::HandheldDashboardMove(0, 5 - static_cast<int>(W::HandheldDashboardSectionIndex()));
+        H::HandleMenuInput(input, confirm);
+        W::HandheldDashboardMove(0, 2);
+        H::HandleMenuInput(input, confirm);
+        Check(
+            W::HandheldParkMapSubjectsPresentation().rows.size() == R::Roster(0).size() + 2, "Catalog controller entry failed");
+        H::HandleMenuInput(input, confirm);
+        Check(
+            W::HandheldParkMapSubjectsPresentation().breadcrumb == "Research / Invention details",
+            "Research item entry failed");
+        H::HandleMenuInput(input, cancel);
+        H::Frame filter;
+        filter.navigateX = 1;
+        H::HandleMenuInput(input, filter);
+        Check(W::HandheldParkMapSubjectsPresentation().title == R::Category(1), "Catalog filter controller failed");
+        const auto catalogSave = std::string(argv[2]) + "/research-catalog.park";
+        Check(
+            ScenarioSave(state, catalogSave, flags) && context->LoadParkFromFile(catalogSave),
+            "Research catalog save/reload failed");
+        Check(R::Invented(pending) && !R::Roster(3).empty(), "Native invention availability did not persist");
+        // Object removal is performed through native manager lifecycle; retained descriptor must reject reuse.
+        const auto stale = R::Roster(1).front();
+        context->GetObjectManager().UnloadObjects({ *stale.descriptor });
+        Check(
+            !R::Current(stale) && R::Detail(stale, 0).title == "Research record changed",
+            "Departed object descriptor accepted");
+        Check(context->GetObjectManager().LoadObject("rct2.ride.ding1"), "Replacement object unavailable");
+        Check(!R::Current(stale), "Reused object slot accepted stale catalog target");
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
         // Separate initialized no-money/undefined scenario fixture; no gameplay patches.
         gameStateInitAll(state, { 32, 32 });
         state.park.flags.set(ParkFlag::noMoney);

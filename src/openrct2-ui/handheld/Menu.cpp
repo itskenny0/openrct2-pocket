@@ -20,6 +20,7 @@
 #include "MapSubjects.h"
 #include "Paths.h"
 #include "ResearchManagement.h"
+#include "ResearchCatalog.h"
 #include "RideAccess.h"
 #include "RideManagement.h"
 #include "RightsTools.h"
@@ -164,6 +165,8 @@ namespace OpenRCT2::Ui::Windows
         ridesPrice,
         ridesConfirm,
         research,
+        researchCatalog,
+        researchItem,
         researchEditor,
         researchConfirm,
         marketing,
@@ -255,14 +258,20 @@ namespace OpenRCT2::Ui::Windows
         }
         Handheld::FinanceInformation::Ledger _ledger;
         size_t _financeGraph{}, _financeSample{};
+        uint8_t _researchFilter{};
+        std::vector<Handheld::ResearchCatalog::Target> _researchCatalog;
+        std::optional<Handheld::ResearchCatalog::Target> _researchItem;
+        size_t _researchCatalogFocus{};
         bool parkInformation() const
         {
-            return _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::mapSubjects || _page == Page::mapSubject || _page == Page::parkNews || _page == Page::parkNewsDetail || _page == Page::parkAwards
+            return _page == Page::researchCatalog || _page == Page::researchItem || _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::mapSubjects || _page == Page::mapSubject || _page == Page::parkNews || _page == Page::parkNewsDetail || _page == Page::parkAwards
                 || _page == Page::parkHistory;
         }
         Handheld::ManagementPresentation parkInformationPresentation() const
         {
             using namespace Handheld::ParkInformation;
+            if (_page == Page::researchCatalog) return Handheld::ResearchCatalog::Presentation(_researchCatalog,_researchFilter,_focus.index());
+            if (_page == Page::researchItem && _researchItem) return Handheld::ResearchCatalog::Detail(*_researchItem,_focus.index());
             if (_page == Page::financeHistory) return Handheld::FinanceInformation::History(_financeGraph,_financeSample,_focus.index());
             if (_page == Page::financeLedger) return Handheld::FinanceInformation::LedgerPresentation(_ledger, _focus.index());
             if (_page == Page::mapSubjects) return Handheld::MapSubjects::Presentation(_mapSubjects, _parkMap.mode, _parkMap.filter, _focus.index());
@@ -675,7 +684,7 @@ namespace OpenRCT2::Ui::Windows
         }
         bool constructionMenu() const
         {
-            return _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
+            return _page == Page::researchCatalog || _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
                 || _page == Page::staffPatrolClear || _page == Page::rightsOptions || _page == Page::rightsConfirm
                 || _page == Page::areaOptions || _page == Page::sceneryOptions || _page == Page::sceneryName
                 || _page == Page::sceneryConfirm || _page == Page::sceneryGroups || _page == Page::sceneryStyle
@@ -683,6 +692,12 @@ namespace OpenRCT2::Ui::Windows
         }
         void constructionMove(int x, int y)
         {
+            if (_page == Page::researchCatalog)
+            {
+                if (x) { _researchFilter=static_cast<uint8_t>((_researchFilter+x+8)%8); _researchCatalog=Handheld::ResearchCatalog::Roster(_researchFilter); _focus={}; }
+                if (y) move(y);
+                invalidate(); return;
+            }
             if (_page == Page::financeHistory)
             {
                 if (x) _financeSample=std::clamp<int>(static_cast<int>(_financeSample)-x,0,63);
@@ -899,6 +914,8 @@ namespace OpenRCT2::Ui::Windows
                     return { "Review change...", "Cancel" };
                 case Page::financeConfirm:
                     return { "Apply", "Cancel" };
+                case Page::researchCatalog:
+                case Page::researchItem:
                 case Page::financeHistory:
                 case Page::financeLedger:
                 case Page::mapSubjects:
@@ -1350,6 +1367,16 @@ namespace OpenRCT2::Ui::Windows
         {
             if (_page == Page::parkMap) { _parkMap.Update(); invalidate(); }
             if (parkInformation()) { _ledger.Clamp(); invalidate(); }
+            if (_page == Page::researchCatalog)
+            {
+                const auto updated=Handheld::ResearchCatalog::Roster(_researchFilter);
+                if(updated!=_researchCatalog) {
+                    const auto selected=_focus.index()<_researchCatalog.size()?std::optional<Handheld::ResearchCatalog::Target>{_researchCatalog[_focus.index()]}:std::nullopt;
+                    const auto found=selected?std::find(updated.begin(),updated.end(),*selected):updated.end();
+                    const auto row=found==updated.end()?std::min(_focus.index(),updated.size()):static_cast<size_t>(found-updated.begin());
+                    _researchCatalog=updated; _focus={}; _focus.move(static_cast<int>(row),rows().size());
+                }
+            }
             if (_page == Page::mapSubjects)
             {
                 const auto updated = Handheld::MapSubjects::Roster(_parkMap.mode, _parkMap.filter);
@@ -1764,6 +1791,10 @@ namespace OpenRCT2::Ui::Windows
             }
             switch (_page)
             {
+                case Page::researchCatalog:
+                    page(Page::research); break;
+                case Page::researchItem:
+                    page(Page::researchCatalog); _focus.move(static_cast<int>(_researchCatalogFocus),rows().size()); break;
                 case Page::financeHistory:
                 case Page::financeLedger:
                     page(Page::finances); break;
@@ -3885,8 +3916,16 @@ namespace OpenRCT2::Ui::Windows
                         invalidate();
                     }
                     break;
+                case Page::researchCatalog:
+                    if(choice<_researchCatalog.size()) { _researchItem=_researchCatalog[choice]; _researchCatalogFocus=choice; page(Page::researchItem); }
+                    else if(choice==_researchCatalog.size()) { _researchFilter=(_researchFilter+1)%8; _researchCatalog=Handheld::ResearchCatalog::Roster(_researchFilter); _focus={}; invalidate(); }
+                    else page(Page::research);
+                    break;
+                case Page::researchItem:
+                    back(); break;
                 case Page::research:
-                    if (choice == 1)
+                    if(choice==2) { _researchFilter=0; _researchCatalog=Handheld::ResearchCatalog::Roster(0); page(Page::researchCatalog); }
+                    else if (choice == 1)
                         page(Page::dashboard);
                     else if (
                         Handheld::ResearchManagement::FundingAvailable() || Handheld::ResearchManagement::AvailableCategories())
@@ -4104,6 +4143,7 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::DrawManagementContent(rt, {8, 8}, {496, 348}, model);
                 if (_page == Page::parkHistory) Handheld::ParkInformation::DrawHistory(rt, _parkGuestHistory);
                 if (_page == Page::financeHistory) Handheld::FinanceInformation::DrawHistory(rt,_financeGraph);
+                if (_page == Page::researchItem && _researchItem) Handheld::ResearchCatalog::DrawPreview(rt,*_researchItem);
                 Handheld::Concept::Box(rt, {8, 359}, {496, 25});
                 Handheld::DrawModernText(rt, {16, 369}, "D-pad Select   A Choose   B Back   Start Back", {}, 480);
                 return;

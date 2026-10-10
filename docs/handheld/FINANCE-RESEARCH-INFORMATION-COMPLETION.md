@@ -64,3 +64,30 @@ joined; native Park::UpdateHistories/profit updates, sample bounds, controller
 entry/cycling/return, save/reload and no-money history pass. Release GUI/CLI passes.
 Older native samples beyond desktop's 64-point view are not exposed by this page.
 Research catalog and linked news handoffs remain pending at this checkpoint.
+
+## Phase 3: native invention catalog
+
+Phase 2 canonical `c103108ba7d109f7993fdb65a8c702c360f774d6`, local
+`66ac4a5c1a14c9fbb1eafb15bf1ed057f3001aef`, tree `b65b6004f62319aa734c46d33c84e8fd3a925840`.
+
+Research → Invention catalog preserves native researchItemsInvented ordering and
+actual records, including duplicates and unavailable loaded-object records. All/seven
+native category filters show actual membership/counts. Native research vectors can
+contain a current project before it becomes invented: details separately query real
+RideType/RideEntry/SceneryGroup invention state instead of equating vector membership
+with availability. No fictional invention date or unlock operation is supplied.
+Native localized item/category names and Object::DrawPreview are used where loaded.
+Missing/invalid descriptors remain readable unavailable records, with no unsafe preview.
+
+Copied targets retain raw research identity, flags/category, duplicate occurrence and
+full ObjectEntryDescriptor. List changes retain the selected matching identity; leaving
+or reusing an object slot invalidates detail/preview. Only short-lived resolved pointers
+are used while drawing. Controller left/right filters; up/down scrolls; A inspects;
+B restores catalog focus or Research. Load/exit destroys menu state.
+
+Focused tests initialize native scenario research metadata, then use ResearchUpdate
+for actual invention progression (no live manual unlock). Actual membership/category/
+duplicate/missing records, stale descriptor rejection on native manager unload/reuse,
+controller detail/filter/recovery and native availability persistence pass. Source never
+loads objects or changes research flags; loading in tests is initial fixture metadata.
+Linked finance/research/campaign news remains pending at this phase.
