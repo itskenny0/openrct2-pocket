@@ -44,3 +44,23 @@ news handoffs are not yet delivered by this phase. Existing map/train/follow/not
 construction/design/guest/staff and arbitrary file-browsing gaps remain unchanged.
 AArch64, physical Brick, hardware-frame capture and sustained routing remain unvalidated.
 Exact published phase commits and capture provenance are appended after validation.
+
+## Phase 2: native financial histories
+
+Phase 1 canonical `1ab190383ae7fbc5f6c38bf3320eac418141c090`, local
+`cd5da74381f27773408dec46a17181f67e9eb34f`, tree `cad315a575fd42a7951e8dc6051b308a54cd1948`.
+
+Finances → Financial histories shows desktop's 64 weekly samples of native cash
+less loan, weekly profit and park value. A Next graph cycles all three; left/right
+selects a bounded sample; explicit Older/Newer rows do the same. No interpolation,
+forecast or fictitious company-value history is introduced. Native current company
+value remains on Overview; native state has no company-value history array.
+Graph dates/order/currency come from Graph::DrawFinanceGraph. Native min/max range
+matches desktop Finances; negative cash/profit values are preserved. Undefined
+records stay blank and selected values display Unavailable; empty/no-money states
+are explicit. Graph dark-label styling and breakOnMissing are opt-in, preserving
+desktop defaults. Native graph raster regression proves missing records are not
+joined; native Park::UpdateHistories/profit updates, sample bounds, controller
+entry/cycling/return, save/reload and no-money history pass. Release GUI/CLI passes.
+Older native samples beyond desktop's 64-point view are not exposed by this page.
+Research catalog and linked news handoffs remain pending at this checkpoint.

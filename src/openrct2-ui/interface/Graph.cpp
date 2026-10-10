@@ -122,7 +122,7 @@ namespace OpenRCT2::Graph
     template<typename T, T TkNoValue, bool TbackgroundLine>
     static void DrawLine(
         RenderTarget& rt, const T* series, const int32_t count, const ScreenRect& bounds, const int32_t xStep, const T minValue,
-        const T maxValue)
+        const T maxValue, const bool breakOnMissing)
     {
         const T screenRange = bounds.getHeight();
         const T valueRange = maxValue - minValue;
@@ -171,6 +171,8 @@ namespace OpenRCT2::Graph
                 lastCoords = coords;
                 lastCoordsValid = true;
             }
+            else if (breakOnMissing)
+                lastCoordsValid = false;
             coords.x += xStep;
         }
     }
@@ -180,8 +182,8 @@ namespace OpenRCT2::Graph
     {
         DrawYLabels<T>(rt, p.internalBounds, p.min, p.max, p.numYLabels, p.yLabelStepPx, p.lineCol, labelFmt);
         DrawMonths<T, TkNoValue>(rt, p.series, p.numPoints, p.internalBounds, p.xStepPx, p.darkBackground);
-        DrawLine<T, TkNoValue, true>(rt, p.series, p.numPoints, p.internalBounds, p.xStepPx, p.min, p.max);
-        DrawLine<T, TkNoValue, false>(rt, p.series, p.numPoints, p.internalBounds, p.xStepPx, p.min, p.max);
+        DrawLine<T, TkNoValue, true>(rt, p.series, p.numPoints, p.internalBounds, p.xStepPx, p.min, p.max, p.breakOnMissing);
+        DrawLine<T, TkNoValue, false>(rt, p.series, p.numPoints, p.internalBounds, p.xStepPx, p.min, p.max, p.breakOnMissing);
         if (p.hoverIdx >= 0 && p.hoverIdx < p.numPoints)
         {
             const T value = p.series[p.hoverIdx];
@@ -198,7 +200,8 @@ namespace OpenRCT2::Graph
 
     void DrawFinanceGraph(RenderTarget& rt, const GraphProperties<money64>& p)
     {
-        DrawGraph<money64, kMoney64Undefined>(rt, p, "{BLACK}{CURRENCY2DP}", "{CURRENCY2DP}");
+        DrawGraph<money64, kMoney64Undefined>(
+            rt, p, p.darkBackground ? "{WHITE}{CURRENCY2DP}" : "{BLACK}{CURRENCY2DP}", "{CURRENCY2DP}");
     }
 
     void DrawRatingGraph(RenderTarget& rt, const GraphProperties<uint16_t>& p)

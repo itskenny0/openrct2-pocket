@@ -104,6 +104,12 @@ int main(int argc, char** argv)
         Check(
             ledger.Value(EnumValue(ExpenditureType::research)) == -kResearchCosts[3] / 4,
             "Native weekly research ledger mismatch");
+        FinanceUpdateDailyProfit();
+        Park::UpdateHistories(state.park);
+        Check(F::Series(0)[0] == state.park.cash - state.park.bankLoan, "Cash history is not native cash less loan");
+        Check(
+            F::Series(1)[0] != kMoney64Undefined && F::Series(2)[0] == state.park.value, "Native profit/value history missing");
+        Check(F::History(0, 63, 0).stats[1].second == H::FormatMoney(kMoney64Undefined), "Missing finance sample fabricated");
         const auto net = ledger.Net();
         Check(net == -quote.cost - kResearchCosts[3] / 4, "Net categories invented gross values");
         const auto date = GetDate().GetMonthsElapsed();
@@ -178,12 +184,47 @@ int main(int argc, char** argv)
         H::HandleMenuInput(input, cancel);
         Check(W::HandheldFinancesIsOpen(), "Cancellation lost finance context");
         Check(state.park.cash == cash + net, "Read-only ledger changed cash");
+        W::HandheldDashboardMove(0, 4);
+        H::HandleMenuInput(input, confirm);
+        Check(W::HandheldParkMapSubjectsPresentation().title == "Cash less loan history", "Financial graph entry failed");
+        H::HandleMenuInput(input, confirm);
+        Check(W::HandheldParkMapSubjectsPresentation().title == "Weekly profit history", "Financial graph cycling failed");
+        for (int i = 0; i < 100; ++i)
+            H::HandleMenuInput(input, older);
+        Check(
+            W::HandheldParkMapSubjectsPresentation().stats[1].first == "Sample 63 weeks back", "History sample escaped bounds");
+        H::HandleMenuInput(input, cancel);
+        Check(W::HandheldFinancesIsOpen(), "History return lost Finances");
         SaveFlags flags{};
         const auto save = std::string(argv[2]) + "/finance-information.park";
         Check(ScenarioSave(state, save, flags) && context->LoadParkFromFile(save), "Ledger save/reload failed");
         Check(
             state.park.expenditureTable[1][EnumValue(ExpenditureType::marketing)] == -quote.cost, "Ledger persistence failed");
         Check(!Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu), "Load retained transient ledger");
+        Check(F::Series(0)[0] == state.park.cash - state.park.bankLoan, "Finance history did not persist");
+        if (argc == 4)
+        {
+            // Native graph raster regression: a missing record must not connect its neighbours.
+            Drawing::X8DrawingEngine engine(context->GetUiContext()); engine.Resize(512,384); engine.BeginDraw();
+            auto& rt=*engine.getRT();
+            const money64 samples[]={1000,kMoney64Undefined,-1000,0};
+            Graph::GraphProperties<money64> props{};
+            props.series=samples; props.min=-2000; props.max=2000; props.hoverIdx=-1;
+            props.darkBackground=true; props.lineCol=ColourWithFlags{Drawing::Colour::grey};
+            props.RecalculateLayout({{100,100},{190,190}},4,4);
+            auto crossesGap=[&] {
+                const auto* pixels=reinterpret_cast<const uint8_t*>(rt.bits);
+                for(int y=140;y<151;++y) if(pixels[y*rt.LineStride()+160]==21) return true;
+                return false;
+            };
+            std::fill_n(reinterpret_cast<uint8_t*>(rt.bits),rt.LineStride()*rt.height,uint8_t{118});
+            Graph::DrawFinanceGraph(rt,props);
+            Check(crossesGap(),"Native graph fixture did not expose continuity baseline");
+            std::fill_n(reinterpret_cast<uint8_t*>(rt.bits),rt.LineStride()*rt.height,uint8_t{118});
+            props.breakOnMissing=true; Graph::DrawFinanceGraph(rt,props);
+            Check(!crossesGap(),"Native finance graph bridged an undefined record");
+            engine.EndDraw();
+        }
         // Separate initialized no-money/undefined scenario fixture; no gameplay patches.
         gameStateInitAll(state, { 32, 32 });
         state.park.flags.set(ParkFlag::noMoney);
@@ -192,7 +233,8 @@ int main(int argc, char** argv)
         Check(
             ledger.Net() == kMoney64Undefined && F::LedgerPresentation(ledger, 0).stats[0].second == "Not applicable",
             "Undefined/no-money ledger mishandled");
-        std::cout << "Native expenditure actions/calendar/bounds/controller/cancellation/save passed\n";
+        Check(F::History(0, 0, 0).stats[0].second == "Not applicable", "No-money financial graph fabricated values");
+        std::cout << "Native finance histories and expenditure actions/calendar/bounds/controller/cancellation/save passed\n";
         return 0;
     }
     catch (const std::exception& e)

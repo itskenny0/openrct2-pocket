@@ -99,4 +99,64 @@ namespace OpenRCT2::Ui::Handheld::FinanceInformation
                                                                         : "Signed net categories; Left/Right changes month";
         return model;
     }
+    inline const money64* Series(size_t graph)
+    {
+        const auto& park = getGameState().park;
+        if (graph == 0)
+            return park.cashHistory; // Native cash less loan, not raw cash.
+        if (graph == 1)
+            return park.weeklyProfitHistory;
+        return park.valueHistory;
+    }
+    inline money64 Current(size_t graph)
+    {
+        const auto& park = getGameState().park;
+        if (graph == 0)
+            return park.cash == kMoney64Undefined || park.bankLoan == kMoney64Undefined ? kMoney64Undefined
+                                                                                        : park.cash - park.bankLoan;
+        return graph == 1 ? park.currentProfit : park.value;
+    }
+    inline ManagementPresentation History(size_t graph, size_t sample, size_t selected)
+    {
+        static constexpr const char* names[] = { "Cash less loan history", "Weekly profit history", "Park value history" };
+        graph %= 3;
+        sample = std::min<size_t>(63, sample);
+        ManagementPresentation model;
+        model.breadcrumb = "Finances / Native weekly history";
+        model.title = names[graph];
+        model.selected = selected;
+        model.stats = { { "Current", Money(Current(graph)) },
+                        { "Sample " + std::to_string(sample) + " weeks back", Money(Series(graph)[sample]) } };
+        model.rows = { "Next financial graph", "Older sample", "Newer sample", "Back to Finances" };
+        const bool hasData = std::any_of(Series(graph), Series(graph) + 64, [](auto v) { return v != kMoney64Undefined; });
+        model.status = getGameState().park.flags.has(ParkFlag::noMoney) ? "No-money park; financial values not applicable"
+            : hasData                                                   ? "Native weekly records; Left/Right selects sample"
+                                                                        : "Waiting for native weekly history";
+        return model;
+    }
+    inline void DrawHistory(Drawing::RenderTarget& rt, size_t graph)
+    {
+        if (getGameState().park.flags.has(ParkFlag::noMoney))
+            return;
+        graph %= 3;
+        Graph::GraphProperties<money64> props{};
+        props.series = Series(graph);
+        props.hoverIdx = -1;
+        // Same magnitude/leading-digit range as desktop Finances, within ordinary native monetary bounds.
+        money64 magnitude = 0;
+        for (size_t i = 0; i < 64; ++i)
+            if (props.series[i] != kMoney64Undefined)
+                magnitude = std::max(magnitude, std::abs(props.series[i]));
+        money64 oom = 10;
+        while (magnitude / oom >= 10)
+            oom *= 10;
+        const auto limit = std::max(10.00_GBP, ((magnitude + oom - 1) / oom) * oom);
+        props.min = graph == 2 ? 0 : -limit;
+        props.max = limit;
+        props.darkBackground = true;
+        props.breakOnMissing = true;
+        props.lineCol = ColourWithFlags{ Drawing::Colour::grey };
+        props.RecalculateLayout({ { 138, 150 }, { 476, 234 } }, 5, 64);
+        Graph::DrawFinanceGraph(rt, props);
+    }
 } // namespace OpenRCT2::Ui::Handheld::FinanceInformation
