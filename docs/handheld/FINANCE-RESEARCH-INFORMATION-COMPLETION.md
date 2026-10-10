@@ -99,3 +99,61 @@ Money news opens Finances, campaign completion opens Marketing, and native resea
 Focused native/SDL tests pass actual research-generated news, action-funded campaign completion, finance-message API fixtures, return context, disabled messages and expiry. Existing loan, admission, funding and marketing controls remain unchanged.
 
 Phase 3 publication: canonical `6dd46c7ec9f7f6f3cf81e400e25ddc9109ea2cbe`, local `a119ba8819233e5636cc4ce130a7ae6a62f54501`, identical tree `737574e2837ae29b6d5de9476d7b0514ee6ebfae`.
+
+## Validation/capture closeout — 2026-10-10
+
+Published Phase 4: canonical `2a4adf098a8a3b57a493c37e0d1f4aabfe4fc56b`,
+local implementation `a44350384efd2bf53495675921044903a50635ec`, source tree
+`2a5ed4823531d43e24097438ad7fb9d9af23a627`.
+The restored workspace was again at `db96e886` with partial published files.
+All fourteen original changed/untracked paths and the index were preserved before
+recovery; exact published blobs were hash-verified and atomically installed.
+Local recovery safety `e2732fdc7aa866e5cf1297fda4fca31b14dc871a` has that exact
+published tree. Esperanto remains untouched/uncommitted with its recorded SHA256.
+No clone/reset/clean/restore/history rewrite or force-push was used.
+
+Release GUI/CLI build PASS after regenerating stale CMake source lists to include
+Mazes.cpp. All thirteen required suites PASS: FinanceResearchInformationTests,
+ParkMapInformationTests, SceneryPathParityTests, ConstructionTests, PathActionsTests,
+PresentationLifecycleTests, RideConstructionTests, SeatRotationTests,
+FamilyOperationTests, MazeConstructionTests, MiniGolfConstructionTests,
+StaffCompletionTests and GuestCompletionTests. Drivers supporting private assets
+ran with the supplied installation; public-fixture-only drivers ran without the
+unsupported fourth argument. Initial argument-count failures are retained in logs,
+not represented as gameplay regressions. CTest input/launcher/save-preservation 3/3 PASS.
+
+PathActionsTests had an obsolete two-action Overview assertion from before map,
+news, awards and history were delivered. Its contract now requires all six current
+rows, explicitly checks the four information entry labels, and retains all four
+native summary/statistics checks. Full native/SDL PathActionsTests rerun PASS;
+no implementation behavior was weakened to satisfy the old assertion.
+
+Asset-backed DesignCapture, RideConstructionCapture, Factory Capers
+MazeConstructionCapture and the original Mines of Africa CustomCoasterCapture all
+PASS. The original Wooden circuit/elevated access/open/save regression observed
+one natural queue participant by 30,000 ticks. This is not sustained throughput.
+
+FinanceResearchCapture.cpp and render_finance_research.py produce 25 genuine
+512x384 PNGs using the production Pocket menu window, native viewport and X8
+software renderer. The supplied Mines of Africa scenario is opened with permitted
+native actions, park advertising and maximum research funding, then progressed
+32,768 native ticks. No capture accounting/history/news/research values are patched.
+Frames cover all fourteen-category ledger paging, current/older periods, cash less
+loan/profit/value graphs, actual negative profit and undefined samples, all seven
+invention filters including a native empty category, object previews and naturally
+generated campaign/research news links and return context. Rendering asserts
+unchanged native cash and expenditure. Every final PNG was visually inspected;
+no material clipping, overlap, unreadable focus or HUD/footer collision was found.
+
+OpenRCT2-Pocket-Finance-Research-Captures.zip contains the PNGs, dimension/SHA256
+manifest, source/provenance hashes and actual test results. Original assets,
+scenario parks and user saves are excluded. The scenario did not naturally generate
+money news; money-news handoff/expiry/return is covered by native API tests, with
+no invented screenshot. No-money/explicit undefined-ledger states are tested but
+not manufactured for scenario captures. These are native production software
+renders, not physical Brick or hardware SDL framebuffer evidence.
+
+The capture/publication checkpoint SHA is recorded externally after guarded
+fast-forward publication with verified parent and exact source-tree equality.
+Next: native guest ride history, persistent follow and ride/group/map-linked
+filters, preserving all existing construction, guest/staff and management contracts.

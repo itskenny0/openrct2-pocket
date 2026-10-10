@@ -3390,7 +3390,8 @@ static void TestOverview(IContext& context, const std::string& profile, bool rea
     const auto ledger = park.expenditureTable;
     const auto commonPrices = park.samePriceThroughoutPark;
     auto model = O::Presentation(0);
-    Require(model.title == park.name && model.stats.size() == 4 && model.rows.size() == 2, "Overview is not a concise summary");
+    Require(model.title == park.name && model.stats.size() == 4 && model.rows.size() == 6, "Overview summary or information entry points missing");
+    Require(model.rows[2] == "Park map..." && model.rows[3] == "Park news..." && model.rows[4] == "Park awards..." && model.rows[5] == "Park history...", "Overview native information routes changed");
     Require(
         model.stats[0].second == "Closed" && model.stats[1].second == "321" && model.stats[2].second == "733 / 999"
             && model.stats[3].second == H::FormatMoney(park.value),

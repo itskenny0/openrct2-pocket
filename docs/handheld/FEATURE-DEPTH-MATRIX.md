@@ -291,3 +291,14 @@ SCENERY-PATH-PARITY-COMPLETION.md for precise gaps.
 Pocket Overview now links a native park map, recent/archive news, active awards and native park rating/guest graphs. Map colours, rotation and viewport geometry are shared with desktop Map.cpp; peep overlays use native entity positions/colours. Bounded camera-relative tile axes, whole-park/1–8x presentation, explicit locate, actual guest/tracked/staff-role/ride rosters, generation guards and inspection return context are delivered. Native graph undefined samples/date order are preserved and dark-panel labels are opt-in without changing desktop defaults. See PARK-MAP-INFORMATION-COMPLETION.md.
 
 General map/information remains PARTIAL for moving-train overlay, finer task filters, persistent follow and editor-only map operations. News settings/acknowledgement and research/finance/campaign subject handoffs remain ordinary gaps. Active awards use the only native current-award state; no invented historical award log. Finance historical ledgers/graphs and research finished-item catalog remain the recommended substantial information milestone. Every previous ordinary construction, design, guest/staff and file-management gap is retained.
+
+## Finance/research validation closeout (2026-10-10)
+
+Native ledger/history/catalog and management news handoffs are delivered and
+validated; see FINANCE-RESEARCH-INFORMATION-COMPLETION.md. Thirteen native/SDL
+suites, CTest 3/3 and all four supplied-asset construction/design regressions PASS.
+Twenty-five reviewed production 512x384 scenario renders cover negative/undefined
+history, native catalog filters/previews and campaign/research news return flows.
+Money-news capture is unavailable in that natural scenario; native handoff tests
+pass. Hardware/AArch64/performance and broader ordinary parity remain unvalidated.
+The next guest phases are still pending at this closeout.
