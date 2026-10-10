@@ -21,6 +21,7 @@
 #include "Paths.h"
 #include "ResearchManagement.h"
 #include "ResearchCatalog.h"
+#include "ManagementNews.h"
 #include "RideAccess.h"
 #include "RideManagement.h"
 #include "RightsTools.h"
@@ -234,6 +235,7 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::ParkInformation::NewsTarget> _parkNewsTarget;
         size_t _parkNewsPage{}, _parkNewsFocus{};
         bool _parkGuestHistory{};
+        bool _managementNewsReturn{};
         std::vector<Handheld::MapSubjects::Target> _mapSubjects;
         std::optional<Handheld::MapSubjects::Target> _mapTarget;
         size_t _mapSubjectsFocus{};
@@ -277,7 +279,10 @@ namespace OpenRCT2::Ui::Windows
             if (_page == Page::mapSubjects) return Handheld::MapSubjects::Presentation(_mapSubjects, _parkMap.mode, _parkMap.filter, _focus.index());
             if (_page == Page::mapSubject && _mapTarget) return Handheld::MapSubjects::Detail(*_mapTarget, _focus.index(), _status);
             if (_page == Page::parkNews) return NewsPresentation(_parkNews, _focus.index());
-            if (_page == Page::parkNewsDetail && _parkNewsTarget) return NewsDetail(*_parkNewsTarget, _parkNewsPage, _focus.index(), _status);
+            if (_page == Page::parkNewsDetail && _parkNewsTarget) {
+                auto model=NewsDetail(*_parkNewsTarget,_parkNewsPage,_focus.index(),_status);
+                model.rows[2]=Handheld::ManagementNews::Label(*_parkNewsTarget); return model;
+            }
             if (_page == Page::parkAwards) return Awards(_focus.index());
             return History(_parkGuestHistory, _focus.index());
         }
@@ -767,6 +772,7 @@ namespace OpenRCT2::Ui::Windows
 
         void page(Page next)
         {
+            if(next==Page::park || next==Page::dashboard) _managementNewsReturn=false;
             if (_clearReviewResumed && next != Page::sceneryClearConfirm) {
                 if (_pausedHere && !(gGamePaused & GAME_PAUSED_NORMAL))
                     PauseToggle();
@@ -1562,11 +1568,13 @@ namespace OpenRCT2::Ui::Windows
         }
         void dashboardPause()
         {
+            _managementNewsReturn=false;
             if (managementShell())
                 page(Page::park);
         }
         void dashboardSwitchPane()
         {
+            if (_managementNewsReturn) return;
             if (!managementShell() || !dashboardCanSwitch())
                 return;
             if (dashboardRailFocused())
@@ -1780,6 +1788,11 @@ namespace OpenRCT2::Ui::Windows
         }
         void back()
         {
+            if (_managementNewsReturn && (_page==Page::finances || _page==Page::marketing || _page==Page::researchItem || _page==Page::researchCatalog))
+            {
+                _managementNewsReturn=false; _dashboard.section=Handheld::Dashboard::Section::overview;
+                _dashboard.focus=Handheld::Dashboard::Focus::content; page(Page::parkNewsDetail); return;
+            }
             if (_mapInspection && (_page == Page::guestInspect || _page == Page::staffInspect || _page == Page::ridesInspect
                 || _page == Page::guestRoster || _page == Page::staff || _page == Page::ridesRoster || _page == Page::shop))
             {
@@ -2907,6 +2920,7 @@ namespace OpenRCT2::Ui::Windows
                     else if (choice == 16) page(Page::finances);
                     invalidate(); break;
                 case Page::finances:
+                    if (choice == 2 && _managementNewsReturn) { back(); break; }
                     if (choice == 4) { _financeGraph=0; _financeSample=0; page(Page::financeHistory); }
                     else if (choice == 3) { _ledger.Begin(); page(Page::financeLedger); }
                     else if (choice == 2)
@@ -3000,7 +3014,15 @@ namespace OpenRCT2::Ui::Windows
                     }
                     else if (choice == 2 && _parkNewsTarget)
                     {
-                        if (!Handheld::ParkInformation::SubjectCurrent(*_parkNewsTarget)) { _status = "News subject unavailable"; invalidate(); }
+                        const auto link=Handheld::ManagementNews::Available(*_parkNewsTarget);
+                        if(link!=Handheld::ManagementNews::Link::none)
+                        {
+                            if(link==Handheld::ManagementNews::Link::finance) { _dashboard.section=Handheld::Dashboard::Section::finances; page(Page::finances); }
+                            else if(link==Handheld::ManagementNews::Link::marketing) { _dashboard.section=Handheld::Dashboard::Section::marketing; page(Page::marketing); }
+                            else { _researchItem=Handheld::ManagementNews::ResearchTarget(*_parkNewsTarget); _researchCatalog=Handheld::ResearchCatalog::Roster(0); _researchFilter=0; page(Page::researchItem); }
+                            _managementNewsReturn=true;
+                        }
+                        else if (!Handheld::ParkInformation::SubjectCurrent(*_parkNewsTarget)) { _status = "News subject unavailable"; invalidate(); }
                         else if (_parkNewsTarget->ride) inspectMapSubject(*_parkNewsTarget->ride, Page::parkNewsDetail);
                         else if (_parkNewsTarget->guest) inspectMapSubject(*_parkNewsTarget->guest, Page::parkNewsDetail);
                         else if (_parkNewsTarget->staff) inspectMapSubject(*_parkNewsTarget->staff, Page::parkNewsDetail);
@@ -3810,6 +3832,7 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::marketing:
+                    if(choice==1 && _managementNewsReturn) { back(); break; }
                     if (choice == 0)
                     {
                         if (!Handheld::MarketingManagement::Types().empty())

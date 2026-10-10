@@ -7,6 +7,7 @@
 #include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/FinanceInformation.h>
+#include <openrct2-ui/handheld/ManagementNews.h>
 #include <openrct2-ui/handheld/MapSubjects.h>
 #include <openrct2-ui/handheld/ParkInformation.h>
 #include <openrct2-ui/handheld/ParkMap.h>
@@ -300,6 +301,64 @@ int main(int argc, char** argv)
             ScenarioSave(state, catalogSave, flags) && context->LoadParkFromFile(catalogSave),
             "Research catalog save/reload failed");
         Check(R::Invented(pending) && !R::Roster(3).empty(), "Native invention availability did not persist");
+        namespace N = H::ManagementNews;
+        const auto generated = H::ParkInformation::NewsList();
+        const auto researchNews = std::find_if(generated.begin(), generated.end(), [&](const auto& n) {
+            return n.item.type == News::ItemType::research && n.item.assoc == pending.rawValue;
+        });
+        Check(
+            researchNews != generated.end() && N::Available(*researchNews) == N::Link::research,
+            "Native invention news link unavailable");
+        const auto researchReview = *researchNews;
+        // Native message API fixture verifies money handoff without changing simulation accounting.
+        News::AddItemToQueue(state.park.newsItems, News::ItemType::money, "Finance subject regression", 0);
+        GameActions::ParkMarketingAction linkedCampaign(ADVERTISING_CAMPAIGN_PARK, 0, 2);
+        Check(GameActions::Execute(&linkedCampaign, state).error == GameActions::Status::ok, "Linked campaign action failed");
+        GameActions::ProcessQueue(state);
+        for (int i = 0; i < 4; ++i)
+            MarketingUpdate();
+        const auto messages = H::ParkInformation::NewsList();
+        auto openNews = [&](News::ItemType type) {
+            Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+            W::HandheldDashboardOpen();
+            W::HandheldDashboardMove(0, -static_cast<int>(W::HandheldDashboardSectionIndex()));
+            H::HandleMenuInput(input, confirm);
+            W::HandheldDashboardMove(0, 3);
+            H::HandleMenuInput(input, confirm);
+            const auto list = H::ParkInformation::NewsList();
+            auto found = std::find_if(list.begin(), list.end(), [&](const auto& n) { return n.item.type == type; });
+            Check(found != list.end(), "Native linked message absent");
+            W::HandheldMenuMove(static_cast<int>(found - list.begin()));
+            H::HandleMenuInput(input, confirm);
+            W::HandheldMenuMove(2);
+            H::HandleMenuInput(input, confirm);
+        };
+        openNews(News::ItemType::money);
+        Check(W::HandheldFinancesIsOpen(), "Money news did not open native Finances");
+        H::HandleMenuInput(input, cancel);
+        Check(
+            W::HandheldParkMapSubjectsPresentation().breadcrumb == "Overview / Park news", "Money news context not recovered");
+        openNews(News::ItemType::campaign);
+        Check(W::HandheldDashboardSectionIndex() == 6, "Campaign news did not open Marketing");
+        H::HandleMenuInput(input, cancel);
+        Check(
+            W::HandheldParkMapSubjectsPresentation().breadcrumb == "Overview / Park news",
+            "Campaign news context not recovered");
+        openNews(News::ItemType::research);
+        Check(
+            W::HandheldParkMapSubjectsPresentation().breadcrumb == "Research / Invention details",
+            "Research news did not inspect native invention");
+        H::HandleMenuInput(input, cancel);
+        Check(
+            W::HandheldParkMapSubjectsPresentation().breadcrumb == "Overview / Park news",
+            "Research news context not recovered");
+        News::DisableNewsItems(state.park.newsItems, News::ItemType::research, pending.rawValue);
+        Check(N::Available(researchReview) == N::Link::none, "Disabled/stale research news accepted");
+        const auto moneyMessage = std::find_if(
+            messages.begin(), messages.end(), [](const auto& n) { return n.item.type == News::ItemType::money; });
+        Check(moneyMessage != messages.end(), "Money news fixture absent");
+        News::InitQueue(state.park);
+        Check(N::Available(*moneyMessage) == N::Link::none, "Expired finance news accepted");
         // Object removal is performed through native manager lifecycle; retained descriptor must reject reuse.
         const auto stale = R::Roster(1).front();
         context->GetObjectManager().UnloadObjects({ *stale.descriptor });

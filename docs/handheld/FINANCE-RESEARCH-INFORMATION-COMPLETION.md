@@ -91,3 +91,11 @@ duplicate/missing records, stale descriptor rejection on native manager unload/r
 controller detail/filter/recovery and native availability persistence pass. Source never
 loads objects or changes research flags; loading in tests is initial fixture metadata.
 Linked finance/research/campaign news remains pending at this phase.
+
+## Phase 4 — linked management news
+
+Money news opens Finances, campaign completion opens Marketing, and native research completion opens the exact available invention detail. B and explicit Back recover the copied news review. Research links copy the loaded object descriptor and reject expired/disabled messages, unloaded/reused objects and changed availability. Campaign news does not encode a finished campaign identity; its link correctly opens the overview instead of inventing campaign details. These links are read-only navigation and do not unlock research or execute transactions.
+
+Focused native/SDL tests pass actual research-generated news, action-funded campaign completion, finance-message API fixtures, return context, disabled messages and expiry. Existing loan, admission, funding and marketing controls remain unchanged.
+
+Phase 3 publication: canonical `6dd46c7ec9f7f6f3cf81e400e25ddc9109ea2cbe`, local `a119ba8819233e5636cc4ce130a7ae6a62f54501`, identical tree `737574e2837ae29b6d5de9476d7b0514ee6ebfae`.

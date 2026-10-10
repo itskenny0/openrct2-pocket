@@ -13,6 +13,9 @@
 #include <openrct2/localisation/StringIds.h>
 #include <openrct2/management/Award.h>
 #include <openrct2/management/NewsItem.h>
+#include <openrct2/management/Research.h>
+#include <openrct2/object/Object.h>
+#include <openrct2/object/ObjectManager.h>
 #include <openrct2/world/Map.h>
 
 namespace OpenRCT2::Ui::Handheld::ParkInformation
@@ -40,6 +43,7 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
         std::optional<RideManagement::Target> ride;
         std::optional<GuestManagement::Target> guest;
         std::optional<StaffManagement::Target> staff;
+        std::optional<ObjectEntryDescriptor> researchObject;
     };
     inline bool Same(const News::Item& a, const News::Item& b)
     {
@@ -54,7 +58,7 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
         auto append = [&](const auto& queue, bool archived) {
             for (const auto& item : queue)
             {
-                NewsTarget target{ item, archived, {}, {}, {} };
+                NewsTarget target{ item, archived, {}, {}, {}, {} };
                 if (item.type == News::ItemType::ride && item.assoc < RideId::GetNull().ToUnderlying())
                     target.ride = RideManagement::Identify(RideId::FromUnderlying(item.assoc), true);
                 else if (
@@ -63,6 +67,19 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
                 {
                     target.guest = GuestManagement::Identify(EntityId::FromUnderlying(item.assoc));
                     target.staff = StaffManagement::Identify(EntityId::FromUnderlying(item.assoc));
+                }
+                if (item.type == News::ItemType::research)
+                {
+                    const ResearchItem research(item.assoc, ResearchCategory::transport, 0);
+                    if ((research.type == Research::EntryType::ride && research.baseRideType < RIDE_TYPE_COUNT)
+                        || research.type == Research::EntryType::scenery)
+                    {
+                        const auto* object = GetContext()->GetObjectManager().GetLoadedObject(
+                            research.type == Research::EntryType::ride ? ObjectType::ride : ObjectType::sceneryGroup,
+                            research.entryIndex);
+                        if (object)
+                            target.researchObject = object->GetDescriptor();
+                    }
                 }
                 result.push_back(std::move(target));
             }
