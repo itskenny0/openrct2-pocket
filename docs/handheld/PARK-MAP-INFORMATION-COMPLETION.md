@@ -45,3 +45,25 @@ Expanded ParkMapInformationTests PASS: native camera-relative movement at all fo
 Phase 3 identifiers are recorded in the final validation checkpoint; final SHA is recorded externally to avoid self-reference. Publication always verifies remote/native parent, exact source-tree equality and expected_sha/force=false fast-forward update. Esperanto is excluded from commits.
 
 Remaining ordinary gaps: moving train overlay, richer ride-category/peep task filters, persistent follow, native scenario/editor map resizing/entry/spawn tools, notification settings/acknowledgement, research/finance/campaign news subject handoffs and finance histories/research finished-item catalog. No native historical award log exists in currentAwards; none is invented. Source parity remains PARTIAL; the 100% goal and all prior construction/management gaps remain explicit.
+
+## Final validation and captures
+
+Release GUI and CLI build PASS. Required native suites PASS: ParkMapInformationTests; SceneryPathParityTests (also private sprites); ConstructionTests; PathActionsTests (including existing management/RideAccess/design coverage); PresentationLifecycleTests; RideConstructionTests; SeatRotationTests; FamilyOperationTests; MazeConstructionTests; MiniGolfConstructionTests; StaffCompletionTests; GuestCompletionTests. Final PresentationLifecycle rerun PASS. Standalone CTest: handheld-input, handheld-launcher and handheld-save-preservation, 3/3 PASS.
+
+Asset-backed DesignCapture PASS (tested/rated authoring, export round-trip, scenery, native design placement/recovery); RideConstructionCapture PASS; Factory Capers MazeConstructionCapture PASS. Original African Diamond Mine CustomCoasterCapture PASS: action-built Wooden circuit/elevated access/Open/save, with an observed natural queue participant over the test window. This is not sustained throughput or evidence for all other ride families.
+
+Final ParkMapInformationTests asset run PASS. Native fixtures initialise object/research/guest data only before gameplay actions. The 1001x1001 map refresh test performs native resize/shrink actions. Captures load supplied African Diamond Mine as a native scenario, explicitly open through the existing native park action when permitted, then advance 16384 native simulation ticks. News, awards, guests and histories are whatever the simulation actually produces; no values, awards or messages are inserted for scenario captures. Native simulation randomness means active awards/counts vary between runs; the final archive records its actual state.
+
+Sixteen 512x384 PNGs: 01 terrain/ownership map and viewport; 02 native ride/path colours; 03 zoomed navigation; 04 actual native news list; 05 full news text/details; 06 actual awards or native empty state; 07 native rating history; 08 native guest history; 09 dense guest mode/legend/footer; 10 actual guest roster; 11 subject detail; 12 existing guest inspection; 13 staff mode; 14 departed staff feedback after native fire; 15 selected native guest on map; 16 native staff roster/empty filter. All captures are production Pocket window + native viewport/component renders. Fifteen use the supplied scenario and private sprites; 14 uses a native initialised action-built fixture and private sprites. They are not full SDL hardware/game-loop framebuffer captures or physical Brick frames.
+
+Every image was visually inspected. Fixed native news roster newline/colour overflow, award focus contrast, map filter/legend overlap and native graph labels/date-label contrast; rebuilt, reran and regenerated affected captures. The capture driver activates the production X8 software context before native camera updates, avoiding invalid drawing-context access under SDL dummy. Normal headless tests still emit native G1 diagnostics without private graphics; dummy SDL hardware renderer warnings are accurately retained. The ZIP includes dimensions/SHA256/provenance manifest and excludes private archives, parks and exported designs.
+
+No AArch64 build, physical Brick controls/performance, sustained park/guest throughput or full SDL hardware gameplay validation is claimed. Map overlays and information are read-only except explicit camera/locate and existing inspection operations; no Pocket gameplay state is saved.
+
+| Published phase | Canonical SHA | Local safety SHA | Matching tree |
+| --- | --- | --- | --- |
+| Map subjects/recovery and presentation fixes | a5c1a738a06b8b0d876d48c23d4d22707e7139f7 | d1f84ebb494d62b6736cf01f29f86e7636eab666 | 86dbc63652f00ca3af60a5f5d71dc81ae5320699 |
+
+The final documentation/publication SHA is recorded in the delivered report/manifest, not inside its own source commit. Esperanto remains uncommitted and byte-identical to the preserved checksum above.
+
+Recommended next substantial subsystem: native Finance and Research Information Completion. Deliver historical expenditure/category/period navigation and native cash/profit/park-value graphs, native researched/invented item catalog with object availability, and coherent information links from existing news where supported. Preserve existing loan/admission/funding/priorities/marketing controls and all map/construction gaps.
