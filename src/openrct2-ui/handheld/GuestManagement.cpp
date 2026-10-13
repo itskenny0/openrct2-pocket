@@ -17,6 +17,7 @@
 #include <openrct2/localisation/StringIds.h>
 #include <openrct2/peep/PeepActionFormat.h>
 #include <openrct2/ride/Ride.h>
+#include <openrct2/ride/RideManager.hpp>
 #include <unordered_map>
 
 namespace OpenRCT2::Ui::Handheld::GuestManagement
@@ -266,6 +267,39 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
         WindowScrollToLocation(*main, *location);
         return true;
     }
+    std::vector<RideManagement::Target> RideHistory(const Target& target)
+    {
+        std::vector<RideManagement::Target> result;
+        const auto* guest = Resolve(target);
+        if (!guest) return result;
+        // Desktop Guest::onUpdateRides uses this native set membership and RideManager order.
+        for (const auto& ride : RideManager(getGameState()))
+            if (ride.isRide() && guest->hasRidden(ride))
+                if (auto identity = RideManagement::Identify(ride.id)) result.push_back(*identity);
+        return result;
+    }
+    bool HistoryRideCurrent(const Target& target, const RideManagement::Target& rideTarget)
+    {
+        const auto* guest = Resolve(target);
+        const auto* ride = RideManagement::Resolve(rideTarget);
+        return guest && ride && ride->isRide() && guest->hasRidden(*ride);
+    }
+    ManagementPresentation HistoryPresentation(const Target& target, const std::vector<RideManagement::Target>& list, size_t selected)
+    {
+        ManagementPresentation model;
+        model.breadcrumb = "Guests / Native ride history";
+        const auto* guest = Resolve(target);
+        model.title = guest ? guest->getName() : "Guest unavailable";
+        model.selected = selected;
+        for (const auto& rideTarget : list)
+        {
+            const auto* ride = RideManagement::Resolve(rideTarget);
+            model.rows.push_back(HistoryRideCurrent(target, rideTarget) ? ride->getName() : "Ride unavailable");
+        }
+        model.rows.push_back("Back to guest");
+        model.status = !guest ? "Guest no longer in park" : list.empty() ? "No retained native rides" : "Native ride order; A Inspect ride";
+        return model;
+    }
     ManagementPresentation Presentation(
         View view, size_t selected, const std::vector<Target>& roster, const std::optional<Target>& target,
         const std::string& status, const std::string& text, size_t textPage)
@@ -318,7 +352,7 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
                 "Thoughts...",      "Spending...",
                 "Carried items...", "Back to roster",
                 "Name...",          guest->peepFlags.has(PeepFlag::tracking) ? "Tracking: On..." : "Tracking: Off...",
-                "Preferences...",   "Pick up..."
+                "Preferences...",   "Pick up...", "Ride history..."
             };
         }
         else if (view == View::needs)

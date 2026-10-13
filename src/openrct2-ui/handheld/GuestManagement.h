@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "Currency.h"
+#include "RideManagement.h"
 #include "ManagementPanel.h"
 
 #include <openrct2/actions/GameActionRunner.h>
@@ -61,6 +62,9 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
     std::vector<std::string> TextLines(const std::string& text);
     std::optional<CoordsXYZ> Location(const Target& target);
     bool Locate(const Target& target);
+    std::vector<RideManagement::Target> RideHistory(const Target&);
+    bool HistoryRideCurrent(const Target&, const RideManagement::Target&);
+    ManagementPresentation HistoryPresentation(const Target&, const std::vector<RideManagement::Target>&, size_t selected);
     ManagementPresentation Presentation(
         View view, size_t selected, const std::vector<Target>& roster = {}, const std::optional<Target>& target = {},
         const std::string& status = {}, const std::string& text = {}, size_t textPage = 0);
