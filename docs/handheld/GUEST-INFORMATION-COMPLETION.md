@@ -42,8 +42,42 @@ publication with exact local/canonical source-tree equality.
 
 ## Remaining phases
 
-Persistent native main-viewport follow/stop, identity/load/exit cleanup and
-controller menu recovery are pending. Native ride-specific GuestList filters and
+Persistent native main-viewport follow/stop and controller recovery are delivered below. Native ride-specific GuestList filters and
 whole-filter map entry/recovery remain pending. Existing groups/tracked filtering,
 name/tracking/preferences and shared guest/staff pickup/placement are preserved.
 All broader ordinary gameplay gaps remain on FEATURE-DEPTH-MATRIX.md.
+
+## Phase 2: native persistent follow
+
+Phase 1 canonical `784244aa2db522cae00e758505aa0332ce0fdd40`, local `35b8098`,
+matching tree `8f58c4c11dd430bb1de032aba29b2d40bb77a05b`.
+
+Guest inspector adds Follow guest / Stop following after the existing actions.
+Follow returns to the unobstructed park; B recovers the same inspector, retaining
+follow. D-pad explicitly stops native follow before panning. The compact native
+two-line context box shows B Guest / D-pad Stop. Zoom and rotation use existing
+native viewport operations. No peep position, flags, metrics, simulation or native
+serialized gameplay data is changed. GuestFollow.h retains only a transient copied
+guest identity; WindowFollowSprite/WindowUnfollowSprite and native smart-follow
+resolution own guest/vehicle/ride camera behavior.
+
+Picked, departed and reused guests are rejected. Native peep removal stops follow
+before entity reuse; native map/load intent and window-manager cleanup stop it.
+If native manual locate/pan or another camera owner replaces follow, the transient
+Pocket guard is discarded. Ordinary menus can be entered/recovered without losing
+follow; no new camera simulation or desktop mouse mapping is introduced.
+
+GUI/CLI build PASS. Expanded asset-backed GuestInformationTests PASS for controller
+Follow/Stop, B inspector recovery, native zoom/rotation with unchanged peep position,
+controller D-pad stopping, native pickup rejection/cancel, load cleanup, actual
+native removal, reused entity slot with deliberately matching fixture identity
+fields, fresh replacement identity and native window-manager shutdown. Native
+fixture setup is explicit and production never generates or edits peep state.
+SDL PresentationLifecycleTests and asset-backed ParkMapInformationTests PASS;
+CTest input/launcher/save-preservation 3/3 PASS. Existing history persistence and
+inspection tests remain enabled and pass. Hardware/AArch64/sustained-follow and
+hardware-frame validation remain unclaimed.
+
+Phase 3 native ride-specific GuestList filters and filtered map workflows remain
+pending. Canonical Phase 2 SHA is recorded externally after verified fast-forward
+publication; Esperanto remains excluded with its unchanged recorded checksum.

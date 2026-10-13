@@ -3,6 +3,7 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
+#include "GuestFollow.h"
 #include "Explorer.h"
 
 #include "AreaTools.h"
@@ -656,6 +657,7 @@ namespace OpenRCT2::Ui::Handheld
 
     void UpdateExplorer(ControllerInput& input)
     {
+        GuestFollow::Update();
         if (gLegacyScene != LegacyScene::playing)
         {
             EndTerrain();
@@ -1048,6 +1050,8 @@ namespace OpenRCT2::Ui::Handheld
                     if (access && RideManagement::Resolve(*access))
                         Windows::HandheldRideAccessOpen(*access);
                 }
+                else if (const auto followed = GuestFollow::Current(); followed && CanExplore())
+                    Windows::HandheldGuestOpen(*followed);
                 else
                     wm->CloseTop();
             }
@@ -1229,6 +1233,7 @@ namespace OpenRCT2::Ui::Handheld
         {
             auto* main = WindowGetMain();
             _terrainStatus.clear();
+            GuestFollow::Stop();
             WindowUnfollowSprite(*main);
             InputScrollViewportSmooth({ frame.panX, frame.panY }, main);
         }
@@ -1264,7 +1269,7 @@ namespace OpenRCT2::Ui::Handheld
             DrawMapFocus(rt, c);
             return;
         }
-        std::string status = "L/R: Zoom   X: Rotate";
+        std::string status = GuestFollow::Current() ? "Follow / B Guest / D-pad Stop" : "L/R: Zoom   X: Rotate";
         std::string costAmount;
         if (_terrainActive)
         {
@@ -1387,6 +1392,8 @@ namespace OpenRCT2::Ui::Handheld
             DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), status);
         else if (!costAmount.empty())
             DrawCostBadge(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), costAmount);
+        if (GuestFollow::Current() && !_terrainActive && !Paths::IsActive())
+            DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), status);
         // High contrast, fixed map focus; this does not move the desktop pointer.
         DrawMapFocus(rt, c);
     }

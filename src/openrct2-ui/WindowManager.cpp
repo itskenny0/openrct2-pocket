@@ -12,6 +12,7 @@
 #include "handheld/Explorer.h"
 #include "handheld/FlatRides.h"
 #include "handheld/GuestManagement.h"
+#include "handheld/GuestFollow.h"
 #include "handheld/MarketingManagement.h"
 #include "handheld/Paths.h"
 #include "handheld/RideManagement.h"
@@ -415,6 +416,7 @@ public:
         switch (intent.GetAction())
         {
             case INTENT_ACTION_MAP:
+                Handheld::GuestFollow::Stop();
                 Handheld::EndTerrain();
                 WindowMapReset();
                 break;
@@ -1085,6 +1087,7 @@ public:
     {
         if (cls == WindowClass::peep)
         {
+            Handheld::GuestFollow::Invalidate(number);
             if (const auto& target = Handheld::PeepPlacement::target)
             {
                 const auto id = target->guest ? target->guest->id : target->staff->id;
@@ -1179,6 +1182,7 @@ public:
 
     void Cleanup() override
     {
+        Handheld::GuestFollow::Stop();
         // Release native tool ghosts while the context and loaded objects still exist.
         Handheld::EndTerrain();
         CloseByCondition([](WindowBase* w) { return true; });

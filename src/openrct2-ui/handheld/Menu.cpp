@@ -10,6 +10,7 @@
 #include "FinanceInformation.h"
 #include "FlatRides.h"
 #include "GuestManagement.h"
+#include "GuestFollow.h"
 #include "ListFocus.h"
 #include "MarketingManagement.h"
 #include "Mazes.h"
@@ -3782,6 +3783,14 @@ namespace OpenRCT2::Ui::Windows
                         close();
                         Handheld::BeginPeepPlacement({ person, {} });
                         return;
+                    }
+                    else if (choice == 11)
+                    {
+                        if (Handheld::GuestFollow::Current() == _guestTarget)
+                        { Handheld::GuestFollow::Stop(); _status = "Follow stopped"; invalidate(); }
+                        else if (Handheld::GuestFollow::Start(*_guestTarget))
+                        { close(); return; }
+                        else { _status = "Guest cannot be followed now"; invalidate(); }
                     }
                     else if (choice == 10) { _guestRideFocus = 0; page(Page::guestRideHistory); }
                     else if (choice == 8)

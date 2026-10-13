@@ -7,6 +7,9 @@
 #include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/GuestManagement.h>
+#include <openrct2-ui/handheld/GuestFollow.h>
+#include <openrct2-ui/handheld/PeepPlacement.h>
+#include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/handheld/ManagementNews.h>
 #include <openrct2-ui/handheld/MapSubjects.h>
 #include <openrct2-ui/handheld/ParkInformation.h>
@@ -104,11 +107,38 @@ int main(int argc, char** argv)
         H::ControllerInput input;H::Frame confirm;confirm.actions={H::Action::confirm};H::Frame cancel;cancel.actions={H::Action::back};
         W::HandheldGuestOpen(target);W::HandheldMenuMove(10);H::HandleMenuInput(input,confirm);Check(W::HandheldGuestsPresentation().breadcrumb=="Guests / Native ride history","Controller history entry failed");
         H::HandleMenuInput(input,confirm);Check(W::HandheldRidesIsOpen(),"History inspection failed");H::HandleMenuInput(input,cancel);Check(W::HandheldGuestsPresentation().breadcrumb=="Guests / Native ride history","History return failed");H::HandleMenuInput(input,cancel);
+        namespace F=H::GuestFollow;
+        const auto personPosition=G::Resolve(target)->getLocation();
+        W::HandheldMenuMove(11);H::HandleMenuInput(input,confirm);
+        Check(F::Current()==target && WindowGetMain()->viewportSmartFollowSprite==target.id,"Controller follow start failed");
+        H::HandleExplorerInput(input,cancel);Check(W::HandheldGuestsIsOpen() && F::Current()==target,"Follow inspector recovery failed");
+        W::HandheldMenuMove(11);H::HandleMenuInput(input,confirm);Check(!F::Current() && WindowGetMain()->viewportSmartFollowSprite.IsNull(),"Explicit follow stop failed");
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        Check(F::Start(target),"Native follow restart failed");
+        if(argc==4) {
+            auto* native=dynamic_cast<Drawing::X8DrawingEngine*>(context->GetDrawingEngine());Check(native,"Native drawing context missing");
+            native->Drawing::X8DrawingEngine::Resize(512,384);native->Drawing::X8DrawingEngine::BeginDraw();
+            ViewportUpdatePosition(WindowGetMain());W::MainWindowZoom(true,false);ViewportRotateSingle(WindowGetMain(),1);ViewportUpdatePosition(WindowGetMain());
+            native->Drawing::X8DrawingEngine::EndDraw();
+            Check(F::Current()==target && G::Resolve(target)->getLocation()==personPosition,"Native follow zoom/rotation changed person or follow");
+        }
+        H::Frame pan;pan.panX=1;H::HandleExplorerInput(input,pan);Check(!F::Current(),"Controller pan did not stop follow");
+        Check(H::PeepPlacement::Begin({target,{}}).error==GameActions::Status::ok,"Follow pickup fixture failed");GameActions::ProcessQueue(state);
+        Check(!F::Start(target),"Picked guest follow accepted");H::PeepPlacement::End();
+        Check(F::Start(target),"Follow before load failed");
         SaveFlags flags{};const auto save=std::string(argv[2])+"/guest-history.park";Check(ScenarioSave(state,save,flags) && context->LoadParkFromFile(save),"History save/load failed");
-        Check(G::RideHistory(target).size()==2 && !Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu),"History persistence/teardown failed");Check(state.park.cash==cash && state.park.expenditureTable==accounting,"History reads changed accounting");
+        Check(G::RideHistory(target).size()==2 && !Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu),"History persistence/teardown failed");Check(!F::Current(),"Load retained native follow guard");Check(state.park.cash==cash && state.park.expenditureTable==accounting,"History reads changed accounting");
         const auto old=G::RideHistory(target).front();GameActions::RideDemolishAction remove(old.id,GameActions::RideModifyType::demolish);Check(GameActions::Execute(&remove,state).error==GameActions::Status::ok,"Ride removal failed");GameActions::ProcessQueue(state);
         Check(!G::HistoryRideCurrent(target,old) && G::RideHistory(target).size()==1,"Removed history ride retained");
         GameActions::RideCreateAction replacement(RIDE_TYPE_WOODEN_ROLLER_COASTER,index,0,0,0,RideInspection::every30Minutes);Check(GameActions::Execute(&replacement,state).error==GameActions::Status::ok,"Replacement failed");GameActions::ProcessQueue(state);Check(!G::HistoryRideCurrent(target,old),"Reused ride revived old history");
-        G::Invalidate(target.id);Check(G::RideHistory(target).empty(),"Stale guest history accepted");std::cout<<"Native guest history membership/order/empty/removal-reuse/controller-return/save passed\n";return 0;
+        Check(F::Start(target),"Follow before departure failed");
+        auto* departing=state.entities.tryGetEntity<Guest>(target.id);departing->remove();
+        Check(!F::Current() && !F::Start(target) && WindowGetMain()->viewportSmartFollowSprite.IsNull(),"Departed native guest retained follow");
+        auto* reused=Guest::generate(personPosition);Check(reused && reused->id==target.id,"Native peep slot was not reused");
+        reused->outsideOfPark=false;reused->peepId=target.peepId;reused->setParkEntryTime(target.entryTime); // Replacement fixture deliberately matches native baseline fields.
+        Check(!F::Start(target),"Reused peep with matching fields revived stale follow");
+        const auto replacementPerson=*G::Identify(reused->id);Check(F::Start(replacementPerson),"Fresh reused peep identity rejected");
+        Ui::GetWindowManager()->Cleanup();Check(!F::Current(),"Native window-manager shutdown retained follow");
+        Check(G::RideHistory(target).empty(),"Stale guest history accepted");std::cout<<"Native guest history membership/order/empty/removal-reuse/controller-return/save passed\n";return 0;
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

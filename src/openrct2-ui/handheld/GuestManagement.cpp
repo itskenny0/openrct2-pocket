@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "GuestManagement.h"
+#include "GuestFollow.h"
 
 #include "TextEntry.h"
 
@@ -352,7 +353,8 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
                 "Thoughts...",      "Spending...",
                 "Carried items...", "Back to roster",
                 "Name...",          guest->peepFlags.has(PeepFlag::tracking) ? "Tracking: On..." : "Tracking: Off...",
-                "Preferences...",   "Pick up...", "Ride history..."
+                "Preferences...",   "Pick up...", "Ride history...",
+                GuestFollow::Current() == target ? "Stop following" : "Follow guest"
             };
         }
         else if (view == View::needs)
