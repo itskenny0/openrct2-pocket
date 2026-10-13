@@ -2472,7 +2472,8 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::sceneryOptions:
-                    if (choice == 12) page(Page::sceneryGroups);
+                    if (choice == 14) { Handheld::SceneryTools::BeginPick(); close(); }
+                    else if (choice == 12) page(Page::sceneryGroups);
                     else if (choice == 13)
                     {
                         _signTarget = Handheld::SceneryEditTarget();

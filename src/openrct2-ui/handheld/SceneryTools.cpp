@@ -241,19 +241,30 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                  ch[2] ? "Tertiary: " + ColourName(current.colours[2]) : "Tertiary: unavailable",
                  current.mode == Mode::place          ? "Mode: Place"
                      : current.mode == Mode::recolour ? "Mode: Recolour"
-                                                      : "Mode: Remove",
+                     : current.mode == Mode::remove   ? "Mode: Remove"
+                                                      : "Mode: Pick object",
                  "Edit sign text...",
                  "Filter scenery group...",
-                 "Edit sign style..." };
+                 "Edit sign style...",
+                 "Pick placed object..." };
     }
-    void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position)
+    void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position, const std::optional<Target>& hovered)
     {
         const auto& s = Current();
+        if (s.mode == Mode::pick)
+        {
+            auto display = s;
+            if (hovered) { display.category = hovered->category; display.object = hovered->object; }
+            DrawConstructionOverlay(rt, position, "Pick scenery", hovered ? Name(display) : "Point at scenery",
+                "Pick placed object", "A Select / B Back", "No placement or charge");
+            return;
+        }
         DrawConstructionOverlay(
             rt, position, s.category == Category::additions ? "Path furniture" : "Scenery", Name(s),
             s.mode == Mode::place          ? "Place"
                 : s.mode == Mode::recolour ? "Recolour"
-                                           : "Remove",
+                : s.mode == Mode::remove   ? "Remove"
+                                           : "Pick placed object",
             s.category == Category::additions     ? "Native path edges"
                 : s.category == Category::walls   ? "Wall edge " + std::to_string(s.direction + 1)
                 : s.category == Category::banners ? "Path edge " + std::to_string(s.direction + 1)
@@ -282,7 +293,12 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
             current.colours[row - 7] = static_cast<Drawing::Colour>(
                 (static_cast<int>(current.colours[row - 7]) + delta + 72) % 72);
         if (row == 10)
-            current.mode = static_cast<Mode>((static_cast<int>(current.mode) + delta + 3) % 3);
+            current.mode = static_cast<Mode>((static_cast<int>(current.mode) + delta + 4) % 4);
+    }
+    void BeginPick()
+    {
+        ClearPreview();
+        current.mode = Mode::pick;
     }
     static std::unique_ptr<GameActions::GameAction> Placement(CoordsXY tile, const Settings& s)
     {
@@ -429,6 +445,44 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         if (Find(t, false) != e || Find(t, true))
             return {};
         return t;
+    }
+    GameActions::Result Pick(const Target& t, bool execute)
+    {
+        auto* element = Find(t, false);
+        if (!element || Find(t, true)) return Invalid("Scenery target changed");
+        InteractionInfo hit{};
+        hit.Loc = t.location;
+        hit.Element = element;
+        const auto fresh = Capture(hit);
+        if (!fresh || *fresh != t) return Invalid("Scenery target changed");
+        if (!Eligible(t.category, t.object)) return Invalid("Object unavailable or not researched");
+        auto selected = current;
+        selected.category = t.category;
+        selected.object = t.object;
+        selected.mode = Mode::place;
+        // Pocket directions are native map directions, unlike desktop's camera-relative buttons.
+        selected.direction = t.category == Category::banners ? t.part : t.location.direction;
+        selected.quadrant = t.category == Category::small ? t.part : 0;
+        selected.height = t.location.z;
+        if (t.category == Category::banners) selected.height -= 2 * kCoordsZStep;
+        if (t.category == Category::large)
+        {
+            const auto* entry = ObjectEntryManager::GetObjectEntry<LargeSceneryEntry>(t.object);
+            if (!entry || t.part >= entry->tiles.size()) return Invalid("Large scenery sequence unavailable");
+            selected.height -= entry->tiles[t.part].offset.z;
+        }
+        const auto channels = Channels(t.category, t.object);
+        for (size_t i = 0; i < channels.size(); ++i)
+            if (channels[i]) selected.colours[i] = t.colours[i];
+        if (execute)
+        {
+            ClearPreview();
+            const auto entries = Entries(t.category);
+            if (current.category != t.category || std::ranges::none_of(entries,
+                [&](const auto& e) { return e.identity.index == t.object; })) groupFilter = kObjectEntryIndexNull;
+            current = selected;
+        }
+        return {};
     }
     GameActions::Result Modify(const Target& t, Mode mode, const std::array<Drawing::Colour, 3>& proposed, bool execute)
     {

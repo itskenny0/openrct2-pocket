@@ -412,7 +412,11 @@ namespace OpenRCT2::Ui::Handheld
             if (settings.mode == SceneryTools::Mode::place)
                 return SceneryTools::Place(_terrainTile, settings, execute);
             if (_sceneryEdit)
+            {
+                if (settings.mode == SceneryTools::Mode::pick)
+                    return SceneryTools::Pick(*_sceneryEdit, execute);
                 return SceneryTools::Modify(*_sceneryEdit, settings.mode, settings.colours, execute);
+            }
             GameActions::Result result;
             result.error = GameActions::Status::invalidParameters;
             result.errorMessage = "Point at scenery";
@@ -734,7 +738,13 @@ namespace OpenRCT2::Ui::Handheld
                 coords = _colourTarget ? std::optional<CoordsXY>{ _colourTarget->location } : std::nullopt;
             }
             if (_sceneryTool)
-                _sceneryEdit = SceneryTools::Capture(GetMapCoordinatesFromPos(Centre(), kViewportInteractionItemAll));
+            {
+                constexpr ViewportInteractionItems pickTypes = { ViewportInteractionItem::scenery,
+                    ViewportInteractionItem::wall, ViewportInteractionItem::largeScenery,
+                    ViewportInteractionItem::banner, ViewportInteractionItem::pathAddition };
+                _sceneryEdit = SceneryTools::Capture(GetMapCoordinatesFromPos(Centre(),
+                    SceneryTools::Current().mode == SceneryTools::Mode::pick ? pickTypes : kViewportInteractionItemAll));
+            }
             if (_sceneryTool && SceneryTools::Current().mode != SceneryTools::Mode::place)
             {
                 coords = _sceneryEdit ? std::optional<CoordsXY>{ _sceneryEdit->location } : std::nullopt;
@@ -1114,7 +1124,14 @@ namespace OpenRCT2::Ui::Handheld
                                         _terrainStatus = Designs::Query(_terrainTile).getErrorMessage();
                                     break;
                                 }
+                                const bool picking = _sceneryTool && SceneryTools::Current().mode == SceneryTools::Mode::pick;
                                 const auto result = TerrainAction(true);
+                                if (picking && result.error == GameActions::Status::ok)
+                                {
+                                    _terrainStatus = "Object selected / Move, then A Place";
+                                    input.suspend(); // Selection cannot spill into placement on the same held press.
+                                    return;
+                                }
                                 _terrainStatus = result.error == GameActions::Status::ok
                                     ? (FlatRides::CurrentStage() != FlatRides::Stage::inactive ? ""
                                            : _shopTool                                         ? "Shop placement requested."
@@ -1295,7 +1312,8 @@ namespace OpenRCT2::Ui::Handheld
                     status += "  " + result.getErrorMessage();
             }
             else
-                status += _colourRide     ? "  Point at this ride track / Y scheme"
+                status += _sceneryTool && SceneryTools::Current().mode == SceneryTools::Mode::pick ? "  Point at placed scenery"
+                    : _colourRide     ? "  Point at this ride track / Y scheme"
                     : _sceneryRemovalTool ? "  Point at small scenery"
                                           : "  Move onto land";
             if (!_terrainStatus.empty())
@@ -1347,7 +1365,7 @@ namespace OpenRCT2::Ui::Handheld
                 else if (_sceneryClearTool)
                     SceneryClear::DrawOverlay(rt, Concept::kOrigin);
                 else if (_sceneryTool)
-                    SceneryTools::DrawOverlay(rt, Concept::kOrigin);
+                    SceneryTools::DrawOverlay(rt, Concept::kOrigin, _sceneryEdit);
                 else if (_treeTool)
                     DrawTreeOverlay(rt, Concept::kOrigin, Trees::Name(_treeIndex), Trees::Eligible(_treeIndex));
                 else if (_colourRide)
@@ -1376,7 +1394,8 @@ namespace OpenRCT2::Ui::Handheld
             else if (_areaTool)
                 DrawConstructionFooter(rt, { ContextGetWidth(), height }, "Apply", "Brush");
             else if (_sceneryTool)
-                DrawConstructionFooter(rt, { ContextGetWidth(), height }, "Apply", "Options");
+                DrawConstructionFooter(rt, { ContextGetWidth(), height },
+                    SceneryTools::Current().mode == SceneryTools::Mode::pick ? "Pick" : "Apply", "Options");
             else if (_treeTool)
                 DrawTreeFooter(rt, { ContextGetWidth(), height });
             else if (_colourRide)

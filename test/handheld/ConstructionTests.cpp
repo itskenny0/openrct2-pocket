@@ -12,6 +12,7 @@
 #include <openrct2/actions/footpath/FootpathRemoveAction.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/object/ObjectManager.h>
+#include <openrct2/world/tile_element/LargeSceneryElement.h>
 #include <openrct2/scenario/Scenario.h>
 #include <openrct2/world/Map.h>
 #include <openrct2/world/TileElementsView.h>
@@ -149,6 +150,51 @@ int main(int argc, char** argv)
             GameActions::ProcessQueue(state);
             Require(state.park.cash == cash - q.cost && Ghosts() == 0, "Scenery exact cost/ghost failed");
             auto target = TargetAt(c.tile, c.category);
+            const auto beforePick = S::Current();
+            const auto pickCash = state.park.cash;
+            const auto pickLedger = state.park.expenditureTable;
+            Require(S::Pick(target, false).error == GameActions::Status::ok && S::Current() == beforePick,
+                "Eyedropper query changed tool selection");
+            Require(S::Pick(target, true).error == GameActions::Status::ok, "Eyedropper selection failed");
+            const auto copied = S::Current();
+            Require(copied.category == c.category && copied.object == i && copied.mode == S::Mode::place
+                    && TargetAt(c.tile, c.category) == target && Ghosts() == 0
+                    && state.park.cash == pickCash && state.park.expenditureTable == pickLedger,
+                "Eyedropper changed native element, ghosts or accounting");
+            const auto channels = S::Channels(c.category, i);
+            for (size_t channel = 0; channel < channels.size(); ++channel)
+                Require(copied.colours[channel] == (channels[channel] ? target.colours[channel] : beforePick.colours[channel]),
+                    "Eyedropper changed unsupported colours or missed native colours");
+            Require(copied.quadrant == (c.category == S::Category::small ? target.part : 0),
+                "Eyedropper native quadrant mismatch");
+            Require(copied.height == target.location.z - (c.category == S::Category::banners ? 2 * kCoordsZStep : 0),
+                "Eyedropper native placement height mismatch");
+            if (c.category == S::Category::large)
+            {
+                bool selectedSequence = false;
+                for (int y = 32; y < 992 && !selectedSequence; y += 32)
+                    for (int x = 32; x < 992 && !selectedSequence; x += 32)
+                        for (auto* element : TileElementsView<>(CoordsXY{x,y}))
+                            if (const auto* large = element->asLargeScenery(); large && large->getEntryIndex() == i
+                                    && large->getSequenceIndex() > 0 && !element->isGhost())
+                            {
+                                InteractionInfo hit{};hit.Loc={x,y};hit.Element=element;
+                                const auto sequence = S::Capture(hit);
+                                Require(sequence && S::Pick(*sequence,true).error == GameActions::Status::ok
+                                        && S::Current().height == copied.height && S::Current().direction == copied.direction
+                                        && state.park.cash == pickCash && state.park.expenditureTable == pickLedger,
+                                    "Eyedropper non-origin large sequence changed origin height/direction/accounting");
+                                selectedSequence = true;break;
+                            }
+                Require(selectedSequence,"Native multi-tile eyedropper fixture lacked a second sequence");
+            }
+            auto stalePick = target;stalePick.descriptor += "-removed";
+            Require(S::Pick(stalePick, true).error != GameActions::Status::ok && S::Current() == copied,
+                "Eyedropper accepted stale descriptor");
+            ScenerySetNotInvented({ c.type, i });
+            Require(S::Pick(target, true).error != GameActions::Status::ok && S::Current() == copied,
+                "Eyedropper bypassed native research eligibility");
+            ScenerySetInvented({ c.type, i });
             auto colours = target.colours;
             colours[0] = Drawing::Colour::brightRed;
             if (S::Channels(c.category, i)[0])
@@ -182,6 +228,7 @@ int main(int argc, char** argv)
             Require(ScenarioSave(state, save, flags) && context->LoadParkFromFile(save), "Scenery save/reload failed");
             target = TargetAt(c.tile, c.category);
             Require(state.park.cash == savedCash && Ghosts() == 0, "Scenery persistence accounting failed");
+            const auto savedTarget = target;
             const auto remove = S::Modify(target, S::Mode::remove, {}, false);
             Require(remove.error == GameActions::Status::ok, "Scenery removal query failed");
             Require(
@@ -192,6 +239,7 @@ int main(int argc, char** argv)
                 state.park.cash == savedCash - remove.cost
                     && S::Modify(target, S::Mode::remove, {}, true).error != GameActions::Status::ok,
                 "Scenery refund/stale removal failed");
+            Require(S::Pick(savedTarget, true).error != GameActions::Status::ok, "Removed eyedropper target accepted");
             if (c.category != S::Category::banners && c.category != S::Category::additions)
             {
                 settings.direction = 2;
@@ -204,6 +252,9 @@ int main(int argc, char** argv)
                 GameActions::ProcessQueue(state);
                 const auto raised = TargetAt(c.tile, c.category);
                 Require(raised.location.z == settings.height, "Native scenery height differs");
+                Require(S::Pick(raised,true).error == GameActions::Status::ok
+                        && S::Current().height == settings.height && S::Current().direction == raised.location.direction,
+                    "Eyedropper selected a different stacked height or rotated element");
                 Require(
                     S::Modify(raised, S::Mode::remove, {}, true).error == GameActions::Status::ok,
                     "Elevated scenery cleanup failed");

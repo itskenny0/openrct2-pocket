@@ -6,6 +6,8 @@
 #include <iostream>
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/handheld/ControllerInput.h>
+#include <openrct2-ui/handheld/Hud.h>
+#include <openrct2-ui/handheld/ConstructionPanel.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/RideAccess.h>
 #include <openrct2-ui/handheld/SceneryTools.h>
@@ -111,6 +113,12 @@ int main(int argc, char** argv)
                 Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu)->onDraw(rt);
             else if (clearPanel)
                 H::SceneryClear::DrawOverlay(rt, { 8, 8 });
+            else if (std::string(name).starts_with("landscaping-"))
+            {
+                H::DrawHud(rt, {512,384}, H::NativeHud());
+                S::DrawOverlay(rt, H::Concept::kOrigin, H::SceneryEditTarget());
+                H::DrawConstructionFooter(rt, {512,384}, S::Current().mode == S::Mode::pick ? "Pick" : "Place", "Options");
+            }
             else
                 S::DrawOverlay(rt, { 8, 8 });
             Image image;
@@ -201,6 +209,51 @@ int main(int argc, char** argv)
         Check(bannerResult.error == GameActions::Status::ok, "Banner placement failed");
         GameActions::ProcessQueue(state);
         auto target = targetAt(tile, S::Category::banners);
+        H::BeginScenery();
+        W::HandheldSceneryOptionsOpen();
+        W::HandheldConstructionMove(0, 14);
+        capture("landscaping-03-eyedropper-options.png", true);
+        H::HandleMenuInput(controller, confirm);
+        Check(S::Current().mode == S::Mode::pick && !Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu),
+            "Controller eyedropper entry skipped pick mode");
+        capture("landscaping-01-native-eyedropper.png", false);
+        Check(S::Pick(target, false).error == GameActions::Status::ok, "Native banner eyedropper query failed");
+        if (argc == 4)
+        {
+            auto* drawing = dynamic_cast<Drawing::X8DrawingEngine*>(context->GetDrawingEngine());
+            Check(drawing, "Native eyedropper drawing context missing");
+            drawing->Drawing::X8DrawingEngine::Resize(512,384);
+            auto* main = WindowGetMain();
+            auto* viewport = main->viewport;
+            const auto centre = ScreenCoordsXY{256,192};
+            const auto projected = Translate3DTo2DWithZ(GetCurrentRotation(), CoordsXYZ{tile.x+16,tile.y+16,target.location.z});
+            bool found = false;
+            constexpr ViewportInteractionItems pickTypes = {ViewportInteractionItem::scenery,ViewportInteractionItem::wall,
+                ViewportInteractionItem::largeScenery,ViewportInteractionItem::banner,ViewportInteractionItem::pathAddition};
+            for (int dy=-40;dy<=40 && !found;dy+=2)
+                for (int dx=-40;dx<=40 && !found;dx+=2)
+                {
+                    viewport->viewPos = projected - ScreenCoordsXY{viewport->zoom.ApplyTo(centre.x),viewport->zoom.ApplyTo(centre.y)} + ScreenCoordsXY{dx,dy};
+                    main->savedViewPos = viewport->viewPos;
+                    drawing->Drawing::X8DrawingEngine::BeginDraw();ViewportRender(*drawing->getRT(),viewport);
+                    drawing->Drawing::X8DrawingEngine::EndDraw();
+                    const auto hit = S::Capture(GetMapCoordinatesFromPos(centre,pickTypes));
+                    found = hit && *hit == target;
+                }
+            Check(found, "Native eyedropper reticle did not hit actual banner sprite");
+            H::UpdateExplorer(controller);
+            const auto beforeCash = state.park.cash;
+            const auto beforeLedger = state.park.expenditureTable;
+            H::HandleExplorerInput(controller,confirm); // actual reticle; duplicate A must not place
+            Check(S::Current().mode == S::Mode::place && S::Current().object == bannerObject
+                    && state.park.cash == beforeCash && state.park.expenditureTable == beforeLedger
+                    && targetAt(tile,S::Category::banners) == target,
+                "Controller eyedropper changed native element/accounting or spilled held A into placement");
+        }
+        else Check(S::Pick(target, true).error == GameActions::Status::ok && S::Current().object == bannerObject,
+            "Native banner eyedropper handoff failed");
+        capture("landscaping-02-native-eyedropper-placement.png", false);
+        H::EndTerrain();
         const auto cash = state.park.cash;
         auto draft = S::BeginStyle(target, S::Style::noEntry);
         Check(draft.has_value(), "No-entry draft absent");

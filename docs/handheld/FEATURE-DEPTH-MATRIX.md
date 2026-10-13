@@ -344,3 +344,16 @@ Previous canonical phases: finance closeout `3cb124cf9e7014c1685a61d819db8598ce7
 guest history `784244aa2db522cae00e758505aa0332ce0fdd40`, follow
 `b242e5c7d9aa2624486ae1aae980f3ccd703dc64`. Guards and actual validation/gaps
 are recorded in GUEST-INFORMATION-COMPLETION.md and the finance checkpoint.
+
+
+## Scenery selection and landscaping Phase 1 (2026-10-13)
+
+Native scenery eyedropper now selects eligible real small/large/wall/banner/furniture
+objects and appropriate copied placement settings, with stale/ghost/descriptor guards,
+non-origin large height and native banner/path offset handling. Held A selects without
+placing, changing the source element or charging money. Existing groups, styles,
+clearing and placement are preserved. GUI/CLI, expanded ConstructionTests and asset-
+backed native/SDL SceneryPathParityTests, PresentationLifecycleTests and CTest 3/3 PASS.
+Three inspected production 512×384 fixture captures are retained for the final ZIP.
+Search, bulk placement and terrain colours are the next independently published phases;
+all broader ordinary and hardware gaps remain. See SCENERY-LANDSCAPING-COMPLETION.md.

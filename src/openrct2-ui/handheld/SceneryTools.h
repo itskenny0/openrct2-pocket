@@ -21,7 +21,8 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     {
         place,
         recolour,
-        remove
+        remove,
+        pick
     };
     struct Settings
     {
@@ -80,11 +81,13 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     std::string Name(const Settings& settings);
     std::array<bool, 3> Channels(Category category, ObjectEntryIndex object);
     std::vector<std::string> Options();
-    void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position);
+    void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position, const std::optional<Target>& hovered = {});
     void Configure(size_t row, int delta = 1);
     const Settings& Current();
     void SelectCategory(Category category);
     bool Select(ObjectEntryIndex object);
+    void BeginPick();
+    GameActions::Result Pick(const Target& target, bool execute);
     std::optional<Target> Capture(const InteractionInfo& info);
     GameActions::Result Modify(const Target& target, Mode mode, const std::array<Drawing::Colour, 3>& colours, bool execute);
     GameActions::Result SetText(const Target& target, const std::string& text, bool execute);
