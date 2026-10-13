@@ -2744,7 +2744,15 @@ static void TestGuests(IContext& context, const std::string& profile, bool realU
         press(H::Action::confirm);
         Require(W::HandheldGuestsPresentation().title == "Action groups", "Held A skipped native groups");
         press(H::Action::confirm);
-        Require(W::HandheldGuestsPresentation().title == "Filtered guests", "Group did not open native membership");
+        const auto filteredModel = W::HandheldGuestsPresentation();
+        Require(filteredModel.title == G::Groups(G::GroupMode::actions).front().label,
+            "Filtered roster did not identify its actual native group");
+        Require(filteredModel.rows.size() >= 4
+                && filteredModel.rows[filteredModel.rows.size() - 4] == "Show roster on map"
+                && filteredModel.rows[filteredModel.rows.size() - 3] == "Filter by name..."
+                && filteredModel.rows[filteredModel.rows.size() - 2] == "Show tracked only"
+                && filteredModel.rows.back() == "Back to groups",
+            "Native filter map/name/tracking/parent controls missing");
         press(H::Action::confirm);
         press(H::Action::back);
         Require(W::HandheldGuestsPresentation().selected == 0, "Filtered roster identity focus lost");
@@ -2898,9 +2906,16 @@ static void TestGuests(IContext& context, const std::string& profile, bool realU
             "Pickup recovery leaked owner or missed inspector");
         guest->outsideOfPark = true;
         press(H::Action::confirm);
-        Require(
-            W::HandheldGuestsIsOpen() && W::HandheldGuestsPresentation().rows.size() == 20,
-            "Stale guest Locate exited or selected replacement");
+        const auto remainingGuests = G::Roster();
+        const auto staleModel = W::HandheldGuestsPresentation();
+        Require(W::HandheldGuestsIsOpen() && remainingGuests.size() == 19
+                && std::find(remainingGuests.begin(), remainingGuests.end(), target) == remainingGuests.end()
+                && staleModel.rows.size() == remainingGuests.size() + 4
+                && staleModel.rows[remainingGuests.size()] == "Show roster on map"
+                && staleModel.rows[remainingGuests.size() + 1] == "Filter by name..."
+                && staleModel.rows[remainingGuests.size() + 2] == "Show tracked only"
+                && staleModel.rows.back() == "Back to Guests",
+            "Stale guest Locate exited, retained stale identity or lost roster controls");
         guest->outsideOfPark = false;
         press(H::Action::openMenu);
         Require(!W::HandheldDashboardIsOpen(), "Start failed guest pause transition");

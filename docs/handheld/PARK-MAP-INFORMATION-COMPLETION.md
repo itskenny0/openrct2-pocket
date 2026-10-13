@@ -67,3 +67,17 @@ No AArch64 build, physical Brick controls/performance, sustained park/guest thro
 The final documentation/publication SHA is recorded in the delivered report/manifest, not inside its own source commit. Esperanto remains uncommitted and byte-identical to the preserved checksum above.
 
 Recommended next substantial subsystem: native Finance and Research Information Completion. Deliver historical expenditure/category/period navigation and native cash/profit/park-value graphs, native researched/invented item catalog with object availability, and coherent information links from existing news where supported. Preserve existing loan/admission/funding/priorities/marketing controls and all map/construction gaps.
+
+
+## Guest-filter map extension (2026-10-13)
+
+GUEST-INFORMATION-COMPLETION.md records the follow and native-filter phases.
+Whole guest rosters (action/thought groups, ride rider/queue/thought membership,
+name and tracked intersections) can open the native map with those exact members.
+Native marker IDs select the overlay; map subject inspection and Back recover the
+original roster and parent. Explicit map mode changes clear custom filters;
+map tracking is independent of the preserved source-roster tracking setting.
+Expanded native/SDL GuestInformationTests, asset-backed ParkMapInformationTests,
+GuestCompletionTests, PresentationLifecycleTests, full asset-backed PathActionsTests
+and CTest 3/3 PASS. Moving-train overlay and editor-only map operations
+remain ordinary map gaps; no alternate geometry, colours or simulation was added.

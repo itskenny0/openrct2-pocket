@@ -8,6 +8,7 @@
 #include <openrct2/actions/peep/GuestSetFlagsAction.h>
 #include <openrct2/actions/peep/GuestSetNameAction.h>
 #include <openrct2/core/EnumUtils.hpp>
+#include <openrct2/core/String.hpp>
 #include <openrct2/drawing/Drawing.String.h>
 #include <openrct2/entity/EntityList.h>
 #include <openrct2/interface/Viewport.h>
@@ -19,6 +20,7 @@
 #include <openrct2/peep/PeepActionFormat.h>
 #include <openrct2/ride/Ride.h>
 #include <openrct2/ride/RideManager.hpp>
+#include <openrct2/ride/RideData.h>
 #include <unordered_map>
 
 namespace OpenRCT2::Ui::Handheld::GuestManagement
@@ -123,13 +125,54 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
             model.status = "No current groups";
         return model;
     }
+    std::string FilterName(const Filter& filter)
+    {
+        std::string label = filter.group ? filter.group->label : "All guests";
+        if (filter.ride)
+        {
+            const auto* ride = RideManagement::Resolve(filter.ride->ride);
+            if (!ride) return "Ride unavailable";
+            label = std::string(filter.ride->kind == RideFilterKind::riders ? "Riders / "
+                : filter.ride->kind == RideFilterKind::queue ? "Queue / " : "Thinking / ") + ride->getName();
+        }
+        if (!filter.name.empty()) label += " / Name: " + filter.name;
+        if (filter.tracked) label += " / Tracked";
+        return label;
+    }
     std::vector<Target> Roster(const Filter& filter)
     {
         std::vector<Target> result;
+        std::array<uint8_t, 12> rideArgs{};
+        GroupMode mode = GroupMode::actions;
+        if (filter.ride)
+        {
+            const auto* ride = RideManagement::Resolve(filter.ride->ride);
+            if (!ride) return result;
+            Formatter ft(rideArgs.data());
+            const auto kind = filter.ride->kind;
+            ft.Add<StringId>(kind == RideFilterKind::thoughts ? kStringIdNone
+                : kind == RideFilterKind::queue ? static_cast<StringId>(STR_GUESTS_QUEUING_FOR)
+                : ride->getRideTypeDescriptor().flags.has(RtdFlag::describeAsInside) ? static_cast<StringId>(STR_GUESTS_IN_RIDE) : static_cast<StringId>(STR_GUESTS_ON_RIDE));
+            ride->formatNameTo(ft);
+            mode = kind == RideFilterKind::thoughts ? GroupMode::thoughts : GroupMode::actions;
+        }
         for (const auto* guest : EntityList<Guest>())
             if (auto target = Identify(guest->id); target && (!filter.tracked || guest->peepFlags.has(PeepFlag::tracking))
-                && (!filter.group || Arguments(*guest, filter.group->mode) == filter.group->arguments))
+                && (!filter.group || Arguments(*guest, filter.group->mode) == filter.group->arguments)
+                && (filter.name.empty() || String::contains(guest->getName(), filter.name.c_str(), true)))
+            {
+                if (filter.ride)
+                {
+                    auto args = Arguments(*guest, mode);
+                    if (mode == GroupMode::thoughts)
+                    {
+                        const StringId wildcard = kStringIdNone;
+                        std::memcpy(args.data(), &wildcard, sizeof(wildcard));
+                    }
+                    if (args != rideArgs) continue;
+                }
                 result.push_back(*target);
+            }
         std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
             return a.peepId == b.peepId ? a.id < b.id : a.peepId < b.peepId;
         });

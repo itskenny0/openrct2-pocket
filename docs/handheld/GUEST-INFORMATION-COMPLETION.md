@@ -42,8 +42,8 @@ publication with exact local/canonical source-tree equality.
 
 ## Remaining phases
 
-Persistent native main-viewport follow/stop and controller recovery are delivered below. Native ride-specific GuestList filters and
-whole-filter map entry/recovery remain pending. Existing groups/tracked filtering,
+Persistent native main-viewport follow/stop, controller recovery, native GuestList
+filters and whole-filter map entry/recovery are delivered below. Existing groups/tracked filtering,
 name/tracking/preferences and shared guest/staff pickup/placement are preserved.
 All broader ordinary gameplay gaps remain on FEATURE-DEPTH-MATRIX.md.
 
@@ -78,6 +78,65 @@ CTest input/launcher/save-preservation 3/3 PASS. Existing history persistence an
 inspection tests remain enabled and pass. Hardware/AArch64/sustained-follow and
 hardware-frame validation remain unclaimed.
 
-Phase 3 native ride-specific GuestList filters and filtered map workflows remain
-pending. Canonical Phase 2 SHA is recorded externally after verified fast-forward
+Phase 3 follows below. Canonical Phase 2 was verified by guarded fast-forward
 publication; Esperanto remains excluded with its unchanged recorded checksum.
+
+
+## Phase 3: native filters and whole-roster map entry
+
+Phase 2 canonical `b242e5c7d9aa2624486ae1aae980f3ccd703dc64`, local `00e24fc`,
+matching tree `444e2f25d7735d6b43706f8371bb6c47b5d7640b`.
+
+Ride Customers adds native rider, queue and thinking-about-ride entry points.
+Membership uses the same 12-byte Formatter arguments as desktop GuestList,
+including describeAsInside, native ride names, the first fresh thought (freshness
+<=5) and its StringId wildcard. Copied ride identities are revalidated before
+reading arguments; removed/reused rides produce an empty unavailable filter.
+No rider count, queue membership or thought association is inferred from totals.
+
+Every guest roster now supports controller name search, tracked intersection and
+Show roster on map, retaining action/thought groups and copied native identities.
+Name search uses native formatted names and String::contains with desktop's
+case-insensitive mode. The existing bounded controller keyboard applies on OK;
+Back discards the draft and Clr/OK removes the name constraint. Filters are
+transient view state, with no gameplay or save-format additions.
+
+The map keeps native tile colours, camera geometry and marker positions/colours.
+The shared native marker helper now carries entity IDs so the Pocket overlay can
+select exactly the actual filtered members. A sorted ID lookup bounds dense-map
+marker lookup cost. Map subject rosters use the same membership as markers; map
+tracking can be toggled independently and mode changes explicitly clear custom
+filters. B returns through subject inspection/map to the original roster/filter
+and its ride or group parent. The copied ride parent survives nested guest/ride
+inspection. Live changes retain selected guest identities and footer controls.
+Start/menu replacement and native load teardown discard transient context.
+
+Final GUI/CLI affected-object rebuild PASS, with production source held fixed.
+Expanded asset-backed native/SDL GuestInformationTests PASS for rider/queue/queue-front
+membership, another ride exclusion, fresh/stale/other-ride thoughts, group/tracking/
+case-insensitive name intersections, marker identity, controller search apply/cancel/
+clear, tracked selection, filtered map subject inspection and Back to original roster
+and ride. Existing native history, follow/stop/zoom/rotation/pickup/load/removal/reuse/
+shutdown and persistence assertions remain enabled and pass.
+Asset-backed ParkMapInformationTests, GuestCompletionTests, SDL
+PresentationLifecycleTests and full asset-backed PathActionsTests PASS. CTest
+input/launcher/save-preservation 3/3 PASS. Expected native invalid-action diagnostics,
+public-fixture missing scenery warnings and dummy hardware-renderer warnings remain
+reported; no physical framebuffer validation is claimed.
+
+A fixture assumption about the default 'Guest' name failed under native real-name
+mode. The fixture now uses the native naming action to assign a deterministic name;
+case-insensitive and nonmatching-name assertions were retained. An inconsistent
+object build caused a stale-menu filter-layout mismatch; every affected object was
+rebuilt from frozen source before the final runs. Two obsolete assertions were
+updated: the generic 'Filtered guests' title now checks the actual native group
+label and all footer controls; stale Locate now checks exactly 19 actual native
+members, departed-identity exclusion and the four map/name/tracking/Back rows.
+Existing identity-focus, inspection, native action/accounting and parent-return
+coverage remains enabled, with no production eligibility guard weakened.
+
+Ordinary roadmap: the dedicated global guestsThinkingX thought-type entry point
+(which is not called elsewhere in the current desktop UI) remains unsupported;
+action/thought argument groups and ride-specific thoughts are delivered. Moving
+train map overlay and editor-only map operations remain separate map gaps.
+Hardware/AArch64 and sustained large-park performance remain unvalidated.

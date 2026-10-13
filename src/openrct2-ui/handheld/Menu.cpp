@@ -136,6 +136,7 @@ namespace OpenRCT2::Ui::Windows
         guestText,
         guestGroups,
         guestName,
+        guestFilterName,
         guestNameConfirm,
         guestTracking,
         guestPreferences,
@@ -278,7 +279,7 @@ namespace OpenRCT2::Ui::Windows
             if (_page == Page::researchItem && _researchItem) return Handheld::ResearchCatalog::Detail(*_researchItem,_focus.index());
             if (_page == Page::financeHistory) return Handheld::FinanceInformation::History(_financeGraph,_financeSample,_focus.index());
             if (_page == Page::financeLedger) return Handheld::FinanceInformation::LedgerPresentation(_ledger, _focus.index());
-            if (_page == Page::mapSubjects) return Handheld::MapSubjects::Presentation(_mapSubjects, _parkMap.mode, _parkMap.filter, _focus.index());
+            if (_page == Page::mapSubjects) return Handheld::MapSubjects::Presentation(_mapSubjects, _parkMap.mode, _parkMap.filter, _focus.index(), _parkMap.guestFilter);
             if (_page == Page::mapSubject && _mapTarget) return Handheld::MapSubjects::Detail(*_mapTarget, _focus.index(), _status);
             if (_page == Page::parkNews) return NewsPresentation(_parkNews, _focus.index());
             if (_page == Page::parkNewsDetail && _parkNewsTarget) {
@@ -316,6 +317,8 @@ namespace OpenRCT2::Ui::Windows
         std::vector<Handheld::GuestManagement::Group> _guestGroups;
         Handheld::GuestManagement::Filter _guestFilter;
         Page _guestRosterParent = Page::guests;
+        bool _guestMapReturn{};
+        std::optional<Handheld::RideManagement::Target> _guestRosterRideParent;
         Page _guestTextParent = Page::guestThoughts;
         std::string _guestNameBaseline;
         PeepFlags _guestFlagsBaseline{};
@@ -483,7 +486,7 @@ namespace OpenRCT2::Ui::Windows
             }
             if (current == Page::ridesAccess && _ridesTarget)
                 return Handheld::RideAccess::Presentation(*_ridesTarget, selected, _status);
-            return Handheld::RideManagement::Presentation(
+            auto model = Handheld::RideManagement::Presentation(
                 current == Page::ridesRoster            ? View::roster
                     : current == Page::ridesInspect     ? View::inspection
                     : current == Page::ridesGraphs      ? View::graphs
@@ -500,6 +503,9 @@ namespace OpenRCT2::Ui::Windows
                     : current == Page::ridesPrice       ? View::price
                                                         : View::confirmation,
                 selected, _ridesRoster, _ridesTarget, _ridesDraft, _status, _rideGraphMetric, _rideGraphOffset);
+            if (current == Page::ridesCustomers && _ridesTarget && Handheld::RideManagement::Resolve(*_ridesTarget))
+                model.rows.insert(model.rows.end(), { "Guests riding...", "Guests queuing...", "Guests thinking about ride..." });
+            return model;
         }
         std::vector<Handheld::StaffManagement::Target> _staffRoster;
         std::optional<Handheld::StaffManagement::Target> _staffTarget;
@@ -603,13 +609,21 @@ namespace OpenRCT2::Ui::Windows
                 || _page == Page::guestNeeds || _page == Page::guestThoughts || _page == Page::guestSpending
                 || _page == Page::guestInventory || _page == Page::guestText || _page == Page::guestGroups
                 || _page == Page::guestName || _page == Page::guestNameConfirm || _page == Page::guestTracking
-                || _page == Page::guestPreferences || _page == Page::guestRideHistory;
+                || _page == Page::guestPreferences || _page == Page::guestRideHistory || _page == Page::guestFilterName;
         }
         Handheld::ManagementPresentation guestPresentationFor(Page current, size_t selected) const
         {
             using Handheld::GuestManagement::View;
             if (current == Page::guestRideHistory && _guestTarget)
                 return Handheld::GuestManagement::HistoryPresentation(*_guestTarget, _guestRides, selected);
+            if (current == Page::guestFilterName)
+            {
+                auto model = Handheld::StaffManagement::NamePresentation(_nameEntry, selected, false, _status);
+                model.breadcrumb = "Guests / Filter by name";
+                model.title = _nameEntry.text.empty() ? "All guest names" : _nameEntry.text;
+                model.status = "Case insensitive / OK Apply / Clr Remove";
+                return model;
+            }
             if (current == Page::guestName || current == Page::guestNameConfirm)
             {
                 auto model = Handheld::StaffManagement::NamePresentation(
@@ -632,12 +646,14 @@ namespace OpenRCT2::Ui::Windows
                                                       : View::text;
             auto model = Handheld::GuestManagement::Presentation(
                 view, selected, _guestRoster, _guestTarget, _status, _guestText, _guestTextPage);
-            if (current == Page::guestRoster && (_guestFilter.group || _guestFilter.tracked))
+            if (current == Page::guestRoster)
             {
-                model.title = _guestFilter.tracked ? "Tracked guests" : "Filtered guests";
-                model.rows.back() = _guestRosterParent == Page::guestGroups ? "Back to groups" : "Back to Guests";
-                model.status = std::to_string(_guestRoster.size()) + " guests / "
-                    + (_guestFilter.group ? _guestFilter.group->label : "Tracking enabled");
+                model.title = Handheld::GuestManagement::FilterName(_guestFilter);
+                model.rows.back() = _guestRosterParent == Page::guestGroups ? "Back to groups"
+                    : _guestRosterParent == Page::ridesCustomers ? "Back to ride customers" : "Back to Guests";
+                model.rows.insert(model.rows.end() - 1, { "Show roster on map", "Filter by name...",
+                    _guestFilter.tracked ? "Show tracked and untracked" : "Show tracked only" });
+                model.status = std::to_string(_guestRoster.size()) + " native guests / A Inspect or map";
             }
             return model;
         }
@@ -675,7 +691,7 @@ namespace OpenRCT2::Ui::Windows
         void parkMapSubjects()
         {
             if (_page != Page::parkMap) return;
-            _mapSubjects = Handheld::MapSubjects::Roster(_parkMap.mode, _parkMap.filter);
+            _mapSubjects = Handheld::MapSubjects::Roster(_parkMap.mode, _parkMap.filter, _parkMap.guestFilter);
             page(Page::mapSubjects);
             if (_mapTarget)
             {
@@ -983,6 +999,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::guestText:
                 case Page::guestGroups:
                 case Page::guestName:
+                case Page::guestFilterName:
                 case Page::guestNameConfirm:
                 case Page::guestTracking:
                 case Page::guestPreferences:
@@ -1397,7 +1414,7 @@ namespace OpenRCT2::Ui::Windows
             }
             if (_page == Page::mapSubjects)
             {
-                const auto updated = Handheld::MapSubjects::Roster(_parkMap.mode, _parkMap.filter);
+                const auto updated = Handheld::MapSubjects::Roster(_parkMap.mode, _parkMap.filter, _parkMap.guestFilter);
                 if (updated != _mapSubjects)
                 {
                     const auto selected = _focus.index() < _mapSubjects.size()
@@ -1466,7 +1483,8 @@ namespace OpenRCT2::Ui::Windows
                     const auto selected = _focus.index() < _guestRoster.size()
                         ? std::optional<Handheld::GuestManagement::Target>{ _guestRoster[_focus.index()] }
                         : std::nullopt;
-                    size_t row = std::min(_focus.index(), updated.size());
+                    size_t row = selected ? std::min(_focus.index(), updated.size())
+                        : updated.size() + std::min<size_t>(_focus.index() - _guestRoster.size(), 3);
                     if (selected)
                         if (const auto found = std::find(updated.begin(), updated.end(), *selected); found != updated.end())
                             row = std::distance(updated.begin(), found);
@@ -1556,7 +1574,7 @@ namespace OpenRCT2::Ui::Windows
             return _page == Page::dashboard || _page == Page::overview || _page == Page::finances || _page == Page::staff
                 || _page == Page::staffInspect || _page == Page::staffStats || _page == Page::research
                 || _page == Page::marketing || _page == Page::marketingActive
-                || (guestManagement() && _page != Page::guestName && _page != Page::guestNameConfirm
+                || (guestManagement() && _page != Page::guestName && _page != Page::guestFilterName && _page != Page::guestNameConfirm
                     && _page != Page::guestTracking)
                 || _page == Page::ridesRoster || _page == Page::ridesInspect || _page == Page::ridesAccess
                 || _page == Page::ridesGraphs || _page == Page::ridesStations || _page == Page::ridesCustomers
@@ -1594,12 +1612,14 @@ namespace OpenRCT2::Ui::Windows
         {
             _managementNewsReturn=false;
             _guestRideInspection=false;
+            _guestMapReturn=false;
+            _parkMap.guestFilter.reset();
             if (managementShell())
                 page(Page::park);
         }
         void dashboardSwitchPane()
         {
-            if (_managementNewsReturn || _guestRideInspection) return;
+            if (_managementNewsReturn || _guestRideInspection || _guestMapReturn) return;
             if (!managementShell() || !dashboardCanSwitch())
                 return;
             if (dashboardRailFocused())
@@ -1669,7 +1689,7 @@ namespace OpenRCT2::Ui::Windows
                     _staffUniformDraft = static_cast<Drawing::Colour>((EnumValue(_staffUniformDraft) + x + 72) % 72);
                 invalidate();
             }
-            else if (_page == Page::ridesName || _page == Page::designName || _page == Page::staffName || _page == Page::guestName)
+            else if (_page == Page::ridesName || _page == Page::designName || _page == Page::staffName || _page == Page::guestName || _page == Page::guestFilterName)
             {
                 const auto current = _focus.index();
                 const auto next = _nameEntry.Move(current, x, y);
@@ -1852,6 +1872,16 @@ namespace OpenRCT2::Ui::Windows
                 case Page::mapSubjects:
                     page(Page::parkMap);
                     break;
+                case Page::parkMap:
+                    if (_guestMapReturn)
+                    {
+                        _guestMapReturn = false;
+                        _dashboard.section = Handheld::Dashboard::Section::guests;
+                        page(Page::guestRoster);
+                        _focus.move(static_cast<int>(_guestRosterFocus), rows().size());
+                    }
+                    else { _dashboard.section = Handheld::Dashboard::Section::overview; page(Page::overview); }
+                    break;
                 case Page::parkNewsDetail:
                     page(Page::parkNews);
                     _focus.move(static_cast<int>(_parkNewsFocus), rows().size());
@@ -1859,7 +1889,6 @@ namespace OpenRCT2::Ui::Windows
                 case Page::parkNews:
                 case Page::parkAwards:
                 case Page::parkHistory:
-                case Page::parkMap:
                     _dashboard.section = Handheld::Dashboard::Section::overview;
                     page(Page::overview);
                     break;
@@ -2030,6 +2059,8 @@ namespace OpenRCT2::Ui::Windows
                     page(Page::guests);
                     break;
                 case Page::guestRoster:
+                    if (_guestRosterParent == Page::ridesCustomers)
+                    { _dashboard.section = Handheld::Dashboard::Section::rides; _ridesTarget = _guestRosterRideParent; }
                     page(_guestRosterParent);
                     break;
                 case Page::guestInspect:
@@ -2039,6 +2070,9 @@ namespace OpenRCT2::Ui::Windows
                     page(
                         _guestTarget && Handheld::GuestManagement::Resolve(*_guestTarget) ? _guestTextParent
                                                                                           : Page::guestRoster);
+                    break;
+                case Page::guestFilterName:
+                    page(Page::guestRoster);
                     break;
                 case Page::guestNameConfirm:
                     page(Page::guestName);
@@ -3007,7 +3041,7 @@ namespace OpenRCT2::Ui::Windows
                     else if (choice == _mapSubjects.size() && _parkMap.mode >= 2)
                     {
                         _parkMap.filter = (_parkMap.filter + 1) % (_parkMap.mode == 2 ? 2 : 5);
-                        _mapSubjects = Handheld::MapSubjects::Roster(_parkMap.mode, _parkMap.filter);
+                        _mapSubjects = Handheld::MapSubjects::Roster(_parkMap.mode, _parkMap.filter, _parkMap.guestFilter);
                         _focus = {}; invalidate();
                     }
                     else page(Page::parkMap);
@@ -3550,7 +3584,18 @@ namespace OpenRCT2::Ui::Windows
                     page(Page::ridesCustomers);
                     break;
                 case Page::ridesCustomers:
-                    page(choice == 0 ? Page::ridesStations : Page::ridesStats);
+                    if (choice >= 2 && choice <= 4 && _ridesTarget && Handheld::RideManagement::Resolve(*_ridesTarget))
+                    {
+                        _guestFilter = {};
+                        _guestFilter.ride = Handheld::GuestManagement::RideFilter{
+                            *_ridesTarget, static_cast<Handheld::GuestManagement::RideFilterKind>(choice - 2) };
+                        _guestRosterParent = Page::ridesCustomers;
+                        _guestRosterRideParent = _ridesTarget;
+                        _guestRosterFocus = 0;
+                        _dashboard.section = Handheld::Dashboard::Section::guests;
+                        page(Page::guestRoster);
+                    }
+                    else page(choice == 0 ? Page::ridesStations : Page::ridesStats);
                     break;
                 case Page::ridesEarnings:
                     page(Page::ridesStats);
@@ -3719,8 +3764,33 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::guestRoster:
                     _guestRosterFocus = choice;
-                    if (choice >= _guestRoster.size())
+                    if (choice == _guestRoster.size())
+                    {
+                        _parkMap.Begin();
+                        _parkMap.mode = 2;
+                        _parkMap.rides = false;
+                        _parkMap.filter = _guestFilter.tracked ? 1 : 0;
+                        _parkMap.guestFilter = _guestFilter;
+                        _parkMap.guestFilter->tracked = false;
+                        _guestMapReturn = true;
+                        page(Page::parkMap);
+                    }
+                    else if (choice == _guestRoster.size() + 1)
+                    {
+                        _nameEntry = { _guestFilter.name };
+                        page(Page::guestFilterName);
+                    }
+                    else if (choice == _guestRoster.size() + 2)
+                    {
+                        _guestFilter.tracked = !_guestFilter.tracked;
+                        page(Page::guestRoster);
+                    }
+                    else if (choice > _guestRoster.size())
+                    {
+                        if (_guestRosterParent == Page::ridesCustomers)
+                        { _dashboard.section = Handheld::Dashboard::Section::rides; _ridesTarget = _guestRosterRideParent; }
                         page(_guestRosterParent);
+                    }
                     else if (Handheld::GuestManagement::Resolve(_guestRoster[choice]))
                     {
                         _guestTarget = _guestRoster[choice];
@@ -3802,6 +3872,16 @@ namespace OpenRCT2::Ui::Windows
                                 : choice == 3 ? Page::guestSpending
                                 : choice == 4 ? Page::guestInventory
                                               : Page::guestRoster);
+                    break;
+                case Page::guestFilterName:
+                    if (choice == 47) page(Page::guestRoster);
+                    else if (choice == 46)
+                    {
+                        _guestFilter.name = _nameEntry.text;
+                        _guestRosterFocus = 0;
+                        page(Page::guestRoster);
+                    }
+                    else { _nameEntry.Press(choice); invalidate(); }
                     break;
                 case Page::guestName:
                     if (choice == 47)

@@ -1291,13 +1291,13 @@ namespace OpenRCT2::Ui::Windows
         {
             for (const auto* staff : EntityList<Staff>())
                 if (staff->x != kLocationNull && (role < 0 || EnumValue(staff->assignedStaffType) == role))
-                    result.push_back({ NativeMiniMapCoords({ staff->x, staff->y }), StaffMapColour });
+                    result.push_back({ NativeMiniMapCoords({ staff->x, staff->y }), StaffMapColour, staff->id });
         }
         else
         {
             for (const auto* guest : EntityList<Guest>())
                 if (guest->x != kLocationNull && (!tracked || guest->peepFlags.has(PeepFlag::tracking)))
-                    result.push_back({ NativeMiniMapCoords({ guest->x, guest->y }), GuestMapColour });
+                    result.push_back({ NativeMiniMapCoords({ guest->x, guest->y }), GuestMapColour, guest->id });
         }
         return result;
     }

@@ -48,11 +48,20 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
         size_t count{};
         bool operator==(const Group&) const = default;
     };
+    enum class RideFilterKind { riders, queue, thoughts };
+    struct RideFilter
+    {
+        RideManagement::Target ride;
+        RideFilterKind kind{};
+    };
     struct Filter
     {
         std::optional<Group> group;
         bool tracked{};
+        std::optional<RideFilter> ride{};
+        std::string name{};
     };
+    std::string FilterName(const Filter&);
     std::vector<Target> Roster(const Filter& filter = {});
     std::vector<Group> Groups(GroupMode mode);
     ManagementPresentation GroupPresentation(GroupMode, const std::vector<Group>&, size_t selected);

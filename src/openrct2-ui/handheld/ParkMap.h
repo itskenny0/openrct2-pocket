@@ -20,6 +20,7 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
         uint8_t rotation = 255;
         bool rides{};
         int mode{}, filter{};
+        std::optional<GuestManagement::Filter> guestFilter;
         int zoom = 1;
         int extent{}, next{};
         std::vector<Drawing::PaletteIndex> pixels;
@@ -32,6 +33,7 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
         }
         void Begin()
         {
+            guestFilter.reset();
             const auto bounds = getGameState().mapSize;
             focus = CoordsXY{ bounds.x / 2 * 32, bounds.y / 2 * 32 };
             if (auto* main = WindowGetMain(); main && main->viewport)
@@ -56,6 +58,7 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
             mode = (mode + 1) % 4;
             rides = mode == 1;
             filter = 0;
+            guestFilter.reset();
             rotation = 255;
         }
         void Update()
@@ -124,7 +127,7 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
         if (state.mode >= 2)
         {
             legend[0] = state.mode == 2 ? "Guests: native pink" : "Staff: native green";
-            DrawModernText(rt, { 20, 193 }, MapSubjects::FilterName(state.mode, state.filter), {}, 150);
+            DrawModernText(rt, { 20, 193 }, MapSubjects::FilterName(state.mode, state.filter, state.guestFilter), {}, 150);
         }
         for (size_t i = 0; i < legend.size(); ++i)
             DrawModernText(rt, { 20, (state.mode >= 2 ? 243 : 229) + static_cast<int>(i) * 22 }, legend[i], {}, 150);
@@ -170,10 +173,19 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
                 GfxDrawLine(rt, { { a.x, b.y }, a }, colour);
             }
         }
+        std::vector<uint16_t> guestMembers;
+        if (state.mode == 2 && state.guestFilter)
+        {
+            for (const auto& member : MapSubjects::Roster(2, state.filter, state.guestFilter))
+                guestMembers.push_back(std::get<GuestManagement::Target>(member).id.ToUnderlying());
+            std::sort(guestMembers.begin(), guestMembers.end());
+        }
         if (state.mode >= 2)
             for (const auto& peep : Windows::NativeMiniMapPeepMarkers(
                      state.mode == 3, state.mode == 2 && state.filter != 0, state.mode == 3 ? state.filter - 1 : -1))
             {
+                if (state.mode == 2 && state.guestFilter
+                    && !std::binary_search(guestMembers.begin(), guestMembers.end(), peep.id.ToUnderlying())) continue;
                 const auto point = project(peep.position);
                 if (point.x >= origin.x && point.x < origin.x + width - 1 && point.y >= origin.y
                     && point.y < origin.y + height - 1)

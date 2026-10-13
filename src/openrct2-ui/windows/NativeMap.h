@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include <array>
+#include <openrct2/Identifiers.h>
 #include <openrct2/drawing/PaletteIndex.h>
 #include <openrct2/interface/ScreenCoords.hpp>
 #include <openrct2/world/Location.hpp>
@@ -12,6 +13,7 @@ namespace OpenRCT2::Ui::Windows
     {
         TileCoordsXY position;
         Drawing::PaletteIndex colour;
+        EntityId id;
     };
     std::vector<NativeMiniMapMarker> NativeMiniMapPeepMarkers(bool staff, bool tracked, int role);
     // Shared with the desktop map; uses native colours, ownership and camera rotation.

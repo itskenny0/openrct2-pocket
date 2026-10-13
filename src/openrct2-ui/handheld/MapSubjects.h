@@ -62,13 +62,13 @@ namespace OpenRCT2::Ui::Handheld::MapSubjects
             },
             target);
     }
-    inline std::vector<Target> Roster(int mode, int filter)
+    inline std::vector<Target> Roster(int mode, int filter, const std::optional<GuestManagement::Filter>& guestFilter = {})
     {
         std::vector<Target> result;
         if (mode == 2)
         {
-            GuestManagement::Filter options;
-            options.tracked = filter != 0;
+            auto options = guestFilter.value_or(GuestManagement::Filter{});
+            options.tracked = options.tracked || filter != 0;
             for (const auto& target : GuestManagement::Roster(options))
                 result.emplace_back(target);
         }
@@ -83,23 +83,24 @@ namespace OpenRCT2::Ui::Handheld::MapSubjects
                 result.emplace_back(target);
         return result;
     }
-    inline std::string FilterName(int mode, int filter)
+    inline std::string FilterName(int mode, int filter, const std::optional<GuestManagement::Filter>& guestFilter = {})
     {
+        if (mode == 2 && guestFilter) return GuestManagement::FilterName(*guestFilter) + (filter ? " / Tracked" : "");
         return mode == 2 ? (filter ? "Tracked guests" : "All guests")
             : mode == 3  ? (filter ? StaffManagement::RoleName(static_cast<StaffType>(filter - 1)) : "All staff roles")
                          : "All rides";
     }
-    inline ManagementPresentation Presentation(const std::vector<Target>& roster, int mode, int filter, size_t selected)
+    inline ManagementPresentation Presentation(const std::vector<Target>& roster, int mode, int filter, size_t selected, const std::optional<GuestManagement::Filter>& guestFilter = {})
     {
         ManagementPresentation model;
         model.breadcrumb = "Park map / Native subjects";
-        model.title = FilterName(mode, filter);
+        model.title = FilterName(mode, filter, guestFilter);
         model.selected = selected;
         model.stats = { { "Native members", std::to_string(roster.size()) } };
         for (const auto& target : roster)
             model.rows.push_back(Name(target));
         if (mode == 2 || mode == 3)
-            model.rows.push_back("Change native filter");
+            model.rows.push_back(mode == 2 && guestFilter ? "Toggle tracked guests" : "Change native filter");
         model.rows.push_back("Return to map");
         model.status = roster.empty() ? "No eligible subjects in this filter" : "A Select subject  B Map";
         return model;

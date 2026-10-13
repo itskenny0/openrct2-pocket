@@ -8,10 +8,11 @@
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/GuestManagement.h>
 #include <openrct2-ui/handheld/GuestFollow.h>
+#include <openrct2-ui/handheld/MapSubjects.h>
+#include <openrct2-ui/windows/NativeMap.h>
 #include <openrct2-ui/handheld/PeepPlacement.h>
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/handheld/ManagementNews.h>
-#include <openrct2-ui/handheld/MapSubjects.h>
 #include <openrct2-ui/handheld/ParkInformation.h>
 #include <openrct2-ui/handheld/ParkMap.h>
 #include <openrct2-ui/handheld/ParkOverview.h>
@@ -92,6 +93,7 @@ int main(int argc, char** argv)
         Check(context->GetObjectManager().LoadObject("rct2.peep_animations.guest"),"Guest metadata missing");
         auto* person=Guest::generate({640,640,16});Check(person,"Guest generation failed");person->outsideOfPark=false;person->setParkEntryTime(state.currentTicks);
         const auto target=*G::Identify(person->id);Check(G::RideHistory(target).empty(),"Empty history fabricated");
+        Check(G::SetName(target,person->getName(),"Guest Filter Fixture",true).error==GameActions::Status::ok,"Native filter fixture name failed");GameActions::ProcessQueue(state);
         auto* object=context->GetObjectManager().LoadObject("rct2.ride.ptct1");Check(object && context->GetObjectManager().LoadObject("rct2.station.plain"),"Ride metadata missing");
         const auto index=context->GetObjectManager().GetLoadedObjectEntryIndex(object);RideTypeSetInvented(RIDE_TYPE_WOODEN_ROLLER_COASTER);RideEntrySetInvented(index);
         for(int i=0;i<3;++i){
@@ -107,6 +109,60 @@ int main(int argc, char** argv)
         H::ControllerInput input;H::Frame confirm;confirm.actions={H::Action::confirm};H::Frame cancel;cancel.actions={H::Action::back};
         W::HandheldGuestOpen(target);W::HandheldMenuMove(10);H::HandleMenuInput(input,confirm);Check(W::HandheldGuestsPresentation().breadcrumb=="Guests / Native ride history","Controller history entry failed");
         H::HandleMenuInput(input,confirm);Check(W::HandheldRidesIsOpen(),"History inspection failed");H::HandleMenuInput(input,cancel);Check(W::HandheldGuestsPresentation().breadcrumb=="Guests / Native ride history","History return failed");H::HandleMenuInput(input,cancel);
+        // Native GuestList fixture: each state uses the desktop action/thought formatter contract.
+        const auto savedState=person->state;
+        const auto savedRide=person->currentRide;
+        const auto savedThought=person->thoughts[0];
+        G::Filter rideFilter;rideFilter.ride=G::RideFilter{rides[0],G::RideFilterKind::riders};
+        person->state=PeepState::onRide;person->currentRide=rides[0].id;
+        Check(G::Roster(rideFilter)==std::vector<G::Target>{target},"Rider native membership failed");
+        person->currentRide=rides[1].id;Check(G::Roster(rideFilter).empty(),"Other ride matched rider filter");
+        person->currentRide=rides[0].id;person->state=PeepState::queuing;
+        Check(G::Roster(rideFilter).empty(),"Queue matched rider filter");
+        rideFilter.ride->kind=G::RideFilterKind::queue;
+        Check(G::Roster(rideFilter)==std::vector<G::Target>{target},"Queue native membership failed");
+        person->state=PeepState::queuingFront;Check(G::Roster(rideFilter).size()==1,"Queue front excluded");
+        person->state=savedState;person->currentRide=savedRide;
+        rideFilter.ride->kind=G::RideFilterKind::thoughts;
+        person->thoughts[0].type=PeepThoughtType::wasGreat;person->thoughts[0].rideId=rides[0].id;person->thoughts[0].freshness=5;
+        Check(G::Roster(rideFilter)==std::vector<G::Target>{target},"Native thought wildcard membership failed");
+        person->thoughts[0].freshness=6;Check(G::Roster(rideFilter).empty(),"Stale thought matched filter");
+        person->thoughts[0].freshness=1;person->thoughts[0].rideId=rides[1].id;
+        Check(G::Roster(rideFilter).empty(),"Other ride thought matched filter");person->thoughts[0].rideId=rides[0].id;
+        rideFilter.tracked=true;Check(G::Roster(rideFilter).empty(),"Untracked guest matched intersection");
+        const auto originalFlags=person->peepFlags;person->peepFlags.set(PeepFlag::tracking);
+        Check(G::Roster(rideFilter).size()==1,"Tracked ride intersection failed");rideFilter.tracked=false;
+        const auto thoughtGroups=G::Groups(G::GroupMode::thoughts);Check(!thoughtGroups.empty(),"Thought group fixture absent");
+        rideFilter.group=thoughtGroups.front();Check(G::Roster(rideFilter).size()==1,"Group ride intersection failed");rideFilter.group.reset();
+        rideFilter.name="gUeSt";Check(G::Roster(rideFilter).size()==1,"Case-insensitive native name intersection failed");
+        rideFilter.name="no such guest name";Check(G::Roster(rideFilter).empty(),"Nonmatching name admitted guest");rideFilter.name.clear();
+        const auto subjects=H::MapSubjects::Roster(2,0,rideFilter);
+        Check(subjects.size()==1 && std::get<G::Target>(subjects.front())==target,"Filtered map differs from roster");
+        const auto markers=W::NativeMiniMapPeepMarkers(false,false,-1);
+        Check(std::any_of(markers.begin(),markers.end(),[&](const auto& m){return m.id==target.id;}),"Native map marker identity missing");
+        auto choose=[&](const H::ManagementPresentation& model,const std::string& row) {
+            const auto it=std::find(model.rows.begin(),model.rows.end(),row);Check(it!=model.rows.end(),"Controller row missing");
+            W::HandheldMenuMove(static_cast<int>(it-model.rows.begin())-static_cast<int>(model.selected));H::HandleMenuInput(input,confirm);
+        };
+        W::HandheldGuestOpen(target);W::HandheldMenuMove(10);H::HandleMenuInput(input,confirm);H::HandleMenuInput(input,confirm);choose(W::HandheldRidesPresentation(),"Statistics...");choose(W::HandheldRidesPresentation(),"Customers...");
+        choose(W::HandheldRidesPresentation(),"Guests thinking about ride...");
+        Check(W::HandheldGuestsPresentation().rows.front()==person->getName(),"Ride filter controller roster failed");
+        choose(W::HandheldGuestsPresentation(),"Filter by name...");choose(W::HandheldGuestsPresentation(),"G");choose(W::HandheldGuestsPresentation(),"OK");
+        Check(W::HandheldGuestsPresentation().rows.front()==person->getName(),"Controller name filter apply failed");
+        choose(W::HandheldGuestsPresentation(),"Filter by name...");choose(W::HandheldGuestsPresentation(),"Z");H::HandleMenuInput(input,cancel);
+        Check(W::HandheldGuestsPresentation().rows.front()==person->getName(),"Cancelled name draft changed membership");
+        choose(W::HandheldGuestsPresentation(),"Show tracked only");Check(W::HandheldGuestsPresentation().rows.front()==person->getName(),"Controller tracked intersection failed");
+        choose(W::HandheldGuestsPresentation(),"Show roster on map");Check(W::HandheldParkMapIsOpen(),"Filtered roster map entry failed");
+        W::HandheldParkMapSubjects();Check(W::HandheldParkMapSubjectsPresentation().rows.front()==person->getName(),"Map subject filter lost");
+        H::HandleMenuInput(input,confirm);choose(W::HandheldParkMapSubjectsPresentation(),"Inspect subject");
+        Check(W::HandheldGuestsIsOpen(),"Filtered map inspection failed");H::HandleMenuInput(input,cancel);
+        Check(W::HandheldParkMapSubjectsPresentation().title==person->getName(),"Map inspection return context lost");
+        H::HandleMenuInput(input,cancel);H::HandleMenuInput(input,cancel);Check(W::HandheldParkMapIsOpen(),"Map subject return failed");
+        H::HandleMenuInput(input,cancel);Check(W::HandheldGuestsPresentation().title.find("Thinking / ")==0,"Map return lost roster filter");
+        choose(W::HandheldGuestsPresentation(),"Filter by name...");choose(W::HandheldGuestsPresentation(),"Clr");choose(W::HandheldGuestsPresentation(),"OK");
+        H::HandleMenuInput(input,cancel);Check(W::HandheldRidesPresentation().breadcrumb=="Rides / Customers","Filtered roster return lost ride context");
+        person->thoughts[0]=savedThought;person->peepFlags=originalFlags;
+        W::HandheldGuestOpen(target);
         namespace F=H::GuestFollow;
         const auto personPosition=G::Resolve(target)->getLocation();
         W::HandheldMenuMove(11);H::HandleMenuInput(input,confirm);
@@ -129,8 +185,9 @@ int main(int argc, char** argv)
         SaveFlags flags{};const auto save=std::string(argv[2])+"/guest-history.park";Check(ScenarioSave(state,save,flags) && context->LoadParkFromFile(save),"History save/load failed");
         Check(G::RideHistory(target).size()==2 && !Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu),"History persistence/teardown failed");Check(!F::Current(),"Load retained native follow guard");Check(state.park.cash==cash && state.park.expenditureTable==accounting,"History reads changed accounting");
         const auto old=G::RideHistory(target).front();GameActions::RideDemolishAction remove(old.id,GameActions::RideModifyType::demolish);Check(GameActions::Execute(&remove,state).error==GameActions::Status::ok,"Ride removal failed");GameActions::ProcessQueue(state);
+        rideFilter.ride=G::RideFilter{old,G::RideFilterKind::riders};Check(G::Roster(rideFilter).empty(),"Removed ride filter retained members");
         Check(!G::HistoryRideCurrent(target,old) && G::RideHistory(target).size()==1,"Removed history ride retained");
-        GameActions::RideCreateAction replacement(RIDE_TYPE_WOODEN_ROLLER_COASTER,index,0,0,0,RideInspection::every30Minutes);Check(GameActions::Execute(&replacement,state).error==GameActions::Status::ok,"Replacement failed");GameActions::ProcessQueue(state);Check(!G::HistoryRideCurrent(target,old),"Reused ride revived old history");
+        GameActions::RideCreateAction replacement(RIDE_TYPE_WOODEN_ROLLER_COASTER,index,0,0,0,RideInspection::every30Minutes);Check(GameActions::Execute(&replacement,state).error==GameActions::Status::ok,"Replacement failed");GameActions::ProcessQueue(state);Check(!G::HistoryRideCurrent(target,old),"Reused ride revived old history");Check(G::Roster(rideFilter).empty(),"Reused ride revived stale filter");
         Check(F::Start(target),"Follow before departure failed");
         auto* departing=state.entities.tryGetEntity<Guest>(target.id);departing->remove();
         Check(!F::Current() && !F::Start(target) && WindowGetMain()->viewportSmartFollowSprite.IsNull(),"Departed native guest retained follow");
