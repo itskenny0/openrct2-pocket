@@ -86,6 +86,7 @@ namespace OpenRCT2::Ui::Windows
         sceneryStyleEditor,
         sceneryStyleConfirm,
         areaOptions,
+        terrainPaintConfirm,
         rightsOptions,
         rightsConfirm,
         sceneryName,
@@ -338,6 +339,8 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::SceneryTools::StyleDraft> _signStyle;
         std::optional<Handheld::SceneryClear::Draft> _clearDraft;
         bool _clearReviewResumed{};
+        std::optional<Handheld::AreaTools::PaintDraft> _paintDraft;
+        bool _paintReviewResumed{};
         bool _pathUndoResumed{};
         std::optional<Handheld::Paths::UndoDraft> _pathUndo;
         std::optional<Handheld::RightsTools::Draft> _rightsDraft;
@@ -717,7 +720,7 @@ namespace OpenRCT2::Ui::Windows
         {
             return _page == Page::researchCatalog || _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
                 || _page == Page::staffPatrolClear || _page == Page::rightsOptions || _page == Page::rightsConfirm
-                || _page == Page::areaOptions || _page == Page::sceneryOptions || _page == Page::sceneryName || _page == Page::scenerySearch
+                || _page == Page::areaOptions || _page == Page::terrainPaintConfirm || _page == Page::sceneryOptions || _page == Page::sceneryName || _page == Page::scenerySearch
                 || _page == Page::sceneryConfirm || _page == Page::sceneryGroups || _page == Page::sceneryStyle
                 || _page == Page::sceneryStyleEditor || _page == Page::sceneryStyleConfirm || _page == Page::sceneryClearOptions || _page == Page::sceneryClearConfirm;
         }
@@ -799,6 +802,10 @@ namespace OpenRCT2::Ui::Windows
         void page(Page next)
         {
             if(next==Page::park || next==Page::dashboard) _managementNewsReturn=false;
+            if (_paintReviewResumed && next != Page::terrainPaintConfirm) {
+                if (_pausedHere && !(gGamePaused & GAME_PAUSED_NORMAL)) PauseToggle();
+                _paintReviewResumed=false;
+            }
             if (_clearReviewResumed && next != Page::sceneryClearConfirm) {
                 if (_pausedHere && !(gGamePaused & GAME_PAUSED_NORMAL))
                     PauseToggle();
@@ -1083,6 +1090,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::sceneryConfirm:
                     return { "Apply text", "Cancel" };
                 case Page::sceneryClearOptions: return Handheld::SceneryClear::Options();
+                case Page::terrainPaintConfirm: return {"Apply paint","Cancel"};
                 case Page::sceneryClearConfirm: return {"Clear native area", "Cancel"};
                 case Page::sceneryGroups:
                 {
@@ -1234,7 +1242,7 @@ namespace OpenRCT2::Ui::Windows
         void onClose() override
         {
             Handheld::DesignAuthoring::End();
-            if (_ridesReviewResumed || _rightsReviewResumed || _clearReviewResumed || _pathUndoResumed)
+            if (_ridesReviewResumed || _rightsReviewResumed || _clearReviewResumed || _paintReviewResumed || _pathUndoResumed)
                 _pausedHere = false; // Our pause was already released; retain any external pause.
             if (_page == Page::designConfirm && _focus.index() == 0)
                 Handheld::Designs::CancelReview();
@@ -1300,6 +1308,13 @@ namespace OpenRCT2::Ui::Windows
         void openAreaOptions()
         {
             page(Page::areaOptions);
+        }
+        void openTerrainPaintReview(CoordsXY tile)
+        {
+            if (_pausedHere && (gGamePaused & GAME_PAUSED_NORMAL)) {PauseToggle();_paintReviewResumed=true;}
+            _paintDraft=Handheld::AreaTools::BeginPaint(tile,Handheld::AreaTools::settings);
+            if (_paintDraft) {page(Page::terrainPaintConfirm);_focus.move(1,2);}
+            else {page(Page::areaOptions);_status="Paint unavailable / check native quote or pending actions";}
         }
         void openSceneryClearOptions() {page(Page::sceneryClearOptions);}
         void openSceneryClearReview(CoordsXY tile) {
@@ -1944,6 +1959,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::sceneryConfirm:
                     page(Page::sceneryName);
                     break;
+                case Page::terrainPaintConfirm: _paintDraft.reset(); close(); break;
                 case Page::sceneryClearConfirm: _clearDraft.reset(); close(); break;
                 case Page::sceneryClearOptions: close(); break;
                 case Page::sceneryGroups:
@@ -2455,6 +2471,15 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::sceneryClearOptions:
                     if(choice==0)close();else{Handheld::SceneryClear::Configure(choice);invalidate();}break;
+                case Page::terrainPaintConfirm:
+                    if (choice==1) {_paintDraft.reset();close();}
+                    else if (_paintDraft)
+                    {
+                        const auto result=Handheld::AreaTools::ApplyPaint(*_paintDraft,true);
+                        if (result.error==GameActions::Status::ok) {_paintDraft.reset();close();}
+                        else {_status=result.getErrorMessage();invalidate();}
+                    }
+                    break;
                 case Page::sceneryClearConfirm:
                     if(choice==1){_clearDraft.reset();close();}
                     else if(_clearDraft){const auto result=Handheld::SceneryClear::Action(*_clearDraft,true);
@@ -4478,6 +4503,12 @@ namespace OpenRCT2::Ui::Windows
                     Handheld::RightsTools::Presentation(*_rightsDraft, _focus.index(), _status));
                 return;
             }
+            if (_page==Page::terrainPaintConfirm && _paintDraft)
+            {
+                Handheld::DrawManagementPanel(rt,{ContextGetWidth(),ContextGetHeight()},
+                    Handheld::AreaTools::PaintPresentation(*_paintDraft,_focus.index(),_status));
+                return;
+            }
             if(_page==Page::sceneryClearConfirm && _clearDraft) {
                 Handheld::DrawManagementPanel(rt,{ContextGetWidth(),ContextGetHeight()},Handheld::SceneryClear::Presentation(*_clearDraft,_focus.index(),_status));return;
             }
@@ -4893,6 +4924,10 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* w = OpenPanel())
             w->openRightsReview(tile);
+    }
+    void HandheldTerrainPaintReviewOpen(CoordsXY tile)
+    {
+        if (auto* window=OpenPanel()) window->openTerrainPaintReview(tile);
     }
     void HandheldAreaOptionsOpen()
     {

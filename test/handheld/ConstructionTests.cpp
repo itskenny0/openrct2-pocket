@@ -589,6 +589,71 @@ int main(int argc, char** argv)
             "Scatter native map/accounting persistence differs");
         S::ResetScatter(); Require(!S::ScatterActive() && !S::ScatterReviewed(),"Scatter load/exit state survived cleanup");
         std::cout << "Native scatter stable estimate / read-only review / cancel / stale ownership / partial clearance / pending guard / actual cost / save passed\n";
+        A::Settings colours;
+        colours.operation=A::Operation::paint; colours.width=colours.height=2;
+        auto* grid=objects.LoadObject("rct2.terrain_surface.grid");
+        auto* stucco=objects.LoadObject("official.terrain_edge.stucco");
+        auto* grass=objects.LoadObject("rct2.terrain_surface.grass");
+        auto* rock=objects.LoadObject("rct2.terrain_edge.rock");
+        Require(grid && stucco && grass && rock,"Native colourable terrain objects missing");
+        colours.surface=objects.GetLoadedObjectEntryIndex(grid); colours.edge=objects.GetLoadedObjectEntryIndex(stucco);
+        colours.surfaceColour=Drawing::Colour::brightRed; colours.edgeColour=Drawing::Colour::lightBlue;
+        Require(A::SurfaceColourSupported(colours.surface) && A::EdgeColourSupported(colours.edge),"Native primary-colour flags missing");
+        const CoordsXY colourTile{512,864}; const auto colourRange=*A::Range(colourTile,2,2);
+        for(int y=864;y<=896;y+=32) for(int x=512;x<=544;x+=32)
+            MapGetSurfaceElementAt(CoordsXY{x,y})->setOwnership({OwnershipFlag::landOwned});
+        const auto terrainBefore=A::CapturePaint(colourRange); const auto terrainCash=state.park.cash;
+        const auto terrainLedger=state.park.expenditureTable;
+        const auto colourQuote=A::Action(colourTile,colours,false);
+        auto colourDraft=A::BeginPaint(colourTile,colours);
+        Require(colourQuote.error==GameActions::Status::ok && colourDraft && colourDraft->cost==colourQuote.cost
+            && A::ApplyPaint(*colourDraft,false).error==GameActions::Status::ok
+            && state.park.cash==terrainCash && state.park.expenditureTable==terrainLedger
+            && A::CapturePaint(colourRange)==terrainBefore,"Terrain colour review/query mutated native state");
+        auto staleColour=*colourDraft; ++staleColour.cost;
+        Require(A::ApplyPaint(staleColour,true).error!=GameActions::Status::ok,"Changed colour quote accepted");
+        staleColour=*colourDraft; staleColour.surfaceDescriptor="reused slot";
+        Require(A::ApplyPaint(staleColour,true).error!=GameActions::Status::ok,"Stale terrain object descriptor accepted");
+        MapGetSurfaceElementAt(colourTile)->setOwnership({});
+        Require(A::ApplyPaint(*colourDraft,true).error!=GameActions::Status::ok,"Stale terrain ownership accepted");
+        MapGetSurfaceElementAt(colourTile)->setOwnership({OwnershipFlag::landOwned});
+        state.park.flags.set(ParkFlag::forbidLandscapeChanges);
+        Require(A::Action(colourTile,colours,true).error!=GameActions::Status::ok,"Native landscaping restriction bypassed");
+        state.park.flags.unset(ParkFlag::forbidLandscapeChanges);
+        state.park.cash=0;
+        Require(A::ApplyPaint(*colourDraft,true).error!=GameActions::Status::ok,"Terrain colour funds bypassed");
+        state.park.cash=terrainCash;
+        auto invalidColour=colours; invalidColour.surfaceColour=static_cast<Drawing::Colour>(72);
+        Require(A::Action(colourTile,invalidColour,true).error!=GameActions::Status::ok,"Invalid native palette accepted");
+        Require(A::ApplyPaint(*colourDraft,true).error==GameActions::Status::ok && !A::BeginPaint(colourTile,colours)
+            && A::ApplyPaint(*colourDraft,true).error!=GameActions::Status::ok,"Terrain pending/repeated action guard failed");
+        GameActions::ProcessQueue(state);
+        Require(state.park.cash==terrainCash-colourQuote.cost && !*A::paintPending,"Terrain actual native cost/completion differs");
+        const auto painted=A::CapturePaint(colourRange);
+        for(size_t i=0;i<painted.size();++i)
+            Require(painted[i].surface==colours.surface && painted[i].edge==colours.edge
+                && painted[i].surfaceColour==colours.surfaceColour && painted[i].edgeColour==colours.edgeColour
+                && painted[i].baseZ==terrainBefore[i].baseZ && painted[i].water==terrainBefore[i].water
+                && painted[i].slope==terrainBefore[i].slope,"Native terrain colour encoding/geometry differs");
+        SaveFlags colourFlags{}; const auto colourSave=std::string(argv[2])+"/terrain-colours.park";
+        const auto colourCash=state.park.cash;
+        Require(ScenarioSave(state,colourSave,colourFlags) && context->LoadParkFromFile(colourSave)
+            && A::CapturePaint(colourRange)==painted && state.park.cash==colourCash,"Native terrain colour save persistence differs");
+        auto fixed=colours; fixed.surface=objects.GetLoadedObjectEntryIndex(objects.LoadObject("rct2.terrain_surface.grass"));
+        fixed.edge=objects.GetLoadedObjectEntryIndex(objects.LoadObject("rct2.terrain_edge.rock"));
+        Require(!A::SurfaceColourSupported(fixed.surface) && !A::EdgeColourSupported(fixed.edge),"Fixed terrain exposes unsupported colours");
+        A::settings=fixed; const auto unsupported=A::settings;
+        A::Configure(7); A::Configure(8);
+        Require(A::settings==unsupported,"Unsupported native colour row changed selection");
+        fixed.surfaceColour=Drawing::Colour::black; fixed.edgeColour=Drawing::Colour::black;
+        Require(A::Action(colourTile,fixed,true).error==GameActions::Status::ok,"Native fixed-style action failed");
+        GameActions::ProcessQueue(state);
+        const auto fixedPainted=A::CapturePaint(colourRange);
+        for(const auto& t:fixedPainted)
+            Require(t.surfaceColour==colours.surfaceColour && t.edgeColour==colours.edgeColour,
+                "Native fixed surface/edge action overwrote unsupported stored colour channel");
+        A::ResetPaint(); Require(!*A::paintPending,"Terrain load/exit cleanup retained pending action");
+        std::cout << "Native surface/edge colours / supported palette / query purity / stale review / native restriction-funds / pending repeat / exact cash / encoding / unsupported preservation / save passed\n";
         std::cout << "Pocket park construction native checks passed\n";
         return 0;
     }

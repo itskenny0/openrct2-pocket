@@ -1137,6 +1137,12 @@ namespace OpenRCT2::Ui::Handheld
                                         _terrainStatus = Designs::Query(_terrainTile).getErrorMessage();
                                     break;
                                 }
+                                if (_areaTool && AreaTools::settings.operation==AreaTools::Operation::paint)
+                                {
+                                    Windows::HandheldTerrainPaintReviewOpen(*_terrainTile);
+                                    input.suspend();
+                                    return;
+                                }
                                 const bool picking = _sceneryTool && SceneryTools::Current().mode == SceneryTools::Mode::pick;
                                 const auto result = TerrainAction(true);
                                 if (picking && result.error == GameActions::Status::ok)
@@ -1190,7 +1196,7 @@ namespace OpenRCT2::Ui::Handheld
                         {
                             Paths::ToggleRemove();
                             _terrainStatus.clear();
-        _scatterFeedback = false;
+                            _scatterFeedback = false;
                             break;
                         }
                         Invoke(ShortcutId::kViewGeneralRotateClockwise);
@@ -1209,7 +1215,7 @@ namespace OpenRCT2::Ui::Handheld
                             else
                                 Paths::CycleSurface();
                             _terrainStatus.clear();
-        _scatterFeedback = false;
+                            _scatterFeedback = false;
                             break;
                         }
                         if (_terrainActive)
@@ -1241,11 +1247,16 @@ namespace OpenRCT2::Ui::Handheld
                             else if (_colourRide)
                                 _colourScheme = (_colourScheme + 1) % kNumRideColourSchemes;
                             else if (_surfaceTool)
-                                _surfaceIndex = Surface::Next(_surfaceIndex);
+                            {
+                                AreaTools::settings={}; AreaTools::settings.operation=AreaTools::Operation::paint;
+                                AreaTools::settings.surface=_surfaceIndex; AreaTools::ResetColours();
+                                _surfaceTool=false; _areaTool=true;
+                                Windows::HandheldAreaOptionsOpen();
+                            }
                             else if (!_sceneryRemovalTool)
                                 _raiseLand = !_raiseLand;
                             _terrainStatus.clear();
-        _scatterFeedback = false;
+                            _scatterFeedback = false;
                         }
                         break;
                     case Action::back:
@@ -1273,7 +1284,7 @@ namespace OpenRCT2::Ui::Handheld
         {
             auto* main = WindowGetMain();
             _terrainStatus.clear();
-        _scatterFeedback = false;
+            _scatterFeedback = false;
             GuestFollow::Stop();
             WindowUnfollowSprite(*main);
             InputScrollViewportSmooth({ frame.panX, frame.panY }, main);
@@ -1382,10 +1393,7 @@ namespace OpenRCT2::Ui::Handheld
                         std::to_string(RightsTools::settings.width) + " x " + std::to_string(RightsTools::settings.height)
                             + " tiles");
                 else if (_areaTool)
-                    DrawConstructionOverlay(
-                        rt, Concept::kOrigin, "Terrain / Water",
-                        AreaTools::operations[static_cast<size_t>(AreaTools::settings.operation)], "Area brush",
-                        AreaTools::SizeName(AreaTools::settings), AreaTools::SelectionName(AreaTools::settings));
+                    AreaTools::DrawOverlay(rt,Concept::kOrigin);
                 else if (_sceneryClearTool)
                     SceneryClear::DrawOverlay(rt, Concept::kOrigin);
                 else if (_sceneryTool)
@@ -1416,7 +1424,7 @@ namespace OpenRCT2::Ui::Handheld
             else if (_sceneryClearTool)
                 DrawConstructionFooter(rt, {ContextGetWidth(), height}, "Review", "Options");
             else if (_areaTool)
-                DrawConstructionFooter(rt, { ContextGetWidth(), height }, "Apply", "Brush");
+                DrawConstructionFooter(rt, { ContextGetWidth(), height }, AreaTools::settings.operation==AreaTools::Operation::paint?"Review":"Apply", "Brush");
             else if (_sceneryTool)
                 DrawConstructionFooter(rt, { ContextGetWidth(), height },
                     SceneryTools::Current().mode == SceneryTools::Mode::pick ? "Pick" : SceneryTools::ScatterActive() && !SceneryTools::ScatterReviewed() ? "Review" : "Apply", "Options");

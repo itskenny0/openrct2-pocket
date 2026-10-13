@@ -197,3 +197,64 @@ feedback/failure until the next review or map-load/exit reset. SDL assertions ve
 that Options does not erase the actual failure. The native error capture was
 regenerated and inspected. ConstructionTests rerun PASS; CTest 3/3 PASS. Temporary
 partial recovery files were moved into the preserved recovery archive, not discarded.
+
+## Phase 3 publication
+
+Canonical `ee2cbd3db0b334915455676542f429bdd7588a11`, local final safety
+`a78766abe5aac24e5d050f305cf8c97af55578c5` (preceded by bedaf26), complete matching
+source tree `ef54f2c2e2b222697731aeee3d6eaa05a962da9a`. Current native parent f20751d,
+every changed blob and complete source-tree equality were verified before the
+expected_sha/force=false fast-forward. Esperanto remains excluded and unchanged.
+
+## Phase 4 — native terrain surface and edge colours
+
+Area paint options appends Surface colour and Edge colour. D-pad left/right or A
+cycles the actual desktop 72-colour dropdown mapping; native localized names are
+used. Only loaded objects with TerrainSurfaceFlag/TerrainEdgeFlag::hasPrimaryColour
+expose a channel; unsupported choices are explicitly unavailable and cannot change
+settings. Changing styles uses the desktop LandTool reset helpers for native defaults.
+No object is loaded/unlocked by the workflow. Quick surface Y opens the shared
+one-tile paint/colour options with its selected native surface; all loaded surface/
+edge choices remain available. Camera X and L1/R1 zoom remain native.
+
+Native surface/edge icons with the same ImageId remaps as desktop Land provide
+selected-colour previews alongside the native area selection. A in area paint opens
+a Cancel-first review showing selected styles, supported colours and the native quote.
+A Apply submits one native SurfaceSetStyleAction; B/Cancel returns to the active
+brush without changing map/accounting. Review snapshots the selected native object
+descriptors, actual terrain styles/colours/base height/slope/water/ownership and park
+flags, and rechecks the actual quote. Changed/reused/missing objects, changed terrain/
+flags/cost, invalid palette encodings and native restrictions/funds reject apply.
+Pending and submitted guards prevent held/repeated actions; native callback completion
+releases the pending guard. Map-load/exit cleanup detaches pending review lifetime.
+No new serialized gameplay state or direct Pocket terrain writes were added.
+
+A demonstrated native action inconsistency was corrected: edge style changes wrote
+primary edge colour even when the new edge lacked the primary-colour flag, although
+Query already ignored recolouring for that unsupported channel. Execute now uses the
+same native flag gate as surface colour writes. Native style changes preserve both
+unsupported encoded colour channels without altering quote/accounting policy. Tests
+switch actual colourable Grid/Stucco to fixed Grass/Rock and verify this preservation.
+Native actions still own range/ownership, restrictions, costs, grass and save encoding;
+no all-tiles/atomicity promise is added beyond their existing semantics.
+
+GUI/CLI build PASS with production source fixed. Expanded native ConstructionTests
+PASS: actual supported palette/flags, both colour encodings and native save/load,
+query/review map/cash/ledger purity, stale descriptor/ownership/quote, native landscaping
+restrictions/funds, invalid palette, pending/repeated actions, exact native cost and
+unsupported channel preservation. Asset-backed SDL SceneryPathParityTests PASS for
+both controller colour selectors, real park-A review with held input, Cancel-first
+cancellation, native apply/cost/both fields, pending guard, stale recovery, unsupported
+controls and quick-surface handoff. PresentationLifecycleTests PASS. CTest final sweep
+follows. Native multiplayer paint review remains unavailable until asynchronous
+network completion/recovery can be validated; the ordinary single native action API
+is unchanged.
+
+Six genuine 512×384 captures (14–19 colour options, selected native icon/area preview,
+Cancel-first quote, native result, stale review and unsupported controls) were generated
+and inspected. Preview sprites were moved fully inside their indigo panel, rebuilt,
+retested and regenerated. Product labels say Style previews, Cost and Apply paint.
+Native world/components and real native data; not hardware/full SDL frames. Broad
+preservation sweep, asset-backed regressions and final inspected ZIP follow this
+independently published phase. Remaining exact drag/network/Shift-Z and broader
+ordinary roadmap gaps from Phase 3 persist; 100% ordinary gameplay is not yet claimed.

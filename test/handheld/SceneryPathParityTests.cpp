@@ -90,6 +90,7 @@ int main(int argc, char** argv)
                 && objects.LoadObject("rct2.station.plain"),
             "Fixture terrain/station missing");
         bool clearPanel = false;
+        bool terrainPanel=false;
         CoordsXYZ captureFocus{ 656, 656, 32 };
         auto capture = [&](const char* name, bool menu) {
             const auto* output = std::getenv("POCKET_PARITY_CAPTURES");
@@ -117,8 +118,9 @@ int main(int argc, char** argv)
             else if (std::string(name).starts_with("landscaping-"))
             {
                 H::DrawHud(rt, {512,384}, H::NativeHud());
-                S::DrawOverlay(rt, H::Concept::kOrigin, H::SceneryEditTarget());
-                H::DrawConstructionFooter(rt, {512,384}, S::Current().mode == S::Mode::pick ? "Pick" : S::ScatterActive() && !S::ScatterReviewed() ? "Review" : "Apply", "Options");
+                if (terrainPanel) H::AreaTools::DrawOverlay(rt,H::Concept::kOrigin);
+                else S::DrawOverlay(rt, H::Concept::kOrigin, H::SceneryEditTarget());
+                H::DrawConstructionFooter(rt, {512,384}, terrainPanel ? "Review" : S::Current().mode == S::Mode::pick ? "Pick" : S::ScatterActive() && !S::ScatterReviewed() ? "Review" : "Apply", "Options");
             }
             else
                 S::DrawOverlay(rt, { 8, 8 });
@@ -356,6 +358,77 @@ int main(int argc, char** argv)
         captureFocus={scatterTile.x+16,scatterTile.y+16,32};
         capture("landscaping-13-scatter-area-preview.png",false);
         H::EndTerrain(); S::Configure(16); captureFocus={656,656,32};
+        namespace A=H::AreaTools;
+        auto* grid=objects.LoadObject("rct2.terrain_surface.grid");
+        auto* stucco=objects.LoadObject("official.terrain_edge.stucco");
+        Check(grid && stucco,"Native terrain preview objects missing");
+        A::settings={}; A::settings.operation=A::Operation::paint; A::settings.width=A::settings.height=2;
+        A::settings.surface=objects.GetLoadedObjectEntryIndex(grid); A::settings.edge=objects.GetLoadedObjectEntryIndex(stucco);
+        A::ResetColours(); H::BeginAreaTools(); terrainPanel=true;
+        W::HandheldAreaOptionsOpen(); W::HandheldConstructionMove(0,7);
+        const auto beforePalette=A::settings.surfaceColour;
+        H::HandleMenuInput(controller,confirm);
+        Check(A::settings.surfaceColour!=beforePalette && A::SurfaceColourSupported(A::settings.surface),"Controller native palette selection failed");
+        W::HandheldConstructionMove(0,1); const auto beforeEdgePalette=A::settings.edgeColour;
+        H::HandleMenuInput(controller,confirm);
+        Check(A::settings.edgeColour!=beforeEdgePalette && A::EdgeColourSupported(A::settings.edge),"Controller native edge palette selection failed");
+        capture("landscaping-14-terrain-colours-options.png",true);
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        CoordsXY paintTile{1280,1280}; captureFocus={1296,1296,32};
+        if (argc==4)
+        {
+            auto* drawing=dynamic_cast<Drawing::X8DrawingEngine*>(context->GetDrawingEngine());
+            auto* main=WindowGetMain(); auto* viewport=main->viewport;
+            const auto projected=Translate3DTo2DWithZ(GetCurrentRotation(),captureFocus);
+            viewport->viewPos=projected-ScreenCoordsXY{viewport->zoom.ApplyTo(256),viewport->zoom.ApplyTo(192)};
+            main->savedViewPos=viewport->viewPos;
+            drawing->Drawing::X8DrawingEngine::BeginDraw(); ViewportRender(*drawing->getRT(),viewport);
+            drawing->Drawing::X8DrawingEngine::EndDraw(); H::UpdateExplorer(controller);
+            paintTile=gMapSelectPositionA; captureFocus={paintTile.x+16,paintTile.y+16,32};
+        }
+        const auto paintRange=*A::Range(paintTile,2,2);
+        gMapSelectPositionA={paintRange.getX1(),paintRange.getY1()}; gMapSelectPositionB={paintRange.getX2(),paintRange.getY2()};
+        capture("landscaping-15-terrain-native-preview.png",false);
+        const auto paintCash=state.park.cash; const auto paintBefore=A::CapturePaint(paintRange);
+        if (argc==4) H::HandleExplorerInput(controller,confirm);
+        else W::HandheldTerrainPaintReviewOpen(paintTile);
+        Check(Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu) && state.park.cash==paintCash,
+            "Held A skipped native paint review");
+        capture("landscaping-16-terrain-cancel-review.png",true);
+        H::HandleMenuInput(controller,confirm);
+        Check(state.park.cash==paintCash && A::CapturePaint(paintRange)==paintBefore,"Cancel-first paint mutated state");
+        W::HandheldTerrainPaintReviewOpen(paintTile);
+        const auto paintQuote=A::Action(paintTile,A::settings,false);
+        W::HandheldConstructionMove(0,-1); H::HandleMenuInput(controller,confirm);
+        Check(!Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu),"Paint confirmation failed to recover tool");
+        Check(!A::BeginPaint(paintTile,A::settings),"Paint action repeated before native completion");
+        GameActions::ProcessQueue(state);
+        Check(state.park.cash==paintCash-paintQuote.cost && MapGetSurfaceElementAt(paintTile)->getPrimarySurfaceColour()==A::settings.surfaceColour
+                && MapGetSurfaceElementAt(paintTile)->getPrimaryEdgeColour()==A::settings.edgeColour,
+            "Controller native colour action/cost differs");
+        capture("landscaping-17-terrain-native-result.png",false);
+        W::HandheldTerrainPaintReviewOpen(paintTile);
+        MapGetSurfaceElementAt(paintTile)->setOwnership({});
+        W::HandheldConstructionMove(0,-1); H::HandleMenuInput(controller,confirm);
+        Check(Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu),"Stale paint review executed instead of recovery");
+        capture("landscaping-18-terrain-stale-review.png",true);
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        MapGetSurfaceElementAt(paintTile)->setOwnership({OwnershipFlag::landOwned});
+        A::settings.surface=objects.GetLoadedObjectEntryIndex(objects.LoadObject("rct2.terrain_surface.grass"));
+        A::settings.edge=objects.GetLoadedObjectEntryIndex(objects.LoadObject("rct2.terrain_edge.rock"));
+        W::HandheldAreaOptionsOpen(); W::HandheldConstructionMove(0,8);
+        const auto fixedColours=A::settings; H::HandleMenuInput(controller,confirm);
+        Check(A::settings==fixedColours,"Controller unsupported colour changed native selection");
+        capture("landscaping-19-terrain-unsupported-colour.png",true);
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        H::EndTerrain();
+        H::BeginSurface(); H::Frame quickColourOptions; quickColourOptions.actions={H::Action::contextSecondary,H::Action::contextSecondary};
+        H::HandleExplorerInput(controller,quickColourOptions);
+        Check(Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu) && A::settings.operation==A::Operation::paint
+            && A::settings.width==1 && A::settings.height==1 && A::settings.surface!=kObjectEntryIndexNull,
+            "Quick surface did not hand off native selection into colour/area options");
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        H::EndTerrain(); terrainPanel=false; captureFocus={656,656,32};
         const auto cash = state.park.cash;
         auto draft = S::BeginStyle(target, S::Style::noEntry);
         Check(draft.has_value(), "No-entry draft absent");

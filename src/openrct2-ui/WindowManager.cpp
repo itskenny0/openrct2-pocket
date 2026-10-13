@@ -17,6 +17,7 @@
 #include "handheld/Paths.h"
 #include "handheld/RideManagement.h"
 #include "handheld/SceneryTools.h"
+#include "handheld/AreaTools.h"
 #include "handheld/Shops.h"
 #include "handheld/Trees.h"
 #include "interface/Chat.h"
@@ -417,6 +418,7 @@ public:
         {
             case INTENT_ACTION_MAP:
                 Handheld::SceneryTools::ResetScatter();
+                Handheld::AreaTools::ResetPaint();
                 Handheld::GuestFollow::Stop();
                 Handheld::EndTerrain();
                 WindowMapReset();
@@ -1184,6 +1186,7 @@ public:
     void Cleanup() override
     {
         Handheld::SceneryTools::ResetScatter();
+        Handheld::AreaTools::ResetPaint();
         Handheld::GuestFollow::Stop();
         // Release native tool ghosts while the context and loaded objects still exist.
         Handheld::EndTerrain();

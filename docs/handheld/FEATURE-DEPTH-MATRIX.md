@@ -381,3 +381,18 @@ PresentationLifecycleTests PASS; captures 08–13 inspected. See SCENERY-LANDSCA
 COMPLETION.md for exact recovery/publication/validation provenance. Scenery remains
 PARTIAL: continuous wall drag/repaint/pick equivalents, Shift Z search, network scatter
 and next terrain surface/edge colour phase. Final regression/capture ZIP pending.
+
+## Scenery selection and landscaping Phase 4 — 2026-10-13
+
+Phase 3 native scatter published ee2cbd3, complete tree ef54f2c. Area paint now exposes
+actual loaded-object surface/edge primary-colour channels and desktop palette/defaults,
+selected-colour native icon previews, Cancel-first native quote, copied object/terrain/
+flags/cost stale guards, pending callback/repeat guards and load/exit cleanup. Quick
+surface selection hands off into shared one-tile colour/area options. Native
+SurfaceSetStyleAction now preserves unsupported primary edge encoding consistently
+with its Query/surface-channel flag policy. Expanded native/SDL construction/scenery
+and presentation checks PASS; captures 14–19 inspected. See SCENERY-LANDSCAPING-
+COMPLETION.md. Colour capability is complete for supported loaded native definitions;
+network review remains unvalidated/unavailable. Scenery/landscaping overall remains
+PARTIAL for the exact drag, network, modifier and broader ordinary roadmap gaps.
+Final preservation sweep and capture ZIP remain next.

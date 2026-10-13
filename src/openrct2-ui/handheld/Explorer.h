@@ -102,6 +102,7 @@ namespace OpenRCT2::Ui::Windows
     void HandheldScenerySearchOpen();
     void HandheldSceneryStyleOpen(const Handheld::SceneryTools::Target& target);
     void HandheldAreaOptionsOpen();
+    void HandheldTerrainPaintReviewOpen(CoordsXY tile);
     void HandheldSceneryClearOptionsOpen();
     void HandheldSceneryClearReviewOpen(CoordsXY tile);
     void HandheldRightsOptionsOpen();
