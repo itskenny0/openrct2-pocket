@@ -396,3 +396,24 @@ COMPLETION.md. Colour capability is complete for supported loaded native definit
 network review remains unvalidated/unavailable. Scenery/landscaping overall remains
 PARTIAL for the exact drag, network, modifier and broader ordinary roadmap gaps.
 Final preservation sweep and capture ZIP remain next.
+
+## Scenery/landscaping validation handoff — 2026-10-13
+
+All four implementation phases are published through 3882849 (source tree 92c2acc):
+native placed-object eyedropper; eligible native name/descriptor/author search;
+shared desktop/native small-scenery scatter with review, callbacks and honest partial
+results; supported native surface/edge colours, native previews and stale/pending
+paint review. Native fixed-edge colour preservation is corrected in the native action.
+Fourteen named fixed-source native/SDL regression drivers PASS, including finance/
+research, guests/staff/map, paths and ride/construction preservation; CTest 3/3 PASS.
+Asset-backed RideConstructionCapture, MazeConstructionCapture and original Wooden/
+natural-guest CustomCoasterCapture returned confirmed exit 0. DesignCapture is
+unconfirmed after workspace disappearance and requires rerun.
+
+The environment is offline again. The nineteen capture files were generated but final
+all-file inspection/checksum/provenance ZIP and download remain UNFINISHED. Source is
+published; no missing test/package/hardware result is claimed. See the exact
+interrupted closeout and standalone resume instructions in
+SCENERY-LANDSCAPING-COMPLETION.md. Preserve delivered source; complete this capture
+closeout before a new substantial subsystem. Remaining drag/modifier/network and
+broader ordinary gaps remain PARTIAL on the 100% roadmap.
