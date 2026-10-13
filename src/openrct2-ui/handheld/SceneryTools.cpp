@@ -5,6 +5,7 @@
 #include "TextEntry.h"
 
 #include <algorithm>
+#include <openrct2/core/String.hpp>
 #include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2/GameState.h>
 #include <openrct2/actions/footpath/FootpathAdditionPlaceAction.h>
@@ -47,6 +48,7 @@
 namespace OpenRCT2::Ui::Handheld::SceneryTools
 {
     static Settings current;
+    static std::string search;
     static ObjectEntryIndex groupFilter = kObjectEntryIndexNull;
     static std::optional<CoordsXY> lastTile;
     struct Request
@@ -106,6 +108,22 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         const auto* o = GetContext()->GetObjectManager().GetLoadedObject(Type(s.category), s.object);
         return o ? o->GetName() : "No objects available";
     }
+    const std::string& Search() { return search; }
+    bool SetSearch(const std::string& value)
+    {
+        if (TextEntry{value}.Length() > TextEntry::limit) return false;
+        ClearPreview();
+        search = value;
+        return true;
+    }
+    static bool MatchesSearch(const Object& object)
+    {
+        if (search.empty()) return true;
+        return String::contains(object.GetName(),search,true)
+            || String::contains(object.GetIdentifier(),search,true)
+            || String::contains(object.GetFileName(),search,true)
+            || std::ranges::any_of(object.GetAuthors(),[](const auto& author) { return String::contains(author,search,true); });
+    }
     std::vector<PickerEntry> Entries(Category c)
     {
         std::vector<PickerEntry> result;
@@ -123,7 +141,10 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                                ObjectEntryManager::GetObjectEntry<SceneryGroupEntry>(groupFilter)->SceneryEntries,
                                ScenerySelection{ SceneryType(c), i })
                             != ObjectEntryManager::GetObjectEntry<SceneryGroupEntry>(groupFilter)->SceneryEntries.end())))
-                result.push_back({ { Type(c), i }, GetContext()->GetObjectManager().GetLoadedObject(Type(c), i)->GetName() });
+            {
+                const auto* object = GetContext()->GetObjectManager().GetLoadedObject(Type(c),i);
+                if (MatchesSearch(*object)) result.push_back({ { Type(c), i, std::string(object->GetIdentifier()) }, object->GetName() });
+            }
         return result;
     }
     std::vector<Group> Groups(Category c)
@@ -202,6 +223,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     {
         ClearPreview();
         current.category = c;
+        search.clear();
         groupFilter = kObjectEntryIndexNull;
         current.object = kObjectEntryIndexNull;
         current.mode = Mode::place;
@@ -209,8 +231,14 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         if (!list.empty())
             current.object = list.front().identity.index;
     }
-    bool Select(ObjectEntryIndex i)
+    bool Select(ObjectEntryIndex i, const std::string& expectedDescriptor)
     {
+        if (!expectedDescriptor.empty())
+        {
+            const auto entries = Entries(current.category);
+            if (std::ranges::none_of(entries,[&](const auto& e) {
+                return e.identity.index == i && e.identity.key == expectedDescriptor; })) return false;
+        }
         if (!Eligible(current.category, i))
             return false;
         ClearPreview();
@@ -246,7 +274,8 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                  "Edit sign text...",
                  "Filter scenery group...",
                  "Edit sign style...",
-                 "Pick placed object..." };
+                 "Pick placed object...",
+                 search.empty() ? "Search objects..." : "Search: " + search };
     }
     void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position, const std::optional<Target>& hovered)
     {
@@ -479,7 +508,8 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
             ClearPreview();
             const auto entries = Entries(t.category);
             if (current.category != t.category || std::ranges::none_of(entries,
-                [&](const auto& e) { return e.identity.index == t.object; })) groupFilter = kObjectEntryIndexNull;
+                [&](const auto& e) { return e.identity.index == t.object; }))
+            { groupFilter = kObjectEntryIndexNull; search.clear(); }
             current = selected;
         }
         return {};

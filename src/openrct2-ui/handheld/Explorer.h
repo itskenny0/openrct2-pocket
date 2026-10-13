@@ -98,6 +98,8 @@ namespace OpenRCT2::Ui::Windows
     void HandheldPathOptionsOpen();
     void HandheldTreePickerOpen();
     void HandheldSceneryOptionsOpen();
+    bool HandheldSceneryPickerIsOpen();
+    void HandheldScenerySearchOpen();
     void HandheldSceneryStyleOpen(const Handheld::SceneryTools::Target& target);
     void HandheldAreaOptionsOpen();
     void HandheldSceneryClearOptionsOpen();

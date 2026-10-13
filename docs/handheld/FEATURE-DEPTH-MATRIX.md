@@ -357,3 +357,15 @@ backed native/SDL SceneryPathParityTests, PresentationLifecycleTests and CTest 3
 Three inspected production 512×384 fixture captures are retained for the final ZIP.
 Search, bulk placement and terrain colours are the next independently published phases;
 all broader ordinary and hardware gaps remain. See SCENERY-LANDSCAPING-COMPLETION.md.
+
+
+## Scenery selection and landscaping Phase 2 (2026-10-13)
+
+Native scenery/furniture search now intersects loaded/researched objects and existing
+groups, using desktop native names/identifiers/authors/filenames. Controller keyboard
+apply/cancel/clear, explicit empty results, X search, stable descriptor identities,
+previews and placement handoff are delivered without changing native accounting or
+save format. GUI/CLI, expanded asset-backed native/SDL SceneryPathParityTests,
+ConstructionTests and PresentationLifecycleTests PASS; four inspected 512×384 native
+fixture captures are retained. Native bulk placement and terrain colours follow;
+remaining ordinary and hardware gaps stay explicit. See SCENERY-LANDSCAPING-COMPLETION.md.

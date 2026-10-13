@@ -7,6 +7,7 @@
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/handheld/Hud.h>
+#include <openrct2-ui/handheld/TextEntry.h>
 #include <openrct2-ui/handheld/ConstructionPanel.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/RideAccess.h>
@@ -161,6 +162,17 @@ int main(int argc, char** argv)
                     != entry->SceneryEntries.end(),
                 "Group contains non-member");
         Check(!S::SetGroup(30000), "Missing group accepted");
+        const auto groupBeforeSearch=S::GroupName();
+        const auto groupMembers=S::Entries(S::Category::walls);Check(!groupMembers.empty(),"Group search fixture empty");
+        const auto member=groupMembers.front().identity;
+        Check(S::SetSearch(member.key) && S::GroupName()==groupBeforeSearch,"Search replaced native group context");
+        Check(std::ranges::any_of(S::Entries(S::Category::walls),[&](const auto& e){return e.identity==member;}),
+            "Search lost eligible native group member");
+        ScenerySetNotInvented({SCENERY_TYPE_WALL,member.index});
+        Check(S::Entries(S::Category::walls).empty(),"Search bypassed native research membership");
+        ScenerySetInvented({SCENERY_TYPE_WALL,member.index});
+        Check(S::SetSearch("") && S::GroupName()==groupBeforeSearch && S::Entries(S::Category::walls).size()==groupMembers.size(),
+            "Clearing search lost native group membership");
         H::BeginScenery();
         W::HandheldSceneryOptionsOpen();
         W::HandheldConstructionMove(0, 12);
@@ -253,6 +265,49 @@ int main(int argc, char** argv)
         else Check(S::Pick(target, true).error == GameActions::Status::ok && S::Current().object == bannerObject,
             "Native banner eyedropper handoff failed");
         capture("landscaping-02-native-eyedropper-placement.png", false);
+        H::EndTerrain();
+        const auto searchCash = state.park.cash;
+        const auto searchLedger = state.park.expenditureTable;
+        const auto selectedBeforeSearch = S::Current();
+        Check(S::SetSearch("sIgN") && !S::Entries(S::Category::banners).empty(),"Native case-insensitive object name search failed");
+        Check(S::SetSearch("rct2.footpath_banner.bn1"),"Native descriptor search rejected");
+        const auto descriptorResults = S::Entries(S::Category::banners);
+        Check(descriptorResults.size()==1 && descriptorResults.front().identity.index==bannerObject
+                && descriptorResults.front().identity.key==target.descriptor,"Search lost stable native descriptor identity");
+        Check(!S::Select(bannerObject,target.descriptor+"-removed") && S::Current()==selectedBeforeSearch,
+            "Search accepted stale descriptor or changed selection");
+        Check(!S::SetSearch(std::string(33,'X')) && S::Search()=="rct2.footpath_banner.bn1","Search accepted unbounded input");
+        Check(S::SetSearch(""),"Search clear failed");
+        H::BeginScenery();W::HandheldSceneryOptionsOpen();W::HandheldConstructionMove(0,15);H::HandleMenuInput(controller,confirm);
+        capture("landscaping-04-native-search-keyboard.png",true);
+        size_t keyFocus=0;
+        const auto keys=H::TextEntry{}.Keys();
+        auto pressKey=[&](const std::string& key) {
+            const auto it=std::find(keys.begin(),keys.end(),key);Check(it!=keys.end(),"Native keyboard key missing");
+            const auto index=static_cast<size_t>(it-keys.begin());W::HandheldMenuMove(static_cast<int>(index)-static_cast<int>(keyFocus));
+            H::HandleMenuInput(controller,confirm);keyFocus=index;
+        };
+        pressKey("B");pressKey("OK");
+        Check(W::HandheldSceneryPickerIsOpen() && S::Search()=="B" && S::Current()==selectedBeforeSearch,
+            "Controller search apply changed placement selection or missed results");
+        const auto stableFocus=W::HandheldObjectPickerFocus();
+        capture("landscaping-05-native-search-results.png",true);
+        H::Frame searchAction;searchAction.actions={H::Action::contextPrimary,H::Action::contextPrimary};
+        H::HandleMenuInput(controller,searchAction);keyFocus=0;pressKey("Z");H::HandleMenuInput(controller,back);
+        Check(W::HandheldSceneryPickerIsOpen() && S::Search()=="B" && W::HandheldObjectPickerFocus()==stableFocus,
+            "Cancelled search changed query or native focus");
+        H::HandleMenuInput(controller,searchAction);keyFocus=0;pressKey("Clr");
+        for(char c:std::string("NO-MATCH-4871")) { pressKey(std::string(1,c)); }
+        pressKey("OK");
+        Check(W::HandheldSceneryPickerIsOpen() && S::Entries(S::Category::banners).empty(),"Native empty search fabricated results");
+        capture("landscaping-06-native-search-empty.png",true);
+        H::HandleMenuInput(controller,searchAction);keyFocus=0;pressKey("Clr");pressKey("OK");
+        Check(S::Search().empty() && !S::Entries(S::Category::banners).empty(),"Controller clear did not restore eligible objects");
+        capture("landscaping-07-native-search-clear.png",true);
+        H::HandleMenuInput(controller,confirm);
+        Check(!Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu) && S::Current().object==bannerObject
+                && state.park.cash==searchCash && state.park.expenditureTable==searchLedger,
+            "Search/preview/selection mutated native accounting or missed placement handoff");
         H::EndTerrain();
         const auto cash = state.park.cash;
         auto draft = S::BeginStyle(target, S::Style::noEntry);

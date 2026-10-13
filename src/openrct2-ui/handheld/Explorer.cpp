@@ -626,6 +626,8 @@ namespace OpenRCT2::Ui::Handheld
                     Windows::HandheldParkMapControl(-1);
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::nextOption)
                     Windows::HandheldParkMapControl(1);
+                else if (Windows::HandheldSceneryPickerIsOpen() && action == Action::contextPrimary)
+                    Windows::HandheldScenerySearchOpen();
                 else if (action == Action::confirm)
                     Windows::HandheldMenuConfirm();
                 else if (action == Action::openBuild && Windows::HandheldDashboardIsOpen())

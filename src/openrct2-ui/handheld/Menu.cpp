@@ -89,6 +89,7 @@ namespace OpenRCT2::Ui::Windows
         rightsOptions,
         rightsConfirm,
         sceneryName,
+        scenerySearch,
         sceneryConfirm,
         shopPicker,
         ridePicker,
@@ -331,6 +332,8 @@ namespace OpenRCT2::Ui::Windows
         size_t _ridesRosterFocus{};
         bool _ridesBusy{};
         Handheld::TextEntry _nameEntry;
+        Page _scenerySearchParent = Page::sceneryOptions;
+        size_t _scenerySearchRow{};
         std::optional<Handheld::SceneryTools::Target> _signTarget;
         std::optional<Handheld::SceneryTools::StyleDraft> _signStyle;
         std::optional<Handheld::SceneryClear::Draft> _clearDraft;
@@ -714,7 +717,7 @@ namespace OpenRCT2::Ui::Windows
         {
             return _page == Page::researchCatalog || _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
                 || _page == Page::staffPatrolClear || _page == Page::rightsOptions || _page == Page::rightsConfirm
-                || _page == Page::areaOptions || _page == Page::sceneryOptions || _page == Page::sceneryName
+                || _page == Page::areaOptions || _page == Page::sceneryOptions || _page == Page::sceneryName || _page == Page::scenerySearch
                 || _page == Page::sceneryConfirm || _page == Page::sceneryGroups || _page == Page::sceneryStyle
                 || _page == Page::sceneryStyleEditor || _page == Page::sceneryStyleConfirm || _page == Page::sceneryClearOptions || _page == Page::sceneryClearConfirm;
         }
@@ -744,7 +747,7 @@ namespace OpenRCT2::Ui::Windows
                 invalidate();
                 return;
             }
-            if (_page == Page::sceneryName)
+            if (_page == Page::sceneryName || _page == Page::scenerySearch)
             {
                 const auto next = _nameEntry.Move(_focus.index(), x, y);
                 _focus.move(static_cast<int>(next) - static_cast<int>(_focus.index()), rows().size());
@@ -778,7 +781,7 @@ namespace OpenRCT2::Ui::Windows
                                                                                                                : size.width,
                                      size.height };
             const ScreenSize bounds = (_page == Page::staffPatrolClear || _page == Page::rightsConfirm
-                                       || _page == Page::sceneryName || _page == Page::sceneryConfirm
+                                       || _page == Page::sceneryName || _page == Page::scenerySearch || _page == Page::sceneryConfirm
                                        || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement() || managementShell())
                 ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
                 : information() ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 }
@@ -786,7 +789,7 @@ namespace OpenRCT2::Ui::Windows
             WindowSetResize(*this, bounds, bounds);
             WindowSetPosition(
                 *this,
-                (_page == Page::staffPatrolClear || _page == Page::rightsConfirm || _page == Page::sceneryName
+                (_page == Page::staffPatrolClear || _page == Page::rightsConfirm || _page == Page::sceneryName || _page == Page::scenerySearch
                  || _page == Page::sceneryConfirm || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement()
                  || managementShell())
                     ? ScreenCoordsXY{ 0, 0 }
@@ -1075,6 +1078,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::areaOptions:
                     return Handheld::AreaTools::Options();
                 case Page::sceneryName:
+                case Page::scenerySearch:
                     return _nameEntry.Keys();
                 case Page::sceneryConfirm:
                     return { "Apply text", "Cancel" };
@@ -1313,6 +1317,14 @@ namespace OpenRCT2::Ui::Windows
         {
             page(Page::sceneryOptions);
         }
+        bool sceneryPicker() const { return _page == Page::sceneryPicker; }
+        void openScenerySearch()
+        {
+            _scenerySearchParent = _page == Page::sceneryPicker ? Page::sceneryPicker : Page::sceneryOptions;
+            _scenerySearchRow = _focus.index();
+            _nameEntry = { Handheld::SceneryTools::Search() };
+            page(Page::scenerySearch);
+        }
         void openTreePicker()
         {
             page(Page::treePicker);
@@ -1400,6 +1412,7 @@ namespace OpenRCT2::Ui::Windows
         }
         void onUpdate() override
         {
+            if (_page == Page::sceneryPicker) { refreshPicker(); invalidate(); }
             if (_page == Page::parkMap) { _parkMap.Update(); invalidate(); }
             if (parkInformation()) { _ledger.Clamp(); invalidate(); }
             if (_page == Page::researchCatalog)
@@ -1920,6 +1933,11 @@ namespace OpenRCT2::Ui::Windows
                 case Page::areaOptions:
                     close();
                     break;
+                case Page::scenerySearch:
+                    page(_scenerySearchParent);
+                    if (_scenerySearchParent == Page::sceneryPicker) refreshPicker();
+                    else _focus.move(static_cast<int>(_scenerySearchRow),rows().size());
+                    break;
                 case Page::sceneryName:
                     page(Page::sceneryOptions);
                     break;
@@ -2375,7 +2393,7 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::sceneryPicker:
-                    if (_picker.selected() && Handheld::SceneryTools::Select(_picker.selected()->identity.index))
+                    if (_picker.selected() && Handheld::SceneryTools::Select(_picker.selected()->identity.index, _picker.selected()->identity.key))
                     {
                         close();
                         if (!Handheld::IsSceneryToolActive())
@@ -2386,6 +2404,16 @@ namespace OpenRCT2::Ui::Windows
                         refreshPicker();
                         _status = "Scenery unavailable";
                     }
+                    break;
+                case Page::scenerySearch:
+                    if (choice == 47) back();
+                    else if (choice == 46)
+                    {
+                        if (Handheld::SceneryTools::SetSearch(_nameEntry.text))
+                        { page(Page::sceneryPicker); refreshPicker(); }
+                        else { _status = "Search is limited to 32 characters"; invalidate(); }
+                    }
+                    else { _nameEntry.Press(choice); invalidate(); }
                     break;
                 case Page::sceneryName:
                     if (choice == 47)
@@ -2472,7 +2500,8 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::sceneryOptions:
-                    if (choice == 14) { Handheld::SceneryTools::BeginPick(); close(); }
+                    if (choice == 15) openScenerySearch();
+                    else if (choice == 14) { Handheld::SceneryTools::BeginPick(); close(); }
                     else if (choice == 12) page(Page::sceneryGroups);
                     else if (choice == 13)
                     {
@@ -4292,6 +4321,18 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
+            if (_page == Page::scenerySearch)
+            {
+                auto model = Handheld::StaffManagement::NamePresentation(_nameEntry,_focus.index(),false,_status);
+                model.breadcrumb = "Scenery / Search";
+                model.title = _nameEntry.text.empty() ? "All eligible objects" : _nameEntry.text;
+                model.status = "OK Apply / Clr Clear";
+                model.rows[42] = "Sp";
+                model.rows[44] = "Aa";
+                model.rows[47] = "B";
+                Handheld::DrawManagementPanel(rt,{ContextGetWidth(),ContextGetHeight()},model);
+                return;
+            }
             if (_page == Page::parkMap) { Handheld::ParkMap::Draw(rt, _parkMap); return; }
             if (parkInformation())
             {
@@ -4476,7 +4517,9 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::DrawObjectPicker(
                     rt, { ContextGetWidth(), ContextGetHeight() }, _picker,
                     Handheld::SceneryTools::CategoryName(Handheld::SceneryTools::Current().category),
-                    _status.empty() ? Handheld::SceneryTools::GroupName() : _status);
+                    _status.empty() ? Handheld::SceneryTools::GroupName() + (Handheld::SceneryTools::Search().empty()
+                        ? "" : " / " + Handheld::SceneryTools::Search()) : _status,
+                    "No matching available objects", true);
                 return;
             }
             if (_page == Page::treePicker)
@@ -4866,6 +4909,15 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = OpenPanel())
             window->openSceneryOptions();
+    }
+    bool HandheldSceneryPickerIsOpen()
+    {
+        const auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window && static_cast<const HandheldMenuWindow*>(window)->sceneryPicker();
+    }
+    void HandheldScenerySearchOpen()
+    {
+        if (auto* window = OpenPanel()) window->openScenerySearch();
     }
     void HandheldTreePickerOpen()
     {

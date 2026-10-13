@@ -58,6 +58,8 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     std::vector<Group> Groups(Category category);
     bool SetGroup(ObjectEntryIndex group);
     std::string GroupName();
+    const std::string& Search();
+    bool SetSearch(const std::string& value);
     enum class Style
     {
         noEntry,
@@ -85,7 +87,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     void Configure(size_t row, int delta = 1);
     const Settings& Current();
     void SelectCategory(Category category);
-    bool Select(ObjectEntryIndex object);
+    bool Select(ObjectEntryIndex object, const std::string& expectedDescriptor = {});
     void BeginPick();
     GameActions::Result Pick(const Target& target, bool execute);
     std::optional<Target> Capture(const InteractionInfo& info);
