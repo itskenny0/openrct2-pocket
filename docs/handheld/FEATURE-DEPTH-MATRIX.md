@@ -369,3 +369,15 @@ save format. GUI/CLI, expanded asset-backed native/SDL SceneryPathParityTests,
 ConstructionTests and PresentationLifecycleTests PASS; four inspected 512×384 native
 fixture captures are retained. Native bulk placement and terrain colours follow;
 remaining ordinary and hardware gaps stay explicit. See SCENERY-LANDSCAPING-COMPLETION.md.
+
+## Scenery selection and landscaping Phase 3 — 2026-10-13
+
+Phase 2 published f20751d (tree 6a38c38), preserving native eyedropper/name search.
+Shared desktop/controller native small-scenery scatter now adds bounded size/density,
+native area/ghost preview, released-A review/apply, frozen proposals/identity/cost
+checks, pending callback guards, partial native results/actual cost and save cleanup.
+GUI/CLI, expanded ConstructionTests, asset-backed SDL SceneryPathParityTests and
+PresentationLifecycleTests PASS; captures 08–13 inspected. See SCENERY-LANDSCAPING-
+COMPLETION.md for exact recovery/publication/validation provenance. Scenery remains
+PARTIAL: continuous wall drag/repaint/pick equivalents, Shift Z search, network scatter
+and next terrain surface/edge colour phase. Final regression/capture ZIP pending.

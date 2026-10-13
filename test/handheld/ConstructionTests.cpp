@@ -530,6 +530,65 @@ int main(int argc, char** argv)
             "Rights persistence differs");
         std::cout << "Native land / construction rights / mixed available-unavailable / query-cancel-stale-funds / exact cash "
                      "/ save-reload passed\n";
+        S::Settings scatter;
+        scatter.object=objects.GetLoadedObjectEntryIndex(objects.LoadObject("rct2.scenery_small.corroof"));
+        ScenerySetInvented({SCENERY_TYPE_SMALL,scatter.object});
+        scatter.scatter=true; scatter.scatterDensity=ScatterToolDensity::highDensity;
+        const CoordsXY scatterTile{864,864};
+        MapGetSurfaceElementAt(scatterTile)->setOwnership({OwnershipFlag::landOwned});
+        const auto scatterCash=state.park.cash;
+        const auto scatterLedger=state.park.expenditureTable;
+        const auto quote=S::Place(scatterTile,scatter,false);
+        Require(quote.error==GameActions::Status::ok && S::Place(scatterTile,scatter,false).cost==quote.cost
+            && state.park.cash==scatterCash && state.park.expenditureTable==scatterLedger && Ghosts()==0,
+            "Scatter estimate resampled, charged or mutated map/accounting");
+        Require(S::Place(scatterTile,scatter,true).error==GameActions::Status::ok && S::ScatterReviewed()
+            && state.park.cash==scatterCash,"Scatter first A skipped read-only review");
+        S::ClearPreview(); GameActions::ProcessQueue(state);
+        Require(state.park.cash==scatterCash && state.park.expenditureTable==scatterLedger && !S::ScatterReviewed(),
+            "Scatter cancel placed or charged");
+        Require(S::Place(scatterTile,scatter,true).error==GameActions::Status::ok,"Scatter review failed");
+        MapGetSurfaceElementAt(scatterTile)->setOwnership({});
+        Require(S::Place(scatterTile,scatter,true).error!=GameActions::Status::ok && state.park.cash==scatterCash,
+            "Scatter stale ownership review accepted");
+        MapGetSurfaceElementAt(scatterTile)->setOwnership({OwnershipFlag::landOwned});
+        Require(S::Place(scatterTile,scatter,true).error==GameActions::Status::ok,"Native scatter batch rejected");
+        Require(S::Place(scatterTile,scatter,true).error!=GameActions::Status::ok,"Pending native scatter repeated");
+        GameActions::ProcessQueue(state);
+        Require(S::ScatterStatus().find("1/3 placed")!=std::string::npos && state.park.cash==scatterCash-quote.cost/3,
+            "Native partial failures or actual cost misreported");
+        S::ClearPreview(); ScenerySetNotInvented({SCENERY_TYPE_SMALL,scatter.object});
+        Require(S::Place(CoordsXY{896,864},scatter,true).error!=GameActions::Status::ok,"Scatter bypassed research");
+        ScenerySetInvented({SCENERY_TYPE_SMALL,scatter.object}); scatter.scatterSize=65;
+        Require(S::Place(scatterTile,scatter,true).error!=GameActions::Status::ok,"Scatter bound bypassed");
+        scatter.scatterSize=4;
+        const CoordsXY areaScatter{640,864};
+        auto countScenery=[&] {
+            size_t count=0;
+            for (int y=32;y<992;y+=32) for (int x=32;x<992;x+=32)
+                for (auto* e:TileElementsView<>(CoordsXY{x,y}))
+                {
+                    InteractionInfo hit{}; hit.Loc={x,y}; hit.Element=e;
+                    const auto t=S::Capture(hit);
+                    if (t && t->category==S::Category::small && t->object==scatter.object && !e->isGhost()) ++count;
+                }
+            return count;
+        };
+        const auto beforeCount=countScenery(); const auto beforeBulkCash=state.park.cash;
+        Require(S::Place(areaScatter,scatter,true).error==GameActions::Status::ok && S::ScatterReviewed(),"Native area scatter review failed");
+        Require(S::Place(areaScatter,scatter,true).error==GameActions::Status::ok,"Native area scatter apply failed");
+        GameActions::ProcessQueue(state);
+        const auto added=countScenery()-beforeCount;
+        Require(added>0 && added<=12 && beforeBulkCash-state.park.cash==static_cast<money64>(added)*quote.cost/3,
+            "Native multi-tile scatter population and actual cash differ");
+        SaveFlags scatterFlags{}; const auto scatterSave=std::string(argv[2])+"/scatter.park";
+        const auto placed=TargetAt(scatterTile,S::Category::small);
+        const auto paidCash=state.park.cash;
+        Require(ScenarioSave(state,scatterSave,scatterFlags) && context->LoadParkFromFile(scatterSave),"Scatter save/reload failed");
+        Require(TargetAt(scatterTile,S::Category::small)==placed && state.park.cash==paidCash && Ghosts()==0,
+            "Scatter native map/accounting persistence differs");
+        S::ResetScatter(); Require(!S::ScatterActive() && !S::ScatterReviewed(),"Scatter load/exit state survived cleanup");
+        std::cout << "Native scatter stable estimate / read-only review / cancel / stale ownership / partial clearance / pending guard / actual cost / save passed\n";
         std::cout << "Pocket park construction native checks passed\n";
         return 0;
     }

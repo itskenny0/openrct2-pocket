@@ -416,6 +416,7 @@ public:
         switch (intent.GetAction())
         {
             case INTENT_ACTION_MAP:
+                Handheld::SceneryTools::ResetScatter();
                 Handheld::GuestFollow::Stop();
                 Handheld::EndTerrain();
                 WindowMapReset();
@@ -1182,6 +1183,7 @@ public:
 
     void Cleanup() override
     {
+        Handheld::SceneryTools::ResetScatter();
         Handheld::GuestFollow::Stop();
         // Release native tool ghosts while the context and loaded objects still exist.
         Handheld::EndTerrain();

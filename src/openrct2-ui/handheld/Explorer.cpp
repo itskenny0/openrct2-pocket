@@ -83,6 +83,7 @@ namespace OpenRCT2::Ui::Handheld
     static bool _selectionOwned{};
     static std::optional<CoordsXY> _terrainTile;
     static std::string _terrainStatus;
+    static bool _scatterFeedback{};
     static std::optional<RideManagement::Target> _ridePathAccess;
     static StationIndex _accessStation{};
     static bool _accessExit{};
@@ -134,6 +135,7 @@ namespace OpenRCT2::Ui::Handheld
         _surfaceIndex = kObjectEntryIndexNull;
         _raiseLand = raise;
         _terrainStatus.clear();
+        _scatterFeedback = false;
     }
 
     void BeginWater(bool raise)
@@ -285,6 +287,7 @@ namespace OpenRCT2::Ui::Handheld
         Designs::ClearPreview();
         _shopIndex = index;
         _terrainStatus.clear();
+        _scatterFeedback = false;
         return true;
     }
     void RotateShop()
@@ -296,6 +299,7 @@ namespace OpenRCT2::Ui::Handheld
         Designs::ClearPreview();
         _shopDirection = (_shopDirection + 1) & 3;
         _terrainStatus.clear();
+        _scatterFeedback = false;
     }
 
     bool IsTreeToolActive()
@@ -317,6 +321,7 @@ namespace OpenRCT2::Ui::Handheld
         Designs::ClearPreview();
         _treeIndex = index;
         _terrainStatus.clear();
+        _scatterFeedback = false;
         return true;
     }
 
@@ -377,6 +382,7 @@ namespace OpenRCT2::Ui::Handheld
         _surfaceIndex = kObjectEntryIndexNull;
         Paths::End();
         _terrainStatus.clear();
+        _scatterFeedback = false;
         ClearTerrainSelection();
     }
 
@@ -761,6 +767,11 @@ namespace OpenRCT2::Ui::Handheld
                 _terrainTile = CoordsXY{ coords->x & ~31, coords->y & ~31 };
                 gMapSelectPositionA = gMapSelectPositionB = *_terrainTile;
                 gMapSelectType = MapSelectType::full;
+                if (_sceneryTool && SceneryTools::ScatterActive())
+                {
+                    const auto bounds=SceneryTools::ScatterBounds(*_terrainTile);
+                    gMapSelectPositionA=bounds.first; gMapSelectPositionB=bounds.second;
+                }
                 if (StaffPatrol::Active())
                 {
                     const auto range = StaffPatrol::Range(_terrainTile);
@@ -1134,6 +1145,13 @@ namespace OpenRCT2::Ui::Handheld
                                     input.suspend(); // Selection cannot spill into placement on the same held press.
                                     return;
                                 }
+                                if (_sceneryTool && SceneryTools::ScatterActive())
+                                {
+                                    _scatterFeedback=result.error==GameActions::Status::ok;
+                                    _terrainStatus=result.error==GameActions::Status::ok ? SceneryTools::ScatterStatus() : result.getErrorMessage();
+                                    input.suspend(); // One review/apply transition per released press.
+                                    return;
+                                }
                                 _terrainStatus = result.error == GameActions::Status::ok
                                     ? (FlatRides::CurrentStage() != FlatRides::Stage::inactive ? ""
                                            : _shopTool                                         ? "Shop placement requested."
@@ -1172,6 +1190,7 @@ namespace OpenRCT2::Ui::Handheld
                         {
                             Paths::ToggleRemove();
                             _terrainStatus.clear();
+        _scatterFeedback = false;
                             break;
                         }
                         Invoke(ShortcutId::kViewGeneralRotateClockwise);
@@ -1190,6 +1209,7 @@ namespace OpenRCT2::Ui::Handheld
                             else
                                 Paths::CycleSurface();
                             _terrainStatus.clear();
+        _scatterFeedback = false;
                             break;
                         }
                         if (_terrainActive)
@@ -1225,6 +1245,7 @@ namespace OpenRCT2::Ui::Handheld
                             else if (!_sceneryRemovalTool)
                                 _raiseLand = !_raiseLand;
                             _terrainStatus.clear();
+        _scatterFeedback = false;
                         }
                         break;
                     case Action::back:
@@ -1252,6 +1273,7 @@ namespace OpenRCT2::Ui::Handheld
         {
             auto* main = WindowGetMain();
             _terrainStatus.clear();
+        _scatterFeedback = false;
             GuestFollow::Stop();
             WindowUnfollowSprite(*main);
             InputScrollViewportSmooth({ frame.panX, frame.panY }, main);
@@ -1308,7 +1330,7 @@ namespace OpenRCT2::Ui::Handheld
                 const auto result = TerrainAction(false);
                 if (result.error == GameActions::Status::ok)
                 {
-                    costAmount = FormatMoney(result.cost);
+                    costAmount = FormatMoney(result.cost) + (_sceneryTool && SceneryTools::ScatterActive() ? " est." : "");
                 }
                 else
                     status += "  " + result.getErrorMessage();
@@ -1319,7 +1341,7 @@ namespace OpenRCT2::Ui::Handheld
                     : _sceneryRemovalTool ? "  Point at small scenery"
                                           : "  Move onto land";
             if (!_terrainStatus.empty())
-                status = _terrainStatus;
+                status = _sceneryTool && SceneryTools::ScatterActive() && _scatterFeedback ? SceneryTools::ScatterStatus() : _terrainStatus;
         }
         if (Paths::IsActive())
         {
@@ -1332,7 +1354,7 @@ namespace OpenRCT2::Ui::Handheld
             else
                 status = result.getErrorMessage();
             if (!_terrainStatus.empty())
-                status = _terrainStatus;
+                status = _sceneryTool && SceneryTools::ScatterActive() && _scatterFeedback ? SceneryTools::ScatterStatus() : _terrainStatus;
             Paths::DrawOverlay(rt, Concept::kOrigin);
             if (Paths::IsConnected())
                 DrawConstructionFooter(rt, { ContextGetWidth(), height }, Paths::ConnectedReady() ? "Extend" : "Start", "Turn");
@@ -1397,7 +1419,7 @@ namespace OpenRCT2::Ui::Handheld
                 DrawConstructionFooter(rt, { ContextGetWidth(), height }, "Apply", "Brush");
             else if (_sceneryTool)
                 DrawConstructionFooter(rt, { ContextGetWidth(), height },
-                    SceneryTools::Current().mode == SceneryTools::Mode::pick ? "Pick" : "Apply", "Options");
+                    SceneryTools::Current().mode == SceneryTools::Mode::pick ? "Pick" : SceneryTools::ScatterActive() && !SceneryTools::ScatterReviewed() ? "Review" : "Apply", "Options");
             else if (_treeTool)
                 DrawTreeFooter(rt, { ContextGetWidth(), height });
             else if (_colourRide)

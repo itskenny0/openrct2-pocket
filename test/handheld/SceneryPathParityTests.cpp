@@ -118,7 +118,7 @@ int main(int argc, char** argv)
             {
                 H::DrawHud(rt, {512,384}, H::NativeHud());
                 S::DrawOverlay(rt, H::Concept::kOrigin, H::SceneryEditTarget());
-                H::DrawConstructionFooter(rt, {512,384}, S::Current().mode == S::Mode::pick ? "Pick" : "Place", "Options");
+                H::DrawConstructionFooter(rt, {512,384}, S::Current().mode == S::Mode::pick ? "Pick" : S::ScatterActive() && !S::ScatterReviewed() ? "Review" : "Apply", "Options");
             }
             else
                 S::DrawOverlay(rt, { 8, 8 });
@@ -309,6 +309,53 @@ int main(int argc, char** argv)
                 && state.park.cash==searchCash && state.park.expenditureTable==searchLedger,
             "Search/preview/selection mutated native accounting or missed placement handoff");
         H::EndTerrain();
+        S::SelectCategory(S::Category::small); Check(S::Select(smallObject),"Scatter object missing"); S::Configure(6);
+        H::BeginScenery(); W::HandheldSceneryOptionsOpen(); W::HandheldConstructionMove(0,16);
+        H::HandleMenuInput(controller,confirm);
+        W::HandheldConstructionMove(0,2); H::HandleMenuInput(controller,confirm); // medium density, size 1: two native attempts
+        capture("landscaping-08-scatter-options.png",true);
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        const CoordsXY scatterTile{1504,1504}; captureFocus={1520,1520,32};
+        if (argc==4)
+        {
+            auto* drawing=dynamic_cast<Drawing::X8DrawingEngine*>(context->GetDrawingEngine());
+            auto* main=WindowGetMain(); auto* viewport=main->viewport;
+            const auto projected=Translate3DTo2DWithZ(GetCurrentRotation(),captureFocus);
+            viewport->viewPos=projected-ScreenCoordsXY{viewport->zoom.ApplyTo(256),viewport->zoom.ApplyTo(192)};
+            main->savedViewPos=viewport->viewPos;
+            drawing->Drawing::X8DrawingEngine::BeginDraw(); ViewportRender(*drawing->getRT(),viewport);
+            drawing->Drawing::X8DrawingEngine::EndDraw();
+            H::UpdateExplorer(controller);
+            std::cout << "Scatter controller native target " << gMapSelectPositionA.x << "," << gMapSelectPositionA.y
+                << " / context " << ContextGetWidth() << "x" << ContextGetHeight() << "\n";
+            captureFocus={gMapSelectPositionA.x+16,gMapSelectPositionA.y+16,32};
+        }
+        const auto bulkCash=state.park.cash;
+        capture("landscaping-09-scatter-preview.png",false);
+        if (argc==4) H::HandleExplorerInput(controller,confirm);
+        else S::Place(scatterTile,S::Current(),true);
+        Check(S::ScatterReviewed() && state.park.cash==bulkCash,"Held A skipped scatter review or charged");
+        capture("landscaping-10-scatter-review.png",false);
+        if (argc==4) H::HandleExplorerInput(controller,confirm);
+        else S::Place(scatterTile,S::Current(),true);
+        Check(!S::ScatterReviewed(),"Controller scatter apply missed native submission");
+        Check(S::Place(scatterTile,S::Current(),true).error!=GameActions::Status::ok,"Pending scatter repeated");
+        GameActions::ProcessQueue(state);
+        Check(S::ScatterStatus().find("1/2 placed")!=std::string::npos && state.park.cash<bulkCash,
+            "Scatter partial clearance or native accounting absent");
+        capture("landscaping-11-scatter-partial-result.png",false);
+        const auto nativeFailure=S::Options().back();
+        Check(nativeFailure!="Last error: none","Partial scatter lost native failure reason");
+        W::HandheldSceneryOptionsOpen(); W::HandheldConstructionMove(0,19);
+        Check(S::Options().back()==nativeFailure,"Menu ghost cleanup erased completed native batch failure");
+        capture("landscaping-12-scatter-native-error.png",true);
+        Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+        S::Configure(17,3); S::UpdatePreview(scatterTile);
+        const auto bounds=S::ScatterBounds(scatterTile);
+        gMapSelectPositionA=bounds.first; gMapSelectPositionB=bounds.second;
+        captureFocus={scatterTile.x+16,scatterTile.y+16,32};
+        capture("landscaping-13-scatter-area-preview.png",false);
+        H::EndTerrain(); S::Configure(16); captureFocus={656,656,32};
         const auto cash = state.park.cash;
         auto draft = S::BeginStyle(target, S::Style::noEntry);
         Check(draft.has_value(), "No-entry draft absent");

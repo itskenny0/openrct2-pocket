@@ -34,6 +34,9 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         std::array<Drawing::Colour, 3> colours{ Drawing::Colour::bordeauxRed, Drawing::Colour::yellow,
                                                 Drawing::Colour::darkBrown };
         Mode mode{};
+        bool scatter{};
+        uint16_t scatterSize = 1;
+        ScatterToolDensity scatterDensity{};
         bool operator==(const Settings&) const = default;
     };
     struct Target
@@ -88,6 +91,11 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     const Settings& Current();
     void SelectCategory(Category category);
     bool Select(ObjectEntryIndex object, const std::string& expectedDescriptor = {});
+    bool ScatterActive();
+    bool ScatterReviewed();
+    std::string ScatterStatus();
+    std::pair<CoordsXY, CoordsXY> ScatterBounds(CoordsXY centre);
+    void ResetScatter();
     void BeginPick();
     GameActions::Result Pick(const Target& target, bool execute);
     std::optional<Target> Capture(const InteractionInfo& info);

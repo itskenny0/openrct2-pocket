@@ -2,6 +2,7 @@
 #include "SceneryTools.h"
 
 #include "ConstructionPanel.h"
+#include "Currency.h"
 #include "TextEntry.h"
 
 #include <algorithm>
@@ -38,6 +39,8 @@
 #include <openrct2/object/WallObject.h>
 #include <openrct2/world/Banner.h>
 #include <openrct2/world/Map.h>
+#include <openrct2/world/SceneryScatter.h>
+#include <openrct2/network/Network.h>
 #include <openrct2/world/TileElementsView.h>
 #include <openrct2/world/tile_element/BannerElement.h>
 #include <openrct2/world/tile_element/LargeSceneryElement.h>
@@ -58,6 +61,38 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         bool operator==(const Request&) const = default;
     };
     static std::optional<Request> requested;
+    struct ScatterDraft
+    {
+        Request key;
+        std::string descriptor;
+        std::vector<Request> proposals;
+        bool reviewed{};
+        money64 quote{};
+    };
+    struct ScatterOutcome
+    {
+        size_t total{}, completed{}, placed{};
+        money64 cost{};
+        std::string failure;
+    };
+    static std::optional<ScatterDraft> scatterDraft;
+    static std::shared_ptr<ScatterOutcome> scatterOutcome;
+    bool ScatterActive() { return current.scatter && current.category == Category::small && current.mode == Mode::place; }
+    bool ScatterReviewed() { return scatterDraft && scatterDraft->reviewed; }
+    std::string ScatterStatus()
+    {
+        if (scatterOutcome)
+        {
+            const auto& o = *scatterOutcome;
+            return std::to_string(o.placed) + "/" + std::to_string(o.total)
+                + (o.completed < o.total ? " pending" : " placed / " + FormatMoney(o.cost))
+                ;
+        }
+        return ScatterReviewed() ? "A Apply / B Cancel" : "A Review batch";
+    }
+    std::pair<CoordsXY, CoordsXY> ScatterBounds(CoordsXY centre) { return SceneryScatterBounds(centre,current.scatterSize); }
+    void ResetScatter() { ClearPreview(); scatterOutcome.reset(); current.scatter = false; }
+
     static std::optional<Target> ghost;
     static uint32_t suspended{};
     static ObjectType Type(Category c)
@@ -275,7 +310,13 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                  "Filter scenery group...",
                  "Edit sign style...",
                  "Pick placed object...",
-                 search.empty() ? "Search objects..." : "Search: " + search };
+                 search.empty() ? "Search objects..." : "Search: " + search,
+                 current.category != Category::small ? "Scatter: small scenery only" : current.scatter ? "Scatter: enabled" : "Scatter: disabled",
+                 "Scatter size: " + std::to_string(current.scatterSize) + " x " + std::to_string(current.scatterSize),
+                 "Scatter density: " + std::to_string(static_cast<int>(current.scatterDensity)+1) + " / attempts "
+                    + std::to_string(SceneryScatterQuantity(current.scatterSize,current.scatterDensity)),
+                 scatterOutcome && !scatterOutcome->failure.empty()
+                    ? "Last error: " + FmtString(scatterOutcome->failure).WithoutFormatTokens() : "Last error: none" };
     }
     void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position, const std::optional<Target>& hovered)
     {
@@ -290,7 +331,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         }
         DrawConstructionOverlay(
             rt, position, s.category == Category::additions ? "Path furniture" : "Scenery", Name(s),
-            s.mode == Mode::place          ? "Place"
+            s.mode == Mode::place          ? (ScatterActive() ? "Scatter " + std::to_string(s.scatterSize) + " x " + std::to_string(s.scatterSize) : "Place")
                 : s.mode == Mode::recolour ? "Recolour"
                 : s.mode == Mode::remove   ? "Remove"
                                            : "Pick placed object",
@@ -300,7 +341,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                 : s.category == Category::large
                 ? "Direction " + std::to_string(s.direction + 1) + " / multi-tile"
                 : "Direction " + std::to_string(s.direction + 1) + " / Q" + std::to_string(s.quadrant + 1),
-            s.height ? "Height " + std::to_string(s.height) : "Automatic height");
+            ScatterActive() ? ScatterStatus() : s.height ? "Height " + std::to_string(s.height) : "Automatic height");
     }
     void Configure(size_t row, int delta)
     {
@@ -321,12 +362,16 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         if (row >= 7 && row <= 9 && Channels(current.category, current.object)[row - 7])
             current.colours[row - 7] = static_cast<Drawing::Colour>(
                 (static_cast<int>(current.colours[row - 7]) + delta + 72) % 72);
+        if (row == 16 && current.category == Category::small) current.scatter = !current.scatter;
+        if (row == 17) current.scatterSize = std::clamp<int>(current.scatterSize + delta, 1, 64);
+        if (row == 18) current.scatterDensity = static_cast<ScatterToolDensity>((static_cast<int>(current.scatterDensity)+delta+3)%3);
         if (row == 10)
             current.mode = static_cast<Mode>((static_cast<int>(current.mode) + delta + 4) % 4);
     }
     void BeginPick()
     {
         ClearPreview();
+        current.scatter = false;
         current.mode = Mode::pick;
     }
     static std::unique_ptr<GameActions::GameAction> Placement(CoordsXY tile, const Settings& s)
@@ -658,6 +703,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     void ClearPreview()
     {
         requested.reset();
+        scatterDraft.reset();
         RemoveGhost();
     }
     static GameActions::Result Query(std::optional<CoordsXY> tile, const Settings& s)
@@ -712,10 +758,81 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         }
         ghost = t;
     }
+    static GameActions::Result Scatter(std::optional<CoordsXY> tile, const Settings& s, bool execute)
+    {
+        const auto max = GetMapSizeMaxXY();
+        if (!tile || tile->x < 32 || tile->y < 32 || tile->x > max.x || tile->y > max.y || tile->x%32 || tile->y%32
+            || s.scatterSize < 1 || s.scatterSize > 64 || static_cast<int>(s.scatterDensity)>2 || s.category != Category::small
+            || !Eligible(s.category,s.object) || Network::GetMode()!=Network::Mode::none)
+            return Invalid("Scatter unavailable / check object, land or network mode");
+        if (execute && scatterOutcome && scatterOutcome->completed < scatterOutcome->total)
+            return Invalid("Native scatter actions pending");
+        const auto* object = GetContext()->GetObjectManager().GetLoadedObject(Type(s.category),s.object);
+        const std::string descriptor(object->GetIdentifier());
+        const Request key{*tile,s};
+        if (execute && scatterDraft && scatterDraft->descriptor != descriptor)
+            return Invalid("Scatter object changed / review again");
+        if (!scatterDraft || scatterDraft->key != key || scatterDraft->descriptor != descriptor)
+        {
+            scatterDraft = ScatterDraft{key,descriptor,{},false,0};
+            const auto* entry = ObjectEntryManager::GetObjectEntry<SmallSceneryEntry>(s.object);
+            auto direction=s.direction; auto quadrant=s.quadrant;
+            for (int i=0;i<SceneryScatterQuantity(s.scatterSize,s.scatterDensity);++i)
+            {
+                const auto location=SceneryScatterProposal(*tile,s.scatterSize,*entry,quadrant,direction);
+                auto proposed=s; proposed.direction=direction; proposed.quadrant=quadrant;
+                scatterDraft->proposals.push_back({location,proposed});
+            }
+        }
+        GameActions::Result result;
+        result.cost=0;
+        size_t available=0;
+        std::string failure;
+        for (const auto& p : scatterDraft->proposals)
+        {
+            const auto q=Query(p.tile,p.settings);
+            if (q.error==GameActions::Status::ok) { result.cost+=q.cost; ++available; }
+            else failure=q.getErrorMessage();
+        }
+        if (!available) return Invalid(failure.c_str());
+        if (!execute) return result; // Stable estimate; collisions between sampled proposals remain native partial failures.
+        if (!scatterDraft->reviewed || scatterDraft->quote!=result.cost)
+        {
+            scatterDraft->reviewed=true; scatterDraft->quote=result.cost; scatterOutcome.reset();
+            return result; // First released A reviews; only the next released A submits native actions.
+        }
+        scatterOutcome=std::make_shared<ScatterOutcome>();
+        const auto outcome=scatterOutcome;
+        outcome->total=scatterDraft->proposals.size();
+        const auto proposals=std::move(scatterDraft->proposals);
+        scatterDraft.reset();
+        for (const auto& p : proposals)
+        {
+            auto q=Query(p.tile,p.settings);
+            if (q.error!=GameActions::Status::ok)
+            {
+                ++outcome->completed; outcome->failure=q.getErrorMessage();
+                continue;
+            }
+            auto action=Placement(p.tile,p.settings);
+            action->SetCallback([outcome](const GameActions::GameAction*,const GameActions::Result* r) {
+                ++outcome->completed;
+                if (r->error==GameActions::Status::ok) { ++outcome->placed; outcome->cost+=r->cost; }
+                else outcome->failure=r->getErrorMessage();
+            });
+            GameActions::Execute(action.get(),getGameState());
+        }
+        return result;
+    }
     GameActions::Result Place(std::optional<CoordsXY> tile, const Settings& s, bool execute)
     {
         const auto old = requested;
         RemoveGhost();
+        if (s.scatter && s.category==Category::small && s.mode==Mode::place)
+        {
+            requested.reset();
+            return Scatter(tile,s,execute);
+        }
         const auto r = Query(tile, s);
         if (!execute)
         {

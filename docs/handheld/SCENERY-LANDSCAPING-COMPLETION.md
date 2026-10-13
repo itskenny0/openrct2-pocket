@@ -126,3 +126,74 @@ Native shared scatter/bulk placement and terrain surface/edge colours remain pen
 All other ordinary construction, export, path-network, map/save and hardware gaps
 remain on the 100% feature matrix. Phase 2 canonical SHA/tree is recorded after guarded
 publication, without modifying the tested production source.
+
+## Phase 2 publication and second recovery
+
+Phase 2 canonical `f20751d08f26d9e25cac52f474df668a45341665`, original local
+`836b9d61fb30d93ce7b18adba9fd9f59132bb9ce`, exact tree
+`6a38c38c42aa80e60f27e7107209e4f4e80b33df`. The checkout/build directories
+vanished during the subsequent scatter compile; the execution service disconnected.
+The incomplete scatter changes and captures were lost. On 2026-10-13 access returned
+at Staff db96e886 again. Every edit/index/untracked file was preserved; 93 canonical
+files were recovered atomically after blob checks, complete tree equality verified,
+and recovery safety `81092f6115d47b1f516dc67b3f3e08fa27bedca6` committed before
+compiling. Esperanto retains its recorded SHA256 and remains excluded. No forbidden
+Git recovery/history command was used. Private Library assets were rematerialized.
+
+## Phase 3 — shared native small-scenery scatter
+
+Desktop Scenery scatter and drag were audited. New SceneryScatter.h extracts the
+existing desktop UtilRand quadrant/offset/even-size/non-rotatable-direction proposal,
+quantity and selection bounds helpers; desktop and Pocket both call them. This is
+not an independent scatter algorithm. Native small scenery only: options appends
+Scatter enabled, size 1–64 and density 1–3. Native attempt count is size times density,
+not area squared. Existing indices/categories/groups/search/styles are preserved.
+D-pad pans; X camera rotation, L1/R1 zoom and Y/Select options retain the tool.
+Native square selection and one native object ghost follow desktop preview semantics.
+A first reviews the frozen native proposals without placing/spending; a second
+released A applies. B cancels the tool/review. Changing tile/settings/object resets
+review; native descriptor, availability, ownership and cost are rechecked. The cost
+badge explicitly says estimate: independently valid proposals can collide later.
+No atomicity is claimed. Native SmallSceneryPlaceAction owns every placement, height,
+clearance, ownership, research, colours, accounting and persistence.
+
+Native action callbacks track actual completed/successful/failed attempts and actual
+cost. A pending batch rejects repeat submission; controller suspension prevents held
+A from skipping review or duplicating apply. Partial result shows placed/attempted and
+actual cost; Options exposes the native failure message. Transient draft cleanup
+shares tool/ghost cleanup; native map-load/reset and shutdown also clear scatter
+feedback/settings. Callbacks own detached result lifetime safely. No serialized
+Pocket gameplay state was added. Native queued actions are not promised cancellable.
+Network scatter is explicitly unavailable until native asynchronous network completion
+can be represented safely; ordinary single-object placement remains unchanged.
+
+GUI/CLI build PASS with source held fixed. Expanded ConstructionTests PASS: stable
+query estimates and no map/cash/ledger mutation, read-only review/cancel, stale
+ownership, native partial clearance, pending repeats, exact actual cash, multi-tile
+native population/accounting, research/bounds, native save/reload and cleanup.
+Asset-backed native/SDL SceneryPathParityTests PASS including real reticle controller
+review/apply with duplicated A, actual partial result, native error recovery/options,
+all previous groups/search/styles/area-clearing checks and persistence.
+PresentationLifecycleTests PASS. An overlapping new fixture was isolated from the
+existing area-clear fixture; no behavioral assertions were weakened. Native target
+comes from actual reticle/map selection rather than assumed world coordinates.
+
+Six genuine production 512×384 captures (08–13 options, native ghost preview, review,
+partial result/cost, native error options and larger area preview) were inspected.
+Overlong result detail was moved to Options, rebuilt/retested and regenerated.
+Native viewport and production Pocket components over action-built native fixtures,
+original sprites; not hardware frames or sustained-operation proof. Final manifest/
+ZIP and broad sweep follow Phase 4. Private source archives/parks/designs excluded.
+
+Remaining exact ordinary gaps: continuous native wall drag preview/release placement,
+continuous repaint/eyedropper drag equivalents, desktop Shift automatic Z-search
+modifier behavior, and network scatter callback/pending recovery. Native surface/edge
+colour controls remain next. Broader matrix gaps remain; 100% ordinary gameplay is
+still the goal, not a delivered claim. Canonical phase publication is recorded in the
+following checkpoint after expected_sha/force=false and exact full-tree verification.
+
+Phase 3 final correction: menu provisional cleanup retains completed native batch
+feedback/failure until the next review or map-load/exit reset. SDL assertions verify
+that Options does not erase the actual failure. The native error capture was
+regenerated and inspected. ConstructionTests rerun PASS; CTest 3/3 PASS. Temporary
+partial recovery files were moved into the preserved recovery archive, not discarded.
