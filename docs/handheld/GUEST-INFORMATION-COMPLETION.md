@@ -140,3 +140,14 @@ Ordinary roadmap: the dedicated global guestsThinkingX thought-type entry point
 action/thought argument groups and ride-specific thoughts are delivered. Moving
 train map overlay and editor-only map operations remain separate map gaps.
 Hardware/AArch64 and sustained large-park performance remain unvalidated.
+
+
+Validated Phase 3 canonical publication: `8d318517ae3f05d4a5496746e25d252bb4795844`,
+local `e3593c261cb80ecc4f78ea928cb5c89f67567628`, exact shared source tree
+`1400355d771ac8fdc3173e2ea34b9abb3caebe66`. Publication verified native remote
+parent `b242e5c7d9aa2624486ae1aae980f3ccd703dc64`, every changed blob SHA and
+complete source-tree equality, then used expected_sha and force=false fast-forward.
+This documentation receipt follows that validated implementation without changing
+production code or tests. Esperanto retains SHA256
+`e37ba559b4d9d761e74f2bb284d1ec762b813e789655c0495a882c83651890b5`
+and remains the sole unrelated working-tree edit, excluded from milestone commits.

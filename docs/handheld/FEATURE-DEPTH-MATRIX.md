@@ -336,3 +336,11 @@ asset-backed ParkMapInformationTests, GuestCompletionTests, PresentationLifecycl
 full asset-backed PathActionsTests and CTest 3/3 PASS; see the incremental checkpoint.
 Dedicated global guestsThinkingX entry, moving-train overlay, editor operations,
 physical Brick/AArch64 and sustained dense-park performance remain exact gaps.
+
+
+Publication: native filters/map Phase 3 `8d318517ae3f05d4a5496746e25d252bb4795844`,
+local validated `e3593c2`, exact tree `1400355d771ac8fdc3173e2ea34b9abb3caebe66`.
+Previous canonical phases: finance closeout `3cb124cf9e7014c1685a61d819db8598ce7dbf08`,
+guest history `784244aa2db522cae00e758505aa0332ce0fdd40`, follow
+`b242e5c7d9aa2624486ae1aae980f3ccd703dc64`. Guards and actual validation/gaps
+are recorded in GUEST-INFORMATION-COMPLETION.md and the finance checkpoint.
