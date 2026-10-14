@@ -447,3 +447,12 @@ local safety 03a966a3e3e2f0d938827ffe8360828268586f9c, complete matching tree
 5cdc86afb52088f6ee36f097e307b364f5607e09. Native parent b2db7e0, changed blobs/full
 tree and expected_sha/force=false fast-forward were verified; final ref read back.
 This publication-history record changes docs only, preserving validated source.
+
+## Save/load browsing Phase 1 — 2026-10-14 UTC
+
+Native park/autosave folder browsing extends the retained three Pocket slots.
+Desktop park filter, configured saves directory, parent navigation, paged real entries,
+long-path detail, explicit empty/error and Cancel-first active-park load review are
+implemented. File byte/size/time identity guards reject stale selections; native
+importer failure recovery retains its documented early-preservation/late-title limits.
+Named Save As and design folder browsing remain pending. See SAVE-LOAD-BROWSING-COMPLETION.md.
