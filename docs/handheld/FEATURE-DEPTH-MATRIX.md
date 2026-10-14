@@ -568,3 +568,11 @@ flat/special design adapters, native rollback guarantees, direct selected-seat a
 exhaustive geometry/positive variants, maze/access ghosts, continuous scenery/network
 review, broader shop appearance, sustained family guests and Brick/AArch64/performance
 remain. Next: broader native shop/facility appearance, preserving delivered naming.
+
+Design substitution implementation published `2f364a1213996a5fde66349423e7a0a7f7fbcd38`,
+matching local `c167a945291ef9f86d96e2f5bb7398f604c37b5b`, complete identical tree
+`832d344cf04c4d2c96f54de7ab1902cecb67faab`. Guarded native parent/blob/tree/ref
+verification succeeded. Saved inspected 24-PNG capture ZIP SHA256
+`bcf4bb8818213e040ad4bf0b6b152d4bc9a932dfc6726cdb50abd1de834e4d2b`.
+Final documentation closeout follows this fixed production source; see the handoff
+for that final ref. Exact remaining ordinary gaps and test-environment caveat remain.

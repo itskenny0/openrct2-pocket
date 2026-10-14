@@ -243,3 +243,22 @@ physical Brick/AArch64/dense-park performance remain as recorded in the matrix.
 Next substantial ordinary gap: broader native shop/facility appearance, using the
 existing native naming/management and appearance actions. Naming already exists;
 do not rebuild it or infer a colour/music capability unsupported by its native object.
+
+## Phase 3 publication and final capture package
+
+Validated implementation canonical `2f364a1213996a5fde66349423e7a0a7f7fbcd38`;
+matching local safety `c167a945291ef9f86d96e2f5bb7398f604c37b5b`; complete tree
+`832d344cf04c4d2c96f54de7ab1902cecb67faab`. Every changed blob and the full tree
+matched before a guarded expected_sha/force=false fast-forward from Phase 2.
+Canonical native parent/tree and the resulting branch ref were read back and verified.
+
+Saved deliverable: **OpenRCT2-Pocket-Design-Substitution-Captures.zip**.
+24 individually inspected production 512×384 PNGs, manifest.json, manifest.csv and
+README.txt; 27 archive members, 185575 bytes. Every archived PNG hash and archive
+integrity/dimension count verified. ZIP SHA256:
+`bcf4bb8818213e040ad4bf0b6b152d4bc9a932dfc6726cdb50abd1de834e4d2b`.
+Manifest records implementation canonical/local/tree, exact driver blob, real native
+fixture/asset provenance and all validation limits. Only PNGs and metadata are in
+the ZIP. Earlier scenery, browsing and selected-track deliverables were preserved.
+This docs-only closeout follows the fixed tested implementation; its final ref is
+reported in the handoff rather than embedded as a circular self-reference here.
