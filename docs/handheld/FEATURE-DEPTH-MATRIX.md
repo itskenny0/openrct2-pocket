@@ -611,3 +611,10 @@ SHOP-APPEARANCE-COMPLETION.md. Native absence of colour support stays explicit.
 Maze/access previews, further selected/special geometry/parameters, flat/special
 design adapters, continuous scenery/network, file/keyboard/import, sustained
 family guests and physical/performance gaps remain. Next: maze/access previews.
+
+Shop appearance final source publication: e7abc11c4aaa82f2085a14102a560f6df7cf498f,
+complete tree 16e03999cba4bc6a0aedfa1db56a36a6990ebfd4, local safety
+090a60939897385021b372c6f8134301bc271d92. Every blob/tree/native parent and
+leased fast-forward ref/readback verified. Subsequent history documentation
+changes no validated production/test/capture files. Whole-game parity remains
+partial; native maze/access placement previews are the next substantial gap.

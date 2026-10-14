@@ -184,3 +184,16 @@ sequential with possible optional scenery omission. These are not claimed closed
 
 Next substantial scope: native maze and ride-access placement previews and their
 provisional lifecycle, preserving all construction/action/eligibility/accounting.
+
+### Final publication closeout
+
+Phase 3 canonical e7abc11c4aaa82f2085a14102a560f6df7cf498f, complete tree
+16e03999cba4bc6a0aedfa1db56a36a6990ebfd4, matching local safety
+090a60939897385021b372c6f8134301bc271d92. Its native parent is Phase 2
+5e25be1470132c91b3bab728d2c2afddaaf5793c. Every changed blob and complete tree
+were verified before expected_sha/force=false fast-forward publication, then the
+native commit parent/tree and resulting branch ref were read back. The final
+publication-history documentation commit changes no production source, test,
+PNG or ZIP. All three authorized phases are complete within the stated native
+channels and host validation limits. Protected Esperanto remains unchanged and
+outside every milestone commit. The ZIP is saved as an actual downloadable file.
