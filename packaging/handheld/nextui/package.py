@@ -11,6 +11,12 @@ for name in ['openrct2','openrct2-cli','input-map']:
  shutil.copy2(src,game/name);(game/name).chmod(0o755);subprocess.run([a.strip,'--strip-unneeded',str(game/name)],check=True)
 # Resolve every ELF DT_NEEDED through target SDK roots; never use host libraries.
 roots=[a.sysroot/'usr/lib',a.sysroot/'lib'];queue=[game/'openrct2',game/'openrct2-cli',game/'input-map'];copied={}
+# SDL and native GPU drivers dlopen these; they are absent from the executable DT_NEEDED graph.
+for name in ['librt.so.1','libasound.so.2']:
+ found=next((root/name for root in roots if (root/name).exists()),None)
+ if found is None:raise RuntimeError('Missing dynamic native runtime dependency '+name)
+ assert 'AArch64' in subprocess.check_output(['readelf','-h',str(found.resolve())],text=True)
+ dest=lib/name;shutil.copy2(found.resolve(),dest);dest.chmod(0o755);copied[name]=str(found.resolve());queue.append(dest)
 while queue:
  src=queue.pop();needed=re.findall(r'Shared library: \[([^]]+)\]',subprocess.check_output(['readelf','-d',str(src)],text=True))
  for name in needed:
