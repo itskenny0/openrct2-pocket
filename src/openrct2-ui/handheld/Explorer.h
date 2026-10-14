@@ -83,6 +83,7 @@ namespace OpenRCT2::Ui::Windows
     Handheld::ManagementPresentation HandheldOverviewPresentation();
     bool HandheldRidesIsOpen();
     Handheld::ManagementPresentation HandheldRidesPresentation();
+    Handheld::ManagementPresentation HandheldShopAppearancePresentation();
     bool HandheldGuestsIsOpen();
     Handheld::ManagementPresentation HandheldGuestsPresentation();
     void HandheldGuestOpen(const Handheld::GuestManagement::Target&);

@@ -8,6 +8,7 @@
  *****************************************************************************/
 
 #include "Ride.h"
+#include "RideIdentity.h"
 
 #include "../Cheats.h"
 #include "../Context.h"
@@ -191,6 +192,7 @@ namespace OpenRCT2
         auto result = &gameState.rides[idx];
         assert(result->id == RideId::GetNull());
 
+        RideAllocationChanged(index);
         // Initialize the ride to all the defaults.
         *result = Ride{};
 
@@ -223,6 +225,7 @@ namespace OpenRCT2
         assert(gameState.rides[idx].type != kRideTypeNull);
 
         auto& ride = gameState.rides[idx];
+        RideAllocationChanged(id);
         RideReset(ride);
 
         // Shrink maximum ride size.

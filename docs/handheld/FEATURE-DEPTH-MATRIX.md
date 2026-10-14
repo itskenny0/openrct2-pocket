@@ -586,3 +586,14 @@ while retaining focused/no-shell preview-restoration assertions. Entire driver p
 both documented and forced Pocket environments; Release GUI/CLI and CTest 5/5 pass.
 No production focus-loss behavior changed; a real focused display remains unverified.
 Broader native shop appearance follows in Phase 2.
+
+### Shop appearance — native controls implemented (Phase 2)
+
+Shop inspection now offers the actual loaded object's native building colour and
+random merchandise channels, paged native palette names and Cancel-first native
+cost review. Exact allocation/object/channel/appearance guards survive action
+serialization and execute-time revalidation. Unsupported objects are explicit;
+no vehicle/station/music controls are invented. Naming/prices/common prices and
+status/stats/demolition remain. Focused native/SDL tests, same-slot reuse rejection,
+held-A cancellation and .park round-trip pass; final preservation/captures follow.
+See SHOP-APPEARANCE-COMPLETION.md for capability and preview-discrepancy evidence.

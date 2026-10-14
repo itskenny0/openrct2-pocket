@@ -37,3 +37,44 @@ paused preservation and explicit focus-loss branches are both exercised; focused
 full-shell display validation remains a host/hardware follow-up.
 
 Shop appearance implementation and final preservation/capture closeout follow.
+
+## Phase 2 — native shop/facility appearance
+
+Desktop audit: Ride.cpp excludes station flags from shop building colour support;
+RideTypeDescriptor hasTrackColourMain/Additional/Supports and the loaded entry's
+disableColourTab govern building controls. Ride::hasRecolourableShopItems governs
+the random merchandise checkbox. Pocket uses exactly these predicates, the
+existing native colour dropdown ordering/names and RideSetAppearanceAction.
+No shop vehicle/station/music controls are invented. Inspection always offers
+Appearance; objects without native controls show an explicit empty state.
+
+Controller: shop inspection fifth row Appearance; D-pad selects native channel
+and paged colour/value, A opens Cancel-first review, A on Cancel/B returns to the
+unchanged editor, Apply runs the native action then returns to the same channel.
+The review shows original/proposed native names and the queried native cost.
+Shared naming, prices/common prices, status, statistics and demolition remain.
+
+The optional native action guard serializes the exact reviewed shop context and
+checks both Query and Execute. It includes native allocation generation (process
+local, never park-save data), ID/type/subtype/build date, location/real block,
+object descriptor/version/flags/items, supported channels, palette cheat state,
+all building colour schemes and merchandise random-colour baseline. Invalid or
+unchanged proposed values are rejected. Unguarded desktop actions retain their
+existing behavior. Native action execution owns appearance and accounting; no
+UI writes live ride fields. Pending UI callbacks use window lifetime/request
+checks; busy input and shared edge-triggered controller handling prevent repeats.
+
+Focused ShopAppearanceTests covers five real native objects: Burger Bar, Balloon
+Stall, Toilets, Cash Machine and Information Kiosk. Native capabilities differ:
+Burger/Toilets/ATM expose zero controls for these loaded objects; Balloon and
+Information expose building main plus random merchandise colours. It exercises
+all supported channels, unsupported station/invalid colour rejection, exact zero
+native cost and unchanged map/cash/prices/status/name/common-price state,
+serialized guards, changed baseline/object flags, demolition/reuse of the same
+native slot, Cancel-first cancellation, repeated A, actual SDL virtual held A,
+stale UI recovery and native .park round-trip. The fixture temporarily changes
+object flags solely to demonstrate stale loaded-definition rejection and restores
+them; production never edits object definitions.
+
+Phase 2 validation: Release GUI/CLI builds, ShopAppearanceTests native/SDL with
+original assets, and CTest 5/5 pass. Final preservation/capture closeout follows.

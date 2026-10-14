@@ -121,7 +121,7 @@ namespace OpenRCT2::Ui::Handheld::ShopManagement
         const auto* ride = target ? Find(*target) : nullptr;
         const auto prices = target ? Prices(*target) : std::vector<Price>{};
         const bool noMoney = getGameState().park.flags.has(ParkFlag::noMoney);
-        Box(rt, p, { width, view == View::inspection ? 330 : 252 });
+        Box(rt, p, { width, view == View::inspection ? 348 : 252 });
         auto text = [&](int y, const std::string& s, bool strong = false) {
             if (strong)
                 DrawStrongText(rt, p + ScreenCoordsXY{ 10, y }, s, width - 20);
@@ -130,7 +130,7 @@ namespace OpenRCT2::Ui::Handheld::ShopManagement
         };
         auto row = [&](int y, const std::string& s, bool selected) {
             if (selected)
-                Box(rt, p + ScreenCoordsXY{ 8, y }, { width - 16, 28 }, true);
+                Box(rt, p + ScreenCoordsXY{ 8, y }, { width - 16, view==View::inspection?23:28 }, true);
             text(y + 9, (selected ? "{BLACK}" : "{WHITE}") + s, selected);
         };
         text(12, "{MUTED}Shops / Facilities");
@@ -156,10 +156,11 @@ namespace OpenRCT2::Ui::Handheld::ShopManagement
             }
             if (prices.empty())
                 text(164, "{MUTED}No products or admission price");
-            row(202, ride->status == RideStatus::open ? "Close" : "Open", focus == 0);
-            row(228, noMoney ? "No-money park" : prices.empty() ? "Prices unavailable" : "Prices...", focus == 1);
-            row(254, "Demolish...", focus == 2);
-            row(280, "Rename...", focus == 3);
+            row(198, ride->status == RideStatus::open ? "Close" : "Open", focus == 0);
+            row(222, noMoney ? "No-money park" : prices.empty() ? "Prices unavailable" : "Prices...", focus == 1);
+            row(246, "Demolish...", focus == 2);
+            row(270, "Rename...", focus == 3);
+            row(294, "Appearance...", focus == 4);
         }
         else if (ride && view == View::prices)
         {
@@ -187,7 +188,7 @@ namespace OpenRCT2::Ui::Handheld::ShopManagement
             row(182, "Cancel", focus == 1);
         }
         if (!feedback.empty())
-            text(view == View::inspection ? 310 : 237, "{MUTED}" + feedback);
+            text(view == View::inspection ? 330 : 237, "{MUTED}" + feedback);
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;
         DrawCommand(rt, { 12, y }, 38, "D-pad", view == View::prices ? "Price / item" : "Choose");

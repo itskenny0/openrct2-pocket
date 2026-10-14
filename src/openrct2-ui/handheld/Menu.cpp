@@ -1,3 +1,4 @@
+#include "ShopAppearance.h"
 #include "DesignAvailability.h"
 // SPDX-License-Identifier: GPL-3.0-only
 #include "AreaTools.h"
@@ -193,6 +194,9 @@ namespace OpenRCT2::Ui::Windows
         ride,
         shop,
         shopPrices,
+        shopAppearance,
+        shopAppearanceEditor,
+        shopAppearanceReview,
         shopDemolish,
         save,
         load,
@@ -776,9 +780,40 @@ namespace OpenRCT2::Ui::Windows
             return _page == Page::dashboard || financeManagement() || staffManagement() || researchManagement()
                 || marketingManagement() || guestManagement() || ridesManagement() || overviewManagement();
         }
+        std::optional<Handheld::ShopAppearance::Draft> _shopAppearanceDraft;
+        size_t _shopAppearanceChannel{};
+        bool _shopAppearanceBusy{};
+        uint64_t _shopAppearanceRequest{};
+        std::shared_ptr<int> _shopAppearanceLifetime=std::make_shared<int>(0);
+    public:
+        Handheld::ManagementPresentation shopAppearancePresentation() const {
+            using namespace Handheld;
+            ManagementPresentation model;model.breadcrumb="Shops / Native appearance";
+            const auto* ride=_shop?ShopManagement::Find(*_shop):nullptr;
+            model.title=ride?ride->getName():"Shop unavailable";model.selected=_focus.index();
+            model.rows=rows();model.status=_status;
+            if(_page==Page::shopAppearance) {
+                if(ride) {const auto* object=GetContext()->GetObjectManager().GetLoadedObject<RideObject>(ride->subtype);
+                    model.bodyLines={object?object->GetName():"Object unavailable","Native supported building / item controls"};}
+                if(!_shop || ShopAppearance::Settings(*_shop).empty())model.status="No native appearance controls for this object";
+            } else if(_shopAppearanceDraft) {
+                const auto& d=*_shopAppearanceDraft;
+                model.stats={{"Channel",d.setting.name},{"Current",ShopAppearance::Label(d.setting,d.setting.current)}};
+                if(_page==Page::shopAppearanceReview) {
+                    model.confirmation=true;model.title="Apply shop appearance?";
+                    model.stats.push_back({"Proposed",ShopAppearance::Label(d.setting,d.value)});
+                    const auto quote=ShopAppearance::Action(d,false);
+                    model.stats.push_back({"Native cost",quote.error==GameActions::Status::ok?Handheld::FormatMoney(quote.cost):"Unavailable"});
+                    model.bodyLines={"Native appearance action / exact reviewed object"};
+                } else model.bodyLines={"A: review chosen value / B: cancel"};
+            }
+            if(_shopAppearanceBusy)model.status="Applying native change...";
+            return model;
+        }
+    private:
         bool shopManagement() const
         {
-            return _page == Page::shop || _page == Page::shopPrices || _page == Page::shopDemolish;
+            return _page == Page::shop || _page == Page::shopPrices || _page == Page::shopDemolish || _page==Page::shopAppearance || _page==Page::shopAppearanceEditor || _page==Page::shopAppearanceReview;
         }
         void pauseManagement()
         {
@@ -985,6 +1020,8 @@ namespace OpenRCT2::Ui::Windows
             if ((_page == Page::designName || _page == Page::designScenery || _page == Page::designExport)
                 && next != Page::designName && next != Page::designScenery && next != Page::designExport)
                 Handheld::DesignAuthoring::End();
+            if(next!=Page::shopAppearanceEditor && next!=Page::shopAppearanceReview)_shopAppearanceDraft.reset();
+            _shopAppearanceBusy=false;++_shopAppearanceRequest;
             _page = next;
             if (next == Page::ridesName || next == Page::designName || next == Page::designScenery || next == Page::designExport)
             {
@@ -1150,7 +1187,16 @@ namespace OpenRCT2::Ui::Windows
                 case Page::researchConfirm:
                     return researchPresentation().rows;
                 case Page::shop:
-                    return { "Status", "Prices", "Demolish", "Rename" };
+                    return { "Status", "Prices", "Demolish", "Rename", "Appearance" };
+                case Page::shopAppearance: {
+                    std::vector<std::string> result;
+                    if(_shop)for(const auto& setting:Handheld::ShopAppearance::Settings(*_shop))
+                        result.push_back(setting.name+" / "+Handheld::ShopAppearance::Label(setting,setting.current));
+                    result.push_back("Back to shop");return result;
+                }
+                case Page::shopAppearanceEditor:
+                    return _shopAppearanceDraft?_shopAppearanceDraft->setting.labels:std::vector<std::string>{"Shop unavailable"};
+                case Page::shopAppearanceReview:return {"Cancel","Apply native change"};
                 case Page::shopPrices:
                 {
                     std::vector<std::string> result;
@@ -2204,6 +2250,13 @@ namespace OpenRCT2::Ui::Windows
                     else
                         close();
                     break;
+                case Page::shopAppearanceEditor: page(Page::shopAppearance);_focus.move(static_cast<int>(_shopAppearanceChannel),rows().size());break;
+                case Page::shopAppearanceReview: {
+                    page(Page::shopAppearanceEditor);
+                    if(_shopAppearanceDraft){const auto& d=*_shopAppearanceDraft;const auto it=std::find(d.setting.values.begin(),d.setting.values.end(),d.value);if(it!=d.setting.values.end())_focus.move(static_cast<int>(it-d.setting.values.begin()),rows().size());}
+                    break;
+                }
+                case Page::shopAppearance:
                 case Page::shopPrices:
                 case Page::shopDemolish:
                     page(Page::shop);
@@ -2410,6 +2463,7 @@ namespace OpenRCT2::Ui::Windows
         }
         void confirm()
         {
+            if (_shopAppearanceBusy) return;
             if ((overviewManagement() && _overviewBusy) || (ridesManagement() && _ridesBusy)
                 || (marketingManagement() && _marketingBusy))
                 return;
@@ -4418,6 +4472,7 @@ namespace OpenRCT2::Ui::Windows
                             && !Handheld::ShopManagement::Prices(*_shop).empty())
                             page(Page::shopPrices);
                     }
+                    else if (choice == 4) {page(Page::shopAppearance);_shopAppearanceChannel=0;}
                     else if (choice == 3)
                     {
                         _ridesTarget = Handheld::RideManagement::Identify(_shop->id, true);
@@ -4439,6 +4494,44 @@ namespace OpenRCT2::Ui::Windows
                                                                           : result.getErrorMessage();
                     }
                     invalidate();
+                    break;
+                case Page::shopAppearance:
+                    if(!_shop || choice>=Handheld::ShopAppearance::Settings(*_shop).size())page(Page::shop);
+                    else {
+                        _shopAppearanceChannel=choice;
+                        _shopAppearanceDraft=Handheld::ShopAppearance::Begin(*_shop,choice);
+                        if(_shopAppearanceDraft) {
+                            page(Page::shopAppearanceEditor);
+                            const auto& d=*_shopAppearanceDraft;const auto it=std::find(d.setting.values.begin(),d.setting.values.end(),d.value);
+                            if(it!=d.setting.values.end())_focus.move(static_cast<int>(it-d.setting.values.begin()),rows().size());
+                        }
+                    }
+                    break;
+                case Page::shopAppearanceEditor:
+                    if(_shopAppearanceDraft && choice<_shopAppearanceDraft->setting.values.size()) {
+                        _shopAppearanceDraft->value=_shopAppearanceDraft->setting.values[choice];
+                        const auto q=Handheld::ShopAppearance::Action(*_shopAppearanceDraft,false);
+                        if(q.error==GameActions::Status::ok)page(Page::shopAppearanceReview);
+                        else {_status=q.getErrorMessage();invalidate();}
+                    }
+                    break;
+                case Page::shopAppearanceReview:
+                    if(choice==0) {back();break;}
+                    if(_shopAppearanceDraft) {
+                        const auto q=Handheld::ShopAppearance::Action(*_shopAppearanceDraft,false);
+                        if(q.error!=GameActions::Status::ok){_status=q.getErrorMessage();invalidate();break;}
+                        _shopAppearanceBusy=true;const auto request=++_shopAppearanceRequest;
+                        const auto result=Handheld::ShopAppearance::Action(*_shopAppearanceDraft,true,
+                            [this,request,lifetime=std::weak_ptr<int>(_shopAppearanceLifetime)](const auto*,const GameActions::Result* outcome){
+                                if(lifetime.expired() || request!=_shopAppearanceRequest || _page!=Page::shopAppearanceReview)return;
+                                _shopAppearanceBusy=false;
+                                if(outcome->error==GameActions::Status::ok) {
+                                    page(Page::shopAppearance);_focus.move(static_cast<int>(_shopAppearanceChannel),rows().size());_status="Native appearance applied";
+                                } else _status=outcome->getErrorMessage();invalidate();
+                            });
+                        if(result.error!=GameActions::Status::ok){_shopAppearanceBusy=false;_status=result.getErrorMessage();}
+                        invalidate();
+                    }
                     break;
                 case Page::shopPrices:
                     if (_shop)
@@ -4868,6 +4961,13 @@ namespace OpenRCT2::Ui::Windows
                     rt, { ContextGetWidth(), ContextGetHeight() }, _dashboard, model, dashboardCanSwitch());
                 return;
             }
+            if (_page==Page::shopAppearance || _page==Page::shopAppearanceEditor || _page==Page::shopAppearanceReview)
+            {
+                Handheld::DrawManagementContent(rt,{8,8},{330,348},shopAppearancePresentation());
+                Handheld::DrawActionStrip(rt,{ContextGetWidth(),ContextGetHeight()});
+                Handheld::DrawModernText(rt,{12,369},"D-pad Choose   A Select / review   B Back",{},488);
+                return;
+            }
             if (shopManagement())
             {
                 using Handheld::ShopManagement::View;
@@ -5212,6 +5312,10 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = OpenPanel())
             window->openLoad();
+    }
+    Handheld::ManagementPresentation HandheldShopAppearancePresentation() {
+        auto* window=GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window?static_cast<HandheldMenuWindow*>(window)->shopAppearancePresentation():Handheld::ManagementPresentation{};
     }
     void HandheldMenuMove(int32_t direction)
     {
