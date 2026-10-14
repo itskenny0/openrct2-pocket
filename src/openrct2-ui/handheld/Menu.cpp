@@ -506,14 +506,18 @@ namespace OpenRCT2::Ui::Windows
                                 "Then choose / build at this location.", "Removal leaves a gap; no rollback." };
                             if (_trackBlock->type == TrackElemType::beginStation || _trackBlock->type == TrackElemType::middleStation
                                 || _trackBlock->type == TrackElemType::endStation)
-                                model.bodyLines.push_back("Stations / access may be renumbered.");
+                            {
+                                model.bodyLines.push_back("Native stations may split / renumber.");
+                                model.bodyLines.push_back(Handheld::TrackEditing::AccessRemovalLabel(*_trackBlock));
+                                model.bodyLines.push_back("Rebuild deleted entrances/exits explicitly.");
+                            }
                         }
                         if (current == Page::trackRemoveConfirm && (_trackBlock->type == TrackElemType::beginStation
                             || _trackBlock->type == TrackElemType::middleStation || _trackBlock->type == TrackElemType::endStation))
                         {
                             model.stats.clear();
                             model.bodyLines = { "Remove: " + Handheld::TrackEditing::Label(*_trackBlock),
-                                "Stations / access may be renumbered.", "Check native access after this removal." };
+                                "Native stations may split / renumber.", Handheld::TrackEditing::AccessRemovalLabel(*_trackBlock), "Rebuild deleted entrances/exits explicitly." };
                         }
                         model.rows = { "Cancel", "Confirm" };
                         model.status = current != Page::trackSpeedConfirm && _trackCost < 0

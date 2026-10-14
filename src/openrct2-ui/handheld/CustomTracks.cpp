@@ -613,9 +613,10 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         placementColour = colour;
         chain = removed.chain;
         active = true;
-        feedback = "Removed: explicit rebuild required";
+        feedback.clear();
+        if (!Supported(selected)) { End(); return false; }
         FocusEndpoint();
-        return Supported(selected);
+        return true;
     }
     bool Select(TrackElemType type)
     {

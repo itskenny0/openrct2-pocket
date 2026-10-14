@@ -192,3 +192,14 @@ Highest-value next subsystem: scenery and path construction parity, including na
 banner/style controls, useful loaded/researched category filtering and bulk removal,
 connected path starts from access endpoints and recoverable native undo/path networks.
 Preserve all delivered ride editing/authoring, family evidence and management systems.
+
+## Selected-track editing follow-up — 2026-10-14
+
+See SELECTED-TRACK-EDITING-COMPLETION.md. Ordinary orthogonal no-predecessor,
+station and supported inverted/covered selected blocks now have exact-context
+Cancel-first native removal and explicit fixed-origin rebuild with parameters,
+accounting and counted access deletion/recovery. Connected four-family station/
+access/Open/save evidence and inspected production captures are recorded there.
+This supersedes those specific pending entries above; atomic restoration, direct
+selected-seat editing, diagonal/special/exhaustive geometry, positive transitions,
+design substitution/arbitrary scenery and hardware/sustained-guest gaps remain.

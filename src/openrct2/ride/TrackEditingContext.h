@@ -40,6 +40,9 @@ namespace OpenRCT2::TrackConstructionSupport
         const auto supported = RideEntryGetSupportedTrackPieces(entry);
         for (size_t i = 0; i < supported.size(); ++i) result.push_back(supported[i]);
         for (const auto& car : entry.Cars) result.push_back(static_cast<int32_t>(car.flags.holder));
+        for (const auto& colour : ride.trackColours)
+            result.insert(result.end(), { static_cast<int32_t>(colour.main), static_cast<int32_t>(colour.additional),
+                static_cast<int32_t>(colour.supports) });
         result.insert(result.end(), { ride.type, ride.subtype, ride.buildDate, ride.overallView.x, ride.overallView.y,
                                       ride.numStations });
         for (const auto& station : ride.getStations())
@@ -47,6 +50,7 @@ namespace OpenRCT2::TrackConstructionSupport
                 station.entrance.x, station.entrance.y, station.entrance.z, station.entrance.direction,
                 station.exit.x, station.exit.y, station.exit.z, station.exit.direction });
         const auto& state = getGameState();
+        result.push_back(state.park.flags.has(ParkFlag::noMoney));
         for (int y = 32; y < state.mapSize.y * 32 - 32; y += 32)
             for (int x = 32; x < state.mapSize.x * 32 - 32; x += 32)
             {

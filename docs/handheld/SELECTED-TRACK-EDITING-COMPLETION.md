@@ -102,3 +102,124 @@ cancels the station review without a repeated action. Existing SeatRotationTests
 RideConstructionTests preserve conventional predecessor/rebuild, seat/speed bounds,
 forward/backward recovery, ghosts and save/reload. Release GUI/CLI and CTest 5/5 pass.
 End-to-end connected station/access validation and captures follow in Phase 3.
+
+## Phase 2 publication
+
+Canonical `82aae60d0f4b15a78f1d9ca93c4ed5f87ef40443`; local safety
+`9da32d375a75de7ed02a2fe5b0074644053ff561`; identical complete tree
+`0f2d8e1600995a96884994823e2161a47d36975f`. Guarded fast-forward and ref
+readback succeeded before Phase 3.
+
+## Workspace recovery during Phase 3
+
+The workspace reverted to Staff `db96e886864a04bfbc60398493f59a221c68c55d`
+during capture closeout. The protected Esperanto file and old recovery targets were
+preserved outside the checkout. Canonical Phase 2 remained intact. All 110 differing
+files were recovered from exact canonical blobs; every blob and the complete staged
+tree matched `0f2d8e1600995a96884994823e2161a47d36975f`. Recovery safety commit
+`3a7a1eafa24b1ddbc0478a4ddfe6b4f3c22b47a5` preceded compilation. No reset,
+restore, clean, clone or history rewrite. Original test archives and native public
+objects v1.8.0 were recovered; all final validation below was rerun on this workspace.
+
+## Phase 3 — connected station and access recovery
+
+Native `Ride::validateStations()` can **delete** entrances/exits facing the removed
+station tile, as well as split and renumber stations. Inspection and both station
+removal reviews now show the actual adjacent entrance/exit deletion counts, state
+that native stations may split/renumber, and require explicit access rebuilding.
+`AccessRemoval` counts real same-ride, same-height entrance/exit elements facing the
+selected ordinary station tile; ghosts are excluded. It does not claim a prediction
+for malformed/hacked geometry. Exact station/access/path context still guards the
+review, so a changed access geometry cannot reuse that count.
+
+After native rebuild, actual station type normalization is reacquired at the placed
+block. Connected completion uses the existing production UpdateExplorer handoff to
+native entrance/exit placement when missing, or RideAccess when complete. Native
+placement restores access only after an explicit player action; existing queue/path
+workflows reconnect it. No entrance is fabricated or silently restored. RideAccess
+still distinguishes attached paths from connection to the park entrance.
+
+Reviews additionally bind native track colour values and the current no-money mode.
+A changed money mode rejects an old refund review even when the numerical quote
+happens to match. Native-context failures now use a short, readable `reselect`
+message in the production two-line error panel. Failed unsupported handoffs end the
+transient draft instead of leaving an invalid active tool.
+
+### Final validation, all after recovery and affected-object rebuilds
+
+Release GUI and CLI PASS. Production source was fixed during compilation; cached
+source lists were regenerated to include the recovered Mazes source, and affected
+objects were rebuilt before linking drivers. CTest **5/5 PASS**: input, launcher,
+atomic save publication/preservation, file browsing and named Save As.
+
+`SelectedTrackEditingTests` PASS: native inspection/query/cancel purity; source/
+station/descriptor/money-mode/quote guards; SDL virtual held-A Cancel-first review;
+solitary stations and genuine no-predecessor straights; covered Dinghy and inverted
+Flying rebuilds; fixed origin, repeat rejection, native refund/build costs; B cancel
+without predecessor deletion; invalid-parameter failure and actual insufficient-funds
+failure preserving the native gap and draft; recovery after native funds restoration;
+native block/parameter/cash save/reload and transient load cleanup. Restriction probes
+use native CheatSetAction for money mode/funds; no live cash/track rollback writes.
+
+`SelectedTrackEditingCapture` PASS with actual original sprites: begin, middle and
+end station removal/rebuild in four complete native circuits (Monorail, Dinghy,
+Flying, Multi-dimension). Exact full block origins/types/variants/seat/speed/chain/
+colour indices and accounting match after rebuild; non-default native colour index 2
+and Multi-dimension seat 9 are retained. Native deleted entrances/exits are explicitly
+replaced through existing native placement; queue/normal-path attachments recover.
+Each circuit queries/executes native Open and survives native save/reload. Provisional
+save while a gap ghost is active preserves the draft/cash and real gap. Native loaded
+object version changes reject placement without cash spending; restoration recovers.
+The empty Monorail vehicle moves over 4096 native ticks; no new sustained guest-use
+or excitement/rating claim for these flat fixtures.
+
+`SaveLoadBrowsingTests` PASS again: original asset-backed native browsing/import and
+save/design round-trips, virtual held-A review cancellation, serialization/publication
+failure preservation and save-and-exit ordering. Its temporary rerun images were not
+used to regenerate the already delivered browsing ZIP.
+
+All **14 preservation drivers PASS** against final rebuilt objects:
+SceneryPathParityTests, ConstructionTests, PathActionsTests,
+PresentationLifecycleTests, ParkMapInformationTests, GuestInformationTests,
+GuestCompletionTests, StaffCompletionTests, FinanceResearchInformationTests,
+RideConstructionTests, SeatRotationTests, FamilyOperationTests,
+MazeConstructionTests and MiniGolfConstructionTests. Each argc contract was inspected;
+only drivers accepting the fourth original-assets argument received it.
+
+All **4 asset-backed regressions PASS**: DesignCapture, RideConstructionCapture,
+MazeConstructionCapture and original Wooden circuit/access/natural-guest
+CustomCoasterCapture. Their actual six-argument contracts use native engine data,
+private original RCT2 installation, scenario, output and profile. Private files remain
+outside public artifacts. After the final native money-mode header change, all 14
+and all 4 drivers were relinked and rerun. The later funds-probe addition changes only
+test code and passed separately; production remains fixed.
+
+### Captures and exact remaining limits
+
+`OpenRCT2-Pocket-Selected-Track-Editing-Captures.zip` contains **40 inspected genuine
+production 512×384 PNGs**, dimension/SHA256/provenance manifest and README. Ten states
+per native family show block/station inspection, Cancel-first refund and counted
+access deletion, unchanged cancel, real gap/ghost/cost, native camera/covered/inverted/
+seat utility choices, readable stale-descriptor recovery, connected result and access
+return. All final PNGs were individually inspected for clipping, overlap, focus,
+contrast, controls and panel/HUD collisions; long picker labels use their existing
+full selected-detail row. Frames use actual native ViewportRender plus production
+Pocket windows/panels in initialized 64×64 native fixtures, not mockups or manually
+composed fake UI. Private archives, source parks and generated designs are excluded.
+Exact publication/ZIP identifiers belong to the subsequent closeout section.
+
+This closes the audited ordinary orthogonal selected-block remove/rebuild workflow.
+It does **not** claim atomic replacement, automatic restoration, universal raw native
+Execute failure rollback, persistent deleted-origin memory, direct in-place selected
+seat changes, diagonal/special/flat-footprint parity, positive manual variant-transition
+parity or exhaustive slope/bank/family coverage. Native malformed multi-sequence Execute
+can fail after earlier mutation: this is source-audited, not a fabricated successful
+rollback test. Physical Brick/AArch64, whole-game dense-park performance and sustained
+new-family natural guest use remain unconfirmed.
+
+Construction remains PARTIAL toward 100% ordinary gameplay. Further ordinary gaps
+include native design vehicle/scenery substitution and warnings, arbitrary export
+scenery selection, flat/special design/family operation, maze/entrance/exit ghosts,
+scenery drag/automatic-Z/network review, shop appearance and remaining matrix items.
+The next substantial milestone is **native design substitution and placement-warning
+recovery**, preserving this editing, browsing and native eligibility/accounting work.

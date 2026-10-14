@@ -105,7 +105,7 @@ namespace OpenRCT2::GameActions
         auto invalid = []() {
             Result r;
             r.error = Status::disallowed;
-            r.errorMessage = "Track endpoint or availability changed; resume construction";
+            r.errorMessage = "Track context changed; reselect";
             return r;
         };
         const auto* ride = GetRide(_ride);

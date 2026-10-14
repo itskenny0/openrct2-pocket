@@ -11,6 +11,7 @@
 #include <openrct2-ui/handheld/TrackEditing.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
+#include <openrct2/actions/cheats/CheatSetAction.h>
 #include <openrct2/GameState.h>
 #include <openrct2/Input.h>
 #include <openrct2/OpenRCT2.h>
@@ -150,6 +151,17 @@ int main(int argc, char** argv)
         guard.UseSelectedRemoval(current.speed, current.inverted, current.seat);
         guard.GuardEditingContext(baseline);
         Check(GameActions::Query(&guard, state).error == GameActions::Status::ok, "Exact guard rejected valid station");
+        GameActions::CheatSetAction freeMode(CheatType::noMoney, 1);
+        Check(GameActions::Execute(&freeMode, state).error == GameActions::Status::ok, "Native money-mode probe failed");
+        GameActions::ProcessQueue(state);
+        const auto freeContext = E::Context(current);
+        Check(freeContext != baseline && E::Change(current, {}, kMoney64Undefined, true, baseline).error != GameActions::Status::ok
+            && E::Context(current) == freeContext && state.park.cash == beforeFailure,
+            "Changed money mode accepted an old refund review");
+        GameActions::CheatSetAction paidMode(CheatType::noMoney, 0);
+        Check(GameActions::Execute(&paidMode, state).error == GameActions::Status::ok, "Native money-mode restore failed");
+        GameActions::ProcessQueue(state);
+        Check(E::Context(current) == baseline, "Native money-mode restoration changed track context");
         auto stale = baseline;
         stale.back() ^= 1;
         guard.GuardEditingContext(stale);
@@ -278,6 +290,29 @@ int main(int argc, char** argv)
             Check(GameActions::Execute(&failed, state).error != GameActions::Status::ok && state.park.cash == gapCash
                 && TrackConstructionSupport::EditingContext(*GetRide(straight.ride.id)) == gapContext,
                 "Failed native placement changed gap/cash");
+            if (family == 0)
+            {
+                C::Update({});
+                const auto cancelGeometry = TrackConstructionSupport::EditingContext(*GetRide(straight.ride.id));
+                H::HandleExplorerInput(controller, back);
+                Check(!C::Active() && state.park.cash == gapCash
+                    && TrackConstructionSupport::EditingContext(*GetRide(straight.ride.id)) == cancelGeometry,
+                    "B cancelled rebuild by removing another block");
+                Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
+                Check(H::ResumeCustomTrackReplacement(straight.ride,
+                    {straight.origin, straight.type, straight.speed, straight.seat, straight.chain, straight.inverted}, straight.colour),
+                    "Native explicit rebuild return failed");
+            }
+            GameActions::CheatSetAction exhaustedFunds(CheatType::setMoney, 0);
+            Check(GameActions::Execute(&exhaustedFunds, state).error == GameActions::Status::ok, "Native funds probe failed");
+            GameActions::ProcessQueue(state);
+            const auto unfundedContext = TrackConstructionSupport::EditingContext(*GetRide(straight.ride.id));
+            Check(C::Action(true).error != GameActions::Status::ok && state.park.cash == 0
+                && TrackConstructionSupport::EditingContext(*GetRide(straight.ride.id)) == unfundedContext && C::Replacing(),
+                "Unfunded native placement changed the gap or lost recovery");
+            GameActions::CheatSetAction restoreFunds(CheatType::setMoney, gapCash);
+            Check(GameActions::Execute(&restoreFunds, state).error == GameActions::Status::ok, "Native funds restore failed");
+            GameActions::ProcessQueue(state);
             const auto gapQuote = C::Action(false);
             Check(gapQuote.error == GameActions::Status::ok && C::Action(true).error == GameActions::Status::ok,
                 "Rear-gap explicit rebuild failed");

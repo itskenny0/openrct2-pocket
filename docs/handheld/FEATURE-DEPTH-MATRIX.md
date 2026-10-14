@@ -504,3 +504,21 @@ accounting. Cancel-first source/geometry/descriptor reviews, fixed-origin draft 
 B return avoid accidentally removing a predecessor. No atomicity/restoration claim.
 Focused native/SDL and save/reload evidence is in SELECTED-TRACK-EDITING-COMPLETION.md;
 connected access/circuit closeout and exact remaining family gaps remain Phase 3.
+
+## Selected-track editing Phase 3 closeout — 2026-10-14 UTC
+
+Ordinary orthogonal selected-block inspection and explicit native remove/rebuild now
+include no-predecessor, station, supported inverted/covered contexts, retained seat/
+speed/chain/colour parameters and counted native access deletion/recovery. Four native
+families pass begin/middle/end station circuit/access/Open/save workflows. Final
+Release GUI/CLI, focused native/SDL/browsing, CTest 5/5, 14 preservation drivers and 4
+original-asset regressions pass after exact Phase 2 workspace recovery and rebuilding.
+Forty final production 512×384 PNGs are individually inspected. See
+SELECTED-TRACK-EDITING-COMPLETION.md for publication, captures and guarantees.
+
+Construction remains PARTIAL: no atomic rollback/restoration, direct selected-seat
+editing, diagonal/special/full-family or positive-transition parity claim. Design
+substitution/warnings and arbitrary scenery selection, maze/access ghosts, sustained
+family guests, scenery drag/network, shop appearance, hardware/performance and other
+existing ordinary matrix gaps remain. Next: native design substitution and
+placement-warning recovery; preserve the completed browsing/selected-track workflows.

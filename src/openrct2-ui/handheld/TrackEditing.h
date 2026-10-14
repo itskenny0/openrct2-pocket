@@ -113,6 +113,26 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
         const auto* ride = RideManagement::Resolve(block.ride);
         return Valid(block) && ride ? TrackConstructionSupport::EditingContext(*ride) : std::vector<int32_t>{};
     }
+    inline std::pair<size_t, size_t> AccessRemoval(const Block& block)
+    {
+        std::pair<size_t, size_t> result{};
+        if (!Valid(block) || (block.type != TrackElemType::beginStation && block.type != TrackElemType::middleStation
+            && block.type != TrackElemType::endStation)) return result;
+        for (auto delta : CoordsDirectionDelta)
+            for (auto* e : TileElementsView<EntranceElement>(CoordsXY(block.origin) + delta))
+                if (!e->isGhost() && e->getRideIndex() == block.ride.id && e->getBaseZ() == block.origin.z
+                    && CoordsXY(block.origin) == CoordsXY(block.origin) + delta + CoordsDirectionDelta[e->getDirection()])
+                {
+                    if (e->getEntranceType() == EntranceType::rideEntrance) ++result.first;
+                    if (e->getEntranceType() == EntranceType::rideExit) ++result.second;
+                }
+        return result;
+    }
+    inline std::string AccessRemovalLabel(const Block& block)
+    {
+        const auto [entrances, exits] = AccessRemoval(block);
+        return "Deletes access here: " + std::to_string(entrances) + " entrance / " + std::to_string(exits) + " exit";
+    }
     inline std::vector<std::string> Inspection(const Block& block)
     {
         if (!Valid(block)) return { "Selected block no longer exists", "Back to block" };
@@ -151,6 +171,7 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
                         };
                         rows.push_back("Entrance: " + access(station.entrance));
                         rows.push_back("Exit: " + access(station.exit));
+                        rows.push_back(AccessRemovalLabel(block));
                         rows.push_back("Removal may split / renumber station");
                         rows.push_back("Check native access after rebuilding");
                     }
