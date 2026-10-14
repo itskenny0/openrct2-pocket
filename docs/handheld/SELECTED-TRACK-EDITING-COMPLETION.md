@@ -223,3 +223,19 @@ scenery selection, flat/special design/family operation, maze/entrance/exit ghos
 scenery drag/automatic-Z/network review, shop appearance and remaining matrix items.
 The next substantial milestone is **native design substitution and placement-warning
 recovery**, preserving this editing, browsing and native eligibility/accounting work.
+
+## Phase 3 publication and capture closeout
+
+Implementation canonical `f45ef4660eaffeb81061d81766ebf0b5aebdf9fd`; local safety
+`56c0339a8e2c728124e609d48d1effc59d090c6c`; identical complete source tree
+`554ddbacce7ed8590bf2516ef1dac9b6a86312e9`. Each uploaded blob and the complete tree were
+verified, the commit's canonical parent was verified, expected_sha / force=false
+fast-forward update succeeded, and the resulting branch ref was read back.
+
+Inspected capture ZIP SHA256:
+`c34bd20e510404fd1125335766187751364d8195f7571c81482481676e93bfd7`.
+40 PNGs, 512×384 each, plus actual dimension/SHA256/provenance JSON/CSV and README.
+The archive was verified against every manifest hash and saved as the actual
+downloadable deliverable. Original assets/parks/designs are not included. Final
+report identifies the later documentation-only publication without a self-referential
+commit/tree assertion. No production source changes follow final validation.

@@ -522,3 +522,9 @@ substitution/warnings and arbitrary scenery selection, maze/access ghosts, susta
 family guests, scenery drag/network, shop appearance, hardware/performance and other
 existing ordinary matrix gaps remain. Next: native design substitution and
 placement-warning recovery; preserve the completed browsing/selected-track workflows.
+
+Selected-track implementation published `f45ef4660eaffeb81061d81766ebf0b5aebdf9fd`, complete tree
+`554ddbacce7ed8590bf2516ef1dac9b6a86312e9`, matching local safety `56c0339a8e2c728124e609d48d1effc59d090c6c`.
+Capture ZIP: 40 individually inspected production 512×384 PNGs; SHA256
+`c34bd20e510404fd1125335766187751364d8195f7571c81482481676e93bfd7`. Final documentation publication follows that fixed
+validated source. Exact remaining ordinary and hardware limits remain above.
