@@ -127,6 +127,13 @@ static constexpr float kWindowScrollLocations[][2] = {
         for (auto it = gWindowList.begin(); it != itEnd; ++it)
         {
             auto& window = *(*it);
+            if (window.flags.has(WindowFlag::hidden))
+            {
+                window.isVisible = false;
+                if (window.viewport != nullptr)
+                    window.viewport->isVisible = false;
+                continue;
+            }
             if (window.viewport == nullptr)
             {
                 window.isVisible = true;
@@ -143,7 +150,7 @@ static constexpr float kWindowScrollLocations[][2] = {
             for (auto itOther = std::next(it); itOther != itEnd; ++itOther)
             {
                 const auto& otherWindow = *(*itOther);
-                if (otherWindow.flags.has(WindowFlag::dead))
+                if (otherWindow.flags.hasAny(WindowFlag::dead, WindowFlag::hidden))
                     continue;
 
                 if (otherWindow.windowPos.x <= window.windowPos.x && otherWindow.windowPos.y <= window.windowPos.y
@@ -489,7 +496,7 @@ static constexpr float kWindowScrollLocations[][2] = {
      */
     void WindowDraw(Drawing::RenderTarget& rt, WindowBase& w, int32_t left, int32_t top, int32_t right, int32_t bottom)
     {
-        if (!w.isVisible)
+        if (!w.isVisible || w.flags.has(WindowFlag::hidden))
             return;
 
         // Divide the draws up for only the visible regions of the window recursively
@@ -500,7 +507,7 @@ static constexpr float kWindowScrollLocations[][2] = {
             auto topwindow = it->get();
             if (topwindow->flags.has(WindowFlag::transparent))
                 continue;
-            if (topwindow->flags.has(WindowFlag::dead))
+            if (topwindow->flags.hasAny(WindowFlag::dead, WindowFlag::hidden))
                 continue;
             if (topwindow->windowPos.x >= right || topwindow->windowPos.y >= bottom)
                 continue;
@@ -561,7 +568,7 @@ static constexpr float kWindowScrollLocations[][2] = {
         for (auto it = WindowGetIterator(&w); it != gWindowList.end(); it++)
         {
             auto* v = it->get();
-            if (v->flags.has(WindowFlag::dead))
+            if (v->flags.hasAny(WindowFlag::dead, WindowFlag::hidden))
                 continue;
             if ((&w == v || v->flags.has(WindowFlag::transparent)) && v->isVisible)
             {
@@ -931,6 +938,8 @@ static constexpr float kWindowScrollLocations[][2] = {
     {
         auto windowRT = rt.Crop({ left, top }, { right - left, bottom - top });
         WindowVisitEach([&windowRT, left, top, right, bottom](WindowBase* w) {
+            if (w->flags.has(WindowFlag::hidden))
+                return;
             if (w->flags.has(WindowFlag::transparent))
                 return;
             if (right <= w->windowPos.x || bottom <= w->windowPos.y)

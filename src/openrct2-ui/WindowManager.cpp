@@ -8,6 +8,7 @@
  *****************************************************************************/
 
 #include "WindowManager.h"
+#include "handheld/WindowVisibility.h"
 
 #include "handheld/Explorer.h"
 #include "handheld/FlatRides.h"
@@ -892,6 +893,9 @@ public:
         std::unique_ptr<WindowBase>&& wp, WindowClass cls, ScreenCoordsXY pos, ScreenSize windowSize,
         WindowFlags flags) override
     {
+        if (Handheld::IsEnabled() && Handheld::IsDesktopChrome(cls))
+            flags.set(WindowFlag::hidden);
+
         windowSize.height += wp->getTitleBarDiffTarget();
 
         if (flags.has(WindowFlag::autoPosition))
@@ -1254,7 +1258,7 @@ public:
         for (auto it = gWindowList.rbegin(); it != gWindowList.rend(); it++)
         {
             auto& w = *it;
-            if (w->flags.has(WindowFlag::dead))
+            if (w->flags.hasAny(WindowFlag::dead, WindowFlag::hidden))
                 continue;
 
             if (screenCoords.x < w->windowPos.x || screenCoords.x >= w->windowPos.x + w->width

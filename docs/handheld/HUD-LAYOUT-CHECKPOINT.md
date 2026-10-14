@@ -145,3 +145,14 @@ native shop/park visible. Management keeps the existing HUD suppression; shop
 preview uses the existing compact HUD and overlay/footer. All 28 final 512x384
 PNGs were inspected for clipping/overlap/contrast/focus/controls/HUD collisions;
 see SHOP-APPEARANCE-COMPLETION.md. No hardware/performance result is inferred.
+
+
+## First Brick playtest follow-up — 2026-10-14
+
+Native base desktop chrome was still composited underneath the Pocket overlay.
+The retained-hidden native window flag now excludes desktop toolbar/status/date/
+weather/news and title chrome from painting, occlusion and hit tests in Pocket
+mode, while preserving the native viewport, Pocket windows and error dialogs.
+See [BRICK-DESKTOP-UI-SUPPRESSION.md](BRICK-DESKTOP-UI-SUPPRESSION.md) for native
+and AArch64 emulated compositor checks, rebuilt binaries and hardware retest
+limits. Ordinary desktop mode remains tested and unchanged.

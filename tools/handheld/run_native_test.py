@@ -12,6 +12,7 @@ parser.add_argument('--build',type=Path,required=True)
 parser.add_argument('--data',type=Path,required=True)
 parser.add_argument('--ninja',default='ninja')
 parser.add_argument('--source', type=Path, help='Alternative native integration driver (default: PathActionsTests.cpp)')
+parser.add_argument('--test-arg', action='append', default=[], help='Additional driver argument, repeatable')
 parser.add_argument('--assets',type=Path,help='Optional local RCT installation; enables real UI lifecycle testing with SDL dummy drivers')
 args=parser.parse_args()
 repo=Path(__file__).resolve().parents[2]
@@ -38,6 +39,7 @@ with tempfile.TemporaryDirectory(prefix='pocket-native-test-') as directory:
     subprocess.run(link,cwd=build,check=True)
     test_args=[str(root/'test'),str(args.data.resolve()),str(root/'profile')]
     if args.assets: test_args.append(str(args.assets.resolve()))
+    test_args.extend(args.test_arg)
     test_env=os.environ.copy()
     if args.assets:
         test_env.setdefault("SDL_VIDEODRIVER", "dummy")
