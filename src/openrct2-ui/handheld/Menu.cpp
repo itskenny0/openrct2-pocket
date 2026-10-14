@@ -28,6 +28,7 @@
 #include "RightsTools.h"
 #include "SaveSlots.h"
 #include "FileBrowsing.h"
+#include "NamedSave.h"
 #include <openrct2-ui/interface/FileBrowser.h>
 #include <openrct2/interface/WindowTypes.h>
 #include "SceneryTools.h"
@@ -191,6 +192,9 @@ namespace OpenRCT2::Ui::Windows
         save,
         load,
         parkFiles,
+        saveFiles,
+        saveName,
+        saveReview,
         overwrite,
         discard,
         exit
@@ -233,6 +237,20 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::FileBrowsing::Identity> _loadFile;
         bool _fileLoad{};
         size_t _fileFocus{}, _fileDetail{};
+        bool _namedSave{};
+        std::optional<Handheld::NamedSave::Draft> _saveDraft;
+        void openSaveFiles()
+        {
+            _namedSave=true; _saveDraft.reset(); _fileFocus=0; _fileDetail=0;
+            _files.Open(fs::u8path(Ui::FileBrowser::GetInitialDirectoryByType(LoadSaveType::park)),"*.park");
+            page(Page::saveFiles);
+        }
+        void editSaveName(std::string name)
+        {
+            _saveDraft.reset(); _nameEntry={name};
+            if (!Handheld::NamedSave::SafeName(name)) _nameEntry.text="My park";
+            page(Page::saveName);
+        }
         void openParkFiles()
         {
             _fileLoad = true;
@@ -740,13 +758,13 @@ namespace OpenRCT2::Ui::Windows
         {
             return _page == Page::researchCatalog || _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
                 || _page == Page::staffPatrolClear || _page == Page::rightsOptions || _page == Page::rightsConfirm
-                || _page == Page::parkFiles || _page == Page::areaOptions || _page == Page::terrainPaintConfirm || _page == Page::sceneryOptions || _page == Page::sceneryName || _page == Page::scenerySearch
+                || (_page == Page::parkFiles || _page == Page::saveFiles) || _page == Page::areaOptions || _page == Page::terrainPaintConfirm || _page == Page::sceneryOptions || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
                 || _page == Page::sceneryConfirm || _page == Page::sceneryGroups || _page == Page::sceneryStyle
                 || _page == Page::sceneryStyleEditor || _page == Page::sceneryStyleConfirm || _page == Page::sceneryClearOptions || _page == Page::sceneryClearConfirm;
         }
         void constructionMove(int x, int y)
         {
-            if (_page == Page::parkFiles && x)
+            if ((_page == Page::parkFiles || _page == Page::saveFiles) && x)
             { _fileDetail = x > 0 ? _fileDetail + 1 : _fileDetail ? _fileDetail - 1 : 0; invalidate(); return; }
             if (_page == Page::researchCatalog)
             {
@@ -772,7 +790,7 @@ namespace OpenRCT2::Ui::Windows
                 invalidate();
                 return;
             }
-            if (_page == Page::sceneryName || _page == Page::scenerySearch)
+            if (_page == Page::saveName || _page == Page::sceneryName || _page == Page::scenerySearch)
             {
                 const auto next = _nameEntry.Move(_focus.index(), x, y);
                 _focus.move(static_cast<int>(next) - static_cast<int>(_focus.index()), rows().size());
@@ -806,16 +824,16 @@ namespace OpenRCT2::Ui::Windows
                                                                                                                : size.width,
                                      size.height };
             const ScreenSize bounds = (_page == Page::staffPatrolClear || _page == Page::rightsConfirm
-                                       || _page == Page::sceneryName || _page == Page::scenerySearch || _page == Page::sceneryConfirm
-                                       || _page == Page::parkFiles || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement() || managementShell())
+                                       || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch || _page == Page::sceneryConfirm
+                                       || (_page == Page::parkFiles || _page == Page::saveFiles) || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement() || managementShell())
                 ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
                 : information() ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 }
                                 : target;
             WindowSetResize(*this, bounds, bounds);
             WindowSetPosition(
                 *this,
-                (_page == Page::staffPatrolClear || _page == Page::rightsConfirm || _page == Page::sceneryName || _page == Page::scenerySearch
-                 || _page == Page::sceneryConfirm || _page == Page::parkFiles || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement()
+                (_page == Page::staffPatrolClear || _page == Page::rightsConfirm || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
+                 || _page == Page::sceneryConfirm || (_page == Page::parkFiles || _page == Page::saveFiles) || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement()
                  || managementShell())
                     ? ScreenCoordsXY{ 0, 0 }
                     : ScreenCoordsXY{ 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
@@ -921,7 +939,7 @@ namespace OpenRCT2::Ui::Windows
             _status.clear();
             _priceDraft.reset();
             layout();
-            if (next == Page::parkFiles) _focus.move(static_cast<int>(_fileFocus), rows().size());
+            if (next == Page::parkFiles || next == Page::saveFiles) _focus.move(static_cast<int>(_fileFocus), rows().size());
             if (next == Page::staff)
                 _focus.move(static_cast<int32_t>(std::min(_staffRosterFocus, rows().size() - 1)), rows().size());
 
@@ -933,7 +951,7 @@ namespace OpenRCT2::Ui::Windows
                 _focus.move(static_cast<int32_t>(std::min(_guestRideFocus, rows().size() - 1)), rows().size());
             if (next == Page::guestRoster)
                 _focus.move(static_cast<int32_t>(std::min(_guestRosterFocus, rows().size() - 1)), rows().size());
-            if (next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish
+            if (next == Page::saveReview || next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish
                 || next == Page::overviewConfirm || next == Page::ridesConfirm || next == Page::financeConfirm
                 || next == Page::marketingConfirm || next == Page::staffHire || next == Page::staffDismiss
                 || next == Page::staffNameConfirm || next == Page::guestNameConfirm || next == Page::guestTracking
@@ -1159,6 +1177,11 @@ namespace OpenRCT2::Ui::Windows
                              "Flat / slope", "Rotate slope",  "Change surface" };
                 case Page::pathUndoConfirm: return {"Remove last new section", "Cancel"};
                 case Page::parkFiles: return _files.Rows();
+                case Page::saveFiles: {
+                    auto result=_files.Rows(); result.insert(result.begin(),"Save in this folder..."); return result;
+                }
+                case Page::saveName: return _nameEntry.Keys();
+                case Page::saveReview: return { _saveDraft && _saveDraft->baseline ? "Replace named park" : "Save named park", "Cancel" };
                 case Page::save:
                 case Page::load:
                 {
@@ -1169,7 +1192,7 @@ namespace OpenRCT2::Ui::Windows
                         const bool exists = fs::exists(SlotPath(slot), error);
                         result.push_back("Pocket " + std::to_string(slot + 1) + (exists ? "  Saved park" : "  Empty"));
                     }
-                    if (_page == Page::load) result.push_back("Browse parks / autosaves...");
+                    result.push_back(_page == Page::load ? "Browse parks / autosaves..." : "Named Save As...");
                     return result;
                 }
                 case Page::overwrite:
@@ -1183,12 +1206,16 @@ namespace OpenRCT2::Ui::Windows
         }
         void save()
         {
-            const auto path = SlotPath(_slot);
+            const auto draft=_saveDraft;
+            const auto path = _namedSave && draft ? draft->destination : SlotPath(_slot);
+            if(_namedSave && (!draft || !draft->Current())) {
+                _saveDraft.reset(); _status="Destination changed. Cancel and review again."; invalidate(); return;
+            }
             const bool saved = Handheld::WriteSaveAtomically(path, [](const fs::path& temporary) {
                 SaveFlags saveFlags{};
                 saveFlags.set(SaveFlag::exportObjects, Config::Get().general.savePluginData);
                 return ScenarioSave(getGameState(), temporary.u8string(), saveFlags) != 0;
-            });
+            }, [&] { return !draft || draft->Current(); });
             if (!saved)
             {
                 _status = "Save failed. Your previous save is kept.";
@@ -1206,7 +1233,8 @@ namespace OpenRCT2::Ui::Windows
                 return;
             }
             page(Page::park);
-            _status = "Saved to Pocket " + std::to_string(_slot + 1);
+            _status = "Saved to " + path.filename().u8string();
+            _saveDraft.reset();
         }
         void load()
         {
@@ -1904,7 +1932,7 @@ namespace OpenRCT2::Ui::Windows
                 return;
             }
             _focus.move(direction, rows().size());
-            if (_page == Page::parkFiles) { _fileFocus = _focus.index(); _fileDetail = 0; }
+            if ((_page == Page::parkFiles || _page == Page::saveFiles)) { _fileFocus = _focus.index(); _fileDetail = 0; }
             _status.clear();
             invalidate();
         }
@@ -2234,6 +2262,9 @@ namespace OpenRCT2::Ui::Windows
                 case Page::overwrite:
                     page(Page::save);
                     break;
+                case Page::saveFiles: _saveDraft.reset(); page(Page::save); break;
+                case Page::saveName: _saveDraft.reset(); page(Page::saveFiles); break;
+                case Page::saveReview: _saveDraft.reset(); page(Page::saveName); break;
                 case Page::parkFiles: page(Page::load); break;
                 case Page::discard:
                     page(_fileLoad ? Page::parkFiles : Page::load);
@@ -4340,8 +4371,32 @@ namespace OpenRCT2::Ui::Windows
                         invalidate();
                     }
                     break;
+                case Page::saveName:
+                    if(choice==47) { _saveDraft.reset(); page(Page::saveFiles); }
+                    else if(choice==46) {
+                        std::string error;
+                        _saveDraft=Handheld::NamedSave::Draft::Review(_files.directory,_nameEntry.text,error);
+                        if(_saveDraft) page(Page::saveReview);
+                        else { _status=error; invalidate(); }
+                    } else { _nameEntry.Press(choice); invalidate(); }
+                    break;
+                case Page::saveReview:
+                    if(choice==0) save(); else { _saveDraft.reset(); page(Page::saveName); }
+                    break;
+                case Page::saveFiles:
+                    if(choice==0) editSaveName(fs::u8path(gScenarioSavePath).stem().u8string());
+                    else if(choice==1) { _files.Parent(); _fileFocus=0; page(Page::saveFiles); }
+                    else if(choice==2) { _files.Refresh(); _fileFocus=0; _focus={}; invalidate(); }
+                    else if(choice-3<_files.entries.size()) {
+                        const auto entry=_files.entries[choice-3];
+                        if(entry.directory) { _files.Open(entry.path,_files.pattern); _fileFocus=0; page(Page::saveFiles); }
+                        else editSaveName(entry.path.stem().u8string());
+                    }
+                    break;
                 case Page::save:
                 {
+                    if(choice==3) { openSaveFiles(); break; }
+                    _namedSave=false; _saveDraft.reset();
                     _slot = choice;
                     std::error_code error;
                     if (fs::exists(SlotPath(_slot), error))
@@ -4420,15 +4475,16 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
-            if (_page == Page::parkFiles)
+            if ((_page == Page::parkFiles || _page == Page::saveFiles))
             {
                 Handheld::ManagementPresentation model;
-                model.breadcrumb = "Load / " + _files.directory.u8string();
-                model.title = "Parks and autosaves";
-                model.rows = _files.Rows(); model.selected = _focus.index();
+                model.breadcrumb = std::string(_page == Page::saveFiles ? "Save / " : "Load / ") + _files.directory.u8string();
+                model.title = _page == Page::saveFiles ? "Save As destination" : "Parks and autosaves";
+                model.rows = rows(); model.selected = _focus.index();
                 std::string detail = _files.directory.u8string();
-                if (_focus.index() >= 2 && _focus.index()-2 < _files.entries.size())
-                    detail = _files.entries[_focus.index()-2].path.u8string();
+                const size_t entryOffset=_page == Page::saveFiles ? 3 : 2;
+                if (_focus.index() >= entryOffset && _focus.index()-entryOffset < _files.entries.size())
+                    detail = _files.entries[_focus.index()-entryOffset].path.u8string();
                 // Byte chunks back up to UTF-8 boundaries; left/right exposes long paths.
                 size_t offset=std::min(_fileDetail*64,detail.size());
                 while(offset && offset<detail.size() && (static_cast<unsigned char>(detail[offset])&0xc0)==0x80) --offset;
@@ -4440,12 +4496,24 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::DrawModernText(rt,{16,369},"Up/Down Select  Left/Right Detail  A Open  B Back",{},480);
                 return;
             }
-            if (_page == Page::scenerySearch)
+            if (_page == Page::saveReview)
+            {
+                Handheld::ManagementPresentation model;
+                model.breadcrumb="Save As / Review";
+                model.title=_saveDraft ? _saveDraft->destination.filename().u8string() : "Review expired";
+                model.confirmation=true; model.rows=rows(); model.selected=_focus.index();
+                model.bodyLines={_saveDraft ? _saveDraft->directory.u8string() : _files.directory.u8string()};
+                model.status=_status.empty() ? "Previous save kept until publication succeeds" : _status;
+                Handheld::DrawManagementContent(rt,{8,8},{496,348},model);
+                Handheld::Concept::Box(rt,{8,359},{496,25});
+                Handheld::DrawModernText(rt,{16,369},"D-pad Select   A Choose   B Cancel",{},480); return;
+            }
+            if (_page == Page::saveName || _page == Page::scenerySearch)
             {
                 auto model = Handheld::StaffManagement::NamePresentation(_nameEntry,_focus.index(),false,_status);
-                model.breadcrumb = "Scenery / Search";
+                model.breadcrumb = _page == Page::saveName ? "Save As / Filename" : "Scenery / Search";
                 model.title = _nameEntry.text.empty() ? "All eligible objects" : _nameEntry.text;
-                model.status = "OK Apply / Clr Clear";
+                model.status = _status.empty() ? "OK Apply / Clr Clear" : _status;
                 model.rows[42] = "Sp";
                 model.rows[44] = "Aa";
                 model.rows[47] = "B";

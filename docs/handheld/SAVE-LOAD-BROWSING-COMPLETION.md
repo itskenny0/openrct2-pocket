@@ -55,3 +55,41 @@ injected failure test. Physical Brick, power-loss durability and hostile concurr
 filesystem changes remain unclaimed.
 PresentationLifecycleTests PASS at Phase 1 source, including SDL controller/HUD,
 construction/menu handoffs, existing native save-reload and shutdown cleanup.
+
+## Phase 1 publication
+
+Canonical a31d613fcc815de4d018a4078725b3b0ce28c85c; local safety
+1311496d1e0fa1e9918da65ea7eef0eda03333ae; complete tree
+8f2c47ce294ab71ac4c348770dfe387d424d3d2c. All seven blobs and complete tree matched;
+current canonical parent 64751a6d and expected_sha/force=false fast-forward verified,
+then branch ref read back. Esperanto excluded and checksum retained.
+
+## Phase 2 — named native Save As
+
+Save / Save and exit retain quick slots and add Named Save As. D-pad/A selects actual
+folders or an existing filename; Save in this folder opens the shared 32-code-point
+UTF-8-retaining keyboard. ASCII labelled keys, whole-code-point deletion, case/clear,
+OK Apply and B/Back Cancel retain the established controls. Native .park extension
+replacement applies; no new gameplay format/state. Unsafe path/control names and
+trailing dot/space reject. Existing filenames can retain UTF-8; the keyboard does not
+claim arbitrary Unicode input or a desktop-length filename editor.
+
+OK creates a Cancel-first review showing exact basename/directory. A explicit Save
+or Replace calls the existing ScenarioSave/WriteSaveAtomically publication helper.
+A draft binds canonical chosen directory, POSIX device/inode and exact destination
+file fingerprint (or absence). Checks before serialization and immediately before
+rename reject stale files or replaced folders; UI selection cannot redirect the
+reviewed write. Symlink/nonregular/unreadable targets and occupied staging paths
+reject. Failed serialization/publication retains the prior destination. Native current
+save identity changes only after success; save-and-exit calls ContextQuit only after
+that same successful publication. No file migration/deletion is provided.
+
+Release GUI/CLI build PASS. CTest 5/5 PASS, adding NamedSaveTests for UTF-8/extension,
+invalid names, partial serialization preservation, changed destination during writer,
+staging symlink preservation, nonregular/symlink targets and replaced directory.
+Asset-backed SaveLoadBrowsingTests PASS including keyboard Apply, Cancel-first review,
+named .park native round-trip/current identity, UTF-8 overwrite review, changed target
+rejection and occupied-stage failure/retry preserving prior save. Production source
+fixed during builds/tests. Save-and-exit success ordering is retained source behavior;
+process exit is not asserted by this integration driver. Exact OS permission failures
+under an unprivileged Brick account and power-loss durability remain unverified.

@@ -90,6 +90,7 @@ int main(int argc, char** argv)
         auto press=[&](H::Action a){H::Frame f; f.actions={a};H::HandleMenuInput(input,f);};
         auto choose=[&](int row){W::HandheldMenuMove(row); press(H::Action::confirm);};
         auto capture = [&](const char* name) {
+            if(auto* main=WindowGetMain()) { main->onResize(); WindowScrollToLocation(*main,{704,704,32}); }
             const auto cash = state.park.cash;
             const auto ledger = state.park.expenditureTable;
             if (auto* native = dynamic_cast<Drawing::X8DrawingEngine*>(context->GetDrawingEngine()))
@@ -151,7 +152,37 @@ int main(int argc, char** argv)
         W::HandheldMenuMove(-1); press(H::Action::confirm);
         Check(state.park.name==parkName && gCurrentLoadedPath.find("autosave_native.park")!=std::string::npos,"Native roundtrip not loaded");
         Check(!H::Designs::Active() && !H::CustomTracks::Active(),"Load did not clear tools");
-        std::cout<<"Native browser/import/failure/roundtrip/controller PASS\n";
+        // Native named Save As and unchanged quick-slot menu.
+        Check(ScenarioSave(state,(saves/fs::u8path("Résumé.park")).u8string(),{})!=0,"UTF-8 fixture save failed");
+        auto named=[&] { Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);W::HandheldMenuOpen();choose(3);choose(3); };
+        named(); capture("09-save-destination.png");
+        choose(0); capture("10-save-keyboard.png");
+        choose(47); // keyboard Back must not save
+        Check(gCurrentLoadedPath.find("autosave_native.park")!=std::string::npos,"Keyboard cancel changed save identity");
+        choose(0);
+        choose(46); capture("11-named-save-review.png");
+        press(H::Action::confirm); // default Cancel
+        Check(gCurrentLoadedPath.find("autosave_native.park")!=std::string::npos,"Cancel changed save identity");
+        choose(46); W::HandheldMenuMove(-1); press(H::Action::confirm);
+        Check(fs::exists(saves/"autosave_native.park") && gCurrentLoadedPath==(saves/"autosave_native.park").u8string(),"Named save or identity failed");
+        Check(context->LoadParkFromFile(gCurrentLoadedPath),"Named save roundtrip failed");
+        Check(state.park.name==parkName,"Named save changed native park");
+        named(); H::FileBrowsing::State namedListing; namedListing.Open(saves,"*.park");
+        auto namedIndex=[&](const std::string& name){for(size_t i=0;i<namedListing.entries.size();++i)if(namedListing.entries[i].path.filename().u8string()==name)return static_cast<int>(i+3);throw std::runtime_error("Named fixture missing");};
+        choose(namedIndex("Résumé.park")); choose(46); capture("12-overwrite-review.png");
+        std::ofstream(saves/fs::u8path("Résumé.park"),std::ios::app)<<"external change";
+        const auto changed=H::FileBrowsing::Capture(saves/fs::u8path("Résumé.park"));
+        W::HandheldMenuMove(-1);press(H::Action::confirm);
+        Check(changed && H::FileBrowsing::Current(*changed),"Stale overwrite changed destination");capture("13-stale-save-recovery.png");
+        named(); choose(0); choose(46);
+        const auto destination=saves/"autosave_native.park";
+        const auto before=H::FileBrowsing::Capture(destination);
+        auto stage=destination;stage+=".pending.park";fs::create_directory(stage);
+        W::HandheldMenuMove(-1);press(H::Action::confirm);
+        Check(before && H::FileBrowsing::Current(*before),"Publication failure changed prior save");capture("14-save-failure.png");
+        fs::remove(stage);press(H::Action::confirm);
+        Check(Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu),"Save recovery lost park menu");
+        std::cout<<"Native browser/import/failure/roundtrip/controller and named Save As PASS\n";
         return 0;
     } catch(const std::exception& e){std::cerr<<e.what()<<"\n";return 1;}
 }

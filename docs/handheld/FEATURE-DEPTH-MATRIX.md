@@ -456,3 +456,12 @@ long-path detail, explicit empty/error and Cancel-first active-park load review 
 implemented. File byte/size/time identity guards reject stale selections; native
 importer failure recovery retains its documented early-preservation/late-title limits.
 Named Save As and design folder browsing remain pending. See SAVE-LOAD-BROWSING-COMPLETION.md.
+
+## Named Save As Phase 2 — 2026-10-14 UTC
+
+Controller folder destination and existing-file/name entry now feed native .park
+serialization with Cancel-first Save/Replace review, immutable destination/folder
+identity and prepublication revalidation. Existing slots/autosave/current-save identity
+and success-only save-and-exit retained. CTest 5/5 and asset-backed native controller
+round-trip/stale/failure recovery pass. Design file browsing remains pending; keyboard
+retains UTF-8 but types only labelled ASCII and bounds names to 32 code points.
