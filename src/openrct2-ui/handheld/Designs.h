@@ -7,7 +7,11 @@
 namespace OpenRCT2::Ui::Handheld::Designs
 {
     bool Eligible(const TrackDesign& design);
+    std::string UnavailableReason(const TrackDesign& design);
     std::vector<PickerEntry> Entries();
+    std::optional<PickerEntry> FileEntry(const std::string& path);
+    bool BrowserReturn();
+    void SetBrowserReturn(bool value);
     bool Begin(const std::string& path);
     void End();
     bool Active();

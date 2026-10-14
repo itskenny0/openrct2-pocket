@@ -465,3 +465,18 @@ identity and prepublication revalidation. Existing slots/autosave/current-save i
 and success-only save-and-exit retained. CTest 5/5 and asset-backed native controller
 round-trip/stale/failure recovery pass. Design file browsing remains pending; keyboard
 retains UTF-8 but types only labelled ASCII and bounds names to 32 code points.
+
+## Save/load/design browsing completion — 2026-10-14 UTC
+
+Native park/autosave browsing, preview-only stored .park metadata, explicit load and
+Cancel-first active-park review, named folder/filename Save As and immutable overwrite
+review/publication are delivered. Native design repository picker X opens folder/file
+inspection with native metadata/preview/eligibility and existing placement/height/
+rotation/scenery/access handoff; cancel returns to selected file. Full-byte stale file
+and folder/destination guards, corrupt/unreadable recovery, current-save identity,
+failed-save/no-quit and native successful-save/quit-request integration pass.
+See SAVE-LOAD-BROWSING-COMPLETION.md for exact API/format/location limits. CTest 5/5,
+all fourteen preservation drivers and four asset-backed regressions pass. This closes
+the named browsing workflow; flat/special design/substitution gaps, 32-code-point ASCII
+keyboard entry, native late-load rollback limits and overall ordinary gameplay PARTIAL
+remain explicit. No physical Brick/AArch64 results are claimed.

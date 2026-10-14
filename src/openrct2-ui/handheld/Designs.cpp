@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "Designs.h"
+#include "FileBrowsing.h"
 
 #include "Currency.h"
 #include "FlatRides.h"
@@ -49,42 +50,52 @@ namespace OpenRCT2::Ui::Handheld::Designs
     {
         return GA::SavedTrackDesignPlaceAction::Eligible(td);
     }
+    std::string UnavailableReason(const TrackDesign& td)
+    {
+        if(Eligible(td)) return {};
+        const auto type=td.trackAndVehicle.rtdIndex;
+        if(type!=RIDE_TYPE_MAZE && !TrackConstructionSupport::Type(type)) return "Ride family has no Pocket saved-design placement";
+        const auto index=GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(td.trackAndVehicle.vehicleObject);
+        const auto* entry=GetRideEntryByIndex(index);
+        if(!entry) return "Required vehicle object is not loaded";
+        if(std::find(std::begin(entry->ride_type),std::end(entry->ride_type),type)==std::end(entry->ride_type)) return "Vehicle and ride family are incompatible";
+        if(FlatRidePlacement::StationObject()==kObjectEntryIndexNull) return "Required station object is not loaded";
+        if(!getGameState().cheats.ignoreResearchStatus && (!RideTypeIsInvented(type) || !RideEntryIsInvented(index))) return "Ride type or vehicle is not researched";
+        return "Native geometry is unsupported for placement";
+    }
     struct PreviewImage
     {
         std::filesystem::file_time_type stamp{};
+        uint64_t digest{};
         std::vector<Drawing::PaletteIndex> pixels;
     };
     static std::map<std::string, std::weak_ptr<PreviewImage>> images;
-    std::vector<PickerEntry> Entries()
+    static std::optional<FileBrowsing::Identity> selectedFile;
+    static bool browserReturn{};
+    bool BrowserReturn() { return browserReturn; }
+    void SetBrowserReturn(bool value) { browserReturn=value; }
+    std::optional<PickerEntry> FileEntry(const std::string& path)
     {
-        std::vector<PickerEntry> entries;
-        auto* repository = GetContext()->GetTrackDesignRepository();
-        if (!repository)
-            return entries;
-        std::set<std::string> paths;
-        auto collect = [&](ride_type_t type, const std::string& object) {
-            for (const auto& file : repository->GetItemsForObjectEntry(type, object))
-            {
-                if (!paths.insert(file.path).second)
-                    continue;
-                auto imported = TrackDesignImport(file.path.c_str());
-                if (!imported || !Eligible(*imported))
-                    continue;
+                const auto identity = FileBrowsing::Capture(std::filesystem::u8path(path));
+                if (!identity) return {};
+                auto imported = TrackDesignImport(path.c_str());
+                if (!imported || !Eligible(*imported) || !FileBrowsing::Current(*identity))
+                    return {};
                 auto td = std::shared_ptr<TrackDesign>(std::move(imported));
                 std::error_code error;
-                const auto stamp = std::filesystem::last_write_time(file.path, error);
-                auto image = images[file.path].lock();
-                if (!image || error || image->stamp != stamp)
+                const auto stamp = std::filesystem::last_write_time(path, error);
+                auto image = images[path].lock();
+                if (!image || error || image->stamp != stamp || image->digest != identity->digest)
                 {
                     image = std::make_shared<PreviewImage>();
-                    image->stamp = stamp;
-                    images[file.path] = image;
+                    image->stamp = stamp; image->digest=identity->digest;
+                    images[path] = image;
                 }
                 const auto index = GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(
                     td->trackAndVehicle.vehicleObject);
-                PickerEntry entry{ { ObjectType::ride, index, file.path }, file.name, ZoomLevel{ 3 } };
-                entry.drawPreview = [td, image](Drawing::RenderTarget& rt) {
-                    if (gLegacyScene != LegacyScene::playing || !Eligible(*td))
+                PickerEntry entry{ { ObjectType::ride, index, path }, std::filesystem::path(path).stem().string(), ZoomLevel{ 3 } };
+                entry.drawPreview = [td, image, identity](Drawing::RenderTarget& rt) {
+                    if (gLegacyScene != LegacyScene::playing || !Eligible(*td) || !FileBrowsing::Current(*identity))
                         return;
                     if (image->pixels.empty())
                     {
@@ -109,7 +120,21 @@ namespace OpenRCT2::Ui::Handheld::Designs
                     rt.zoom_level = ZoomLevel{ 3 };
                     GfxDrawSprite(rt, ImageId(SPR_TEMP_TRACK_LIST), { 48, 112 });
                 };
-                entries.push_back(std::move(entry));
+                return entry;
+    }
+    std::vector<PickerEntry> Entries()
+    {
+        std::vector<PickerEntry> entries;
+        auto* repository = GetContext()->GetTrackDesignRepository();
+        if (!repository)
+            return entries;
+        std::set<std::string> paths;
+        auto collect = [&](ride_type_t type, const std::string& object) {
+            for (const auto& file : repository->GetItemsForObjectEntry(type, object))
+            {
+                if (!paths.insert(file.path).second)
+                    continue;
+                if (auto entry = FileEntry(file.path)) entries.push_back(std::move(*entry));
             }
         };
         for (ride_type_t type = 0; type < RIDE_TYPE_COUNT; ++type)
@@ -134,6 +159,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
     }
     void End()
     {
+        browserReturn=false; selectedFile.reset();
         ClearPreview();
         design.reset();
         heightOffset.reset();
@@ -144,12 +170,16 @@ namespace OpenRCT2::Ui::Handheld::Designs
     }
     bool Begin(const std::string& path)
     {
+        const auto file=FileBrowsing::Capture(std::filesystem::u8path(path));
         auto imported = TrackDesignImport(path.c_str());
-        if (!imported || !Eligible(*imported))
+        if (!file || !imported || !Eligible(*imported) || !FileBrowsing::Current(*file))
             return false;
-        const bool same = selection == path;
+        const bool same = selection == path && selectedFile == file;
+        const auto previousHeight=heightOffset;
         End();
         design = std::move(imported);
+        selectedFile=file;
+        if(same) heightOffset=previousHeight;
         selection = path;
         if (!same)
             direction = 0;
@@ -223,7 +253,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
     }
     static GA::Result QueryAt(const Request& request)
     {
-        if (!design || !Eligible(*design))
+        if (!design || !Eligible(*design) || !selectedFile || !FileBrowsing::Current(*selectedFile))
             return Invalid("Design unavailable");
         sceneryWarning = false;
         if (scenery && !design->sceneryElements.empty())
@@ -260,7 +290,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
     }
     static std::optional<Request> Resolve(std::optional<CoordsXY> tile)
     {
-        if (!design || !Eligible(*design) || !tile || !MapIsLocationValid(*tile) || tile->x % 32 || tile->y % 32)
+        if (!design || !Eligible(*design) || !selectedFile || !FileBrowsing::Current(*selectedFile) || !tile || !MapIsLocationValid(*tile) || tile->x % 32 || tile->y % 32)
             return {};
         // Same native terrain-fit calculation and bounded height search as desktop.
         auto* ride = preview ? GetRide(preview->id()) : nullptr;

@@ -153,3 +153,13 @@ introduced. No guests are forced and no successful operating statistics invented
 The next substantial workflow should complete controller-native elevated access
 from these coaster stations to a real park path network, then demonstrate native
 opening and genuine guest queue/ride/exit, with safe cancellation/resume.
+
+## File browsing / native inspection follow-up — 2026-10-14
+
+SAVE-LOAD-BROWSING-COMPLETION.md adds X Browse files to the existing native repository
+picker. Supported native-format folders/files open metadata/preview inspection before
+placement. Same-file height/rotation/scenery handoff, stale byte/descriptor guard,
+placement cancel-to-file and repository refresh are delivered. Native parsing and
+current eligibility remain authoritative; flat/special design and substitution limits
+are unchanged. The broader construction milestones already supersede the early
+wooden-only statements above; this browser does not add unsupported ride families.

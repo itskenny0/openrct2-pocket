@@ -117,6 +117,8 @@ namespace OpenRCT2::Ui::Windows
     void HandheldShopPickerOpen();
     void HandheldRidePickerOpen();
     void HandheldDesignPickerOpen();
+    void HandheldDesignFilesOpen();
+    bool HandheldDesignPickerIsOpen();
     void HandheldDesignReviewOpen();
     void HandheldDesignOptionsOpen();
     void HandheldDesignReviewPause();

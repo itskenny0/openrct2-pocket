@@ -26,6 +26,10 @@ int main()
     s.Open(root/"missing",s.pattern); require(!s.error.empty() && s.entries.empty());
     for(int i=0;i<300;++i) std::ofstream(root/(std::to_string(i)+".park"))<<i;
     s.Open(root,"*.park"); require(s.entries.size()==301);
+    std::string unicode;
+    for(int i=0;i<80;++i) unicode+="界";
+    require(DetailPages(unicode)==2 && Detail(unicode,0).size()==144 && Detail(unicode,1).size()==96);
+    require(Detail(unicode,0)+Detail(unicode,1)==unicode && Detail(unicode,999)==Detail(unicode,1));
     fs::remove_all(root);
     std::cout<<"File enumeration, staging exclusion, identity and folder recovery PASS\n";
 }

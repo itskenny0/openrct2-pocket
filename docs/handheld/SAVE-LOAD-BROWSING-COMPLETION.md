@@ -93,3 +93,117 @@ rejection and occupied-stage failure/retry preserving prior save. Production sou
 fixed during builds/tests. Save-and-exit success ordering is retained source behavior;
 process exit is not asserted by this integration driver. Exact OS permission failures
 under an unprivileged Brick account and power-loss durability remain unverified.
+
+## Phase 2 publication
+
+Canonical 40a6db57b3852a9d9b1193aa9719eccabbb786a4; local safety
+0f4a4f41021cc4091f1400941b18c9bc0b641a70; complete tree
+d051fdd3e24b97dec280df817b2014baa14e88ea. Eight blobs/full tree verified;
+canonical parent a31d613f and expected_sha/force=false publication, ref read back.
+
+## Phase 3 — native design file inspection and placement
+
+Saved designs retains the native repository visual picker; X Browse files enters the
+controller browser. Native repository Scan already recursively indexes the configured
+RCT1, RCT2 and user track-design directories; it remains the authority for ordinary
+indexed discovery. Folder inspection adds arbitrary readable locations without
+installing, copying or migrating designs. It uses the same native desktop track filter
+(.td4/.td6/.td7), TrackDesignImport, common Designs::FileEntry thumbnail path and
+SavedTrackDesignPlaceAction::Eligible. No second repository/index/save format.
+
+D-pad pages/long-path detail; A enters folders or opens native metadata inspection;
+B returns to the repository picker and originating Build/placement. Inspector shows
+native vehicle descriptor, actual track/maze/scenery counts, parsed native format and
+real TrackDesignDrawPreview pixels. Metadata inspection does not begin placement or
+change rides/accounting/research. Missing loaded vehicle/station, unresearched type/
+vehicle, incompatible vehicle/family, unsupported family/geometry and native parse
+rejection remain explicit. No object installation, unlocking or substitution occurs.
+
+A Place revalidates full file identity and current native eligibility then invokes
+existing BeginSavedDesign. Native ghosts, costs, scenery warnings/choices, rotation,
+manual/automatic elevation, reviews, native construction and entrance/exit recovery
+remain authoritative. Reopening the exact same file preserves height/rotation/scenery;
+changed bytes invalidate cached previews and placement queries/review confirmation.
+Y reopens the file browser while placing; B leaves placement through EndTerrain and
+returns to the selected browser file. Native load/exit clears browser-return tool
+context along with existing provisional state. No gameplay state is serialized.
+
+Park browsing now also opens an inspection page before any load, including at title.
+For .park only, desktop's preview-only ParkImporter::CreateParkFile/LoadFromStream
+(skipObjectCheck=true)/GetParkPreview supplies the actual stored name/rating/guest/ride
+summary. Legacy/corrupt/missing stored-preview states remain explicit without invented
+summaries or compatibility claims. A separate Load enters active-park Cancel-first
+review; failure restores both directory and selected path. Native preview parsing
+never calls Import or loads objects into the active park.
+
+Release native GUI/CLI builds and focused asset-backed SaveLoadBrowsingTests PASS:
+browser/metadata purity, nested native exported TD6, preview, manual-height/rotation
+reinspection, cancel-to-file return, stale same-path design and corrupt format.
+The same driver covers park/Save As workflows, keyboard Back/Apply, real procfs native
+serialization failure without changed save identity, failed Save-and-exit keeping the
+park/no quit, and successful publication followed by native quit request. That extends
+Phase 2's earlier ordering-only coverage. Captures use a native viewport initialized
+at the imported wooden ride's real overall-view location; no fabricated world/UI.
+
+## Preservation sweep
+
+All fourteen independently linked native/SDL drivers PASS: SceneryPathParityTests,
+ConstructionTests, PathActionsTests, PresentationLifecycleTests, ParkMapInformationTests,
+GuestInformationTests, GuestCompletionTests, StaffCompletionTests,
+FinanceResearchInformationTests, RideConstructionTests, SeatRotationTests,
+FamilyOperationTests, MazeConstructionTests and MiniGolfConstructionTests.
+Original assets supplied only to drivers whose actual argc contract supports them;
+other drivers use native public-data fixtures. CTest 5/5 PASS: input, launcher,
+save preservation, browsing and named save. Asset-backed DesignCapture,
+RideConstructionCapture, MazeConstructionCapture and original Wooden
+circuit/access/natural-guest CustomCoasterCapture all returned observed exit 0.
+These are their real existing assertions, not every-family sustained-operation proof.
+GUI objects were rebuilt after header/interface changes. Test links removed only
+GUI Ui.cpp main and the linker dependency-output flag; production dependency records
+were retained. Source fixed throughout each compile/test run. After the sweep, a
+filename keyboard empty-state label was corrected and GUI/focused workflow rerun;
+no simulation, input, action or lifecycle behavior changed in that label correction.
+
+## Exact remaining ordinary gaps and limits
+
+This milestone does not deliver 100% ordinary gameplay. Construction/variants,
+atomic/station/inverted selected replacement, broader family sustained guest use,
+scenery continuous-drag/automatic-Z/network review, shop appearance and other matrix
+gaps remain. Flat/special design limitations and manual substitution/scenery warning
+choice gaps are unchanged. Native repository installation/removal/rename/migration,
+new-folder creation, delete, Windows drive picker and OS file-dialog integration are
+outside this milestone. Parent navigation exposes readable configured/native mounted
+locations on Linux; there are no separate location favourites/last-directory config
+writes. Symlink entries are excluded. Existing filenames retain UTF-8 and long paths
+have detail paging, but keyboard input is labelled ASCII and 32 code points.
+
+File fingerprint checks are not OS locking or adversarial-race protection. Atomic
+rename is Linux publication, not crash/power-loss durability; occupied existing staging
+entries are preserved/refused and another filename/destination can be chosen. A failed
+save never advances current-save identity or invokes quit. Native late object/import
+failure can replace the active park and return to title; that audited guarantee is not
+an injected late-failure test. Early corrupt parsing and real filesystem save failure
+are tested. No AArch64/physical Brick, sustained dense-directory performance, native
+network operation or exhaustive TD4/TD7 family coverage is claimed. Desktop formats
+are enumerated; actual parser/eligibility decide support, without compatibility promises.
+
+Final presentation hardening bounds long-path detail by 48 complete UTF-8 code points
+per page, clamps navigation at both ends and tests non-ASCII reconstruction with no
+skipped/split code points. CTest 5/5 and the complete asset-backed browsing/Save As/
+design workflow were rerun after that presentation-only change. The focused driver
+also injects an actual SDL virtual controller A press into Cancel-first discard review
+and verifies one mapped action, cancellation and held-A suppression after transition.
+Earlier fourteen-driver/four-capture preservation passes precede only these label/
+path-detail presentation corrections; native simulation/action/placement/lifecycle
+code remains exactly the swept code. No unrun repeat sweep is claimed.
+
+Final focused driver returned observed exit 0 with actual SDL virtual held-A checks,
+real native Save-and-exit failure/success ordering and all prior workflows. Native
+placement handoff additionally uses the scenario's permitted maximum ParkSetLoanAction,
+real UpdatePreview/Query at tile origin (704,704), native ghost and actual £32,461.10
+quote, rendered with production Designs::DrawPanel/DrawCostBadge. No cash/terrain/
+research/ratings/statistics are patched. All twenty-four final 512×384 PNGs are visually
+inspected; unchanged images from the earlier inspected run were byte-hash matched,
+and every changed/new final image individually inspected. No clipping/overlap/focus/
+contrast/control collision requiring another production change remains. Intentional
+ellipsis and bounded path paging remain. Final checksum/provenance ZIP follows.

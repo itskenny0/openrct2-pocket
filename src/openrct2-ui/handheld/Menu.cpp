@@ -50,6 +50,9 @@
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
+#include <openrct2/ParkImporter.h>
+#include <openrct2/core/FileStream.h>
+#include <openrct2/park/ParkPreview.h>
 #include <openrct2/Game.h>
 #include <openrct2/GameState.h>
 #include <openrct2/OpenRCT2.h>
@@ -191,6 +194,9 @@ namespace OpenRCT2::Ui::Windows
         shopDemolish,
         save,
         load,
+        parkInspect,
+        designFiles,
+        designInspect,
         parkFiles,
         saveFiles,
         saveName,
@@ -237,8 +243,20 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::FileBrowsing::Identity> _loadFile;
         bool _fileLoad{};
         size_t _fileFocus{}, _fileDetail{};
+        std::optional<ParkPreview> _parkFilePreview;
+        std::string _parkPreviewStatus;
+        std::optional<Handheld::FileBrowsing::Identity> _designFile;
+        std::unique_ptr<TrackDesign> _designMetadata;
+        std::optional<Handheld::PickerEntry> _designFilePreview;
+        std::string _designFileStatus;
         bool _namedSave{};
         std::optional<Handheld::NamedSave::Draft> _saveDraft;
+        std::string fileDetailPath() const
+        {
+            const size_t offset=_page==Page::saveFiles ? 3 : 2;
+            return _focus.index()>=offset && _focus.index()-offset<_files.entries.size()
+                ? _files.entries[_focus.index()-offset].path.u8string() : _files.directory.u8string();
+        }
         void openSaveFiles()
         {
             _namedSave=true; _saveDraft.reset(); _fileFocus=0; _fileDetail=0;
@@ -758,14 +776,14 @@ namespace OpenRCT2::Ui::Windows
         {
             return _page == Page::researchCatalog || _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
                 || _page == Page::staffPatrolClear || _page == Page::rightsOptions || _page == Page::rightsConfirm
-                || (_page == Page::parkFiles || _page == Page::saveFiles) || _page == Page::areaOptions || _page == Page::terrainPaintConfirm || _page == Page::sceneryOptions || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
+                || (_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) || _page == Page::areaOptions || _page == Page::terrainPaintConfirm || _page == Page::sceneryOptions || _page == Page::parkInspect || _page == Page::designInspect || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
                 || _page == Page::sceneryConfirm || _page == Page::sceneryGroups || _page == Page::sceneryStyle
                 || _page == Page::sceneryStyleEditor || _page == Page::sceneryStyleConfirm || _page == Page::sceneryClearOptions || _page == Page::sceneryClearConfirm;
         }
         void constructionMove(int x, int y)
         {
-            if ((_page == Page::parkFiles || _page == Page::saveFiles) && x)
-            { _fileDetail = x > 0 ? _fileDetail + 1 : _fileDetail ? _fileDetail - 1 : 0; invalidate(); return; }
+            if ((_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) && x)
+            { _fileDetail=static_cast<size_t>(std::clamp<int64_t>(static_cast<int64_t>(_fileDetail)+x,0,Handheld::FileBrowsing::DetailPages(fileDetailPath())-1)); invalidate(); return; }
             if (_page == Page::researchCatalog)
             {
                 if (x) { _researchFilter=static_cast<uint8_t>((_researchFilter+x+8)%8); _researchCatalog=Handheld::ResearchCatalog::Roster(_researchFilter); _focus={}; }
@@ -824,16 +842,16 @@ namespace OpenRCT2::Ui::Windows
                                                                                                                : size.width,
                                      size.height };
             const ScreenSize bounds = (_page == Page::staffPatrolClear || _page == Page::rightsConfirm
-                                       || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch || _page == Page::sceneryConfirm
-                                       || (_page == Page::parkFiles || _page == Page::saveFiles) || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement() || managementShell())
+                                       || _page == Page::parkInspect || _page == Page::designInspect || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch || _page == Page::sceneryConfirm
+                                       || (_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement() || managementShell())
                 ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
                 : information() ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 }
                                 : target;
             WindowSetResize(*this, bounds, bounds);
             WindowSetPosition(
                 *this,
-                (_page == Page::staffPatrolClear || _page == Page::rightsConfirm || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
-                 || _page == Page::sceneryConfirm || (_page == Page::parkFiles || _page == Page::saveFiles) || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement()
+                (_page == Page::staffPatrolClear || _page == Page::rightsConfirm || _page == Page::parkInspect || _page == Page::designInspect || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
+                 || _page == Page::sceneryConfirm || (_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement()
                  || managementShell())
                     ? ScreenCoordsXY{ 0, 0 }
                     : ScreenCoordsXY{ 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
@@ -939,7 +957,7 @@ namespace OpenRCT2::Ui::Windows
             _status.clear();
             _priceDraft.reset();
             layout();
-            if (next == Page::parkFiles || next == Page::saveFiles) _focus.move(static_cast<int>(_fileFocus), rows().size());
+            if (next == Page::parkFiles || next == Page::saveFiles || next == Page::designFiles) _focus.move(static_cast<int>(_fileFocus), rows().size());
             if (next == Page::staff)
                 _focus.move(static_cast<int32_t>(std::min(_staffRosterFocus, rows().size() - 1)), rows().size());
 
@@ -1176,6 +1194,9 @@ namespace OpenRCT2::Ui::Windows
                     return { "Resume",       "Follow ground", "Raise height",  "Lower height",
                              "Flat / slope", "Rotate slope",  "Change surface" };
                 case Page::pathUndoConfirm: return {"Remove last new section", "Cancel"};
+                case Page::parkInspect: return { "Load this park", "Back to files" };
+                case Page::designFiles: return _files.Rows();
+                case Page::designInspect: return { _designMetadata && Handheld::Designs::Eligible(*_designMetadata) ? "Place this design" : "Placement unavailable", "Back to files" };
                 case Page::parkFiles: return _files.Rows();
                 case Page::saveFiles: {
                     auto result=_files.Rows(); result.insert(result.begin(),"Save in this folder..."); return result;
@@ -1254,15 +1275,19 @@ namespace OpenRCT2::Ui::Windows
             {
                 // Import may close all windows or change scenes. Never access this after close/load.
                 auto* recovery = OpenPanel();
-                if (recovery) recovery->recoverLoad(folder, pattern, browsing);
+                if (recovery) recovery->recoverLoad(folder, pattern, browsing, fs::u8path(path));
             }
         }
 
     public:
-        void recoverLoad(const fs::path& folder, const std::string& pattern, bool browsing)
+        void recoverLoad(const fs::path& folder, const std::string& pattern, bool browsing, const fs::path& selected)
         {
             _fileLoad = browsing;
-            if (browsing) { _files.Open(folder, pattern); page(Page::parkFiles); }
+            if (browsing) {
+                _files.Open(folder, pattern); _fileFocus=0;
+                for(size_t i=0;i<_files.entries.size();++i)if(_files.entries[i].path==selected)_fileFocus=i+2;
+                page(Page::parkFiles);
+            }
             else page(Page::load);
             _status = "Native load failed. Choose another file or Back.";
             invalidate();
@@ -1439,8 +1464,21 @@ namespace OpenRCT2::Ui::Windows
             page(Page::ridePicker);
             refreshPicker(Handheld::PickerIdentity{ ObjectType::ride, Handheld::FlatRides::Selection() });
         }
+        bool designPickerOpen() const { return _page==Page::designPicker; }
+        void openDesignFiles(bool fromBuild=false)
+        {
+            TrackRepositoryScan(); Handheld::Designs::ClearPreview();Handheld::Designs::CancelReview();
+            _designPickerFromBuild=fromBuild;
+            auto folder=fs::u8path(Ui::FileBrowser::GetInitialDirectoryByType(LoadSaveType::track));
+            if(!Handheld::Designs::Selection().empty()) folder=fs::u8path(Handheld::Designs::Selection()).parent_path();
+            _files.Open(folder,Ui::FileBrowser::GetFilterPatternByType(LoadSaveType::track,false));
+            _fileFocus=0;_fileDetail=0;
+            for(size_t i=0;i<_files.entries.size();++i)if(_files.entries[i].path.u8string()==Handheld::Designs::Selection())_fileFocus=i+2;
+            page(Page::designFiles);
+        }
         void openDesignPicker(bool fromBuild = false)
         {
+            if(Handheld::Designs::BrowserReturn()) { openDesignFiles(fromBuild);return; }
             TrackRepositoryScan();
             Handheld::Designs::ClearPreview();
             Handheld::CustomTracks::ClearPreview();
@@ -1932,7 +1970,7 @@ namespace OpenRCT2::Ui::Windows
                 return;
             }
             _focus.move(direction, rows().size());
-            if ((_page == Page::parkFiles || _page == Page::saveFiles)) { _fileFocus = _focus.index(); _fileDetail = 0; }
+            if ((_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles)) { _fileFocus = _focus.index(); _fileDetail = 0; }
             _status.clear();
             invalidate();
         }
@@ -2262,6 +2300,9 @@ namespace OpenRCT2::Ui::Windows
                 case Page::overwrite:
                     page(Page::save);
                     break;
+                case Page::parkInspect: page(Page::parkFiles); break;
+                case Page::designInspect: _designMetadata.reset();_designFilePreview.reset();page(Page::designFiles);break;
+                case Page::designFiles: page(Page::designPicker);refreshPicker();break;
                 case Page::saveFiles: _saveDraft.reset(); page(Page::save); break;
                 case Page::saveName: _saveDraft.reset(); page(Page::saveFiles); break;
                 case Page::saveReview: _saveDraft.reset(); page(Page::saveName); break;
@@ -4405,6 +4446,40 @@ namespace OpenRCT2::Ui::Windows
                         save();
                     break;
                 }
+                case Page::parkInspect:
+                    if(choice==1) page(Page::parkFiles);
+                    else if(!_loadFile || !Handheld::FileBrowsing::Current(*_loadFile)) { _status="File changed. Back and select again.";invalidate(); }
+                    else if(gLegacyScene==LegacyScene::playing) page(Page::discard);
+                    else load();
+                    break;
+                case Page::designFiles:
+                    if(choice==0) { const auto child=_files.directory;_files.Parent();_fileFocus=0;
+                        for(size_t i=0;i<_files.entries.size();++i)if(_files.entries[i].path==child)_fileFocus=i+2;
+                        page(Page::designFiles);
+                    } else if(choice==1) { TrackRepositoryScan();_files.Refresh();_focus={};_fileFocus=0;invalidate(); }
+                    else if(choice-2<_files.entries.size()) {
+                        const auto entry=_files.entries[choice-2];
+                        if(entry.directory) {_files.Open(entry.path,_files.pattern);_fileFocus=0;page(Page::designFiles);}
+                        else {
+                            _designFile=Handheld::FileBrowsing::Capture(entry.path);
+                            _designMetadata.reset();_designFilePreview.reset();_designFileStatus.clear();
+                            if(_designFile) _designMetadata=TrackDesignImport(entry.path.u8string().c_str());
+                            if(!_designFile) _designFileStatus="File removed or unreadable";
+                            else if(!_designMetadata) _designFileStatus="Native design parser rejected this file";
+                            else if(!Handheld::Designs::Eligible(*_designMetadata)) _designFileStatus=Handheld::Designs::UnavailableReason(*_designMetadata);
+                            else _designFilePreview=Handheld::Designs::FileEntry(entry.path.u8string());
+                            page(Page::designInspect);
+                        }
+                    }
+                    break;
+                case Page::designInspect:
+                    if(choice==1) page(Page::designFiles);
+                    else if(!_designFile || !Handheld::FileBrowsing::Current(*_designFile)) { _status="Design file changed. Back and select again.";invalidate(); }
+                    else if(!_designMetadata || !Handheld::Designs::Eligible(*_designMetadata)) { _status=_designFileStatus;invalidate(); }
+                    else if(Handheld::BeginSavedDesign(_designFile->path.u8string())) {
+                        Handheld::Designs::SetBrowserReturn(true); close();
+                    } else { _status="Native placement unavailable. Back and inspect again.";invalidate(); }
+                    break;
                 case Page::parkFiles:
                 {
                     if (choice == 0) {
@@ -4421,8 +4496,19 @@ namespace OpenRCT2::Ui::Windows
                         else {
                             _loadFile = Handheld::FileBrowsing::Capture(entry.path);
                             if (!_loadFile) { _status="File unavailable. Refresh the folder."; invalidate(); }
-                            else if (gLegacyScene == LegacyScene::playing) page(Page::discard);
-                            else load();
+                            else {
+                                _parkFilePreview.reset(); _parkPreviewStatus="Native preview unavailable for this format";
+                                if(ParkImporter::ExtensionIsOpenRCT2ParkFile(_loadFile->path.extension().u8string())) {
+                                    try {
+                                        auto importer=ParkImporter::CreateParkFile(GetContext()->GetObjectRepository());
+                                        auto stream=FileStream(_loadFile->path.u8string(),FileMode::open);
+                                        importer->LoadFromStream(&stream,false,true,_loadFile->path.u8string());
+                                        _parkFilePreview=importer->GetParkPreview();
+                                        _parkPreviewStatus=_parkFilePreview->parkName.empty() ? "Native preview has no stored summary" : "";
+                                    } catch(const std::exception&) { _parkPreviewStatus="Native preview unavailable; importer decides on Load"; }
+                                }
+                                page(Page::parkInspect);
+                            }
                         }
                     }
                     break;
@@ -4475,20 +4561,48 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
-            if ((_page == Page::parkFiles || _page == Page::saveFiles))
+            if(_page==Page::parkInspect || _page==Page::designInspect)
             {
                 Handheld::ManagementPresentation model;
-                model.breadcrumb = std::string(_page == Page::saveFiles ? "Save / " : "Load / ") + _files.directory.u8string();
-                model.title = _page == Page::saveFiles ? "Save As destination" : "Parks and autosaves";
+                model.rows=rows(); model.selected=_focus.index();
+                if(_page==Page::parkInspect) {
+                    model.breadcrumb="Load / Native file information";
+                    model.title=_loadFile ? _loadFile->path.filename().u8string() : "File unavailable";
+                    if(_parkFilePreview && !_parkFilePreview->parkName.empty()) {
+                        const auto& p=*_parkFilePreview;
+                        model.bodyLines={p.parkName};
+                        model.stats={{"Rating",std::to_string(p.parkRating)},{"Guests",std::to_string(p.numGuests)},{"Rides",std::to_string(p.numRides)}};
+                    }
+                    model.status=_status.empty() ? _parkPreviewStatus : _status;
+                } else {
+                    model.breadcrumb="Designs / Native file information";
+                    model.title=_designFile ? _designFile->path.filename().u8string() : "File unavailable";
+                    if(_designMetadata) {
+                        const auto& d=*_designMetadata;
+                        model.stats={{"Vehicle",std::string(d.trackAndVehicle.vehicleObject.GetName())},
+                            {"Track / maze",std::to_string(d.trackElements.size())+" / "+std::to_string(d.mazeElements.size())},
+                            {"Scenery",std::to_string(d.sceneryElements.size())},
+                            {"Format",trackDesignGetExtension(d.version)}};
+                    }
+                    model.bodyLines={"Native preview", "", "", ""};
+                    model.status=_status.empty() ? (_designMetadata ? Handheld::Designs::UnavailableReason(*_designMetadata) : _designFileStatus) : _status;
+                    if(_designFile && !Handheld::FileBrowsing::Current(*_designFile)) model.status="File changed. Back and select again.";
+                }
+                Handheld::DrawManagementContent(rt,{8,8},{496,348},model);
+                if(_page==Page::designInspect && _designFilePreview && _designFilePreview->drawPreview) {
+                    Drawing::RenderTarget preview;
+                    if(ClipRenderTarget(preview,rt,{420,166},60,62)) _designFilePreview->drawPreview(preview);
+                }
+                Handheld::Concept::Box(rt,{8,359},{496,25});
+                Handheld::DrawModernText(rt,{16,369},"D-pad Select   A Choose   B Back",{},480); return;
+            }
+            if ((_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles))
+            {
+                Handheld::ManagementPresentation model;
+                model.breadcrumb = std::string(_page == Page::designFiles ? "Designs / " : _page == Page::saveFiles ? "Save / " : "Load / ") + _files.directory.u8string();
+                model.title = _page == Page::designFiles ? "Track design files" : _page == Page::saveFiles ? "Save As destination" : "Parks and autosaves";
                 model.rows = rows(); model.selected = _focus.index();
-                std::string detail = _files.directory.u8string();
-                const size_t entryOffset=_page == Page::saveFiles ? 3 : 2;
-                if (_focus.index() >= entryOffset && _focus.index()-entryOffset < _files.entries.size())
-                    detail = _files.entries[_focus.index()-entryOffset].path.u8string();
-                // Byte chunks back up to UTF-8 boundaries; left/right exposes long paths.
-                size_t offset=std::min(_fileDetail*64,detail.size());
-                while(offset && offset<detail.size() && (static_cast<unsigned char>(detail[offset])&0xc0)==0x80) --offset;
-                model.bodyLines={detail.substr(offset,64)};
+                model.bodyLines={Handheld::FileBrowsing::Detail(fileDetailPath(),_fileDetail)};
                 model.status = !_status.empty() ? _status : !_files.error.empty() ? _files.error
                     : _files.entries.empty() ? "No supported files or folders" : "";
                 Handheld::DrawManagementContent(rt, {8,8}, {496,348}, model);
@@ -4512,7 +4626,7 @@ namespace OpenRCT2::Ui::Windows
             {
                 auto model = Handheld::StaffManagement::NamePresentation(_nameEntry,_focus.index(),false,_status);
                 model.breadcrumb = _page == Page::saveName ? "Save As / Filename" : "Scenery / Search";
-                model.title = _nameEntry.text.empty() ? "All eligible objects" : _nameEntry.text;
+                model.title = _nameEntry.text.empty() ? (_page == Page::saveName ? "Enter park filename" : "All eligible objects") : _nameEntry.text;
                 model.status = _status.empty() ? "OK Apply / Clr Clear" : _status;
                 model.rows[42] = "Sp";
                 model.rows[44] = "Aa";
@@ -4628,7 +4742,7 @@ namespace OpenRCT2::Ui::Windows
             if (_page == Page::designPicker)
             {
                 Handheld::DrawObjectPicker(
-                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Saved designs", _status,
+                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Saved designs", _status.empty() ? "X Browse files" : _status,
                     "No supported designs installed");
                 return;
             }
@@ -5294,3 +5408,11 @@ namespace OpenRCT2::Ui::Windows
             window->openTrackPiecePicker();
     }
 } // namespace OpenRCT2::Ui::Windows
+
+namespace OpenRCT2::Ui::Windows {
+    bool HandheldDesignPickerIsOpen() {
+        const auto* w=static_cast<const HandheldMenuWindow*>(GetWindowManager()->FindByClass(WindowClass::handheldMenu));
+        return w && w->designPickerOpen();
+    }
+    void HandheldDesignFilesOpen() { if(auto* w=OpenPanel()) w->openDesignFiles(!Handheld::Designs::Active()); }
+}

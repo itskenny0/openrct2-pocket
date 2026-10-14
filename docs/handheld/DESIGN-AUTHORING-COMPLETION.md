@@ -228,3 +228,11 @@ inverted-start stations and representative native Monorail/Dinghy/Flying circuit
 access/Open/persistence validation. Earlier missing statements are superseded only
 for this scope. Complex/diagonal coverage, positive variant transitions, other special
 parameters, atomic/station/inverted replacement and sustained guest use remain PARTIAL.
+
+## Save/load/file browser follow-up — 2026-10-14
+
+Native authoring/export/scenery/overwrite remains unchanged and asset-backed
+DesignCapture passes again. SAVE-LOAD-BROWSING-COMPLETION.md adds repository/folder
+file inspection and native placement return with stale file/descriptor guards;
+32-code-point UTF-8-retaining naming and native authoring extension/atomic publication
+policy remain. It does not close the unrelated substitution/flat-design gaps.

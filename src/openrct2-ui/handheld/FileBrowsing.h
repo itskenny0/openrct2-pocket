@@ -12,6 +12,22 @@
 namespace OpenRCT2::Ui::Handheld::FileBrowsing
 {
     namespace fs = std::filesystem;
+    inline size_t DetailPages(const std::string& text)
+    {
+        const auto length=std::count_if(text.begin(),text.end(),[](unsigned char c){return (c&0xc0)!=0x80;});
+        return std::max<size_t>(1,(length+47)/48);
+    }
+    inline std::string Detail(const std::string& text,size_t page)
+    {
+        page=std::min(page,DetailPages(text)-1);
+        size_t start=0, end=0, points=0;
+        for(;start<text.size() && points<page*48;++start) if((static_cast<unsigned char>(text[start])&0xc0)!=0x80) ++points;
+        while(start<text.size() && (static_cast<unsigned char>(text[start])&0xc0)==0x80) ++start;
+        points=0;end=start;
+        for(;end<text.size() && points<48;++end) if((static_cast<unsigned char>(text[end])&0xc0)!=0x80) ++points;
+        while(end<text.size() && (static_cast<unsigned char>(text[end])&0xc0)==0x80) ++end;
+        return text.substr(start,end-start);
+    }
     struct Identity
     {
         fs::path path;

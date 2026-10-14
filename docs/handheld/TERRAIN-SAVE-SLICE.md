@@ -32,3 +32,12 @@ The fixed reticle overlay remains the original small viewport overlay. A separat
 ## Repository continuity
 
 The full foundation was successfully imported into `keeganwhitacre/openrct2-pocket`. `main` checkpoint `5882ad9` has exactly the tree of source checkpoint `9e334fb`, with both histories preserved. Tags `brick-explorer-proof1` and `pocket-menu-native-0.2` remain recoverable. The older checkpoint report's GitHub blocker predates that completed import.
+
+## Native browsing / named Save As follow-up — 2026-10-14
+
+SAVE-LOAD-BROWSING-COMPLETION.md supersedes the three-slots-only discovery limitation.
+Slots/autosave remain native; real folder/park/autosave browsing, preview-only .park
+metadata, explicit native load/recovery and reviewed named .park Save As are delivered.
+Current-save identity and quit request occur only after publication. Occupied staging
+entries now refuse/preserve rather than following/overwriting them. Native importer
+late object/import failures retain native title fallback rather than promised rollback.

@@ -249,6 +249,7 @@ namespace OpenRCT2::Ui::Handheld
         auto td = TrackDesignImport(path.c_str());
         if (!td || !Designs::Eligible(*td))
             return false;
+        if(Designs::Active() && Designs::Selection()==path) return Designs::Begin(path);
         BeginTerrain(true);
         return Designs::Begin(path);
     }
@@ -634,6 +635,8 @@ namespace OpenRCT2::Ui::Handheld
                     Windows::HandheldParkMapControl(1);
                 else if (Windows::HandheldSceneryPickerIsOpen() && action == Action::contextPrimary)
                     Windows::HandheldScenerySearchOpen();
+                else if(Windows::HandheldDesignPickerIsOpen() && action==Action::contextPrimary)
+                    Windows::HandheldDesignFilesOpen();
                 else if (action == Action::confirm)
                     Windows::HandheldMenuConfirm();
                 else if (action == Action::openBuild && Windows::HandheldDashboardIsOpen())
@@ -1060,10 +1063,12 @@ namespace OpenRCT2::Ui::Handheld
                     wm->CloseByClass(WindowClass::dropdown);
                 else if ((_terrainActive || Paths::IsActive()) && CanExplore())
                 {
+                    const bool designBrowser=Designs::Active() && Designs::BrowserReturn();
                     const auto access = _ridePathAccess;
                     const auto person = PeepPlacement::target;
                     const auto employee = StaffPatrol::target;
                     EndTerrain();
+                    if(designBrowser) Windows::HandheldDesignFilesOpen();
                     if (person && person->guest && GuestManagement::Resolve(*person->guest))
                         Windows::HandheldGuestOpen(*person->guest);
                     if (person && person->staff && StaffManagement::Resolve(*person->staff))
