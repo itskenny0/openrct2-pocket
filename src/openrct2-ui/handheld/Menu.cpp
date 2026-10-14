@@ -1,3 +1,4 @@
+#include "DesignAvailability.h"
 // SPDX-License-Identifier: GPL-3.0-only
 #include "AreaTools.h"
 #include "Currency.h"
@@ -243,7 +244,7 @@ namespace OpenRCT2::Ui::Windows
         Handheld::FileBrowsing::State _files;
         std::optional<Handheld::FileBrowsing::Identity> _loadFile;
         bool _fileLoad{};
-        size_t _fileFocus{}, _fileDetail{};
+        size_t _fileFocus{}, _fileDetail{}, _designDetail{};
         std::optional<ParkPreview> _parkFilePreview;
         std::string _parkPreviewStatus;
         std::optional<Handheld::FileBrowsing::Identity> _designFile;
@@ -810,6 +811,12 @@ namespace OpenRCT2::Ui::Windows
         }
         void constructionMove(int x, int y)
         {
+            if (_page == Page::designInspect && x) {
+                const auto labels=rows(); const auto text=_focus.index()<labels.size()?labels[_focus.index()]:std::string{};
+                _designDetail=static_cast<size_t>(std::clamp<int64_t>(static_cast<int64_t>(_designDetail)+x,0,Handheld::FileBrowsing::DetailPages(text)-1));
+                invalidate(); return;
+            }
+            if (_page == Page::designInspect && y) _designDetail=0;
             if ((_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) && x)
             { _fileDetail=static_cast<size_t>(std::clamp<int64_t>(static_cast<int64_t>(_fileDetail)+x,0,Handheld::FileBrowsing::DetailPages(fileDetailPath())-1)); invalidate(); return; }
             if (_page == Page::researchCatalog)
@@ -1230,7 +1237,11 @@ namespace OpenRCT2::Ui::Windows
                 case Page::pathUndoConfirm: return {"Remove last new section", "Cancel"};
                 case Page::parkInspect: return { "Load this park", "Back to files" };
                 case Page::designFiles: return _files.Rows();
-                case Page::designInspect: return { _designMetadata && Handheld::Designs::Eligible(*_designMetadata) ? "Place this design" : "Placement unavailable", "Back to files" };
+                case Page::designInspect: {
+                    std::vector<std::string> result{ _designMetadata && Handheld::Designs::Eligible(*_designMetadata) ? "Place this design" : "Placement unavailable", "Back to files" };
+                    if (_designMetadata) { auto lines=Handheld::DesignAvailability::Lines(*_designMetadata);result.insert(result.end(),lines.begin(),lines.end()); }
+                    return result;
+                }
                 case Page::parkFiles: return _files.Rows();
                 case Page::saveFiles: {
                     auto result=_files.Rows(); result.insert(result.begin(),"Save in this folder..."); return result;
@@ -4523,6 +4534,7 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::designInspect:
                     if(choice==1) page(Page::designFiles);
+                    else if(choice>1) { invalidate(); }
                     else if(!_designFile || !Handheld::FileBrowsing::Current(*_designFile)) { _status="Design file changed. Back and select again.";invalidate(); }
                     else if(!_designMetadata || !Handheld::Designs::Eligible(*_designMetadata)) { _status=_designFileStatus;invalidate(); }
                     else if(Handheld::BeginSavedDesign(_designFile->path.u8string())) {
@@ -4633,12 +4645,16 @@ namespace OpenRCT2::Ui::Windows
                             {"Scenery",std::to_string(d.sceneryElements.size())},
                             {"Format",trackDesignGetExtension(d.version)}};
                     }
-                    model.bodyLines={"Native preview", "", "", ""};
+                    if (_focus.index()>1) {
+                        model.stats.clear();
+                        const auto labels=rows(); const auto text=_focus.index()<labels.size()?labels[_focus.index()]:std::string{};
+                        model.bodyLines={Handheld::FileBrowsing::Detail(text,_designDetail), "Left/Right: full selected detail"};
+                    } else model.bodyLines={"Native preview / availability below", "", "", ""};
                     model.status=_status.empty() ? (_designMetadata ? Handheld::Designs::UnavailableReason(*_designMetadata) : _designFileStatus) : _status;
                     if(_designFile && !Handheld::FileBrowsing::Current(*_designFile)) model.status="File changed. Back and select again.";
                 }
                 Handheld::DrawManagementContent(rt,{8,8},{496,348},model);
-                if(_page==Page::designInspect && _designFilePreview && _designFilePreview->drawPreview) {
+                if(_page==Page::designInspect && _focus.index()<=1 && _designFilePreview && _designFilePreview->drawPreview) {
                     Drawing::RenderTarget preview;
                     if(ClipRenderTarget(preview,rt,{420,166},60,62)) _designFilePreview->drawPreview(preview);
                 }

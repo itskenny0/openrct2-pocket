@@ -655,13 +655,6 @@ static void TrackDesignLoadSceneryObjects(const TrackDesign& td)
     objectManager.LoadObject(td.appearance.stationObjectIdentifier);
 }
 
-struct TrackSceneryEntry
-{
-    ObjectType Type = ObjectType::none;
-    ObjectEntryIndex Index = kObjectEntryIndexNull;
-    ObjectEntryIndex SecondaryIndex = kObjectEntryIndexNull; // For footpath railing
-};
-
 static ObjectEntryIndex TrackDesignGetDefaultSurfaceIndex(bool isQueue)
 {
     for (ObjectEntryIndex i = 0; i < kMaxFootpathSurfaceObjects; i++)
@@ -698,7 +691,7 @@ static ObjectEntryIndex TrackDesignGetDefaultRailingIndex()
     return kObjectEntryIndexNull;
 }
 
-static std::optional<TrackSceneryEntry> TrackDesignPlaceSceneryElementGetEntry(const TrackDesignSceneryElement& scenery)
+std::optional<TrackSceneryEntry> TrackDesignResolveScenery(const TrackDesignSceneryElement& scenery)
 {
     TrackSceneryEntry result;
 
@@ -738,7 +731,6 @@ static std::optional<TrackSceneryEntry> TrackDesignPlaceSceneryElementGetEntry(c
 
         if (result.Index == kObjectEntryIndexNull || (secondaryIndexRequired && result.SecondaryIndex == kObjectEntryIndexNull))
         {
-            _trackDesignPlaceStateSceneryUnavailable = true;
             return {};
         }
     }
@@ -757,11 +749,17 @@ static std::optional<TrackSceneryEntry> TrackDesignPlaceSceneryElementGetEntry(c
         }
         if (objectUnavailable)
         {
-            _trackDesignPlaceStateSceneryUnavailable = true;
             return {};
         }
     }
     return result;
+}
+
+static std::optional<TrackSceneryEntry> TrackDesignPlaceSceneryElementGetEntry(const TrackDesignSceneryElement& scenery)
+{
+    auto entry = TrackDesignResolveScenery(scenery);
+    if (!entry) _trackDesignPlaceStateSceneryUnavailable = true;
+    return entry;
 }
 
 /**

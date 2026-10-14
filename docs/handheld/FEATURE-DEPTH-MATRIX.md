@@ -528,3 +528,12 @@ Selected-track implementation published `f45ef4660eaffeb81061d81766ebf0b5aebdf9f
 Capture ZIP: 40 individually inspected production 512×384 PNGs; SHA256
 `c34bd20e510404fd1125335766187751364d8195f7571c81482481676e93bfd7`. Final documentation publication follows that fixed
 validated source. Exact remaining ordinary and hardware limits remain above.
+
+## Design availability inspection Phase 1 — 2026-10-14 UTC
+
+Native file inspection now reports required vehicle loaded/research state, ride
+research, compatible loaded/researched vehicle count, station default fallback and
+optional scenery resolution, including native all-scenery omission and legacy path
+mapping/default policy. Read-only native scenery resolution is shared with actual
+placement. Explicit alternatives and review/execute binding follow in Phase 2.
+See DESIGN-SUBSTITUTION-COMPLETION.md; broader ordinary gameplay remains PARTIAL.

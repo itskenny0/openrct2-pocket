@@ -21,6 +21,7 @@
 #include "VehicleColour.h"
 
 #include <memory>
+#include <optional>
 
 namespace OpenRCT2::RCT12
 {
@@ -271,3 +272,13 @@ bool TrackDesignAreEntranceAndExitPlaced();
 extern std::vector<TrackDesignSceneryElement> _trackSavedTileElementsDesc;
 
 u8string trackDesignGetExtension(OpenRCT2::RCT12::TD46Version version);
+
+// Read-only native scenery resolution, shared by placement and availability inspection.
+struct TrackSceneryEntry
+{
+    OpenRCT2::ObjectType Type = OpenRCT2::ObjectType::none;
+    OpenRCT2::ObjectEntryIndex Index = OpenRCT2::kObjectEntryIndexNull;
+    OpenRCT2::ObjectEntryIndex SecondaryIndex = OpenRCT2::kObjectEntryIndexNull; // For footpath railing
+};
+
+std::optional<TrackSceneryEntry> TrackDesignResolveScenery(const TrackDesignSceneryElement& scenery);
