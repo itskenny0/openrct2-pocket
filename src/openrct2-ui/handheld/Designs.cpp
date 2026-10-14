@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "Designs.h"
 #include "FileBrowsing.h"
+#include "DesignAvailability.h"
 
 #include "Currency.h"
 #include "FlatRides.h"
@@ -33,6 +34,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
     static std::optional<int32_t> heightOffset;
     static std::unique_ptr<ShopPlacement::PreviewRide> preview;
     static std::optional<Request> requested, ghost, review;
+    static std::vector<int32_t> reviewContext;
     static money64 reviewCost{};
     static bool reviewNoMoney{};
     static uint32_t depth{};
@@ -74,22 +76,28 @@ namespace OpenRCT2::Ui::Handheld::Designs
     static bool browserReturn{};
     bool BrowserReturn() { return browserReturn; }
     void SetBrowserReturn(bool value) { browserReturn=value; }
-    std::optional<PickerEntry> FileEntry(const std::string& path)
+    std::optional<PickerEntry> FileEntry(const std::string& path, std::optional<ObjectEntryDescriptor> vehicle)
     {
                 const auto identity = FileBrowsing::Capture(std::filesystem::u8path(path));
                 if (!identity) return {};
                 auto imported = TrackDesignImport(path.c_str());
+                if (imported && vehicle) {
+                    const auto i=GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(*vehicle);
+                    if (!DesignAvailability::Compatible(*imported,i)) return {};
+                    imported->trackAndVehicle.vehicleObject=*vehicle;
+                }
                 if (!imported || !Eligible(*imported) || !FileBrowsing::Current(*identity))
                     return {};
                 auto td = std::shared_ptr<TrackDesign>(std::move(imported));
                 std::error_code error;
                 const auto stamp = std::filesystem::last_write_time(path, error);
-                auto image = images[path].lock();
+                const auto imageKey=path+":"+td->trackAndVehicle.vehicleObject.ToString();
+                auto image = images[imageKey].lock();
                 if (!image || error || image->stamp != stamp || image->digest != identity->digest)
                 {
                     image = std::make_shared<PreviewImage>();
                     image->stamp = stamp; image->digest=identity->digest;
-                    images[path] = image;
+                    images[imageKey] = image;
                 }
                 const auto index = GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(
                     td->trackAndVehicle.vehicleObject);
@@ -168,10 +176,17 @@ namespace OpenRCT2::Ui::Handheld::Designs
         busy = false;
         ++revision;
     }
-    bool Begin(const std::string& path)
+    bool Begin(const std::string& path, std::optional<ObjectEntryDescriptor> vehicle)
     {
         const auto file=FileBrowsing::Capture(std::filesystem::u8path(path));
         auto imported = TrackDesignImport(path.c_str());
+        if (imported && vehicle) {
+            const auto i=GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(*vehicle);
+            if (!DesignAvailability::Compatible(*imported,i)) return false;
+            imported->trackAndVehicle.vehicleObject=*vehicle;
+        }
+        if (!vehicle && design && selection==path && selectedFile==file && imported)
+            imported->trackAndVehicle.vehicleObject=design->trackAndVehicle.vehicleObject;
         if (!file || !imported || !Eligible(*imported) || !FileBrowsing::Current(*file))
             return false;
         const bool same = selection == path && selectedFile == file;
@@ -184,6 +199,27 @@ namespace OpenRCT2::Ui::Handheld::Designs
         if (!same)
             direction = 0;
         return true;
+    }
+    const TrackDesign* Draft() { return design.get(); }
+    bool ChooseVehicle(const ObjectEntryDescriptor& vehicle)
+    {
+        if (!design || busy || review || !selectedFile || !FileBrowsing::Current(*selectedFile)) return false;
+        const auto index=GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(vehicle);
+        if (!DesignAvailability::Compatible(*design,index)) return false;
+        ClearPreview(); design->trackAndVehicle.vehicleObject=vehicle; ++revision; return true;
+    }
+    std::string VehicleNotice()
+    {
+        return design ? "Vehicle: " + design->trackAndVehicle.vehicleObject.ToString() : "Vehicle unavailable";
+    }
+    std::vector<std::string> WarningLines()
+    {
+        if (!design) return {"Design unavailable"};
+        std::vector<std::string> lines{VehicleNotice(), HeightNotice(), SceneryNotice()};
+        if (scenery && sceneryWarning) lines.push_back("Native policy: ALL design scenery omitted");
+        lines.push_back("Native settings may clamp to selected vehicle rules");
+        lines.push_back("Native placement failure has no universal scenery rollback");
+        return lines;
     }
     bool Active()
     {
@@ -395,6 +431,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
         auto result = QueryAt(*next);
         if (result.error != GA::Status::ok)
             return false;
+        reviewContext=TrackDesignPlacementContext::Capture(*design);
         review = next;
         reviewCost = result.cost;
         reviewNoMoney = getGameState().park.flags.has(ParkFlag::noMoney);
@@ -426,6 +463,8 @@ namespace OpenRCT2::Ui::Handheld::Designs
             return Invalid("No design review");
         const auto request = *review;
         review.reset();
+        if (!design || reviewContext!=TrackDesignPlacementContext::Capture(*design))
+            return Invalid("Design objects changed; review again");
         if (reviewNoMoney != getGameState().park.flags.has(ParkFlag::noMoney))
             return Invalid("Park money rules changed; review again");
         auto result = QueryAt(request);
@@ -435,6 +474,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
             return Invalid("Placement changed; review again");
         auto action = GA::SavedTrackDesignPlaceAction(
             request.origin, *design, Config::Get().general.defaultInspectionInterval, reviewCost, scenery);
+        action.BindReview(reviewContext,*selectedFile);
         busy = true;
         const auto token = revision;
         action.SetCallback([token](const auto*, const GA::Result* finished) {

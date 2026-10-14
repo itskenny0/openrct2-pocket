@@ -250,14 +250,16 @@ namespace OpenRCT2::Ui::Handheld
         BeginTerrain(true);
         return FlatRides::Begin(index);
     }
-    bool BeginSavedDesign(const std::string& path)
+    bool BeginSavedDesign(const std::string& path, std::optional<ObjectEntryDescriptor> vehicle)
     {
         auto td = TrackDesignImport(path.c_str());
-        if (!td || !Designs::Eligible(*td))
-            return false;
-        if(Designs::Active() && Designs::Selection()==path) return Designs::Begin(path);
+        if (td && vehicle) td->trackAndVehicle.vehicleObject=*vehicle;
+        if (td && !vehicle && Designs::Active() && Designs::Selection()==path && Designs::Draft())
+            td->trackAndVehicle.vehicleObject=Designs::Draft()->trackAndVehicle.vehicleObject;
+        if (!td || !Designs::Eligible(*td)) return false;
+        if(Designs::Active() && Designs::Selection()==path) return Designs::Begin(path,vehicle);
         BeginTerrain(true);
-        return Designs::Begin(path);
+        return Designs::Begin(path,vehicle);
     }
     bool ResumeFlatRide(RideId id)
     {

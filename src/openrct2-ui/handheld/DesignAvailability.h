@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
+#include <openrct2/ride/TrackDesignPlacementContext.h>
 #include <openrct2/Context.h>
 #include <openrct2/object/ObjectManager.h>
 #include <openrct2/object/RideObject.h>
@@ -18,23 +19,7 @@ namespace OpenRCT2::Ui::Handheld::DesignAvailability
                 || ResearchIsInvented(object->GetObjectType(), manager.GetLoadedObjectEntryIndex(object))
             ? "available" : "not researched";
     }
-    inline bool Compatible(const TrackDesign& td, ObjectEntryIndex index)
-    {
-        const auto type = td.trackAndVehicle.rtdIndex;
-        const auto* entry = GetRideEntryByIndex(index);
-        if (!entry || type >= RIDE_TYPE_COUNT
-            || std::find(std::begin(entry->ride_type), std::end(entry->ride_type), type) == std::end(entry->ride_type)
-            || (!getGameState().cheats.ignoreResearchStatus && (!RideTypeIsInvented(type) || !RideEntryIsInvented(index))))
-            return false;
-        if (type == RIDE_TYPE_MAZE) return !td.mazeElements.empty() && td.trackElements.empty();
-        if (!TrackConstructionSupport::Type(type) || td.trackElements.empty() || !td.mazeElements.empty()) return false;
-        Ride candidate{}; // Detached metadata-only native descriptor context, never a live ride.
-        candidate.type = type;
-        for (const auto& piece : td.trackElements)
-            if (!TrackConstructionSupport::Supported(candidate, *entry, piece.type,
-                    piece.flags.has(TrackDesignTrackElementFlag::isInverted))) return false;
-        return true;
-    }
+    using TrackDesignPlacementContext::Compatible;
     inline std::vector<ObjectEntryIndex> Vehicles(const TrackDesign& td)
     {
         std::vector<ObjectEntryIndex> result;

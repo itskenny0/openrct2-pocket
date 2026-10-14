@@ -56,3 +56,54 @@ unchanged native placement flag, cash/free ride slot/research/RNG. CTest 5/5 pas
 Long availability rows support Left/Right bounded UTF-8 detail; D-pad rows page and
 B returns to the selected file. Subsequent substitution/execute and final asset-backed
 workflows remain pending. Physical Brick/AArch64 are unconfirmed.
+
+## Phase 1 publication
+
+Canonical `e428f2cf9f58ce754ae624137cc5190ba8094b64`; local safety
+`7e3fa20b1c5aa97f703ba130d7bab0b273d0afac`; identical complete tree
+`b07b672d8c0c47d64d7b5c11be6cf690a27d5627`. Every uploaded blob, native
+parent/tree, guarded expected_sha/force=false update and resulting ref verified.
+
+## Phase 2 — explicit vehicle and scenery policy
+
+File inspection → Choose native vehicle lists already loaded/researched native
+ride-type entries whose actual vehicle sprite/normal/covered/inverted track groups
+support every design piece. The selected descriptor is explicit; no automatic object
+installation, unlock or source-file rewrite. No native group/geometry support is
+inferred from vehicle names. Empty lists and stale object/file selections remain
+recoverable. Original supported vehicles remain eligible. Missing original vehicles
+are still unavailable until the player explicitly chooses an eligible alternative.
+
+Placement X options retains existing height/scenery/camera/Back indices and adds
+Choose vehicle and Availability / warnings. Choices preserve orientation, manual
+height and scenery policy, clearing only provisional preview. Native TrackDesign
+copies carry the chosen descriptor through preview, query and SavedTrackDesignPlaceAction
+into TrackDesignAction / RideSetVehicleAction. Native vehicle/settings/station rules
+remain authoritative; a compatible geometry list is not an operating guarantee.
+
+Cancel-first full-screen review shows selected vehicle, actual cost, origin/direction,
+height, scenery status, native settings-clamping warning and no universal scenery
+rollback guarantee. Existing L2/R2 scenery Off/On remains. If native resolution finds
+unavailable scenery, review explicitly says **ALL design scenery omitted**. Native
+legacy path mapping/defaults remain, with their resolved descriptor visible in
+availability. There is no arbitrary individual scenery replacement UI or API.
+
+Reviews bind immutable copied design choices/location, original full-byte file
+identity, native quote/money mode and exact transient loaded-object descriptors,
+versions, research/vehicle support/station-default context. The native action repeats
+context/file/cost checks in Query and Execute, including after action serialization.
+Shared core FileIdentity is the unchanged browser identity algorithm extracted for
+reuse; it does not add park-save fields. Stale reviews reject before native creation.
+A blocked/failed query leaves placement available; B/Cancel returns unchanged. Held
+or repeated confirmation cannot submit twice. A reported native Execute failure uses
+the existing TrackDesignAction cleanup; independent scenery rollback is not promised.
+
+Phase 2 PASS: Release GUI/CLI rebuild; initialized native/SDL DesignSubstitutionTests
+builds/exports an actual closed Monorail circuit, preserves an absent-original source,
+explicitly chooses the other native Monorail vehicle, checks all-scenery omission,
+query/ghost/cancel map/cash purity, unchanged height/rotation on vehicle change,
+changed descriptor and source rejection, bound-action serialization and direct stale
+Query/Execute rejection, actual virtual held-A cancellation, native insufficient-funds
+failure/recovery, exact final subtype/cost, duplicate rejection and .park roundtrip
+with transient cleanup. CTest 5/5 rerun after shared file-identity extraction.
+End-to-end browser/access/Open/capture and broad preservation evidence follows.

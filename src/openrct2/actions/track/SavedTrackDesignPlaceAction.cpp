@@ -2,6 +2,7 @@
 #include "SavedTrackDesignPlaceAction.h"
 
 #include "../../ride/FlatRidePlacement.h"
+#include "../../ride/TrackDesignPlacementContext.h"
 #include "../../ride/TrackConstructionSupport.h"
 #include "../GameActionRunner.h"
 namespace OpenRCT2::GameActions
@@ -37,13 +38,19 @@ namespace OpenRCT2::GameActions
         }
         const auto index = GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(design.trackAndVehicle.vehicleObject);
         const auto* entry = GetRideEntryByIndex(index);
-        if (!entry
+        if (!TrackDesignPlacementContext::Compatible(design,index) || !entry
             || std::find(std::begin(entry->ride_type), std::end(entry->ride_type), design.trackAndVehicle.rtdIndex)
                 == std::end(entry->ride_type)
             || FlatRidePlacement::StationObject() == kObjectEntryIndexNull)
             return false;
         return getGameState().cheats.ignoreResearchStatus
             || (RideTypeIsInvented(design.trackAndVehicle.rtdIndex) && RideEntryIsInvented(index));
+    }
+    void SavedTrackDesignPlaceAction::BindReview(const std::vector<int32_t>& context, const FileIdentity::Identity& source)
+    {
+        _objectContext=context; _sourcePath=source.path.u8string();
+        _sourceDigest=source.digest; _sourceSize=source.size;
+        _sourceModified=source.modified.time_since_epoch().count();
     }
     void SavedTrackDesignPlaceAction::AcceptParameters(GameActionParameterVisitor& visitor)
     {
@@ -57,11 +64,22 @@ namespace OpenRCT2::GameActions
         if (serialiser.isLoading())
             _queryRide = RideId::GetNull();
         serialiser << DS_TAG(_origin) << DS_TAG(_inspection) << DS_TAG(_expectedCost) << DS_TAG(_noMoney)
-                   << DS_TAG(_placeScenery);
+                   << DS_TAG(_placeScenery) << DS_TAG(_objectContext) << DS_TAG(_sourcePath)
+                   << DS_TAG(_sourceDigest) << DS_TAG(_sourceSize) << DS_TAG(_sourceModified);
         _design.Serialise(serialiser);
     }
     Result SavedTrackDesignPlaceAction::Query(GameState_t& state, Park::ParkData& park) const
     {
+        bool sourceCurrent=true;
+        if (!_sourcePath.empty()) {
+            const auto current=FileIdentity::Capture(std::filesystem::u8path(_sourcePath));
+            sourceCurrent=current && current->size==_sourceSize && current->digest==_sourceDigest
+                && current->modified.time_since_epoch().count()==_sourceModified;
+        }
+        if (!sourceCurrent || (!_objectContext.empty() && _objectContext!=TrackDesignPlacementContext::Capture(_design)))
+        {
+            Result result; result.error=Status::disallowed; result.errorMessage="Design objects or file changed; review again"; return result;
+        }
         if (!Eligible(_design) || (_expectedCost != kMoney64Undefined && park.flags.has(ParkFlag::noMoney) != _noMoney))
         {
             Result result;

@@ -537,3 +537,14 @@ optional scenery resolution, including native all-scenery omission and legacy pa
 mapping/default policy. Read-only native scenery resolution is shared with actual
 placement. Explicit alternatives and review/execute binding follow in Phase 2.
 See DESIGN-SUBSTITUTION-COMPLETION.md; broader ordinary gameplay remains PARTIAL.
+
+## Explicit design vehicle/scenery policy Phase 2 — 2026-10-14 UTC
+
+Native file inspection and placement options now offer explicit loaded/researched
+native track-compatible vehicle choices. Missing originals never silently substitute.
+Cancel-first reviews bind source identity, copied choices/origin, native object and
+research/default context, actual quote and money mode through native action Query/
+Execute/serialization. Native all-scenery omission/path fallback warnings are visible;
+height/rotation/scenery and source bytes preserved. Native/SDL/failure/save roundtrip
+and CTest 5/5 pass. DESIGN-SUBSTITUTION-COMPLETION.md records exact limits. Overall
+ordinary construction remains PARTIAL; no arbitrary scenery or rollback promise.

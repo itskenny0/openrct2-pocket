@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "TrackDesignAction.h"
+#include "../../core/FileIdentity.h"
 namespace OpenRCT2::GameActions
 {
     // Strict object/research selection for Pocket; desktop design fallback stays unchanged.
@@ -13,6 +14,10 @@ namespace OpenRCT2::GameActions
         money64 _expectedCost{ kMoney64Undefined };
         bool _noMoney{};
         bool _placeScenery{};
+        std::vector<int32_t> _objectContext;
+        std::string _sourcePath;
+        uint64_t _sourceDigest{}, _sourceSize{};
+        int64_t _sourceModified{};
         RideId _queryRide{ RideId::GetNull() }; // Transient native provisional record, never serialized.
 
     public:
@@ -20,6 +25,7 @@ namespace OpenRCT2::GameActions
         SavedTrackDesignPlaceAction(
             CoordsXYZD origin, const TrackDesign& design, RideInspection inspection, money64 expectedCost = kMoney64Undefined,
             bool placeScenery = false);
+        void BindReview(const std::vector<int32_t>& context, const FileIdentity::Identity& source);
         static bool Eligible(const TrackDesign& design);
         void UsePreviewRideForQuery(RideId ride)
         {

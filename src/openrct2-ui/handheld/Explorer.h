@@ -4,6 +4,7 @@
  *****************************************************************************/
 
 #pragma once
+#include <openrct2/object/Object.h>
 #include "PeepPlacement.h"
 #include "RideManagement.h"
 #include "SceneryTools.h"
@@ -50,7 +51,7 @@ namespace OpenRCT2::Ui::Handheld
     bool ResumeCustomTrackReplacement(const RideManagement::Target& target,
         const TrackConstructionSupport::BlockSnapshot& removed, uint8_t colour);
     bool BeginFlatRide(ObjectEntryIndex index);
-    bool BeginSavedDesign(const std::string& path);
+    bool BeginSavedDesign(const std::string& path, std::optional<ObjectEntryDescriptor> vehicle = {});
     bool ResumeFlatRide(RideId id);
     void SetRidePathAccess(const RideManagement::Target& target, StationIndex station, bool exit, CoordsXYZD outside);
     bool IsShopToolActive();
