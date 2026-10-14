@@ -417,3 +417,26 @@ interrupted closeout and standalone resume instructions in
 SCENERY-LANDSCAPING-COMPLETION.md. Preserve delivered source; complete this capture
 closeout before a new substantial subsystem. Remaining drag/modifier/network and
 broader ordinary gaps remain PARTIAL on the 100% roadmap.
+
+
+## Scenery/landscaping final capture closeout — 2026-10-14 UTC
+
+The interrupted handoff above is superseded. All four implementation phases remain
+published at unchanged production source 3882849 / code tree 92c2acc. Native Release
+GUI/CLI build and expanded asset-backed native/SDL SceneryPathParityTests rerun PASS;
+DesignCapture on African Diamond Mine returned confirmed exit 0; CTest rerun 3/3 PASS.
+Previous fourteen-driver preservation sweep and confirmed asset-backed ride, maze and
+original Wooden/access/natural-guest regressions retain their recorded results.
+
+All nineteen final production native viewport/Pocket component fixture PNGs were
+individually inspected at 512×384. Actual dimension/SHA256/provenance manifest and
+README are saved with OpenRCT2-Pocket-Scenery-Landscaping-Captures.zip: 133606 bytes,
+SHA256 e95c7afb7952d2464964ee09e6fe162b81fc3b71130500e6fcc2bdc21f29c5b8.
+The saved ZIP survived another local reversion; its exact checksum and every image
+hash were verified after recovery. No private asset/archive/park/design is included.
+See SCENERY-LANDSCAPING-COMPLETION.md for completed results, preservation/publication
+history and precise provenance. This requested implementation/capture milestone is
+closed. Scenery/landscaping remains PARTIAL for continuous wall/repaint/eyedropper drag,
+Shift automatic Z-search, asynchronous native network scatter/paint review and all
+broader ordinary roadmap gaps. Physical Brick/AArch64, sustained dense-park performance
+and sustained operation of every ride family remain unestablished.

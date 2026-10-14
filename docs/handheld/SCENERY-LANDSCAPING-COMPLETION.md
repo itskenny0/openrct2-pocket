@@ -322,3 +322,71 @@ native asynchronous network scatter/paint-review completion/recovery and all bro
 matrix gaps. Full ordinary gameplay parity, AArch64 and physical Brick results are
 not claimed. Completed finance/research, guests, staff, map and construction/design
 source and regressions are preserved.
+
+
+## Final validation and capture closeout — 2026-10-14 UTC
+
+This section supersedes the interrupted handoff above. All four requested
+implementation phases and their capture closeout are delivered; production source
+remains unchanged from canonical 3882849c5648fdc78c54ffc3279e07400117fe8a,
+code tree 92c2accbabe7381f38f99bdb5c2a6549fd2c9b1c.
+
+Execution returned at Staff db96e886 again. Working/index patches, index and Esperanto
+bytes were preserved before recovery. Ninety-seven canonical blobs were verified and
+atomically recovered. Complete indexed tree equality with canonical b2db7e0 / tree
+0c51d3de826b209ef8ac9ffc73b404b476305fdf was verified; recovery safety
+050db1e4c743ef40a2b545e69446ae61bc8ac66c was committed before compilation.
+Production source stayed fixed throughout compilation/testing. Native Release GUI/CLI
+build PASS; asset-backed native/SDL SceneryPathParityTests rerun returned exit 0,
+generating all nineteen landscaping images. CTest rerun 3/3 PASS: handheld-input,
+handheld-launcher and handheld-save-preservation.
+
+Previously unconfirmed DesignCapture was rerun on Africa - African Diamond Mine.SC6
+and returned confirmed exit 0. Actual native authoring eligibility/UTF-8/round-trip/
+repository/stale file/source/controller/cancel and picker/research/paging/ghost/
+rotation/cash/stations/access/testing/save-reload assertions passed. Driver blob:
+fe7e11da3fdccc098c534a46c1ad277083d2af3e. Landscaping driver blob:
+9457e3def513243bebc69ac7ef8cc666282f4348. Independent fixture links reused completed
+GUI objects and removed only the GUI dependency-file output flag. SDL dummy renderer
+warnings do not establish hardware results. The previous fourteen-driver regression
+sweep and confirmed RideConstructionCapture, MazeConstructionCapture and original
+Wooden/access/natural-guest CustomCoasterCapture passes remain recorded at this same
+production source; those already verified drivers were not unnecessarily rerun.
+
+All nineteen newly regenerated final 512×384 PNGs were individually inspected for
+clipping, overlap, focus, contrast, controller controls and HUD collisions. No new
+material defect required a production change. Long native names/option values retain
+intentional bounded ellipsis. 01–03 show eyedropper tool entry, native picked-banner
+placement handoff and dense options; 04–07 controller keyboard, native eligible
+result/preview, empty search and clear recovery; 08–13 shared native scatter controls,
+ghost, review, actual partial placement/cost, native failure recovery and larger
+area preview; 14–19 supported native surface/edge colours, native icons/area,
+Cancel-first quote, actual result, stale review and unsupported channels.
+
+OpenRCT2-Pocket-Scenery-Landscaping-Captures.zip is completed and saved: nineteen PNGs,
+README and dimension/SHA256/provenance manifest, 133606 bytes, SHA256
+ e95c7afb7952d2464964ee09e6fe162b81fc3b71130500e6fcc2bdc21f29c5b8.
+Manifest records every actual image checksum/dimension, visual inspection, source
+identity, native renderer/fixture and validation provenance. Original g1.dat SHA256:
+a78acefbcd1b0f5c8dbbf201afb8cf1a3d9294505134efa155c1323242c55a21.
+Private archives, source parks and generated parks/designs are excluded. These are
+production native X8 viewport/Pocket component fixtures with original sprites and
+native costs/results, not whole SDL/hardware frames. No physical Brick/AArch64,
+sustained dense-park performance or sustained operation of every ride family is claimed.
+
+The workspace reverted again before documentation publication. The saved package
+survived and was recovered with its exact ZIP checksum and all nineteen image hashes
+verified. Completed test outcomes were observed before that loss; missing logs are
+not described as retained artifacts or new test runs. Current remote remains b2db7e0.
+Another preservation/recovery verified every published blob and complete source-tree
+equality; safety 59b722dd42de03162ced472e0375271371dd13f2 matches tree 0c51d3d.
+Partial recovery temporary files were moved to the preservation archive. Esperanto
+retains SHA256 e37ba559b4d9d761e74f2bb284d1ec762b813e789655c0495a882c83651890b5
+and is excluded. No clone/reset/clean/restore/discard/history rewrite/force-push was used.
+This documentation-only closeout verifies current native parent, every changed blob,
+complete local/canonical source-tree equality and expected_sha/force=false publication.
+
+Exact remaining ordinary gaps are unchanged: continuous wall drag preview/release,
+continuous repaint/eyedropper drag equivalents, desktop Shift automatic Z-search,
+asynchronous native network scatter/paint review completion/recovery and broader
+matrix gaps. Scenery/landscaping and overall 100% ordinary gameplay remain PARTIAL.
