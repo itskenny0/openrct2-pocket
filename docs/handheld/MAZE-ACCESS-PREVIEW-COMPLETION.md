@@ -228,3 +228,17 @@ automatic restoration or independent rollback simulation is claimed.
 Next substantial work: audit and complete controller-native existing ride
 entrance/exit relocation/removal and access recovery, using native actions and
 explicit consequences/reviews. Do not begin it as part of this milestone.
+
+## Verified publication closeout
+
+Phase 3 implementation/tests/capture closeout published at
+b6bd017973ddbb3855dc903f91635d03c425ec3d, complete tree
+e7cb62982b64afe34e47239aa1081e2ecca05981, matching local safety commit
+5e754ba5db3b0341c94e81167429f3fdbbd15bf1. Every changed blob and complete
+source tree matched; expected_sha / force=false publication advanced from the
+verified Phase 2 parent, and canonical ref/native parent/tree were read back.
+This publication-history follow-up changes documentation only. The capture ZIP
+was saved and made downloadable; completed prior capture packages remain intact.
+The sole preserved unrelated working-tree edit is data/language/eo-ZZ.txt, SHA256
+e37ba559b4d9d761e74f2bb284d1ec762b813e789655c0495a882c83651890b5, excluded
+from all milestone commits. No next subsystem has started.
