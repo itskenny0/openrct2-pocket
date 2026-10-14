@@ -2,6 +2,7 @@
 #include "FlatRideEntrancePlaceAction.h"
 
 #include "../../ride/FlatRidePlacement.h"
+#include "../../ride/AccessPlacementContext.h"
 #include "../GameActionRunner.h"
 #include "RideEntranceExitPlaceAction.h"
 namespace OpenRCT2::GameActions
@@ -20,6 +21,7 @@ namespace OpenRCT2::GameActions
             const auto& station = ride->getStation(_station);
             _start = station.start;
             _entrance = station.entrance;
+            _context=AccessPlacementContext::Capture(*ride,location);
         }
     }
     void FlatRideEntrancePlaceAction::AcceptParameters(GameActionParameterVisitor& v)
@@ -33,7 +35,7 @@ namespace OpenRCT2::GameActions
     {
         GameAction::Serialise(s);
         s << DS_TAG(_ride) << DS_TAG(_location) << DS_TAG(_exit) << DS_TAG(_object) << DS_TAG(_buildDate) << DS_TAG(_start)
-          << DS_TAG(_entrance) << DS_TAG(_station);
+          << DS_TAG(_entrance) << DS_TAG(_station) << DS_TAG(_context) << DS_TAG(_quote);
     }
     Result FlatRideEntrancePlaceAction::Query(GameState_t& state, Park::ParkData& park) const
     {
@@ -47,6 +49,7 @@ namespace OpenRCT2::GameActions
         if (!ride || _station.ToUnderlying() >= ride->getStations().size() || ride->subtype != _object
             || ride->buildDate != _buildDate || !FlatRidePlacement::SupportsStation(*ride))
             return invalid();
+        if(_context.empty() || _context!=AccessPlacementContext::Capture(*ride,_location))return invalid();
         const auto& station = ride->getStation(_station);
         if (station.start != _start || station.entrance != _entrance || !(_exit ? station.exit : station.entrance).isNull()
             || (_exit && station.entrance.isNull()))
@@ -56,7 +59,10 @@ namespace OpenRCT2::GameActions
             return invalid();
         auto action = RideEntranceExitPlaceAction(_location, _location.direction, _ride, _station, _exit);
         action.SetFlags(GetFlags());
-        return QueryNested(&action, state);
+        if(GetFlags().has(CommandFlag::ghost))action.SetPureGhost();
+        auto result=QueryNested(&action,state);
+        if(_quote!=kMoney64Undefined && result.error==Status::ok && result.cost!=_quote)return invalid();
+        return result;
     }
     Result FlatRideEntrancePlaceAction::Execute(GameState_t& state, Park::ParkData& park) const
     {
@@ -65,6 +71,7 @@ namespace OpenRCT2::GameActions
             return valid;
         auto action = RideEntranceExitPlaceAction(_location, _location.direction, _ride, _station, _exit);
         action.SetFlags(GetFlags());
+        if(GetFlags().has(CommandFlag::ghost))action.SetPureGhost();
         return ExecuteNested(&action, state);
     }
 } // namespace OpenRCT2::GameActions

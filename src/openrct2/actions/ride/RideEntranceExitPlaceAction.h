@@ -21,11 +21,15 @@ namespace OpenRCT2::GameActions
         RideId _rideIndex{ RideId::GetNull() };
         StationIndex _stationNum{ StationIndex::GetNull() };
         bool _isExit{};
+        bool _pureGhost{};
 
     public:
         RideEntranceExitPlaceAction() = default;
         RideEntranceExitPlaceAction(
             const CoordsXY& loc, Direction direction, RideId rideIndex, StationIndex stationNum, bool isExit);
+
+        // Opt-in provisional mode: never change real station, maze or path state.
+        void SetPureGhost(bool value=true) { _pureGhost=value; }
 
         void AcceptParameters(GameActionParameterVisitor&) final;
 

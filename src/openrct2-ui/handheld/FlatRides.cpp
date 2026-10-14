@@ -2,6 +2,7 @@
 #include "FlatRides.h"
 
 #include "TrackPreview.h"
+#include "AccessPreview.h"
 
 #include <openrct2/actions/ride/FlatRideEntrancePlaceAction.h>
 #include <openrct2/actions/ride/FlatRidePlaceAction.h>
@@ -74,6 +75,7 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
     void ClearPreview()
     {
         requested.reset();
+        AccessPreview::Clear();
         preview.clear();
         ghost.reset();
     }
@@ -230,9 +232,10 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
         if (!location)
             return Invalid("Choose a free tile beside the ride");
         auto action = GameActions::FlatRideEntrancePlaceAction(target->id, *location, isExit, stationIndex);
-        const auto result = GameActions::Query(&action, getGameState());
+        const auto result = AccessPreview::Bind(action,*location);
         if (!execute || result.error != GameActions::Status::ok)
             return result;
+        ClearPreview();
         const auto token = revision;
         busy = true;
         action.SetCallback([token](const auto*, const GameActions::Result* completed) {
@@ -250,6 +253,12 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
     }
     void UpdatePreview(std::optional<CoordsXY> tile)
     {
+        if((stage==Stage::entrance || stage==Stage::exit) && !busy && target) {
+            preview.clear();ghost.reset();requested.reset();
+            const auto loc=EntranceLocation(tile);
+            if(loc)AccessPreview::Update(*target,*loc,stage==Stage::exit,stationIndex);else AccessPreview::Clear();
+            return;
+        }
         if (stage != Stage::ride || busy)
         {
             ClearPreview();

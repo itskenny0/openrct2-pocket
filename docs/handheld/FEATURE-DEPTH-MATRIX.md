@@ -618,3 +618,13 @@ complete tree 16e03999cba4bc6a0aedfa1db56a36a6990ebfd4, local safety
 leased fast-forward ref/readback verified. Subsequent history documentation
 changes no validated production/test/capture files. Whole-game parity remains
 partial; native maze/access placement previews are the next substantial gap.
+
+### Native maze/access previews — Phase 1
+
+Native missing entrance/exit previews are integrated with the existing supported
+station resolver and stages. Opt-in native ghost-only insertion/removal preserves
+real station/queue/maze/path state; serialized allocation/object/station/tile/quote
+guards and nested provisional cleanup are tested. Release GUI/CLI, focused
+native/SDL access tests, documented and forced-shell PathActions, CTest 5/5 pass.
+Maze build/fill preview isolation and final asset-backed closeout follow; see
+MAZE-ACCESS-PREVIEW-COMPLETION.md. Existing completed capture packages remain.

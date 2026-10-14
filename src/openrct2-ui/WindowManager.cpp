@@ -19,6 +19,7 @@
 #include "handheld/SceneryTools.h"
 #include "handheld/AreaTools.h"
 #include "handheld/Shops.h"
+#include "handheld/AccessPreview.h"
 #include "handheld/Trees.h"
 #include "interface/Chat.h"
 #include "interface/FileBrowser.h"
@@ -585,12 +586,15 @@ public:
             }
 
             case INTENT_ACTION_SUSPEND_SHOP_PREVIEW:
+                // Native whole-tick scope also excludes provisional access elements.
+                Handheld::AccessPreview::Suspend();
                 Handheld::Shops::RemovePreviewTemporarily();
                 Handheld::FlatRides::RemovePreviewTemporarily();
                 break;
             case INTENT_ACTION_RESUME_SHOP_PREVIEW:
                 Handheld::Shops::RestorePreview();
                 Handheld::FlatRides::RestorePreview();
+                Handheld::AccessPreview::Restore();
                 break;
             case INTENT_ACTION_PREPARE_PEEP_SAVE:
                 if (Handheld::PeepPlacement::Active())
