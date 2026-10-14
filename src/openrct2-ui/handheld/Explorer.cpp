@@ -869,6 +869,7 @@ namespace OpenRCT2::Ui::Handheld
             SceneryTools::ClearPreview();
             Shops::ClearPreview();
             FlatRides::ClearPreview();
+            Mazes::ClearPreview();
             Designs::ClearPreview();
             CustomTracks::ClearPreview();
         }

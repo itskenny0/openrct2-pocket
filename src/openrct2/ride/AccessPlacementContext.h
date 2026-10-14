@@ -22,7 +22,9 @@ namespace OpenRCT2::AccessPlacementContext
             state.cheats.sandboxMode,state.cheats.disableClearanceChecks,state.cheats.disableSupportLimits,
             state.cheats.buildInPauseMode,state.cheats.ignoreResearchStatus,RideTypeIsInvented(ride.type),RideEntryIsInvented(ride.subtype)};
         for(const auto* o:{static_cast<const Object*>(object),stationObject}) {
-            const auto descriptor=o->GetDescriptor().ToString();data.push_back(descriptor.size());
+            const auto identity=o->GetDescriptor();
+            data.insert(data.end(),{static_cast<int64_t>(identity.Generation),identity.Entry.flags,identity.Entry.checksum});
+            const auto descriptor=identity.ToString();data.push_back(descriptor.size());
             for(auto c:descriptor)data.push_back(static_cast<unsigned char>(c));
             data.insert(data.end(),{std::get<0>(o->GetVersion()),std::get<1>(o->GetVersion()),std::get<2>(o->GetVersion())});
         }

@@ -233,8 +233,7 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
             return Invalid("Choose a free tile beside the ride");
         auto action = GameActions::FlatRideEntrancePlaceAction(target->id, *location, isExit, stationIndex);
         const auto result = AccessPreview::Bind(action,*location);
-        if (!execute || result.error != GameActions::Status::ok)
-            return result;
+        if (!execute || result.error != GameActions::Status::ok){if(execute && result.error!=GameActions::Status::ok)ClearPreview();return result;}
         ClearPreview();
         const auto token = revision;
         busy = true;

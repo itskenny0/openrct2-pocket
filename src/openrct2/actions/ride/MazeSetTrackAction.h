@@ -27,11 +27,16 @@ namespace OpenRCT2::GameActions
         bool _initialPlacement{};
         RideId _rideIndex{ RideId::GetNull() };
         MazeBuildMode _mode{};
+        bool _pureGhost{},_clearPreview{};
+        std::vector<int64_t> _context;
+        money64 _quote{kMoney64Undefined};
 
     public:
         MazeSetTrackAction() = default;
         MazeSetTrackAction(const CoordsXYZD& location, bool initialPlacement, RideId rideIndex, MazeBuildMode mode);
 
+        void SetPureGhost(bool clear=false) { _pureGhost=true;_clearPreview=clear; }
+        void GuardContext(std::vector<int64_t> context,money64 quote) { _context=std::move(context);_quote=quote; }
         void AcceptParameters(GameActionParameterVisitor&) final;
         void Serialise(DataSerialiser& stream) override;
         Result Query(GameState_t& gameState, Park::ParkData& park) const override;

@@ -628,3 +628,9 @@ guards and nested provisional cleanup are tested. Release GUI/CLI, focused
 native/SDL access tests, documented and forced-shell PathActions, CTest 5/5 pass.
 Maze build/fill preview isolation and final asset-backed closeout follow; see
 MAZE-ACCESS-PREVIEW-COMPLETION.md. Existing completed capture packages remain.
+
+Maze/access preview Phase 2: isolated native maze build/fill proposals now reuse
+MazeSetTrackAction geometry without changing real walls/stations/count/cash. Native
+cursor Move, Cancel-first Fill, exact serialized context/quote guards and nested
+provisional/save suspension are covered by focused native/SDL tests. See
+MAZE-ACCESS-PREVIEW-COMPLETION.md; final broad/capture closeout is pending.

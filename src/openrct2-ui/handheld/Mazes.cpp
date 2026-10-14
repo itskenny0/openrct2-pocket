@@ -10,6 +10,7 @@
 #include <openrct2/actions/ride/RideDemolishAction.h>
 #include <openrct2/object/RideObject.h>
 #include <openrct2/ride/FlatRidePlacement.h>
+#include <openrct2/ride/AccessPlacementContext.h>
 #include <openrct2/world/MapSelection.h>
 #include <openrct2/world/TileElementsView.h>
 #include <openrct2/world/tile_element/TrackElement.h>
@@ -36,8 +37,29 @@ namespace OpenRCT2::Ui::Handheld::Mazes
         std::vector<Cell> cells;
         money64 cost;
         bool noMoney;
+        CoordsXYZD location;
+        std::vector<int64_t> context;
     };
     static std::optional<Review> review;
+    struct PreviewRequest {RideId id;CoordsXYZD location;bool initial;GA::MazeBuildMode mode;
+        std::vector<int64_t> context;money64 cost;};
+    static std::optional<PreviewRequest> previewRequest,ghostRequest;
+    static uint32_t previewDepth{};
+    static void UpdatePreview();
+    static void RemoveGhost()
+    {
+        if(ghostRequest){GA::MazeSetTrackAction action(ghostRequest->location,ghostRequest->initial,ghostRequest->id,ghostRequest->mode);
+            action.SetPureGhost(true);action.SetFlags({GA::CommandFlag::ghost,GA::CommandFlag::noSpend,GA::CommandFlag::allowDuringPaused});
+            action.Execute(getGameState(),getGameState().park);}
+        ghostRequest.reset();
+    }
+    void ClearPreview(){previewRequest.reset();RemoveGhost();}
+    void RemovePreviewTemporarily(){++previewDepth;RemoveGhost();}
+    void RestorePreview(){if(!previewDepth || --previewDepth || !previewRequest)return;
+        const auto old=*previewRequest;const auto* ride=GetRide(old.id);
+        if(!ride || old.context!=AccessPlacementContext::Capture(*ride,old.location)){ClearPreview();return;}
+        UpdatePreview();}
+
     static GA::Result Invalid(const char* text)
     {
         GA::Result r;
@@ -68,6 +90,7 @@ namespace OpenRCT2::Ui::Handheld::Mazes
     }
     void End()
     {
+        ClearPreview();
         const auto* ride = target ? RideManagement::Resolve(*target) : nullptr;
         if (createdHere && ride && ride->mazeTiles == 0 && !busy)
         {
@@ -106,8 +129,7 @@ namespace OpenRCT2::Ui::Handheld::Mazes
     }
     void ToggleCamera()
     {
-        if (!review)
-            camera = !camera;
+        if (!review){ClearPreview();camera = !camera;UpdatePreview();}
     }
     bool Picking()
     {
@@ -139,6 +161,7 @@ namespace OpenRCT2::Ui::Handheld::Mazes
         }
         if (execute)
         {
+            ClearPreview();
             cursor = location;
             camera = false;
             feedback.clear();
@@ -244,13 +267,16 @@ namespace OpenRCT2::Ui::Handheld::Mazes
             return Invalid("Maze selection unavailable");
         auto loc = Next();
         GA::MazeSetTrackAction action(loc, !placed, target->id, mode);
+        if(execute && previewRequest && previewRequest->location==loc && previewRequest->mode==mode)
+            action.GuardContext(previewRequest->context,previewRequest->cost);
         auto q = GA::Query(&action, getGameState());
         if (!execute || q.error != GA::Status::ok)
         {
-            if (execute)
-                feedback = q.getErrorMessage();
+            if (execute){ClearPreview();feedback = q.getErrorMessage();}
             return q;
         }
+        action.GuardContext(AccessPlacementContext::Capture(*RideManagement::Resolve(*target),loc),q.cost);
+        ClearPreview();
         busy = true;
         const auto token = revision;
         action.SetCallback([token, loc](const auto*, const GA::Result* result) {
@@ -280,8 +306,10 @@ namespace OpenRCT2::Ui::Handheld::Mazes
         const auto q = Apply(GA::MazeBuildMode::fill, false);
         if (q.error == GA::Status::ok)
         {
-            review = Review{ Snapshot(), q.cost, getGameState().park.flags.has(ParkFlag::noMoney) };
+            review = Review{ Snapshot(), q.cost, getGameState().park.flags.has(ParkFlag::noMoney),Next(),
+                AccessPlacementContext::Capture(*RideManagement::Resolve(*target),Next()) };
             removeChoice = false;
+            ClearPreview();UpdatePreview();
         }
         feedback = q.error == GA::Status::ok ? "" : q.getErrorMessage();
         return q;
@@ -293,6 +321,7 @@ namespace OpenRCT2::Ui::Handheld::Mazes
     }
     void Cancel()
     {
+        ClearPreview();
         review.reset();
         removeChoice = false;
         feedback.clear();
@@ -308,7 +337,9 @@ namespace OpenRCT2::Ui::Handheld::Mazes
         }
         const auto baseline = *review;
         const auto q = Apply(GA::MazeBuildMode::fill, false);
-        if (Snapshot() != baseline.cells || baseline.noMoney != getGameState().park.flags.has(ParkFlag::noMoney)
+        const auto* current=target?RideManagement::Resolve(*target):nullptr;
+        if (!current || Next()!=baseline.location || AccessPlacementContext::Capture(*current,Next())!=baseline.context
+            || Snapshot() != baseline.cells || baseline.noMoney != getGameState().park.flags.has(ParkFlag::noMoney)
             || q.error != GA::Status::ok || q.cost != baseline.cost)
         {
             Cancel();
@@ -322,14 +353,15 @@ namespace OpenRCT2::Ui::Handheld::Mazes
     {
         if (!review)
         {
-            direction = (direction + delta) & 3;
-            feedback.clear();
+            ClearPreview();direction = (direction + delta) & 3;
+            feedback.clear();UpdatePreview();
         }
         else
             ChooseRemoval();
     }
     void Height(int delta)
     {
+        ClearPreview();
         if (Picking())
         {
             quadrant = (quadrant + delta + 4) & 3;
@@ -337,11 +369,13 @@ namespace OpenRCT2::Ui::Handheld::Mazes
         }
         else if (!placed && !review)
             offset = std::clamp(offset + delta * 16, -256, 512);
+        if(!placed && hovered)Update(hovered);else UpdatePreview();
     }
     void Update(std::optional<CoordsXY> tile)
     {
         if (!active)
             return;
+        if(tile && !MapIsLocationValid(*tile))tile.reset();
         hovered = tile;
         if (!placed && !busy)
             cursor = tile ? std::optional<CoordsXYZD>{ { *tile, (MapGetHighestZ(*tile) + 15) / 16 * 16 + offset, direction } }
@@ -360,6 +394,25 @@ namespace OpenRCT2::Ui::Handheld::Mazes
             gMapSelectArrowDirection = direction;
             MapSelection::invalidate();
         }
+        UpdatePreview();
+    }
+    static void UpdatePreview()
+    {
+        const auto* ride=target?RideManagement::Resolve(*target):nullptr;
+        if(!active || busy || camera || !ride || !target || !CanResume(*target) || !cursor || (!placed && !hovered)){ClearPreview();return;}
+        const auto loc=Next();const auto mode=review?GA::MazeBuildMode::fill:GA::MazeBuildMode::build;
+        const auto context=AccessPlacementContext::Capture(*ride,loc);
+        if(context.empty() || (review && (loc!=review->location || context!=review->context))){ClearPreview();return;}
+        GA::MazeSetTrackAction action(loc,!placed,target->id,mode);auto q=GA::Query(&action,getGameState());
+        if(q.error!=GA::Status::ok){ClearPreview();return;}
+        PreviewRequest next{target->id,loc,!placed,mode,context,q.cost};previewRequest.emplace(next);
+        if(previewDepth)return;
+        if(ghostRequest && ghostRequest->location==loc && ghostRequest->mode==mode && ghostRequest->context==context)return;
+        RemoveGhost();action.GuardContext(context,q.cost);action.SetPureGhost();
+        action.SetFlags({GA::CommandFlag::ghost,GA::CommandFlag::noSpend,GA::CommandFlag::allowDuringPaused});
+        const auto result=GA::Execute(&action,getGameState());
+        if(result.error==GA::Status::ok)ghostRequest.emplace(std::move(next));
+        else {action.SetPureGhost(true);action.Execute(getGameState(),getGameState().park);previewRequest.reset();feedback=result.getErrorMessage();}
     }
     void DrawPanel(Drawing::RenderTarget& rt, ScreenSize screen)
     {

@@ -69,3 +69,39 @@ restoration or observed-focus cleanup with unchanged real map/cash. Native resea
 is inserted into the fixture's actual research list during initialization so
 save/reload reconstructs eligibility; tests do not unlock objects after import to
 force a pass. Actual reloaded native object indices are re-resolved before reuse.
+
+## Phase 2 — isolated native maze proposals
+
+Phase 1 was published at 5279377b68aa216dee12bf5e9e71c5277e589a5f, tree
+7a6be7ad9faaec9dc40ffd38c2d3141021af5357; local safety commit
+3deff45e45d5bead6f1d6703d440d9c880b2dc6e.
+
+MazeSetTrackAction now has an opt-in serialized pure-ghost mode and exact native
+context/quote guards. It copies native real maze elements into native ghost
+elements, then runs the existing native wall-bit algorithm on those ghost
+elements. Real maze tiles, neighboring walls, stations and cash remain intact.
+Cleanup removes only matching native ghost maze cells, even after a ride becomes
+stale. Ordinary native execution and legacy design placement remain native actions.
+No UI map repair or independent preview geometry is introduced.
+
+Pocket Mazes refreshes native build proposals at the half-cell cursor, direction
+and supported manual height. Fill review previews native wall changes and starts
+on Cancel. Move remains native cursor navigation without a geometry/cash mutation;
+the subsequent Build proposal is shown. A complete removal leaves no ghost cell
+to render, so the native selection/review marker remains the destination cue.
+No empty-cell hedge is fabricated. Failed queries clear invalid ghosts and retain
+native errors. Queued Apply binds exact allocation, descriptors, station/real
+neighbor geometry, money/pause policy and native quote, repeated inside Query.
+
+Maze previews join nested simulation/save and whole-tick paused suspension, and
+clear immediately at menu/focus/tool changes. Restoration queries current native
+context. No preview ride or proposed station state is serialized into .park.
+
+Phase 2 validation: Release GUI/CLI, focused original-asset native/SDL
+MazeAccessPreviewTests, MazeConstructionTests and forced-Pocket PathActionsTests;
+CTest 5/5. Focused assertions compare actual native ghost wall rosters with
+committed results for initial, within-tile, neighboring-tile and fill operations;
+prove cancellation/map/cash/station/count purity, nested scopes, invalid targets,
+height, insufficient funds, changed object/version and serialized quote/money-mode
+rejection, and native autosave/load ghost exclusion. Final broad preservation,
+end-to-end family coverage, captures and handoff remain pending.

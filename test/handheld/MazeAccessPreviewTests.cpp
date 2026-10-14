@@ -1,4 +1,6 @@
 #include <openrct2-ui/handheld/AccessPreview.h>
+#include <openrct2-ui/handheld/Mazes.h>
+#include <openrct2/actions/ride/MazeSetTrackAction.h>
 #include <openrct2-ui/handheld/FlatRides.h>
 #include <openrct2/ride/AccessPlacementContext.h>
 #include <openrct2/world/tile_element/EntranceElement.h>
@@ -142,6 +144,55 @@ int main(int argc, char** argv)
         if(replacementResult.error!=GA::Status::ok)std::cerr<<"Reuse result "<<replacementResult.getErrorMessage()<<" index "<<index<<"\n";
         Check(replacementResult.error==GA::Status::ok,"Native slot reuse recreation failed");GA::ProcessQueue(state);
         Check(F::Target()->id==target.id && reused.Execute(state,state.park).error!=GA::Status::ok,"Native same-slot replacement accepted old access action");F::End();
-        std::cout<<"MazeAccessPreviewTests access native/SDL PASS\n";return 0;
+
+        namespace M=H::Mazes;
+        auto* mazeObject=objects.LoadObject("rct2.ride.hmaze");Check(mazeObject,"Native maze object missing");auto mazeIndex=objects.GetLoadedObjectEntryIndex(mazeObject);
+        ResearchInsertRideEntry(mazeIndex,true);RideEntrySetInvented(mazeIndex);RideTypeSetInvented(RIDE_TYPE_MAZE);
+        Check(H::BeginMaze(mazeIndex),"Native maze begin failed");GA::ProcessQueue(state);auto mazeTarget=*M::Target();auto* mazeRide=GetRide(mazeTarget.id);
+        auto mazeGhosts=[&](){int n=0;for(int y=0;y<2048;y+=32)for(int x=0;x<2048;x+=32)for(const auto* e:TileElementsView<TrackElement>(CoordsXY{x,y}))n+=e->isGhost() && e->getRideIndex()==mazeTarget.id;return n;};
+        auto cells=[&](bool ghost){std::vector<std::tuple<int,int,int,uint16_t>> result;for(int y=0;y<2048;y+=32)for(int x=0;x<2048;x+=32){
+            for(const auto* e:TileElementsView<TrackElement>(CoordsXY{x,y}))if(e->isGhost()==ghost && e->getRideIndex()==mazeTarget.id && e->getTrackType()==TrackElemType::maze)result.emplace_back(x,y,e->getBaseZ(),e->getMazeEntry());}return result;};
+        const auto emptyMap=map();const auto emptyCash=state.park.cash;const auto emptyStation=mazeRide->getStation();
+        M::Update(CoordsXY{960,960});auto initialQuote=M::Build(false);const auto initialProposal=cells(true);
+        Check(initialQuote.error==GA::Status::ok && mazeGhosts()==1 && mazeRide->mazeTiles==0 && map()==emptyMap && state.park.cash==emptyCash && std::memcmp(&emptyStation,&mazeRide->getStation(),sizeof(emptyStation))==0,"Initial native maze ghost changed real map/station/cash/count");
+        GA::MazeSetTrackAction quoted(*M::Cursor(),true,mazeTarget.id,GA::MazeBuildMode::build);
+        const auto initialContext=AccessPlacementContext::Capture(*mazeRide,*M::Cursor());
+        quoted.GuardContext(initialContext,initialQuote.cost+1);Check(quoted.Query(state,state.park).error!=GA::Status::ok,"Changed maze quote accepted");
+        quoted.GuardContext(initialContext,initialQuote.cost);DataSerialiser mazeEncoded(true);quoted.Serialise(mazeEncoded);mazeEncoded.getStream().SetPosition(0);
+        GA::MazeSetTrackAction mazeDecoded;DataSerialiser mazeDecode(false,mazeEncoded.getStream());mazeDecoded.Serialise(mazeDecode);
+        Check(mazeDecoded.Query(state,state.park).error==GA::Status::ok && map()==emptyMap,"Maze serialized guard/query purity failed");
+        GA::CheatSetAction noMoney(CheatType::noMoney,1);Check(GA::Execute(&noMoney,state).error==GA::Status::ok,"Native money-mode fixture failed");GA::ProcessQueue(state);
+        Check(mazeDecoded.Query(state,state.park).error!=GA::Status::ok,"Changed money mode accepted old maze quote");
+        GA::CheatSetAction restoreMoneyMode(CheatType::noMoney,0);Check(GA::Execute(&restoreMoneyMode,state).error==GA::Status::ok,"Native money-mode restoration failed");GA::ProcessQueue(state);
+        Ui::ProvisionalElementsRemove();Ui::ProvisionalElementsRemove();Check(mazeGhosts()==0 && map()==emptyMap,"Nested maze suspension changed real map");Ui::ProvisionalElementsRestore();Check(mazeGhosts()==0,"Maze restored early");Ui::ProvisionalElementsRestore();Check(cells(true)==initialProposal,"Native maze proposal restoration differs");
+        M::Update({});Check(mazeGhosts()==0 && map()==emptyMap,"Invalid initial maze target retained ghost");M::Update(CoordsXY{960,960});
+        GA::CheatSetAction zeroCash(CheatType::setMoney,0);Check(GA::Execute(&zeroCash,state).error==GA::Status::ok,"Native funds fixture failed");GA::ProcessQueue(state);M::Update(CoordsXY{960,960});
+        Check(M::Build(true).error==GA::Status::insufficientFunds && mazeGhosts()==0 && map()==emptyMap && mazeRide->mazeTiles==0,"Failed maze purchase changed map/count or retained ghost");
+        GA::CheatSetAction restoreCash(CheatType::setMoney,emptyCash);Check(GA::Execute(&restoreCash,state).error==GA::Status::ok,"Native funds restoration failed");GA::ProcessQueue(state);M::Update(CoordsXY{960,960});
+
+        M::Height(1);Check(mazeGhosts()==1 && M::Cursor()->z==128 && map()==emptyMap,"Native maze height preview failed");M::Height(-1);
+        Check(M::Build(true).error==GA::Status::ok && M::Build(true).error!=GA::Status::ok,"Native initial maze apply/repeat failed");GA::ProcessQueue(state);mazeTarget=*M::Target();
+        Check(cells(false)==initialProposal && mazeRide->mazeTiles==1 && state.park.cash==emptyCash-initialQuote.cost,"Native initial result differs from ghost/accounting");
+        M::Turn(2);auto firstMap=map();const auto firstCash=state.park.cash;const auto secondProposal=cells(true);
+        Check(mazeGhosts()==1 && map()==firstMap && mazeRide->mazeTiles==1,"Native within-tile proposal changed real maze");
+        auto secondQuote=M::Build(false);Check(M::Build(true).error==GA::Status::ok,"Second half-cell native apply failed");GA::ProcessQueue(state);
+        Check(cells(false)==secondProposal && state.park.cash==firstCash-secondQuote.cost,"Native wall algorithm differs between ghost and real half-cell");
+        M::Update(CoordsXY{960,960});const auto multiProposal=cells(true);const auto multiMap=map();auto thirdQuote=M::Build(false);
+        Check(mazeGhosts()==2 && mazeRide->mazeTiles==1 && map()==multiMap,"New-tile preview changed native count/walls");
+        Check(M::Build(true).error==GA::Status::ok,"Native multi-tile build failed");GA::ProcessQueue(state);
+        Check(cells(false)==multiProposal && mazeRide->mazeTiles==2 && state.park.cash==firstCash-secondQuote.cost-thirdQuote.cost,"Native neighbor wall result differs from preview");
+        M::Turn(2);const auto moveMap=map();const auto moveCash=state.park.cash;Check(M::Move().error==GA::Status::ok,"Native cursor move failed");GA::ProcessQueue(state);
+        Check(map()==moveMap && state.park.cash==moveCash,"Native move changed real geometry/accounting");
+        Check(M::ReviewRemoval().error==GA::Status::ok,"Native fill preview review missing");const auto fillProposal=cells(true);
+        Check(map()==moveMap && M::Confirm().error==GA::Status::ok && !M::Reviewing() && map()==moveMap,"Cancel-first fill changed real maze");
+        Check(M::ReviewRemoval().error==GA::Status::ok,"Second native fill review failed");M::ChooseRemoval();Check(M::Confirm().error==GA::Status::ok,"Native fill apply failed");GA::ProcessQueue(state);
+        Check(cells(false)==fillProposal && state.park.cash==moveCash,"Native fill ghost/result/cash differs");
+        M::Update(CoordsXY{960,960});const auto staleMap=map();const auto staleCash=state.park.cash;auto version=mazeObject->GetVersion();auto changedMaze=version;++std::get<2>(changedMaze);mazeObject->SetVersion(changedMaze);
+        Check(M::Build(true).error!=GA::Status::ok && mazeGhosts()==0 && map()==staleMap && state.park.cash==staleCash,"Changed descriptor executed or retained invalid maze ghost");mazeObject->SetVersion(version);
+        M::Update(CoordsXY{960,960});const auto beforeSave=map();const auto savedTiles=mazeRide->mazeTiles;const auto mazeSave=std::filesystem::path(argv[2])/"maze-preview-autosave.park";
+        Check(ScenarioSave(state,mazeSave.string(),flags)!=0 && mazeGhosts()>0 && map()==beforeSave,"Native maze autosave failed preview restoration");
+        M::End();Check(mazeGhosts()==0,"Maze end stranded ghosts");
+        Check(context->LoadParkFromFile(mazeSave.string()) && mazeGhosts()==0 && GetRide(mazeTarget.id)->mazeTiles==savedTiles && !M::Active() && map()==beforeSave,"Native save included maze ghosts or changed real walls");
+        std::cout<<"MazeAccessPreviewTests access/maze native/SDL PASS\n";return 0;
     }catch(const std::exception& e){std::cerr<<e.what()<<std::endl;return 1;}
 }

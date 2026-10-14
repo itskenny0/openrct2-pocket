@@ -10,6 +10,9 @@ namespace OpenRCT2::Ui::Handheld::Mazes
     bool Resume(const RideManagement::Target& target);
     bool CanResume(const RideManagement::Target& target);
     void End();
+    void ClearPreview();
+    void RemovePreviewTemporarily();
+    void RestorePreview();
     bool Active();
     bool Busy();
     bool Reviewing();

@@ -1456,6 +1456,7 @@ namespace OpenRCT2::Ui::Windows
             Handheld::SceneryTools::ClearPreview();
             Handheld::Shops::ClearPreview();
             Handheld::FlatRides::ClearPreview();
+            Handheld::Mazes::ClearPreview();
             Handheld::Designs::ClearPreview();
             Handheld::CustomTracks::ClearPreview();
             setWidgets(kWidgets);
@@ -1576,6 +1577,7 @@ namespace OpenRCT2::Ui::Windows
         {
             Handheld::Shops::ClearPreview();
             Handheld::FlatRides::ClearPreview();
+            Handheld::Mazes::ClearPreview();
             Handheld::Designs::ClearPreview();
             Handheld::CustomTracks::ClearPreview();
             _shopPickerFromBuild = fromBuild;
@@ -1585,6 +1587,7 @@ namespace OpenRCT2::Ui::Windows
         void openRidePicker(bool fromBuild = false)
         {
             Handheld::FlatRides::ClearPreview();
+            Handheld::Mazes::ClearPreview();
             Handheld::Designs::ClearPreview();
             Handheld::CustomTracks::ClearPreview();
             _ridePickerFromBuild = fromBuild;
