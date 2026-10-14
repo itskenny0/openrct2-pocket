@@ -440,3 +440,10 @@ closed. Scenery/landscaping remains PARTIAL for continuous wall/repaint/eyedropp
 Shift automatic Z-search, asynchronous native network scatter/paint review and all
 broader ordinary roadmap gaps. Physical Brick/AArch64, sustained dense-park performance
 and sustained operation of every ride family remain unestablished.
+
+
+Verified final closeout publication: canonical 6033832f91c7050c3ec35c92b70922b784913244,
+local safety 03a966a3e3e2f0d938827ffe8360828268586f9c, complete matching tree
+5cdc86afb52088f6ee36f097e307b364f5607e09. Native parent b2db7e0, changed blobs/full
+tree and expected_sha/force=false fast-forward were verified; final ref read back.
+This publication-history record changes docs only, preserving validated source.

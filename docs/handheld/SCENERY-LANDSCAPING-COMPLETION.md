@@ -390,3 +390,14 @@ Exact remaining ordinary gaps are unchanged: continuous wall drag preview/releas
 continuous repaint/eyedropper drag equivalents, desktop Shift automatic Z-search,
 asynchronous native network scatter/paint review completion/recovery and broader
 matrix gaps. Scenery/landscaping and overall 100% ordinary gameplay remain PARTIAL.
+
+
+## Verified closeout publication
+
+Canonical closeout `6033832f91c7050c3ec35c92b70922b784913244`, local safety
+`03a966a3e3e2f0d938827ffe8360828268586f9c`, exact matching complete source tree
+`5cdc86afb52088f6ee36f097e307b364f5607e09`. Native parent b2db7e0, both changed
+blob hashes, local/native parent trees, new complete tree and canonical commit parent
+were verified before expected_sha=b2db7e0 / force=false fast-forward; the resulting
+branch ref was read back and matched 6033832. This subsequent history-record commit
+changes documentation only and preserves all tested production code and ZIP bytes.
