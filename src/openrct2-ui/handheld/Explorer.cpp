@@ -1181,7 +1181,8 @@ namespace OpenRCT2::Ui::Handheld
                                 _terrainStatus = result.error == GameActions::Status::ok
                                     ? (FlatRides::CurrentStage() != FlatRides::Stage::inactive ? ""
                                            : _shopTool                                         ? "Shop placement requested."
-                                           : _treeTool                                         ? "Tree placement requested."
+                                           : _treeTool                                         ? "Tree requested / Move, then A again"
+                                           : _sceneryTool                                      ? "Scenery requested / Move, then A again"
                                            : _colourRide                                       ? "Track colour scheme applied."
                                            : _sceneryRemovalTool                               ? "Removal requested."
                                            : _surfaceTool                                      ? "Surface change requested."

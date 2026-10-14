@@ -343,12 +343,22 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                 : "Direction " + std::to_string(s.direction + 1) + " / Q" + std::to_string(s.quadrant + 1),
             ScatterActive() ? ScatterStatus() : s.height ? "Height " + std::to_string(s.height) : "Automatic height");
     }
+    static GameActions::Result Query(std::optional<CoordsXY> tile, const Settings& s);
     void Configure(size_t row, int delta)
     {
+        const auto previewHeight = ghost && requested && requested->settings == current
+            ? std::optional<int32_t>{ ghost->location.z } : std::nullopt;
         ClearPreview();
         if ((row == 4 || row == 5) && current.height == 0 && lastTile)
-            if (const auto* surface = MapGetSurfaceElementAt(*lastTile))
+        {
+            const auto native = Query(lastTile, current);
+            if (previewHeight)
+                current.height = *previewHeight;
+            else if (native.error == GameActions::Status::ok)
+                current.height = native.position.z;
+            else if (const auto* surface = MapGetSurfaceElementAt(*lastTile))
                 current.height = surface->getBaseZ();
+        }
         if (row == 2 && current.category != Category::additions)
             current.direction = (current.direction + delta + 4) % 4;
         if (row == 3 && current.category == Category::small)

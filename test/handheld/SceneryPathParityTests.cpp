@@ -16,6 +16,7 @@
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
+#include <openrct2/actions/general/PauseToggleAction.h>
 #include <openrct2/Input.h>
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/PlatformEnvironment.h>
@@ -36,6 +37,7 @@
 #include <openrct2/world/TileElementsView.h>
 #include <openrct2/world/tile_element/PathElement.h>
 #include <openrct2/world/tile_element/SurfaceElement.h>
+#include <openrct2/world/tile_element/SmallSceneryElement.h>
 using namespace OpenRCT2;
 namespace H = Ui::Handheld;
 namespace S = H::SceneryTools;
@@ -487,9 +489,23 @@ int main(int argc, char** argv)
         TestSceneryClear(
             state, largeObject, smallObject, objects.GetLoadedObjectEntryIndex(surface),
             objects.GetLoadedObjectEntryIndex(railings), controller, confirm, clearPanel, captureFocus, capture);
+        if(gGamePaused & GAME_PAUSED_NORMAL){GameActions::PauseToggleAction unpause;Check(GameActions::Execute(&unpause,state).error==GameActions::Status::ok,"Native repeat fixture unpause failed");GameActions::ProcessQueue(state);}
+        // Continuous placement is a retained native tool, with one purchase per press.
+        S::SelectCategory(S::Category::small);Check(S::Select(smallObject),"Repeat scenery selection failed");S::Configure(6,1);if(S::Current().scatter)S::Configure(16,1);
+        const auto repeatedObject=S::Current().object;const CoordsXY repeatA{1856,1856},repeatB{1888,1856};
+        S::UpdatePreview(repeatA);const auto automatic=S::Place(repeatA,S::Current(),false);if(automatic.error!=GameActions::Status::ok)std::cerr<<automatic.getErrorMessage()<<"\n";Check(automatic.error==GameActions::Status::ok,"Native automatic height query failed");
+        const auto heightCash=state.park.cash;S::Configure(4,1);Check(S::Current().height==automatic.position.z+8 && state.park.cash==heightCash,"Manual height did not start at native proposal or changed cash");
+        S::Configure(6,1);Check(S::Current().height==0,"Automatic height reset failed");
+        for(const auto destination:{repeatA,repeatB}){
+            S::UpdatePreview(destination);const auto quote=S::Place(destination,S::Current(),false);const auto beforeRepeat=state.park.cash;
+            Check(quote.error==GameActions::Status::ok && S::Place(destination,S::Current(),true).error==GameActions::Status::ok,"Repeated native scenery placement failed");GameActions::ProcessQueue(state);
+            Check(S::Current().object==repeatedObject && S::Current().mode==S::Mode::place && state.park.cash==beforeRepeat-quote.cost,"Repeated placement lost selection or changed native accounting");
+        }
+        S::ClearPreview();
         SaveFlags flags{};
         auto save = std::string(argv[2]) + "/parity.park";
         Check(ScenarioSave(state, save, flags) && context->LoadParkFromFile(save), "Style save/reload failed");
+        for(const auto destination:{repeatA,repeatB}){bool present=false;for(const auto* e:TileElementsView<SmallSceneryElement>(destination))present|=!e->isGhost() && e->getEntryIndex()==repeatedObject;Check(present,"Repeated scenery did not persist through native load");}
         auto saved = targetAt(tile, S::Category::banners);
         Check(
             saved.bannerFlags == target.bannerFlags && saved.textColour == target.textColour,

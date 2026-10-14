@@ -649,3 +649,11 @@ Move remains native cursor navigation; a fully removed maze cell uses the native
 selection marker. Existing access relocation/removal, exhaustive family geometry,
 network reviews and physical/display/performance validation remain gaps; no atomic
 replacement/rollback or sustained family guest operation is claimed.
+
+## First Brick release preparation
+
+The small scenery repeat/height usability pass retains native placement sessions,
+labels repeat placement accurately and starts manual elevation from native preview/
+query height. Native repeated placement/accounting/save round-trip and CTest pass.
+See BRICK-NEXTUI-TESTING-RELEASE.md. Hardware/package validation is pending; no
+existing access relocation or advanced parity work starts in this milestone.
