@@ -25,7 +25,7 @@ No editor/debug features are counted as ordinary park-play gaps.
 | Research | COMPLETE for ordinary funding/priorities/progression | ResearchManagement.cpp and ParkSetResearchFundingAction: native current project, estimate, funding/categories, research-filtered Build objects. |
 | Marketing | COMPLETE for starting/reviewing native campaigns | MarketingManagement.cpp, ParkMarketingAction: all eligible campaign/target/duration drafts, native costs/progression; no invented campaign cancellation. |
 | Park/scenario management | PARTIAL | ParkOverview.cpp, Menu.cpp: objectives/status and native save/load; RightsTools.h adds native land/construction-rights purchase/inspection; broader desktop Park/Map information remains. |
-| Save / load | COMPLETE for Pocket slots; PARTIAL domain | Menu.cpp native .park saves/loads, overwrite/discard review, autosave/provisional cleanup; desktop LoadSave.cpp has arbitrary file browsing. |
+| Save / load | COMPLETE delivered native controller workflows; PARTIAL desktop parity | Menu.cpp: retained .park slots/autosave, real park/autosave folders, preview-only stored metadata, explicit load/discard recovery and named Save As with guarded publication. Native late-import rollback, 32-code-point ASCII entry and desktop file-management/location gaps remain; see SAVE-LOAD-BROWSING-COMPLETION.md. |
 | Global information | PARTIAL | Hud.h native cash/date/guests/pause/speed; Dashboard sections provide selected native summaries. |
 
 ## Missing depth and recommended treatment
@@ -57,7 +57,7 @@ Complexity refers to implementation, not the number of desktop controls.
 | Research invention list COMPLETE native catalog core; PARTIAL broader information | Research.cpp finished-item list, Research state | Funding/priorities complete | small / medium | Native invention-record catalog, seven category filters, real availability, object previews and stale descriptor guards delivered; native order retained, no invented dates or manual unlocking. See FINANCE-RESEARCH-INFORMATION-COMPLETION.md. |
 | Land/construction rights COMPLETE requested purchase/inspection scope | Map.cpp, LandRights.cpp; LandBuyRightsAction/LandSetRightsAction | Native tile selection/action feedback | medium / high | RightsTools.h: native area inspection and Cancel-first LandBuyRightsAction purchase review, counts, scenario availability, cost/ownership snapshots, stale guards and save/reload; no direct ownership mutation. |
 | Park news/awards/history PARTIAL | Park.cpp, RecentNews.cpp, NewsItem and park histories | Overview, management panes | medium / medium | Native recent/archive pages with full wrapped text, expiry/identity guards and locate; read-only active awards and native rating/guest-history graphs with undefined samples. Guest/staff/ride subject inspection and recovery are delivered. Notification settings and broader research/finance/campaign news subject links remain; see PARK-MAP-INFORMATION-COMPLETION.md. |
-| Arbitrary save/design browsing PARTIAL | LoadSave.cpp and TrackDesignList.cpp; native platform environment | Slot UI and saved-design picker | medium / medium | Controller-native folder/file navigation; keyboard needed only for custom names. |
+| Arbitrary save/design browsing COMPLETE named workflow; native format/family limits retained | LoadSave.cpp, TrackDesignList.cpp; native platform environment/importers/repository | Native park/autosave and design folder/metadata/preview/placement flow, reviewed named Save As | delivered / high | Stable selection, UTF-8 path detail, file/destination guards and recoverable native errors. No new flat-design/substitution support or desktop install/delete/rename/new-folder/Windows-drive flow; see SAVE-LOAD-BROWSING-COMPLETION.md. |
 | General map/information PARTIAL | Map.cpp, Park.cpp, GuestList.cpp | Locate/navigation and Dashboard | medium / medium | Native Pocket map now shares desktop colours/rotation, bounded tile navigation, viewport box, zoom, native ownership labels and explicit locate. Native guest/tracked/staff-role overlays, actual subject rosters and linked inspection/recovery plus news/awards/history are delivered. Native guest follow and filtered guest-map rosters are delivered. Train overlays, non-guest finer map filters and editor-only map operations remain; see PARK-MAP-INFORMATION-COMPLETION.md. |
 | Desktop-only pointer affordances DESKTOP-ONLY | Resizable overlapping windows, hover tooltips, drag widgets | Semantic controller architecture | architectural / low | Replace with bounded pages/context details; literal desktop arrangement inappropriate at 512×384. |
 
@@ -480,3 +480,10 @@ all fourteen preservation drivers and four asset-backed regressions pass. This c
 the named browsing workflow; flat/special design/substitution gaps, 32-code-point ASCII
 keyboard entry, native late-load rollback limits and overall ordinary gameplay PARTIAL
 remain explicit. No physical Brick/AArch64 results are claimed.
+
+Save/load/design browsing implementation published as 2f0f7caad66b901b35bee646a06ff41ebd8f8014,
+matching local c82ebd09 / full tree 1112565763e0fb5e07dd21bcbea6ced3e4f8694e.
+Completed inspected 24-PNG capture ZIP saved (SHA256 812dec5dcff5d0297b38bd9de7885afb38bd86e74343a0e6987dae4487d975a6).
+The next substantial ordinary gameplay gap is broader native selected-track editing/
+replacement, especially station/inverted/no-predecessor cases and actual failure/recovery
+semantics in ADVANCED-RIDE-EDITING-COMPLETION.md. Do not rebuild this browser milestone.

@@ -207,3 +207,24 @@ inspected; unchanged images from the earlier inspected run were byte-hash matche
 and every changed/new final image individually inspected. No clipping/overlap/focus/
 contrast/control collision requiring another production change remains. Intentional
 ellipsis and bounded path paging remain. Final checksum/provenance ZIP follows.
+
+## Phase 3 publication and capture closeout
+
+Canonical 2f0f7caad66b901b35bee646a06ff41ebd8f8014; local safety
+c82ebd09ce9e91b116badb2568bf737d902472a8; complete matching source tree
+1112565763e0fb5e07dd21bcbea6ced3e4f8694e. All thirteen changed blob hashes,
+canonical commit tree/parent 40a6db57 and full tree equality verified; expected_sha /
+force=false fast-forward and resulting branch ref verified. No clone/reset/clean/
+restore/discard/history rewrite or force push. Protected Esperanto remains exact
+SHA256 e37ba559b4d9d761e74f2bb284d1ec762b813e789655c0495a882c83651890b5 and excluded.
+
+OpenRCT2-Pocket-Save-Load-Browsing-Captures.zip is complete and saved: twenty-four
+512×384 production PNGs, README and actual dimension/SHA256/provenance manifest.
+ZIP size 905621 bytes; SHA256
+812dec5dcff5d0297b38bd9de7885afb38bd86e74343a0e6987dae4487d975a6.
+Manifest binds canonical/local/tree/driver identity, native renderer, actual source
+assets checksum, native fixture actions, observed validations and exact limitations.
+Private archives, parks, generated native designs and original source assets excluded.
+No AI mockups or composited fake interfaces. All final image bytes approved as above.
+This subsequent documentation-only publication preserves tested production source and
+ZIP bytes. Final source/ref/tree equality and publication recorded in the final handoff.
