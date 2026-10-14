@@ -45,7 +45,7 @@ Complexity refers to implementation, not the number of desktop controls.
 | Ride graphs COMPLETE within native sample-view scope | Ride.cpp graph page; RideMeasurement sampling and scrolling | Native bounded controller graph view | medium / low | Delivered bounded native speed/altitude/G-force graphs, time ranges and scrolling; waiting/unsupported sampling states remain explicit. |
 | Other ride types / special construction PARTIAL | NewRide.cpp, RideConstruction.cpp; RideCreateAction, TrackPlaceAction, MazeSetTrackAction, TrackDesignAction | Flat/custom/saved adapters | architectural / high | Conventional descriptor-compatible families and native maze half-cell build/move/fill/access/recovery delivered. Maze segment previews and further special geometry remain partial; see MAZE-SPECIAL-RIDE-COMPLETION.md. |
 | Custom editing breadth PARTIAL | RideConstruction.cpp backward/selected-block editing, special tracks, brake speeds, design export | Descriptor-driven forward editor and selected native block removal/speed controls | architectural / high | Disconnected forward/rear endpoints, native backward core, guarded two-step replacement, covered/inverted core and seat placement are delivered. Complex/diagonal coverage, positive transitions, special parameters and atomic/station/inverted replacement remain; see ADVANCED-RIDE-EDITING-COMPLETION.md. |
-| Shop appearance/naming PARTIAL | Ride.cpp colours/music/name and item stats; appearance/name actions | Shop management/picker | medium / medium | Shared reusable naming keyboard delivered; broader shop appearance remains outside this ride milestone. |
+| Shop appearance/naming COMPLETE within native object channels | Ride.cpp shop colour flags/random merchandise/name; RideSetAppearanceAction/SetNameAction | Shop management/picker and shared keyboard | medium / medium | Actual object-supported building colours and random merchandise colours, native palette, Cancel-first cost review, allocation/object/channel/baseline guards and .park persistence delivered. Unsupported loaded objects are explicit; no invented shop vehicle/station/music controls. See SHOP-APPEARANCE-COMPLETION.md. |
 | Connected path builder PARTIAL | Footpath.cpp bridge/tunnel next-endpoint building; FootpathPlaceAction | Existing-path endpoint selection, sequential flat/rise/descend/elevated normal/queue placement | medium / high | Native incoming geometry/ghosts/costs, pending guard and options recovery. Entrance endpoint start, undo/history and asset-backed routing validation remain. See PARK-CONSTRUCTION-COMPLETION.md. |
 | Path furniture COMPLETE native placement/removal core; PARTIAL exhaustive validation | Footpath.cpp additions; FootpathAdditionPlaceAction/RemoveAction | Shared object picker/targeting | medium / medium | Delivered loaded/researched additions picker, native path geometry, placement/removal/ghosts and persistence. Named bench/bin/lamp/fountain/queue-screen fixtures, queue/slope restrictions and persistence pass; expansion exhaustive validation pending. |
 | Terrain brush/edges COMPLETE requested core; PARTIAL broader depth | Land.cpp, Water.cpp, LandRights.cpp; LandRaise/Lower/SmoothAction, SurfaceSetStyleAction, LandSetRightsAction | Existing one-tile tools | medium / high | Rectangular 1–64 brushes, native corner/edge selection, smoothing, area water and surface/edge styles delivered. Colour-choice controls remain; see PARK-CONSTRUCTION-COMPLETION.md. |
@@ -597,3 +597,17 @@ no vehicle/station/music controls are invented. Naming/prices/common prices and
 status/stats/demolition remain. Focused native/SDL tests, same-slot reuse rejection,
 held-A cancellation and .park round-trip pass; final preservation/captures follow.
 See SHOP-APPEARANCE-COMPLETION.md for capability and preview-discrepancy evidence.
+
+### Native shop appearance and preview lifecycle — final closeout
+
+Actual shop/facility object channels and existing shared naming are delivered.
+Native colour/merchandise choices, Cancel-first cost review, allocation/object/
+channel/baseline guards, stale recovery and .park persistence pass. The paused
+shop discrepancy was reproduced and resolved as native focus/reset/modal fixture
+expectations; no production ghost leak/cash defect was demonstrated. Seventeen
+final native/SDL drivers, six original-asset regressions and CTest 5/5 pass. The
+28 inspected production 512x384 capture ZIP and exact limitations are recorded in
+SHOP-APPEARANCE-COMPLETION.md. Native absence of colour support stays explicit.
+Maze/access previews, further selected/special geometry/parameters, flat/special
+design adapters, continuous scenery/network, file/keyboard/import, sustained
+family guests and physical/performance gaps remain. Next: maze/access previews.

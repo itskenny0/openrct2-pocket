@@ -136,3 +136,12 @@ deferred until hardware feedback. No new subsystem should precede that feedback.
 
 Next: physical Brick play/readability test → focused hardware-feedback cleanup →
 desktop-versus-Pocket depth matrix → subsystem depth/completeness.
+
+## Shop appearance capture closeout
+
+Native shop appearance content uses a 330-pixel indigo panel at (8,8), bounded
+native palette paging, gold focus and contextual controller footer, leaving the
+native shop/park visible. Management keeps the existing HUD suppression; shop
+preview uses the existing compact HUD and overlay/footer. All 28 final 512x384
+PNGs were inspected for clipping/overlap/contrast/focus/controls/HUD collisions;
+see SHOP-APPEARANCE-COMPLETION.md. No hardware/performance result is inferred.

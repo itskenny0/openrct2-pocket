@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 #include <openrct2-ui/handheld/ShopAppearance.h>
 #include <openrct2-ui/handheld/Shops.h>
 #include <openrct2-ui/handheld/Hud.h>
@@ -5,9 +6,10 @@
 #include <openrct2/object/RideObject.h>
 #include <openrct2/world/TileElementsView.h>
 #include <openrct2/world/tile_element/TrackElement.h>
-// SPDX-License-Identifier: GPL-3.0-only
 // Native initialized scenario fixture; construction and editing use real actions.
 #include <SDL.h>
+#include <openrct2-ui/ProvisionalElements.h>
+#include <openrct2/interface/Window.h>
 #include <filesystem>
 #include <iostream>
 #include <openrct2-ui/UiContext.h>
@@ -93,12 +95,16 @@ int main(int argc, char** argv)
             std::filesystem::create_directories(output);
             Drawing::X8DrawingEngine engine(context->GetUiContext());engine.Resize(512,384);engine.BeginDraw();
             auto& rt=*engine.getRT();Viewport viewport{};viewport.width=512;viewport.height=384;viewport.zoom=ZoomLevel{1};
-            viewport.viewPos=Translate3DTo2DWithZ(0,captureFocus)-ScreenCoordsXY{viewport.zoom.ApplyTo(310),viewport.zoom.ApplyTo(190)};
+            viewport.viewPos=Translate3DTo2DWithZ(0,captureFocus)-ScreenCoordsXY{viewport.zoom.ApplyTo(410),viewport.zoom.ApplyTo(190)};
             ResetAllSpriteQuadrantPlacements();Drawing::UpdatePaletteEffects();ViewportRender(rt,&viewport);
             if (menu) {
                 if (auto* window=Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu)) window->onDraw(rt);
             } else {
                 H::DrawHud(rt,{512,384},H::NativeHud());
+                if(H::IsShopToolActive()) {
+                    H::DrawShopOverlay(rt,H::Concept::kOrigin,H::Shops::Name(H::ShopSelection()),H::Shops::Eligible(H::ShopSelection()),H::ShopDirection());
+                    H::DrawShopFooter(rt,{512,384});
+                }
             }
             if (auto* error=Ui::GetWindowManager()->FindByClass(WindowClass::error)) error->onDraw(rt);
             Image image;image.Width=512;image.Height=384;image.Depth=8;image.Stride=rt.LineStride();image.Palette=Drawing::gPalette;
@@ -135,6 +141,7 @@ int main(int argc, char** argv)
             for(size_t c=0;c<settings.size();++c){
                 auto draft=A::Begin(target,c);Check(draft.has_value(),"Supported channel has no editor");
                 const auto original=draft->setting.current;
+                Check(A::Action(*draft,false).getErrorMessage()=="Choose a different native value","Unchanged selection misreported as stale shop");
                 draft->value=draft->setting.values[original==draft->setting.values.front()?1:0];
                 auto q=A::Action(*draft,false);Check(q.error==GameActions::Status::ok && q.cost==0,"Native appearance quote failed or cost differs");
                 Check(state.park.cash==cash && mapBytes()==map && ShopAppearanceContext::Value(*ride,*draft->setting.appearance)==original,"Query changed park");
@@ -150,8 +157,10 @@ int main(int argc, char** argv)
                 Check(A::Action(*draft,false).error!=GameActions::Status::ok,"Stale appearance baseline accepted");
                 haveItem|=*draft->setting.appearance==Channel::sellingItemColourIsRandom;
             }
+            capture(("09-result-"+std::to_string(n)+".png").c_str());
+            W::HandheldMenuBack();capture(("10-management-"+std::to_string(n)+".png").c_str());
             Check(ride->price==prices && ride->status==status && ride->getName()==name && state.park.samePriceThroughoutPark==common && state.park.cash==cash && mapBytes()==map,"Appearance changed unrelated native state");
-            W::HandheldMenuBack();W::HandheldMenuBack();
+            W::HandheldMenuBack();
         }
         Check(channels>3 && haveItem,"Differing channel/merchandise coverage absent");
         auto target=targets[1];auto ride=M::Find(target);auto draft=A::Begin(target,0);Check(draft.has_value(),"Building channel absent");
@@ -159,7 +168,10 @@ int main(int argc, char** argv)
         // Native object definition mutation is isolated to this fixture, then restored.
         auto* object=objects.GetLoadedObject<RideObject>(target.object);auto& entry=const_cast<RideObjectEntry&>(object->GetEntry());
         entry.flags.set(RideEntryFlag::disableColourTab);Check(A::Settings(target).empty() && A::Action(*draft,false).error!=GameActions::Status::ok,"Changed object capabilities accepted");entry.flags.unset(RideEntryFlag::disableColourTab);
+        const auto originalVersion=object->GetVersion();auto changedVersion=originalVersion;++std::get<2>(changedVersion);object->SetVersion(changedVersion);
+        Check(A::Action(*draft,false).error!=GameActions::Status::ok,"Changed native object version accepted");object->SetVersion(originalVersion);
         W::HandheldRideOpen(target.id);choose(4);choose(0);captureFocus={720,656,112};capture("02-native-palette.png");
+        W::HandheldMenuMove(24);capture("11-paged-native-palette.png");W::HandheldMenuMove(-24);
         auto model=W::HandheldShopAppearancePresentation();Check(model.rows.size()==Drawing::kColourNumNormal,"Native palette list differs");
         W::HandheldMenuMove(1);press(H::Action::confirm);model=W::HandheldShopAppearancePresentation();
         Check(model.confirmation && model.selected==0,"Appearance review not Cancel-first");capture("03-cancel-first-review.png");
@@ -195,6 +207,58 @@ int main(int argc, char** argv)
         for(size_t i=0;i<targets.size();++i){auto* r=GetRide(targets[i].id);Check(r,"Reloaded shop missing");Check(values[i]==std::array<uint16_t,4>{ShopAppearanceContext::Value(*r,Channel::trackColourMain),ShopAppearanceContext::Value(*r,Channel::trackColourAdditional),ShopAppearanceContext::Value(*r,Channel::trackColourSupports),ShopAppearanceContext::Value(*r,Channel::sellingItemColourIsRandom)},"Reloaded appearance differs");}
         Check(state.park.cash==savedCash && !W::HandheldShopManagementIsOpen(),"Native load retained menu or changed cash");
         W::HandheldRideOpen(targets[1].id);choose(4);captureFocus={720,656,112};capture("08-reloaded-merchandise.png");
+        choose(1);capture("15-native-merchandise-choices.png");
+        W::HandheldMenuBack();W::HandheldMenuBack();
+        W::HandheldMenuBack();
+        Check(!Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu),"Preview fixture still has a modal menu");
+        Ui::GetWindowManager()->CloseAll();
+        Ui::GetWindowManager()->CloseByClass(WindowClass::error);
+        Ui::GetWindowManager()->CloseByClass(WindowClass::progressWindow);
+        // Native window updates cull closed windows before the next ordinary frame.
+        WindowCullDead();
+        auto* balloon=GetRide(targets[1].id);const auto selection=balloon->subtype;
+        Check(H::SetShopSelection(selection),"Preview selection failed");
+        const CoordsXY previewTile{1024,640};captureFocus={1040,656,112};
+        auto* mainWindow=WindowGetMain();Check(mainWindow && mainWindow->viewport,"Native camera missing");
+        mainWindow->viewport->zoom=ZoomLevel{0};
+        mainWindow->viewport->viewPos=Translate3DTo2DWithZ(GetCurrentRotation(),captureFocus)-ScreenCoordsXY{256,192};
+        mainWindow->savedViewPos=mainWindow->viewport->viewPos;ResetAllSpriteQuadrantPlacements();
+        const auto nativeTarget=ScreenGetMapXY({256,192},nullptr);
+        Check(nativeTarget && CoordsXY{nativeTarget->x&~31,nativeTarget->y&~31}==previewTile,"Native camera does not target preview fixture");
+        const auto previewCash=state.park.cash;const auto previewMap=mapBytes();
+        auto ghosts=[&](){int count=0;for(const auto* e:TileElementsView<TrackElement>(previewTile))count+=e->isGhost();return count;};
+        GameActions::CheatSetAction allowPaused(CheatType::buildInPauseMode,1);
+        Check(GameActions::Execute(&allowPaused,state).error==GameActions::Status::ok,"Native paused-build setting failed");GameActions::ProcessQueue(state);gGamePaused=1;
+        S::UpdatePreview(previewTile,selection,0);Check(ghosts()==1 && state.park.cash==previewCash,"Paused native shop preview missing");
+        capture("12-paused-native-preview.png",false);
+        Ui::ProvisionalElementsRemove();Ui::ProvisionalElementsRemove();Check(ghosts()==0 && mapBytes()==previewMap,"Nested preview suspension mutated real map");
+        Ui::ProvisionalElementsRestore();Check(ghosts()==0,"Nested preview restored early");Ui::ProvisionalElementsRestore();Check(ghosts()==1,"Nested preview failed restoration");
+        const auto provisional=std::filesystem::path(argv[2])/"shop-preview-autosave.park";SaveFlags automatic;automatic.set(SaveFlag::automatic);
+        Check(ScenarioSave(state,provisional.string(),automatic)!=0 && ghosts()==1 && state.park.cash==previewCash,"Native autosave did not restore paused preview");
+        Check(InputGetState()==InputState::reset,"Native load/reset fixture assumption changed");
+        gameStateTick();
+        Check(ghosts()==0 && mapBytes()==previewMap && state.park.cash==previewCash,"Reset-state frame retained preview or changed real park");
+        // Complete the native input reset as the ordinary mouse/UI frame does.
+        InputSetState(InputState::normal);WindowCullDead();S::UpdatePreview(previewTile,selection,0);
+        Check(ghosts()==1,"Normal-input paused preview failed restoration");
+        gameStateTick();const bool focusCleanup=!ContextHasFocus();
+        Check(ghosts()==(focusCleanup?0:1) && state.park.cash==previewCash,"Paused full shell frame disagrees with observed focus");
+        W::HandheldRideOpen(targets[1].id);Check(ghosts()==0,"Inspection left preview ghost");capture("13-preview-management-return.png");
+        W::HandheldMenuBack();H::EndTerrain();
+        Check(context->LoadParkFromFile(provisional.string()) && ghosts()==0 && !H::IsShopToolActive(),"Autosave persisted borrowed shop/ghost/tool");
+        size_t realRides=0;for(const auto& r:state.rides)realRides+=!r.id.IsNull();Check(realRides==targets.size(),"Temporary preview ride persisted in autosave");
+        W::HandheldRideOpen(targets[1].id);choose(4);captureFocus={720,656,112};capture("14-autosave-reload-preservation.png");
+        choose(0);W::HandheldMenuMove(1);press(H::Action::confirm);
+        Check(W::HandheldShopAppearancePresentation().confirmation,"Load cleanup review fixture missing");
+        auto pending=A::Begin(*M::Capture(targets[1].id),0);pending->value=pending->setting.values[pending->setting.current==pending->setting.values.front()?1:0];
+        const auto reloadValue=pending->setting.current;
+        GameActions::RideSetAppearanceAction pendingAction(pending->target.id,*pending->setting.appearance,pending->value,0);
+        pendingAction.GuardShopContext(pending->context);GameActions::Enqueue(&pendingAction,state.currentTicks);
+        Check(ShopAppearanceContext::Value(*GetRide(targets[1].id),*pending->setting.appearance)==reloadValue,"Native enqueue executed prematurely");
+        Check(context->LoadParkFromFile(provisional.string()),"Pending-review native load failed");GameActions::ProcessQueue(state);
+        Check(!W::HandheldShopManagementIsOpen() && ShopAppearanceContext::Value(*GetRide(targets[1].id),*pending->setting.appearance)==reloadValue,"Load retained review/queued appearance");
+        W::HandheldRideOpen(targets[1].id);choose(4);capture("16-pending-review-load-recovery.png");
+
         std::cout<<"ShopAppearanceTests native/SDL PASS\n";return 0;
     }
     catch(const std::exception& e){std::cerr<<e.what()<<std::endl;return 1;}

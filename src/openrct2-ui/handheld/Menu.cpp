@@ -4523,7 +4523,7 @@ namespace OpenRCT2::Ui::Windows
                         _shopAppearanceBusy=true;const auto request=++_shopAppearanceRequest;
                         const auto result=Handheld::ShopAppearance::Action(*_shopAppearanceDraft,true,
                             [this,request,lifetime=std::weak_ptr<int>(_shopAppearanceLifetime)](const auto*,const GameActions::Result* outcome){
-                                if(lifetime.expired() || request!=_shopAppearanceRequest || _page!=Page::shopAppearanceReview)return;
+                                if(lifetime.expired() || flags.has(WindowFlag::dead) || request!=_shopAppearanceRequest || _page!=Page::shopAppearanceReview)return;
                                 _shopAppearanceBusy=false;
                                 if(outcome->error==GameActions::Status::ok) {
                                     page(Page::shopAppearance);_focus.move(static_cast<int>(_shopAppearanceChannel),rows().size());_status="Native appearance applied";

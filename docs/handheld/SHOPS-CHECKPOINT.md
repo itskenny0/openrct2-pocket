@@ -125,3 +125,14 @@ adjust its native product/admission prices, confirm demolition with queried
 refund, and save/reload the result. Keep it scoped to shops/facilities, reuse the
 existing handheld Ride inspection entry and solid style, and preserve all completed
 construction. No naming keyboard or broad park-management redesign is needed.
+
+## Shop appearance / preview lifecycle closeout supersedes earlier next steps
+
+Shop placement, management and shared naming remain. Native object-supported
+building colours and random merchandise now have controller-native inspection,
+paged palette, Cancel-first native cost review, exact allocation/object/baseline
+guards and persistence. See SHOP-APPEARANCE-COMPLETION.md. The paused full-shell
+preview discrepancy was reproduced: native focus/modal/input-reset cleanup must
+not resurrect ghosts. Documented and forced-shell PathActions pass; nested
+provisional/autosave/real map/cash/borrowed-ride preservation remains covered.
+No new independent simulation or preview save state was introduced.

@@ -129,3 +129,14 @@ native cash/income/expenses, loan borrowing/repayment and permitted park admissi
 pricing, with native actions, bounded drafts, confirmations and save/reload.
 Use the native money formatter consistently as part of that financial workflow;
 do not redo finished construction or UI polish.
+
+## Native appearance completion follow-up
+
+Inspection adds a fifth Appearance row, preserving Status/Prices/Demolish/Rename
+indices. Actual loaded-object/native descriptor colour and merchandise controls
+use the native palette and RideSetAppearanceAction, with Cancel-first queried cost
+review, stale/reused allocation guards and same-channel return. No vehicle,
+station or music controls are invented for shops. Naming, common-price rules,
+status, native statistics and demolition remain. Seventeen preservation drivers,
+six original-asset regressions, CTest and 28 production captures close out this
+scope; see SHOP-APPEARANCE-COMPLETION.md for exact evidence and limits.

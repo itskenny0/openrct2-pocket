@@ -190,3 +190,11 @@ Production-component 512x384 graph, station, painting and keyboard captures were
 inspected. Release GUI/CLI build, full native driver, SDL driver and lightweight
 CTest (3/3) passed. Physical Brick readability/input, live complete-coaster graphs
 and target audio playback remain validation follow-ups, not claimed fixture results.
+
+## Native shop appearance follow-up
+
+Shop inspection now delegates appearance to object-supported building colour and
+random merchandise channels, reusing native palette labels/actions and shared
+naming. Shop station/vehicle/music controls remain absent by native rules. Exact
+allocation/object/channel/baseline guards, native cost review and persistence
+are covered in SHOP-APPEARANCE-COMPLETION.md; ride appearance workflows remain.

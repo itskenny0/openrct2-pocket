@@ -46,7 +46,11 @@ namespace OpenRCT2::Ui::Handheld::ShopAppearance
     {
         const auto* ride=ShopManagement::Find(draft.target);
         if(!ride || !draft.setting.appearance || draft.context.empty() || draft.context!=ShopAppearanceContext::Capture(*ride)) {
-            GameActions::Result result;result.error=GameActions::Status::disallowed;result.errorMessage="Shop appearance or object changed; reopen controls";return result;
+            GameActions::Result result;result.error=GameActions::Status::disallowed;result.errorMessage="Shop changed; reopen appearance";return result;
+        }
+        if(draft.value==ShopAppearanceContext::Value(*ride,*draft.setting.appearance)) {
+            GameActions::Result result;result.error=GameActions::Status::disallowed;
+            result.errorMessage="Choose a different native value";return result;
         }
         GameActions::RideSetAppearanceAction action(draft.target.id,*draft.setting.appearance,draft.value,0);
         action.GuardShopContext(draft.context);action.SetCallback(std::move(callback));

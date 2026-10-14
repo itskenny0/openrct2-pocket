@@ -1,4 +1,4 @@
-# Native shop appearance and preview lifecycle — incremental checkpoint
+# Native shop appearance and preview lifecycle — completion
 
 ## Baseline integrity
 
@@ -36,7 +36,7 @@ sockets. No focused-display/physical Brick result is claimed. Native no-shell
 paused preservation and explicit focus-loss branches are both exercised; focused
 full-shell display validation remains a host/hardware follow-up.
 
-Shop appearance implementation and final preservation/capture closeout follow.
+The following phases deliver native appearance and the final preservation/capture closeout.
 
 ## Phase 2 — native shop/facility appearance
 
@@ -77,4 +77,110 @@ object flags solely to demonstrate stale loaded-definition rejection and restore
 them; production never edits object definitions.
 
 Phase 2 validation: Release GUI/CLI builds, ShopAppearanceTests native/SDL with
-original assets, and CTest 5/5 pass. Final preservation/capture closeout follows.
+original assets, and CTest 5/5 pass. The final source and capture closeout below supersedes this intermediate test record.
+
+## Phase 3 — end-to-end validation and capture closeout
+
+ShopAppearanceTests runs with the actual engine data, private test profile and
+original RCT2 installation (argc 4). Native placement -> native inspection ->
+supported channel editing -> Cancel-first cancel/apply -> same-channel return ->
+management -> native .park save/reload passes. Unsupported Burger/Toilet/ATM
+objects remain explicit. Balloon/Information building and merchandise values
+persist; no customers, income, routing or statistics are manufactured.
+
+Final additions cover loaded object version changes, unchanged-value feedback,
+nested paused provisional suspension/restoration, actual native autosave and
+borrowed-ride exclusion, exact camera targeting, native input-reset cleanup, the
+normal-input paused full-shell tick, menu return and native queued-action/review
+cleanup across successful load. Native UI callback lifetime checks also reject
+closed/dead windows. There is no new park-save state or independent accounting.
+
+The added full-shell fixture initially expected a ghost while a modal was still
+open and input was in native post-load reset. Observed diagnostics: focus true,
+input reset (0), no active desktop tool, unchanged cash, zero ghost, correct
+camera target. CanExplore correctly rejects non-normal input; direct onDraw and
+menu calls do not complete the ordinary native window/input frame. The fixture
+now closes/culls windows using native APIs, validates the actual camera hit,
+asserts reset-state removal with exact real map/cash preservation, completes the
+native input reset, then asserts valid paused restoration/observed focus cleanup.
+This does not change or weaken the original Phase 1 paused-preview assertion.
+
+Final frozen-production PASS:
+
+- Release GUI and CLI builds; affected Menu/header consumers rebuilt and every
+  native driver relinked after the last production change.
+- CTest 5/5: controller input, launcher, native atomic save preservation, file
+  browsing and named-save helper suites.
+- Seventeen native/SDL drivers: SceneryPathParityTests, ConstructionTests,
+  PathActionsTests, PresentationLifecycleTests, ParkMapInformationTests,
+  GuestInformationTests, GuestCompletionTests, StaffCompletionTests,
+  FinanceResearchInformationTests, RideConstructionTests, SeatRotationTests,
+  FamilyOperationTests, MazeConstructionTests, MiniGolfConstructionTests,
+  SelectedTrackEditingTests, DesignSubstitutionTests and ShopAppearanceTests.
+- Six original-asset regressions: SelectedTrackEditingCapture, DesignCapture,
+  RideConstructionCapture, MazeConstructionCapture, original Wooden circuit/
+  access/natural-guest CustomCoasterCapture, and SaveLoadBrowsingTests.
+- PathActionsTests also passes separately with OPENRCT2_HANDHELD unset and
+  forced=1 after Phase 2. Final forced=1 sweep passes after the small appearance
+  feedback/callback corrections. The final corrections do not alter preview
+  production or the paused fixture. Both environments are reported separately.
+
+An initial reused-output DesignCapture run rejected the pre-existing Café Native
+export left by a prior successful driver: its cancellation assertion correctly
+requires an absent destination. Fresh isolated outputs pass that unchanged
+assertion. No export was removed and no assertion weakened. Driver argc/env
+contracts were checked; no missing test or physical result is claimed.
+
+## Captures
+
+OpenRCT2-Pocket-Shop-Appearance-Captures.zip contains 28 individually inspected
+production 512x384 PNGs plus dimension/SHA256/provenance manifest, checksums and
+README. All PNGs use actual native ViewportRender/X8DrawingEngine and Pocket menu
+onDraw or shop overlay/footer/HUD. They are production component captures over
+native data, not physical-device or whole SDL framebuffer screenshots.
+
+ZIP SHA256: dc51c8d2a67244ea34fa9851262d6b46c00265ef3fc518cebaa09027c3f61e11
+
+The native fixture uses original objects and native actions; paused-preview
+captures explicitly use the native build-in-pause cheat in that isolated fixture.
+Every final image was inspected at native pixel size for clipping, overlap,
+focus, indigo/gold contrast, readable controls, park visibility and HUD collision.
+The stale recovery message was shortened to remain fully readable. The capture
+camera leaves the actual shop visible alongside the panel. No fake UI composition
+or metadata is used. Private assets, source parks, profiles and generated designs
+are excluded. Older completed ZIP packages were not regenerated.
+
+Repository provenance: captures/shop-appearance-manifest.json records exact
+production/driver/binary hashes, native asset hash, invocation and limitations.
+
+## Publication history and remaining limits
+
+Phase 1 canonical 4372a3da1b2db8a84824009ac8044e39e4e03030, tree
+2574ff175c17eafd0bca08cfad3868cd4503dcae, matching local safety
+af4031bfff56f98a82be3a57724233d65a7fbe16.
+
+Phase 2 canonical 5e25be1470132c91b3bab728d2c2afddaaf5793c, tree
+b547c214028b10cfc1735475d8f7aaf7ca1978e0, matching local safety
+4634cf05fc0bc6de95820bc3accb46ab547d6bc6. Every changed blob, complete tree,
+expected canonical parent and force=false lease update/readback were verified.
+Phase 3 publication is recorded in the final closeout below and handoff.
+
+Shop channels are exactly the native descriptor/object rules; no arbitrary
+per-product colour, vehicle/station/music control or object installation is added.
+Special palette entries follow the existing native cheat policy. Shared keyboard
+retains UTF-8 but types its existing labelled ASCII/32-code-point scope. Native
+network/replay and physical Brick/AArch64/dense-park performance remain unverified.
+The logical SDL paused frame is covered; a real focused display/hardware run is
+still separate evidence, and the attempted Xvfb display was unavailable here.
+
+Unrelated ordinary gaps remain: direct selected-seat/further parameters;
+diagonal/special/exhaustive selected replacement and positive variant transitions;
+flat/special saved-design adapters and unsupported substitutions; maze/access
+placement ghosts; continuous scenery gestures/automatic-height/network reviews;
+native file-location/format/keyboard and late-import limits; sustained individual
+family guest operation. Selected replacement remains explicit native removal and
+rebuilding, without atomic replacement/restoration; native design placement stays
+sequential with possible optional scenery omission. These are not claimed closed.
+
+Next substantial scope: native maze and ride-access placement previews and their
+provisional lifecycle, preserving all construction/action/eligibility/accounting.
