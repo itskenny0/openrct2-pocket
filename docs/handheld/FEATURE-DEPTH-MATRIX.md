@@ -576,3 +576,13 @@ verification succeeded. Saved inspected 24-PNG capture ZIP SHA256
 `bcf4bb8818213e040ad4bf0b6b152d4bc9a932dfc6726cdb50abd1de834e4d2b`.
 Final documentation closeout follows this fixed production source; see the handoff
 for that final ref. Exact remaining ordinary gaps and test-environment caveat remain.
+
+## Shop preview lifecycle audit Phase 1 — 2026-10-14 UTC
+
+SHOP-APPEARANCE-COMPLETION.md resolves the extra forced-shell PathActions discrepancy:
+actual dummy-window focus loss correctly clears ghost/borrowed ride with unchanged
+real map/cash and retained tool selection. The fixture now asserts that cleanup,
+while retaining focused/no-shell preview-restoration assertions. Entire driver passes
+both documented and forced Pocket environments; Release GUI/CLI and CTest 5/5 pass.
+No production focus-loss behavior changed; a real focused display remains unverified.
+Broader native shop appearance follows in Phase 2.

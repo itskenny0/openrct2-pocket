@@ -819,10 +819,20 @@ static void TestShops(IContext& context, const std::string& profile, bool realUi
         state.cheats.buildInPauseMode = true;
         gGamePaused = 1;
         const auto pausedCash = state.park.cash;
+        const bool focusCleanup = H::IsEnabled() && !ContextHasFocus();
         gameStateTick();
-        Require(
-            tracks(next, true) == 1 && rides() == baselineRides + 2 && state.park.cash == pausedCash,
-            "Paused native tick stranded shop record/changed cash");
+        Require(tracks(next,false)==0 && state.park.cash==pausedCash,"Paused shop frame changed real track/cash");
+        if (focusCleanup)
+        {
+            // The full Pocket frame intentionally clears unfocused previews.
+            // Provisional restoration must not resurrect that cleared request.
+            Require(tracks(next,true)==0 && rides()==baselineRides+1,
+                "Unfocused paused frame retained/resurrected shop ghost or borrowed ride");
+            Require(H::IsShopToolActive(),"Focus cleanup ended the selected shop tool");
+        }
+        else
+            Require(tracks(next,true)==1 && rides()==baselineRides+2,
+                "Paused native tick stranded shop record/changed cash");
         gGamePaused = 0;
         state.cheats.buildInPauseMode = false;
         H::EndTerrain();
