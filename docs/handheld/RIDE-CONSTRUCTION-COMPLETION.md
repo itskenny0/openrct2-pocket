@@ -208,3 +208,12 @@ access/Open/save evidence and inspected production captures are recorded there.
 This supersedes those specific pending entries above; atomic restoration, direct
 selected-seat editing, diagonal/special/exhaustive geometry, positive transitions,
 design substitution/arbitrary scenery and hardware/sustained-guest gaps remain.
+
+## Native maze/access preview follow-up
+
+Missing entrance/exit placement now renders isolated native ghosts without real
+station/path/maze/cash mutation. Maze build/fill proposals reuse native geometry on
+native ghost entries, with nested provisional/save and paused-tick cleanup. See
+MAZE-ACCESS-PREVIEW-COMPLETION.md for completed native/SDL/asset validation,
+29-capture package, guards, recovery and precise remaining limits. Existing access
+relocation/removal and exhaustive family cases are not delivered by that follow-up.

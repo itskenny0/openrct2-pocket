@@ -194,3 +194,12 @@ pass public fixtures. Maze native opening passes public and Factory Capers
 asset-backed workflows; neither proves sustained guest use. Exact evidence and
 remaining asset-backed Mini Golf/transport/water gaps are recorded in
 TRACK-EDITING-DESIGN-COMPLETION.md.
+
+## Native maze/access preview follow-up
+
+Missing entrance/exit placement now renders isolated native ghosts without real
+station/path/maze/cash mutation. Maze build/fill proposals reuse native geometry on
+native ghost entries, with nested provisional/save and paused-tick cleanup. See
+MAZE-ACCESS-PREVIEW-COMPLETION.md for completed native/SDL/asset validation,
+29-capture package, guards, recovery and precise remaining limits. Existing access
+relocation/removal and exhaustive family cases are not delivered by that follow-up.

@@ -405,6 +405,7 @@ namespace OpenRCT2::Ui::Handheld::Mazes
         if(context.empty() || (review && (loc!=review->location || context!=review->context))){ClearPreview();return;}
         GA::MazeSetTrackAction action(loc,!placed,target->id,mode);auto q=GA::Query(&action,getGameState());
         if(q.error!=GA::Status::ok){ClearPreview();return;}
+        feedback.clear();
         PreviewRequest next{target->id,loc,!placed,mode,context,q.cost};previewRequest.emplace(next);
         if(previewDepth)return;
         if(ghostRequest && ghostRequest->location==loc && ghostRequest->mode==mode && ghostRequest->context==context)return;

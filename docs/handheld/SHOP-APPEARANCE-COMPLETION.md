@@ -197,3 +197,12 @@ publication-history documentation commit changes no production source, test,
 PNG or ZIP. All three authorized phases are complete within the stated native
 channels and host validation limits. Protected Esperanto remains unchanged and
 outside every milestone commit. The ZIP is saved as an actual downloadable file.
+
+## Native maze/access preview follow-up
+
+Missing entrance/exit placement now renders isolated native ghosts without real
+station/path/maze/cash mutation. Maze build/fill proposals reuse native geometry on
+native ghost entries, with nested provisional/save and paused-tick cleanup. See
+MAZE-ACCESS-PREVIEW-COMPLETION.md for completed native/SDL/asset validation,
+29-capture package, guards, recovery and precise remaining limits. Existing access
+relocation/removal and exhaustive family cases are not delivered by that follow-up.

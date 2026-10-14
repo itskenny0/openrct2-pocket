@@ -105,3 +105,126 @@ prove cancellation/map/cash/station/count purity, nested scopes, invalid targets
 height, insufficient funds, changed object/version and serialized quote/money-mode
 rejection, and native autosave/load ghost exclusion. Final broad preservation,
 end-to-end family coverage, captures and handoff remain pending.
+
+## Phase 3 — end-to-end and capture closeout
+
+Phase 2 was published at 4f3b198931792b437f1a4e8d782e7bc3df30f85e, complete tree
+eae892dd76ba350755b7cbfd78e436dd4009f776; matching local safety commit
+4ec8cb911fd22dc07726783f9cf5096a44a08a71. Both phase publications verified every
+changed blob and complete tree, expected_sha / force=false fast-forward ref,
+read-back native parent/tree and branch head. The original baseline was
+7ac014a7a4f1810bccbc2d81e110af98c0c344a1 / f4434bd62e3b645b887e3db9dd4372cfe24eb6aa.
+
+Focused native/SDL tests now include original Carousel, Hedge Maze and Monorail
+station access previews. Exact real map bytes (normalized physical sentinel),
+station structs, native maze wall/count rosters and cash are asserted. Native
+same-slot ride reuse, object-version changes, invalid sides/targets, quote and
+money-mode changes, pending repeated Apply, native insufficient funds, actual
+wall results and native cost deductions are checked. Source objects are loaded
+and fixture research initialized before saves; no import-time unlocking is used.
+
+The maze flow completes Cancel-first Fill via real SDL virtual held A without a
+second submission, immediate menu cleanup, construction return, actual native
+entrance/exit placement, native Open and .park save/reload. A conventional
+three-piece Monorail station demonstrates real station/access purity and return
+to native path-access management. Its incomplete circuit is not claimed Open or
+operating. Native Maze Open evidence is status/access eligibility, not sustained
+individual-family guest operation. No customers/income/guest paths/statistics are
+manufactured in captures. The preservation Wooden circuit/access/natural-guest
+regression exercises actual operating guests separately.
+
+Paused full native ticks for access and maze assert either valid restoration or
+observed focus cleanup with exact real state preservation. Native viewport
+alignment and normal-input return precede those ticks. Native load can leave the
+normal pause flag set; recovery tests use native PauseToggleAction rather than
+assuming an imported park is running. The real Pocket load sequence ends tools
+before native import. An absent-file early failure through that sequence preserves
+the real map/cash, clears previews and recovers through an explicit maze resume.
+Direct Context::LoadParkFromFile is not itself a general tool-reset contract.
+Late native object/import failures retain the limitations in SAVE-LOAD-BROWSING-
+COMPLETION.md; no new rollback guarantee exists. Native successful load rejects/
+clears a queued maze action, resets drafts and excludes ghosts. Actual native
+scene transition to title and context pre-unload also clear maze/access drafts.
+Camera and menu transitions clear previews immediately. Nested scope requests
+restore only while their native identities still match.
+
+Capture inspection found recovered valid proposals could retain an old funds/
+stale error. UpdatePreview now clears prior feedback after a successful native
+query; native failures still retain error detail. The fix was rebuilt before
+relinking all drivers. No production source changed during builds or validation.
+
+### Actual final validation
+
+Release GUI/CLI passed. CTest 5/5 passed: handheld-input, handheld-launcher,
+handheld-save-preservation, handheld-file-browsing and handheld-named-save.
+
+All 18 relinked native/SDL drivers passed on final production objects:
+SceneryPathParityTests, ConstructionTests, PathActionsTests,
+PresentationLifecycleTests, ParkMapInformationTests, GuestInformationTests,
+GuestCompletionTests, StaffCompletionTests, FinanceResearchInformationTests,
+RideConstructionTests, SeatRotationTests, FamilyOperationTests,
+MazeConstructionTests, MiniGolfConstructionTests, SelectedTrackEditingTests,
+DesignSubstitutionTests, ShopAppearanceTests, MazeAccessPreviewTests.
+PathActionsTests also passed separately with OPENRCT2_HANDHELD unset; forced=1
+results are reported independently. SDL video/audio dummy were used. Driver argc
+contracts were inspected; fresh profiles/output directories preserve prior
+exports. No assertions were skipped or weakened. Focused additions for conventional
+access, early failure, native title and pre-unload were subsequently compiled and
+passed against the same final production objects.
+
+All six relinked original-asset regressions passed: SelectedTrackEditingCapture,
+DesignCapture, RideConstructionCapture, MazeConstructionCapture,
+CustomCoasterCapture (original Wooden circuit/access/natural guests),
+SaveLoadBrowsingTests. Factory Capers and African Diamond Mine are native source
+scenarios in their applicable drivers. Private source assets and outputs are not
+published. SDL dummy renderer warnings and unavailable headless changelog text do
+not constitute physical-display validation. Physical Brick/AArch64, real focused
+display and dense-park performance remain unconfirmed.
+
+### Captures
+
+OpenRCT2-Pocket-Maze-Access-Preview-Captures.zip contains 29 inspected native
+production-rendered 512x384 PNGs, actual dimension/SHA256/source/binary provenance
+manifest, PNG checksums and README. ZIP SHA256:
+7782fe9768d31e143ff5d5b3ae4757930583b9bcb0a56d5f02346fdd53c663c1
+
+Native X8DrawingEngine/ViewportRender uses actual original g1 and loaded objects;
+actual Pocket HUD, Mazes, FlatRides and Menu components draw panels and controls.
+These are production-component captures with SDL dummy, not physical device
+screenshots. Each PNG was inspected for panel/footer/HUD clipping, overlap, focus,
+contrast and readability. Native long-name ellipses and native action-money sprites
+remain honest. Headless missing-file console output is tested, not represented as
+a fabricated visual error window. No assets, source parks, generated designs,
+profiles, private archives or inspection contact sheets are in the ZIP. Existing
+completed milestone packages are preserved.
+
+### Controls and precise remaining limits
+
+Access retains D-pad target movement, A native placement, B return, station/
+entrance/exit recovery and Start menus. Native station geometry resolves its side,
+direction and base height; unsupported sides remain native errors. Preview guards
+bind exact native ride allocation, loaded descriptors/flags/version/checksum,
+station/access/real-neighbor tiles, target and actual quote. Ghost modes are opt-in;
+legacy desktop/design behavior remains default. No network-peer compatibility or
+network review validation is claimed by this DISABLE_NETWORK host build.
+
+Maze retains half-cell direction on L1/R1, A Build/Select/Confirm, X native cursor
+Move, Y Cancel-first Fill, B Cancel/Finish-access, L2/R2 initial height or selection
+corner, Select camera and Start menu. Movement does not invent committed geometry.
+Native ghost copies include the wall stencil; a fully erased cell has no hedge to
+render. The native selection/review marker identifies that target.
+
+Only missing entrance/exit placement is delivered. Relocating/removing an existing
+access point and its queue/path/maze-hedge consequences remain an ordinary gap.
+No exhaustive family/station/diagonal/special parity is inferred from these three
+fixtures. Direct selected-seat/further parameters, diagonal/special/exhaustive
+selected replacement and positive transitions; flat/special saved-design adapters
+and unsupported substitutions; continuous scenery gestures/automatic-height/network
+reviews; native file-location/format/keyboard and late-import limits; sustained
+individual family guest operation; physical Brick/AArch64, focused display and
+dense-park performance remain as recorded in the matrix. No atomic replacement,
+automatic restoration or independent rollback simulation is claimed.
+
+Next substantial work: audit and complete controller-native existing ride
+entrance/exit relocation/removal and access recovery, using native actions and
+explicit consequences/reviews. Do not begin it as part of this milestone.

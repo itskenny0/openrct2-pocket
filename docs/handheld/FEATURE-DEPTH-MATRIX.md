@@ -634,3 +634,18 @@ MazeSetTrackAction geometry without changing real walls/stations/count/cash. Nat
 cursor Move, Cancel-first Fill, exact serialized context/quote guards and nested
 provisional/save suspension are covered by focused native/SDL tests. See
 MAZE-ACCESS-PREVIEW-COMPLETION.md; final broad/capture closeout is pending.
+
+### Native maze/access preview completion — final closeout
+
+Supersedes the incremental Phase 1/2 pending closeout notes above. Native missing
+entrance/exit previews and maze build/fill wall proposals now preserve real map,
+stations, paths, cash and counts; native action context/quote guards, nested
+save/autosave and paused-tick suspension, menu/camera/load/title/exit cleanup and
+held-input cancellation are validated. Native Carousel/Maze/Monorail access
+fixtures, maze Open/.park round-trip, 18 drivers, six original-asset regressions,
+documented/forced PathActions and CTest 5/5 pass. 29 inspected 512x384 PNGs are
+packaged. See MAZE-ACCESS-PREVIEW-COMPLETION.md for APIs, exact evidence and ZIP hash.
+Move remains native cursor navigation; a fully removed maze cell uses the native
+selection marker. Existing access relocation/removal, exhaustive family geometry,
+network reviews and physical/display/performance validation remain gaps; no atomic
+replacement/rollback or sustained family guest operation is claimed.
