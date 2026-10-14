@@ -8,6 +8,7 @@ mkdir -p "$USER_DIR"
 exec >> "$USER_DIR/launch.log" 2>&1
 printf '\nOpenRCT2 Pocket launch %s\n' "$(date)"
 GAME_DIR="$PAK_DIR/game"
+if [ ! -f "$GAME_DIR/openrct2" ] && [ -f "$PAK_DIR/openrct2" ]; then GAME_DIR="$PAK_DIR"; fi
 LIB_DIR="$GAME_DIR/lib"
 LOADER="$LIB_DIR/ld-linux-aarch64.so.1"
 # Retain NextUI/PortMaster GPU paths; private loader --library-path replaces LD_LIBRARY_PATH.
@@ -31,8 +32,8 @@ export SDL_RENDER_SCALE_QUALITY=0
 # Preserve a supplied mapping override for changed firmware/controllers.
 if [ -z "${OPENRCT2_BRICK_KEEP_MAPPING:-}" ]; then
  if mapping="$("$LOADER" --library-path "$RUNTIME_LIB_PATH" "$GAME_DIR/input-map")"; then
-  export SDL_GAMECONTROLLERCONFIG="$mapping${SDL_GAMECONTROLLERCONFIG:+
-$SDL_GAMECONTROLLERCONFIG}"
+  export SDL_GAMECONTROLLERCONFIG="${SDL_GAMECONTROLLERCONFIG:+$SDL_GAMECONTROLLERCONFIG
+}$mapping"
  fi
 fi
 printf 'Platform=%s Device=%s Assets=%s User=%s\n' "${PLATFORM:-unset}" "${DEVICE:-unset}" "$RCT2_DIR" "$USER_DIR"
