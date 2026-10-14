@@ -495,3 +495,12 @@ connections and actual access references, with stable block-roster return. Exact
 track/station/access/object review guards run inside the native GameAction wrapper.
 See SELECTED-TRACK-EDITING-COMPLETION.md. Replacement breadth remains pending in this
 incremental phase; overall construction remains PARTIAL.
+
+## Selected-track replacement Phase 2 — 2026-10-14 UTC
+
+Orthogonal no-predecessor/station/inverted/covered selected blocks now have guarded
+native removal and explicit exact-origin rebuild with retained parameters and native
+accounting. Cancel-first source/geometry/descriptor reviews, fixed-origin draft and
+B return avoid accidentally removing a predecessor. No atomicity/restoration claim.
+Focused native/SDL and save/reload evidence is in SELECTED-TRACK-EDITING-COMPLETION.md;
+connected access/circuit closeout and exact remaining family gaps remain Phase 3.

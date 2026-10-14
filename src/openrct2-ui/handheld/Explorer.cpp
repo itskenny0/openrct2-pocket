@@ -237,6 +237,12 @@ namespace OpenRCT2::Ui::Handheld
         BeginTerrain(true);
         return CustomTracks::ResumeFrom(target, std::pair{ origin, type }, backward);
     }
+    bool ResumeCustomTrackReplacement(const RideManagement::Target& target,
+        const TrackConstructionSupport::BlockSnapshot& removed, uint8_t colour)
+    {
+        BeginTerrain(true);
+        return CustomTracks::ResumeReplacement(target, removed, colour);
+    }
     bool BeginFlatRide(ObjectEntryIndex index)
     {
         if (!FlatRides::Eligible(index))
@@ -960,7 +966,13 @@ namespace OpenRCT2::Ui::Handheld
                         CustomTracks::Action(true);
                     else if (action == Action::back)
                     {
-                        if (CustomTracks::StationPlacement())
+                        if (CustomTracks::Replacing())
+                        {
+                            const auto target = CustomTracks::Target();
+                            EndTerrain();
+                            if (target) Windows::HandheldRideOpen(target->id);
+                        }
+                        else if (CustomTracks::StationPlacement())
                             EndTerrain();
                         else
                             CustomTracks::Undo();

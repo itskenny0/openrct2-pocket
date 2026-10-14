@@ -23,6 +23,7 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
         TrackElemType type;
         uint8_t speed, seat;
         bool chain, inverted;
+        uint8_t colour{};
         bool operator==(const Block&) const = default;
     };
     inline bool Eligible(const RideManagement::Target& target)
@@ -52,7 +53,7 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
                               e->getBrakeBoosterSpeed(),
                               e->getSeatRotation(),
                               e->hasChain(),
-                              e->isInverted() });
+                              e->isInverted(), e->getColourScheme() });
                     }
         return result;
     }
@@ -64,19 +65,25 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
     }
     inline bool Valid(const Block& block)
     {
-        if (!Eligible(block.ride))
+        if (!Eligible(block.ride) || !TrackConstructionSupport::Piece(block.type) || block.origin.direction > 3)
             return false;
-        const auto& c = TrackMetadata::GetTrackElementDescriptor(block.type).sequenceData.sequences[0].clearance;
-        const auto xy = CoordsXY(block.origin) + CoordsXY{ c.x, c.y }.rotate(block.origin.direction);
-        if (!MapIsLocationValid(xy))
-            return false;
-        for (auto* e : TileElementsView<TrackElement>(xy))
-            if (!e->isGhost() && e->getRideIndex() == block.ride.id && e->getTrackType() == block.type
-                && e->getSequenceIndex() == 0 && e->getDirection() == block.origin.direction
-                && e->getBaseZ() == block.origin.z + c.z && e->hasChain() == block.chain && e->isInverted() == block.inverted
-                && e->getBrakeBoosterSpeed() == block.speed && e->getSeatRotation() == block.seat)
-                return true;
-        return false;
+        const auto& sequences = TrackMetadata::GetTrackElementDescriptor(block.type).sequenceData;
+        if (!sequences.numSequences) return false;
+        for (uint8_t sequence = 0; sequence < sequences.numSequences; ++sequence)
+        {
+            const auto& c = sequences.sequences[sequence].clearance;
+            const auto xy = CoordsXY(block.origin) + CoordsXY{ c.x, c.y }.rotate(block.origin.direction);
+            if (!MapIsLocationValid(xy)) return false;
+            bool found = false;
+            for (auto* e : TileElementsView<TrackElement>(xy))
+                if (!e->isGhost() && e->getRideIndex() == block.ride.id && e->getTrackType() == block.type
+                    && e->getSequenceIndex() == sequence && e->getDirection() == block.origin.direction
+                    && e->getBaseZ() == block.origin.z + c.z && e->hasChain() == block.chain && e->isInverted() == block.inverted
+                    && e->getBrakeBoosterSpeed() == block.speed && e->getSeatRotation() == block.seat
+                    && e->getColourScheme() == block.colour) { found = true; break; }
+            if (!found) return false;
+        }
+        return true;
     }
     inline std::optional<Block> Previous(const Block& block)
     {
@@ -91,8 +98,13 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
             {
                 const auto previous = TrackConstructionSupport::Previous({ xy, reinterpret_cast<TileElement*>(e) });
                 if (previous)
-                    return Block{ block.ride,     previous->origin, previous->type,    previous->speed,
-                                  previous->seat, previous->chain,  previous->inverted };
+                {
+                    const auto blocks = Blocks(block.ride);
+                    const auto found = std::find_if(blocks.begin(), blocks.end(), [&](const auto& candidate) {
+                        return candidate.origin == previous->origin && candidate.type == previous->type;
+                    });
+                    if (found != blocks.end()) return *found;
+                }
             }
         return {};
     }
@@ -130,6 +142,8 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
                     if (!index.IsNull() && index.ToUnderlying() < ride->getStations().size())
                     {
                         const auto& station = ride->getStation(index);
+                        rows.push_back(block.type == TrackElemType::beginStation ? "Station piece: Begin"
+                            : block.type == TrackElemType::middleStation ? "Station piece: Middle" : "Station piece: End");
                         rows.push_back("Station " + std::to_string(index.ToUnderlying() + 1) + " / length " + std::to_string(station.length));
                         auto access = [](const auto& loc) {
                             return loc.isNull() ? std::string("Missing") : std::to_string(loc.x) + "," + std::to_string(loc.y)
@@ -148,14 +162,13 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
     }
     inline bool CanReplace(const Block& block)
     {
-        const auto previous = Previous(block);
-        return previous && Valid(*previous) && block.origin != previous->origin && !block.inverted && !previous->inverted
-            && block.type != TrackElemType::beginStation && block.type != TrackElemType::middleStation
-            && block.type != TrackElemType::endStation;
+        if (!Valid(block)) return false;
+        const auto& c = TrackMetadata::GetTrackElementDescriptor(block.type).coordinates;
+        return !(c.rotationBegin & 4) && !(c.rotationEnd & 4);
     }
     inline GameActions::Result Replace(
         const Block& block, const Block& previous, money64 cost = kMoney64Undefined, bool execute = false,
-        GameActions::GameAction::Callback_t callback = {})
+        GameActions::GameAction::Callback_t callback = {}, const std::vector<int32_t>& context = {})
     {
         if (!CanReplace(block) || !Valid(previous) || Previous(block) != previous)
         {
@@ -169,6 +182,25 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
         action.UseSelectedRemoval(block.speed, block.inverted, block.seat);
         action.GuardPrevious(
             { previous.origin, previous.type, previous.speed, previous.seat, previous.chain, previous.inverted });
+        action.GuardEditingContext(context);
+        action.SetCallback(std::move(callback));
+        return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+    }
+    inline GameActions::Result RemoveForReplacement(
+        const Block& block, money64 cost = kMoney64Undefined, bool execute = false,
+        GameActions::GameAction::Callback_t callback = {}, const std::vector<int32_t>& context = {})
+    {
+        if (!CanReplace(block))
+        {
+            GameActions::Result error;
+            error.error = GameActions::Status::disallowed;
+            error.errorMessage = "Selected replacement requires ordinary orthogonal endpoints";
+            return error;
+        }
+        GameActions::SequentialTrackPlaceAction action(
+            block.ride.id, block.type, block.origin, block.chain, false, block.origin, block.type, cost);
+        action.UseSelectedRemoval(block.speed, block.inverted, block.seat);
+        action.GuardEditingContext(context);
         action.SetCallback(std::move(callback));
         return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
     }

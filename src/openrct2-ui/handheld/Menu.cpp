@@ -499,7 +499,22 @@ namespace OpenRCT2::Ui::Windows
                         model.confirmation = true;
                         model.title = current == Page::trackReplaceConfirm ? "REMOVE / REBUILD BLOCK?"
                             : current == Page::trackRemoveConfirm ? "REMOVE BLOCK?" : "CHANGE TRACK SPEED?";
-                        if (current == Page::trackReplaceConfirm) model.bodyLines = { "Removal leaves a gap.", "Build the replacement explicitly." };
+                        if (current == Page::trackReplaceConfirm)
+                        {
+                            model.stats.clear();
+                            model.bodyLines = { "Remove: " + Handheld::TrackEditing::Label(*_trackBlock),
+                                "Then choose / build at this location.", "Removal leaves a gap; no rollback." };
+                            if (_trackBlock->type == TrackElemType::beginStation || _trackBlock->type == TrackElemType::middleStation
+                                || _trackBlock->type == TrackElemType::endStation)
+                                model.bodyLines.push_back("Stations / access may be renumbered.");
+                        }
+                        if (current == Page::trackRemoveConfirm && (_trackBlock->type == TrackElemType::beginStation
+                            || _trackBlock->type == TrackElemType::middleStation || _trackBlock->type == TrackElemType::endStation))
+                        {
+                            model.stats.clear();
+                            model.bodyLines = { "Remove: " + Handheld::TrackEditing::Label(*_trackBlock),
+                                "Stations / access may be renumbered.", "Check native access after this removal." };
+                        }
                         model.rows = { "Cancel", "Confirm" };
                         model.status = current != Page::trackSpeedConfirm && _trackCost < 0
                             ? "Native refund " + Handheld::FormatMoney(-_trackCost)
@@ -3440,9 +3455,8 @@ namespace OpenRCT2::Ui::Windows
                     else if (ridesPresentationFor(Page::trackBlock,choice).rows[choice] == "Replace block...")
                     {
                         _trackPrevious = Handheld::TrackEditing::Previous(*_trackBlock);
-                        const auto result = _trackPrevious ? Handheld::TrackEditing::Replace(*_trackBlock,*_trackPrevious)
-                            : Handheld::DesignAuthoring::Error("Native predecessor unavailable");
-                        if (result.error == GameActions::Status::ok) { _trackCost=result.cost; page(Page::trackReplaceConfirm); }
+                        const auto result = Handheld::TrackEditing::RemoveForReplacement(*_trackBlock);
+                        if (result.error == GameActions::Status::ok) { _trackCost=result.cost; _trackContext=Handheld::TrackEditing::Context(*_trackBlock); page(Page::trackReplaceConfirm); }
                         else { _status=result.getErrorMessage(); invalidate(); }
                     }
                     else if (choice == 0)
@@ -3482,25 +3496,32 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::trackReplaceConfirm:
                     if (choice == 0) page(Page::trackBlock);
-                    else if (_trackBlock && _trackPrevious)
+                    else if (_trackBlock)
                     {
-                        const auto block=*_trackBlock, previous=*_trackPrevious;
-                        const auto cost=_trackCost;
+                        const auto block = *_trackBlock;
+                        const auto cost = _trackCost;
+                        const auto context = _trackContext;
                         close();
-                        const auto result=Handheld::TrackEditing::Replace(block,previous,cost,true,
-                            [block,previous](const auto*,const GameActions::Result* outcome) {
+                        const auto result = Handheld::TrackEditing::RemoveForReplacement(block, cost, true,
+                            [block](const auto*, const GameActions::Result* outcome) {
                                 if (outcome->error != GameActions::Status::ok)
-                                { GetWindowManager()->ShowError("Cannot replace track",outcome->getErrorMessage()); return; }
-                                if (!Handheld::TrackEditing::Valid(previous)
-                                    || !Handheld::ResumeCustomTrackFrom(previous.ride,previous.origin,previous.type))
-                                { GetWindowManager()->ShowError("Track removed", "Reselect the predecessor to rebuild"); return; }
-                                Handheld::CustomTracks::Select(block.type);
-                                if (trackTypeHasSpeedSetting(block.type)) Handheld::CustomTracks::SetPlacementSpeed(block.speed);
-                                if (Handheld::CustomTracks::SeatSupported()) Handheld::CustomTracks::SetPlacementSeat(block.seat);
-                                if (block.chain) Handheld::CustomTracks::Chain();
-                            });
+                                {
+                                    HandheldRideOpen(block.ride.id);
+                                    GetWindowManager()->ShowError("Cannot remove for rebuild", outcome->getErrorMessage());
+                                    return;
+                                }
+                                if (!Handheld::ResumeCustomTrackReplacement(block.ride,
+                                    { block.origin, block.type, block.speed, block.seat, block.chain, block.inverted }, block.colour))
+                                {
+                                    HandheldRideOpen(block.ride.id);
+                                    GetWindowManager()->ShowError("Track removed", "Use native Continue track / Access to recover");
+                                }
+                            }, context);
                         if (result.error != GameActions::Status::ok)
-                            GetWindowManager()->ShowError("Cannot replace track",result.getErrorMessage());
+                        {
+                            HandheldRideOpen(block.ride.id);
+                            GetWindowManager()->ShowError("Cannot remove for rebuild", result.getErrorMessage());
+                        }
                     }
                     break;
                 case Page::trackRemoveConfirm:

@@ -4,6 +4,7 @@
 #include "RideManagement.h"
 
 #include <openrct2/ride/ted/TrackElemType.h>
+#include <openrct2/ride/TrackConstructionSupport.h>
 namespace OpenRCT2::Ui::Handheld::CustomTracks
 {
     bool Eligible(ObjectEntryIndex index, ride_type_t type = kRideTypeNull);
@@ -14,6 +15,9 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     bool ResumeFrom(
         const RideManagement::Target& target, std::optional<std::pair<CoordsXYZD, TrackElemType>> source,
         bool backward = false);
+    bool ResumeReplacement(const RideManagement::Target& target,
+        const TrackConstructionSupport::BlockSnapshot& removed, uint8_t colour);
+    bool Replacing();
     void End();
     bool Active();
     bool Busy();

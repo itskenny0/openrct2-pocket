@@ -18,7 +18,8 @@ namespace OpenRCT2::GameActions
         bool _first{}, _chain{}, _noMoney{}, _remove{}, _placementInverted{};
         bool _selected{}, _speedChange{}, _sourceInverted{};
         uint8_t _baselineSpeed{}, _baselineSeat{}, _newSpeed{}, _placementSpeed{ 6 }, _placementSeat{};
-        bool _guardPrevious{}, _backward{}, _guardSource{};
+        bool _guardPrevious{}, _backward{}, _guardSource{}, _detached{};
+        uint8_t _placementColour{};
         TrackConstructionSupport::BlockSnapshot _sourceSnapshot{};
         TrackConstructionSupport::BlockSnapshot _previous{};
         std::vector<int32_t> _editingContext;
@@ -75,6 +76,13 @@ namespace OpenRCT2::GameActions
             _backward = _guardSource = true;
             _sourceSnapshot = source;
         }
+        void UseDetached(const std::vector<int32_t>& context)
+        {
+            _detached = true;
+            _first = false;
+            _editingContext = context;
+        }
+        void SetPlacementColour(uint8_t colour) { _placementColour = colour; }
         void GuardEditingContext(const std::vector<int32_t>& context)
         {
             _editingContext = context;

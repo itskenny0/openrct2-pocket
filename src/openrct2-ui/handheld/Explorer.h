@@ -8,6 +8,7 @@
 #include "RideManagement.h"
 #include "SceneryTools.h"
 #include "StaffManagement.h"
+#include <openrct2/ride/TrackConstructionSupport.h>
 
 #include <cstddef>
 #include <openrct2/Identifiers.h>
@@ -46,6 +47,8 @@ namespace OpenRCT2::Ui::Handheld
     bool ResumeCustomTrack(RideId id);
     bool ResumeCustomTrackFrom(
         const RideManagement::Target& target, CoordsXYZD origin, TrackElemType type, bool backward = false);
+    bool ResumeCustomTrackReplacement(const RideManagement::Target& target,
+        const TrackConstructionSupport::BlockSnapshot& removed, uint8_t colour);
     bool BeginFlatRide(ObjectEntryIndex index);
     bool BeginSavedDesign(const std::string& path);
     bool ResumeFlatRide(RideId id);

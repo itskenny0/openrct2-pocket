@@ -69,6 +69,8 @@ namespace OpenRCT2::GameActions
         visitor.Visit("placementSeat", _placementSeat);
         visitor.Visit("placementInverted", _placementInverted);
         visitor.Visit("backward", _backward);
+        visitor.Visit("detached", _detached);
+        visitor.Visit("placementColour", _placementColour);
         visitor.Visit("guardSource", _guardSource);
         visitor.Visit("sourceSpeed", _sourceSnapshot.speed);
         visitor.Visit("sourceSeat", _sourceSnapshot.seat);
@@ -96,7 +98,7 @@ namespace OpenRCT2::GameActions
                << DS_TAG(_previous.type) << DS_TAG(_previous.speed) << DS_TAG(_previous.seat) << DS_TAG(_previous.chain)
                << DS_TAG(_previous.inverted) << DS_TAG(_backward) << DS_TAG(_guardSource) << DS_TAG(_sourceSnapshot.speed)
                << DS_TAG(_sourceSnapshot.seat) << DS_TAG(_sourceSnapshot.chain) << DS_TAG(_sourceSnapshot.inverted)
-               << DS_TAG(_placementInverted) << DS_TAG(_editingContext);
+               << DS_TAG(_placementInverted) << DS_TAG(_editingContext) << DS_TAG(_detached) << DS_TAG(_placementColour);
     }
     Result SequentialTrackPlaceAction::Query(GameState_t& state, Park::ParkData&) const
     {
@@ -129,11 +131,17 @@ namespace OpenRCT2::GameActions
         if (!_remove && !_speedChange
             && (TrackConstructionSupport::SeatRotation(ride->type, _piece) ? _placementSeat > 15 : _placementSeat != 0))
             return invalid();
+        if (_placementColour > 3) return invalid();
         const auto& ted = GetTrackElementDescriptor(_piece);
         if (!TrackConstructionSupport::Supported(*ride, *entry, _piece, _selected ? _sourceInverted : _placementInverted)
             || (_chain && !ted.flags.has(TrackElementFlag::allowLiftHill) && !ted.flags.has(TrackElementFlag::curveAllowsLift)))
             return invalid();
-        if (_first)
+        if (_detached)
+        {
+            if (_first || _selected || _remove || _speedChange || _backward || _editingContext.empty()
+                || (ted.coordinates.rotationBegin & 4) || (ted.coordinates.rotationEnd & 4)) return invalid();
+        }
+        else if (_first)
         {
             if (_remove || _selected || _speedChange || _piece != TrackElemType::endStation)
                 return invalid();
@@ -249,7 +257,7 @@ namespace OpenRCT2::GameActions
                     != TrackGetActualBank(outgoing.element, next.rollStart))
                 return invalid();
         }
-        if (_backward)
+        if (_backward || _detached)
         {
             TrackBeginEnd incoming{};
             const auto beginDirection = ((_origin.direction + ted.coordinates.rotationBegin) & 3)
@@ -271,7 +279,7 @@ namespace OpenRCT2::GameActions
             flags.set(LiftHillAndInverted::liftHill);
         if (_placementInverted)
             flags.set(LiftHillAndInverted::inverted);
-        TrackPlaceAction native(_ride, _piece, ride->type, _origin, _placementSpeed, 0, _placementSeat, flags, false);
+        TrackPlaceAction native(_ride, _piece, ride->type, _origin, _placementSpeed, _placementColour, _placementSeat, flags, false);
         native.SetFlags(GetFlags());
         auto result = QueryNested(&native, state);
         if (result.error == Status::ok && _cost != kMoney64Undefined && result.cost != _cost)
@@ -307,7 +315,7 @@ namespace OpenRCT2::GameActions
             flags.set(LiftHillAndInverted::liftHill);
         if (_placementInverted)
             flags.set(LiftHillAndInverted::inverted);
-        TrackPlaceAction native(_ride, _piece, GetRide(_ride)->type, _origin, _placementSpeed, 0, _placementSeat, flags, false);
+        TrackPlaceAction native(_ride, _piece, GetRide(_ride)->type, _origin, _placementSpeed, _placementColour, _placementSeat, flags, false);
         native.SetFlags(GetFlags());
         return ExecuteNested(&native, state);
     }

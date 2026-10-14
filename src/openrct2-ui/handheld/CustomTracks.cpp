@@ -31,6 +31,9 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     using namespace TrackMetadata;
     static bool active{}, busy{}, camera{}, chain{}, createdHere{}, backward{}, placementInverted{};
     static std::optional<TrackConstructionSupport::BlockSnapshot> sourceBaseline;
+    static std::optional<TrackConstructionSupport::BlockSnapshot> replacement;
+    static std::vector<int32_t> replacementContext;
+    static uint8_t placementColour{};
     static int32_t stationOffset{};
     static uint8_t placementSpeed{ 6 }, placementSeat{ 4 };
     static uint32_t depth{};
@@ -240,7 +243,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     }
     bool StationPlacement()
     {
-        return active && !previous && !completed;
+        return active && !previous && !completed && !replacement;
     }
     TrackElemType Selection()
     {
@@ -270,6 +273,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             return false;
         // Loaded vehicle support and native TED endpoint geometry filter all
         // conventional special pieces, including inversions/helixes/photo.
+        if (replacement)
+            return !(ted.coordinates.rotationBegin & 4) && !(ted.coordinates.rotationEnd & 4);
         if (StationPlacement())
             return type == TrackElemType::endStation;
         return endpoint
@@ -460,6 +465,9 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             remove.SetFlags({ GA::CommandFlag::allowDuringPaused });
             GA::Execute(&remove, getGameState());
         }
+        replacement.reset();
+        replacementContext.clear();
+        placementColour = 0;
         createdHere = false;
         stationOffset = 0;
         placementSpeed = 6;
@@ -581,6 +589,33 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                     break;
                 }
         return true;
+    }
+    bool Replacing() { return active && replacement.has_value(); }
+    bool ResumeReplacement(const RideManagement::Target& old,
+        const TrackConstructionSupport::BlockSnapshot& removed, uint8_t colour)
+    {
+        const auto now = RideManagement::Identify(old.id);
+        if (!now || now->id != old.id || now->type != old.type || now->object != old.object
+            || now->buildDate != old.buildDate || now->generation != old.generation
+            || !Eligible(now->object, now->type)) return false;
+        const auto* ride = RideManagement::Resolve(*now);
+        if (!ride || ride->status != RideStatus::closed) return false;
+        End();
+        target = *now;
+        replacement = removed;
+        replacementContext = TrackConstructionSupport::EditingContext(*ride);
+        endpoint = removed.origin;
+        selected = removed.type == TrackElemType::beginStation || removed.type == TrackElemType::middleStation
+            ? TrackElemType::endStation : removed.type;
+        placementInverted = removed.inverted;
+        placementSpeed = removed.speed;
+        placementSeat = removed.seat;
+        placementColour = colour;
+        chain = removed.chain;
+        active = true;
+        feedback = "Removed: explicit rebuild required";
+        FocusEndpoint();
+        return Supported(selected);
     }
     bool Select(TrackElemType type)
     {
@@ -725,6 +760,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     {
         if (!active || !target || !endpoint || !Supported(selected))
             return {};
+        if (replacement) return Block{ replacement->origin, selected };
         if (backward)
             return Block{ TrackConstructionSupport::BackwardOrigin(*endpoint, selected), selected };
         auto origin = *endpoint;
@@ -745,6 +781,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         query.SetPlacementSpeed(trackTypeHasSpeedSetting(request->type) ? placementSpeed : 6);
         query.SetPlacementSeat(SeatSupported() ? placementSeat : 0);
         query.SetPlacementInverted(placementInverted);
+        query.SetPlacementColour(placementColour);
+        if (replacement) query.UseDetached(replacementContext);
         if (sourceBaseline && !backward)
             query.GuardSource(*sourceBaseline);
         if (backward)
@@ -761,6 +799,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         action.SetPlacementSpeed(trackTypeHasSpeedSetting(request->type) ? placementSpeed : 6);
         action.SetPlacementSeat(SeatSupported() ? placementSeat : 0);
         action.SetPlacementInverted(placementInverted);
+        action.SetPlacementColour(placementColour);
+        if (replacement) action.UseDetached(replacementContext);
         if (sourceBaseline && !backward)
             action.GuardSource(*sourceBaseline);
         if (backward)
@@ -768,7 +808,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         ClearPreview();
         busy = true;
         const auto token = revision;
-        action.SetCallback([token](const auto*, const GA::Result* result) {
+        action.SetCallback([token, placed = *request](const auto*, const GA::Result* result) {
             if (token != revision)
                 return;
             busy = false;
@@ -776,6 +816,18 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             if (result->error == GA::Status::ok)
             {
                 target = RideManagement::Identify(target->id);
+                if (replacement)
+                {
+                    anchor = placed;
+                    const auto& c = GetTrackElementDescriptor(placed.type).sequenceData.sequences[0].clearance;
+                    const auto xy = CoordsXY(placed.origin) + CoordsXY{ c.x, c.y }.rotate(placed.origin.direction);
+                    for (auto* track : TileElementsView<TrackElement>(xy))
+                        if (!track->isGhost() && track->getRideIndex() == target->id && track->getSequenceIndex() == 0
+                            && track->getBaseZ() == placed.origin.z + c.z && track->getDirection() == placed.origin.direction)
+                        { anchor->type = track->getTrackType(); break; }
+                    replacement.reset();
+                    replacementContext.clear();
+                }
                 if (!Recover())
                 {
                     End();
@@ -809,6 +861,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     GameActions::Result Undo(bool execute)
     {
         ClearPreview();
+        if (replacement) return Invalid("Rebuild cancelled only through B / Return to park");
         if (!previous || !target || busy)
             return Invalid("No preceding track piece");
         const auto block = *previous;
@@ -940,7 +993,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         Box(rt, p, { 164, 238 });
         Heading(
             rt, p + ScreenCoordsXY{ 10, 12 },
-            StationPlacement() ? "Place station"
+            replacement ? "Rebuild removed"
+                : StationPlacement() ? "Place station"
                 : backward     ? "Build backward"
                                : "Build track");
         Rule(rt, p + ScreenCoordsXY{ 8, 38 }, 148);
@@ -984,7 +1038,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;
         DrawCommand(rt, { 8, y }, 17, "A", "Build");
-        DrawCommand(rt, { 100, y }, 17, "B", StationPlacement() ? "Cancel" : "Undo");
+        DrawCommand(rt, { 100, y }, 17, "B", replacement ? "Cancel" : StationPlacement() ? "Cancel" : "Undo");
         DrawCommand(rt, { 192, y }, 30, "L/R", camera ? "Zoom" : "Piece");
         DrawCommand(rt, { 306, y }, 17, "X", camera ? "Rotate" : trackTypeHasSpeedSetting(selected) ? "Speed +" : "Bank");
         DrawCommand(

@@ -8,6 +8,7 @@
 #include "../world/tile_element/PathElement.h"
 #include "../world/tile_element/TrackElement.h"
 #include "Ride.h"
+#include "TrackData.h"
 
 #include <vector>
 namespace OpenRCT2::TrackConstructionSupport
@@ -20,9 +21,25 @@ namespace OpenRCT2::TrackConstructionSupport
         const auto* object = GetContext()->GetObjectManager().GetLoadedObject<RideObject>(ride.subtype);
         if (!object)
             return result;
-        const auto identifier = object->GetIdentifier();
-        result.push_back(static_cast<int32_t>(identifier.size()));
-        for (auto c : identifier) result.push_back(static_cast<unsigned char>(c));
+        auto descriptor = [&](const Object* loaded) {
+            if (!loaded) { result.push_back(-1); return; }
+            const auto d = loaded->GetDescriptor();
+            const auto name = d.ToString();
+            result.push_back(static_cast<int32_t>(name.size()));
+            for (auto c : name) result.push_back(static_cast<unsigned char>(c));
+            result.insert(result.end(), { static_cast<int32_t>(d.Generation), static_cast<int32_t>(d.Entry.flags),
+                static_cast<int32_t>(d.Entry.checksum), std::get<0>(loaded->GetVersion()), std::get<1>(loaded->GetVersion()),
+                std::get<2>(loaded->GetVersion()) });
+        };
+        descriptor(object);
+        descriptor(GetContext()->GetObjectManager().GetLoadedObject(ObjectType::station, ride.entranceStyle));
+        const auto& entry = object->GetEntry();
+        result.insert(result.end(), { static_cast<int32_t>(entry.flags.holder), entry.maxHeight, entry.Clearance,
+            entry.DefaultCar, entry.min_cars_in_train, entry.max_cars_in_train });
+        for (auto type : entry.ride_type) result.push_back(type);
+        const auto supported = RideEntryGetSupportedTrackPieces(entry);
+        for (size_t i = 0; i < supported.size(); ++i) result.push_back(supported[i]);
+        for (const auto& car : entry.Cars) result.push_back(static_cast<int32_t>(car.flags.holder));
         result.insert(result.end(), { ride.type, ride.subtype, ride.buildDate, ride.overallView.x, ride.overallView.y,
                                       ride.numStations });
         for (const auto& station : ride.getStations())
