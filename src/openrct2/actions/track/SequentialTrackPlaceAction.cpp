@@ -96,7 +96,7 @@ namespace OpenRCT2::GameActions
                << DS_TAG(_previous.type) << DS_TAG(_previous.speed) << DS_TAG(_previous.seat) << DS_TAG(_previous.chain)
                << DS_TAG(_previous.inverted) << DS_TAG(_backward) << DS_TAG(_guardSource) << DS_TAG(_sourceSnapshot.speed)
                << DS_TAG(_sourceSnapshot.seat) << DS_TAG(_sourceSnapshot.chain) << DS_TAG(_sourceSnapshot.inverted)
-               << DS_TAG(_placementInverted);
+               << DS_TAG(_placementInverted) << DS_TAG(_editingContext);
     }
     Result SequentialTrackPlaceAction::Query(GameState_t& state, Park::ParkData&) const
     {
@@ -114,6 +114,8 @@ namespace OpenRCT2::GameActions
             || (!state.cheats.ignoreResearchStatus && (!RideTypeIsInvented(ride->type) || !RideEntryIsInvented(_object))))
             return invalid();
         if (ride->type != _expectedType || ride->overallView != _expectedView)
+            return invalid();
+        if (!_editingContext.empty() && TrackConstructionSupport::EditingContext(*ride) != _editingContext)
             return invalid();
         if (_backward && (_first || _selected || _speedChange || !_guardSource))
             return invalid();

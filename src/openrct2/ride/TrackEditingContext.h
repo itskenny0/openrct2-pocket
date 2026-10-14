@@ -1,0 +1,56 @@
+// SPDX-License-Identifier: GPL-3.0-only
+#pragma once
+#include "../Context.h"
+#include "../object/ObjectManager.h"
+#include "../object/RideObject.h"
+#include "../world/TileElementsView.h"
+#include "../world/tile_element/EntranceElement.h"
+#include "../world/tile_element/PathElement.h"
+#include "../world/tile_element/TrackElement.h"
+#include "Ride.h"
+
+#include <vector>
+namespace OpenRCT2::TrackConstructionSupport
+{
+    // Exact, typed, transient action-review data. No hash, tile pointers, padding,
+    // moving trains, queue counts or additional park serialization.
+    inline std::vector<int32_t> EditingContext(const Ride& ride)
+    {
+        std::vector<int32_t> result;
+        const auto* object = GetContext()->GetObjectManager().GetLoadedObject<RideObject>(ride.subtype);
+        if (!object)
+            return result;
+        const auto identifier = object->GetIdentifier();
+        result.push_back(static_cast<int32_t>(identifier.size()));
+        for (auto c : identifier) result.push_back(static_cast<unsigned char>(c));
+        result.insert(result.end(), { ride.type, ride.subtype, ride.buildDate, ride.overallView.x, ride.overallView.y,
+                                      ride.numStations });
+        for (const auto& station : ride.getStations())
+            result.insert(result.end(), { station.start.x, station.start.y, station.height, station.length,
+                station.entrance.x, station.entrance.y, station.entrance.z, station.entrance.direction,
+                station.exit.x, station.exit.y, station.exit.z, station.exit.direction });
+        const auto& state = getGameState();
+        for (int y = 32; y < state.mapSize.y * 32 - 32; y += 32)
+            for (int x = 32; x < state.mapSize.x * 32 - 32; x += 32)
+            {
+                for (auto* e : TileElementsView<TrackElement>(CoordsXY{ x, y }))
+                    if (!e->isGhost() && e->getRideIndex() == ride.id)
+                        result.insert(result.end(), { 1, x, y, e->getBaseZ(), e->getClearanceZ(), e->getDirection(),
+                            static_cast<int32_t>(e->getTrackType()), e->getSequenceIndex(),
+                            e->getStationIndex().ToUnderlying(), e->hasChain(), e->isInverted(),
+                            e->getBrakeBoosterSpeed(), e->getSeatRotation(), e->getColourScheme() });
+                for (auto* e : TileElementsView<EntranceElement>(CoordsXY{ x, y }))
+                    if (!e->isGhost() && e->getRideIndex() == ride.id && e->getEntranceType() != EntranceType::parkEntrance)
+                    {
+                        result.insert(result.end(), { 2, x, y, e->getBaseZ(), e->getDirection(),
+                            static_cast<int32_t>(e->getEntranceType()), e->getStationIndex().ToUnderlying() });
+                        for (auto delta : CoordsDirectionDelta)
+                            for (auto* path : TileElementsView<PathElement>(CoordsXY{ x, y } + delta))
+                                if (!path->isGhost())
+                                    result.insert(result.end(), { 3, delta.x, delta.y, path->getBaseZ(),
+                                        path->getEdges(), path->isSloped(), path->getSlopeDirection() });
+                    }
+            }
+        return result;
+    }
+}

@@ -96,6 +96,56 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
             }
         return {};
     }
+    inline std::vector<int32_t> Context(const Block& block)
+    {
+        const auto* ride = RideManagement::Resolve(block.ride);
+        return Valid(block) && ride ? TrackConstructionSupport::EditingContext(*ride) : std::vector<int32_t>{};
+    }
+    inline std::vector<std::string> Inspection(const Block& block)
+    {
+        if (!Valid(block)) return { "Selected block no longer exists", "Back to block" };
+        const auto& ted = TrackMetadata::GetTrackElementDescriptor(block.type);
+        const auto& c = ted.sequenceData.sequences[0].clearance;
+        const auto xy = CoordsXY(block.origin) + CoordsXY{ c.x, c.y }.rotate(block.origin.direction);
+        auto previous = Previous(block);
+        std::vector<std::string> rows{ "Direction: " + std::to_string(block.origin.direction),
+            previous ? "Previous: " + Label(*previous) : "Previous: disconnected end",
+            "Native sequences: " + std::to_string(ted.sequenceData.numSequences) };
+        for (auto* e : TileElementsView<TrackElement>(xy))
+            if (!e->isGhost() && e->getRideIndex() == block.ride.id && e->getTrackType() == block.type
+                && e->getSequenceIndex() == 0 && e->getDirection() == block.origin.direction
+                && e->getBaseZ() == block.origin.z + c.z)
+            {
+                CoordsXYE input{ xy, reinterpret_cast<TileElement*>(e) }, next{};
+                int32_t z{}, direction{};
+                const bool connected = trackBlockGetNext(&input, &next, &z, &direction)
+                    && TrackIsConnectedByShape(input.element, next.element);
+                rows.push_back(connected ? "Next: " + CustomTracks::PieceName(next.element->asTrack()->getTrackType())
+                                         : "Next: disconnected end");
+                if (block.type == TrackElemType::beginStation || block.type == TrackElemType::middleStation
+                    || block.type == TrackElemType::endStation)
+                {
+                    const auto index = e->getStationIndex();
+                    const auto* ride = RideManagement::Resolve(block.ride);
+                    if (!index.IsNull() && index.ToUnderlying() < ride->getStations().size())
+                    {
+                        const auto& station = ride->getStation(index);
+                        rows.push_back("Station " + std::to_string(index.ToUnderlying() + 1) + " / length " + std::to_string(station.length));
+                        auto access = [](const auto& loc) {
+                            return loc.isNull() ? std::string("Missing") : std::to_string(loc.x) + "," + std::to_string(loc.y)
+                                + " Z" + std::to_string(loc.z) + " D" + std::to_string(loc.direction);
+                        };
+                        rows.push_back("Entrance: " + access(station.entrance));
+                        rows.push_back("Exit: " + access(station.exit));
+                        rows.push_back("Removal may split / renumber station");
+                        rows.push_back("Check native access after rebuilding");
+                    }
+                }
+                break;
+            }
+        rows.push_back("Back to block");
+        return rows;
+    }
     inline bool CanReplace(const Block& block)
     {
         const auto previous = Previous(block);
@@ -123,7 +173,7 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
         return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
     }
     inline GameActions::Result Change(
-        const Block& block, std::optional<uint8_t> speed, money64 cost = kMoney64Undefined, bool execute = false)
+        const Block& block, std::optional<uint8_t> speed, money64 cost = kMoney64Undefined, bool execute = false, const std::vector<int32_t>& context = {})
     {
         if (!Valid(block))
         {
@@ -134,6 +184,7 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
         }
         GameActions::SequentialTrackPlaceAction action(
             block.ride.id, block.type, block.origin, block.chain, false, block.origin, block.type, cost);
+        action.GuardEditingContext(context);
         if (speed)
             action.UseSpeedChange(block.speed, *speed, block.inverted, block.seat);
         else

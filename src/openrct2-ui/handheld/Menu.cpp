@@ -156,6 +156,7 @@ namespace OpenRCT2::Ui::Windows
         ridesInspect,
         trackBlocks,
         trackBlock,
+        trackContext,
         trackRemoveConfirm,
         trackReplaceConfirm,
         trackSpeedConfirm,
@@ -431,11 +432,12 @@ namespace OpenRCT2::Ui::Windows
         }
         std::vector<Handheld::TrackEditing::Block> _trackBlocks;
         std::optional<Handheld::TrackEditing::Block> _trackBlock, _trackPrevious;
+        std::vector<int32_t> _trackContext;
         money64 _trackCost{};
         uint8_t _trackSpeed{};
         bool trackManagement() const
         {
-            return _page == Page::trackBlocks || _page == Page::trackBlock || _page == Page::trackRemoveConfirm
+            return _page == Page::trackBlocks || _page == Page::trackBlock || _page == Page::trackContext || _page == Page::trackRemoveConfirm
                 || _page == Page::trackSpeedConfirm || _page == Page::trackReplaceConfirm;
         }
         bool ridesManagement() const
@@ -485,6 +487,13 @@ namespace OpenRCT2::Ui::Windows
                     model.rows.push_back("Continue section...");
                     model.rows.push_back("Build backward...");
                     if (Handheld::TrackEditing::CanReplace(*_trackBlock)) model.rows.push_back("Replace block...");
+                    model.rows.push_back("Inspect connections / station...");
+                    if (current == Page::trackContext)
+                    {
+                        model.title = "NATIVE TRACK CONTEXT";
+                        model.stats.clear();
+                        model.rows = Handheld::TrackEditing::Inspection(*_trackBlock);
+                    }
                     if (current == Page::trackRemoveConfirm || current == Page::trackSpeedConfirm || current == Page::trackReplaceConfirm)
                     {
                         model.confirmation = true;
@@ -961,6 +970,11 @@ namespace OpenRCT2::Ui::Windows
             if (next == Page::staff)
                 _focus.move(static_cast<int32_t>(std::min(_staffRosterFocus, rows().size() - 1)), rows().size());
 
+            if (next == Page::trackBlocks && _trackBlock)
+            {
+                const auto found = std::find(_trackBlocks.begin(), _trackBlocks.end(), *_trackBlock);
+                if (found != _trackBlocks.end()) _focus.move(static_cast<int>(found - _trackBlocks.begin()), rows().size());
+            }
             if (next == Page::ridesRoster)
                 _focus.move(static_cast<int32_t>(std::min(_ridesRosterFocus, rows().size() - 1)), rows().size());
             if (next == Page::guestGroups)
@@ -1033,6 +1047,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::overviewConfirm:
                     return overviewPresentation().rows;
                 case Page::trackBlocks:
+                case Page::trackContext:
                 case Page::trackBlock:
                 case Page::trackRemoveConfirm:
                 case Page::trackReplaceConfirm:
@@ -2148,6 +2163,7 @@ namespace OpenRCT2::Ui::Windows
                         _trackBlocks = Handheld::TrackEditing::Blocks(*_ridesTarget);
                     page(Page::trackBlocks);
                     break;
+                case Page::trackContext:
                 case Page::trackRemoveConfirm:
                 case Page::trackReplaceConfirm:
                 case Page::trackSpeedConfirm:
@@ -3392,6 +3408,10 @@ namespace OpenRCT2::Ui::Windows
                     else
                         page(Page::ridesInspect);
                     break;
+                case Page::trackContext:
+                    if (!_trackBlock || !Handheld::TrackEditing::Valid(*_trackBlock)
+                        || choice + 1 == Handheld::TrackEditing::Inspection(*_trackBlock).size()) page(Page::trackBlock);
+                    break;
                 case Page::trackBlock:
                     if (!_trackBlock || !Handheld::TrackEditing::Valid(*_trackBlock))
                     {
@@ -3400,6 +3420,8 @@ namespace OpenRCT2::Ui::Windows
                         page(Page::trackBlocks);
                         _status = "Block changed; select again";
                     }
+                    else if (ridesPresentationFor(Page::trackBlock, choice).rows[choice] == "Inspect connections / station...")
+                        page(Page::trackContext);
                     else if (ridesPresentationFor(Page::trackBlock, choice).rows[choice] == "Continue section...")
                     {
                         const auto block = *_trackBlock;
@@ -3437,6 +3459,7 @@ namespace OpenRCT2::Ui::Windows
                         if (result.error == GameActions::Status::ok)
                         {
                             _trackCost = result.cost;
+                            _trackContext = Handheld::TrackEditing::Context(*_trackBlock);
                             page(choice == 1 ? Page::trackRemoveConfirm : Page::trackSpeedConfirm);
                         }
                         else
@@ -3490,8 +3513,9 @@ namespace OpenRCT2::Ui::Windows
                         const auto speed = _page == Page::trackSpeedConfirm ? std::optional<uint8_t>{ _trackSpeed }
                                                                             : std::nullopt;
                         const auto cost = _trackCost;
+                        const auto context = _trackContext;
                         close();
-                        const auto result = Handheld::TrackEditing::Change(block, speed, cost, true);
+                        const auto result = Handheld::TrackEditing::Change(block, speed, cost, true, context);
                         if (result.error != GameActions::Status::ok)
                             GetWindowManager()->ShowError("Cannot edit track", result.getErrorMessage());
                     }

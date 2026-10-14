@@ -487,3 +487,11 @@ Completed inspected 24-PNG capture ZIP saved (SHA256 812dec5dcff5d0297b38bd9de78
 The next substantial ordinary gameplay gap is broader native selected-track editing/
 replacement, especially station/inverted/no-predecessor cases and actual failure/recovery
 semantics in ADVANCED-RIDE-EDITING-COMPLETION.md. Do not rebuild this browser milestone.
+
+## Selected-track inspection Phase 1 — 2026-10-14 UTC
+
+Native block context now exposes no-predecessor/station geometry, native shape
+connections and actual access references, with stable block-roster return. Exact
+track/station/access/object review guards run inside the native GameAction wrapper.
+See SELECTED-TRACK-EDITING-COMPLETION.md. Replacement breadth remains pending in this
+incremental phase; overall construction remains PARTIAL.

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "../../ride/TrackConstructionSupport.h"
+#include "../../ride/TrackEditingContext.h"
 #include "TrackPlaceAction.h"
 namespace OpenRCT2::GameActions
 {
@@ -20,6 +21,7 @@ namespace OpenRCT2::GameActions
         bool _guardPrevious{}, _backward{}, _guardSource{};
         TrackConstructionSupport::BlockSnapshot _sourceSnapshot{};
         TrackConstructionSupport::BlockSnapshot _previous{};
+        std::vector<int32_t> _editingContext;
         money64 _cost{ kMoney64Undefined };
 
     public:
@@ -72,6 +74,10 @@ namespace OpenRCT2::GameActions
         {
             _backward = _guardSource = true;
             _sourceSnapshot = source;
+        }
+        void GuardEditingContext(const std::vector<int32_t>& context)
+        {
+            _editingContext = context;
         }
         void AcceptParameters(GameActionParameterVisitor&) final;
         void Serialise(DataSerialiser&) final;
