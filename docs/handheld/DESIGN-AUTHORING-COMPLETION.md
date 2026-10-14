@@ -247,3 +247,15 @@ access/Open/save evidence and inspected production captures are recorded there.
 This supersedes those specific pending entries above; atomic restoration, direct
 selected-seat editing, diagonal/special/exhaustive geometry, positive transitions,
 design substitution/arbitrary scenery and hardware/sustained-guest gaps remain.
+
+
+## Explicit design substitution/warnings follow-up — 2026-10-14
+
+DESIGN-SUBSTITUTION-COMPLETION.md delivers native required/optional availability,
+explicit already loaded/researched exact-type/track-group vehicle choices, retained
+height/rotation/scenery and source-file identity, Cancel-first native quote/context
+guards, actual optional-scenery omission counts and stale/failure/access/save recovery.
+Earlier substitution-gap entries are superseded only for this scoped workflow.
+Arbitrary scenery/cross-family replacement, flat/special design geometry, native
+rollback, exhaustive operation and hardware limits remain. Existing completed
+browsing/authoring/selected-track capture packages are preserved.

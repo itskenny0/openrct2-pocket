@@ -34,6 +34,8 @@ namespace OpenRCT2::Ui::Handheld::Designs
     static std::optional<int32_t> heightOffset;
     static std::unique_ptr<ShopPlacement::PreviewRide> preview;
     static std::optional<Request> requested, ghost, review;
+    static std::string lastError;
+    static uint32_t sceneryOmitted{}, reviewOmitted{}, placedOmitted{};
     static std::vector<int32_t> reviewContext;
     static money64 reviewCost{};
     static bool reviewNoMoney{};
@@ -167,6 +169,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
     }
     void End()
     {
+        lastError.clear(); sceneryOmitted=reviewOmitted=placedOmitted=0;
         browserReturn=false; selectedFile.reset();
         ClearPreview();
         design.reset();
@@ -210,12 +213,18 @@ namespace OpenRCT2::Ui::Handheld::Designs
     }
     std::string VehicleNotice()
     {
-        return design ? "Vehicle: " + design->trackAndVehicle.vehicleObject.ToString() : "Vehicle unavailable";
+        if (!design) return "Vehicle unavailable";
+        const auto* object=GetContext()->GetObjectManager().GetLoadedObject(design->trackAndVehicle.vehicleObject);
+        return "Vehicle: " + (object?object->GetName():design->trackAndVehicle.vehicleObject.ToString());
     }
+    std::string LastError() { return lastError; }
+    uint32_t PlacementSceneryOmitted() { return placedOmitted; }
     std::vector<std::string> WarningLines()
     {
         if (!design) return {"Design unavailable"};
         std::vector<std::string> lines{VehicleNotice(), HeightNotice(), SceneryNotice()};
+        if (!lastError.empty()) lines.insert(lines.begin(),"Rejected: "+lastError);
+        if (scenery && sceneryOmitted) lines.push_back("Native scenery omissions: "+std::to_string(sceneryOmitted));
         if (scenery && sceneryWarning) lines.push_back("Native policy: ALL design scenery omitted");
         lines.push_back("Native settings may clamp to selected vehicle rules");
         lines.push_back("Native placement failure has no universal scenery rollback");
@@ -285,7 +294,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
             return "No design scenery";
         if (!scenery)
             return "Scenery Off / R2: On";
-        return sceneryWarning ? "Scenery missing; omitted" : "Scenery On / L2: Off";
+        return sceneryWarning ? "All scenery omitted" : "Scenery On / L2: Off";
     }
     static GA::Result QueryAt(const Request& request)
     {
@@ -314,13 +323,16 @@ namespace OpenRCT2::Ui::Handheld::Designs
         if (preview && !preview->id().IsNull())
         {
             action.UsePreviewRideForQuery(preview->id());
-            return GA::Query(&action, getGameState());
+            auto result=GA::Query(&action, getGameState());
+            sceneryOmitted=_trackDesignPlaceStateSceneryOmitted;
+            return result;
         }
         const auto id = GetNextFreeRideId();
         if (id.IsNull())
             return GA::Query(&action, getGameState());
         auto previous = std::move(getGameState().rides[id.ToUnderlying()]);
         auto result = GA::Query(&action, getGameState());
+        sceneryOmitted=_trackDesignPlaceStateSceneryOmitted;
         getGameState().rides[id.ToUnderlying()] = std::move(previous);
         return result;
     }
@@ -431,6 +443,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
         auto result = QueryAt(*next);
         if (result.error != GA::Status::ok)
             return false;
+        lastError.clear(); reviewOmitted=sceneryOmitted;
         reviewContext=TrackDesignPlacementContext::Capture(*design);
         review = next;
         reviewCost = result.cost;
@@ -457,7 +470,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
     {
         return completed;
     }
-    GA::Result Confirm()
+    static GA::Result ConfirmReviewed()
     {
         if (!review || busy)
             return Invalid("No design review");
@@ -474,20 +487,26 @@ namespace OpenRCT2::Ui::Handheld::Designs
             return Invalid("Placement changed; review again");
         auto action = GA::SavedTrackDesignPlaceAction(
             request.origin, *design, Config::Get().general.defaultInspectionInterval, reviewCost, scenery);
-        action.BindReview(reviewContext,*selectedFile);
+        action.BindReview(reviewContext,*selectedFile,reviewOmitted);
         busy = true;
         const auto token = revision;
         action.SetCallback([token](const auto*, const GA::Result* finished) {
             if (token != revision)
                 return;
             busy = false;
-            if (finished->error != GA::Status::ok)
-                return;
+            if (finished->error != GA::Status::ok) { lastError=finished->getErrorMessage();return; }
+            placedOmitted=_trackDesignPlaceStateSceneryOmitted;
             completed = RideManagement::Identify(finished->getData<RideId>());
         });
         result = GA::Execute(&action, getGameState());
         if (result.error != GA::Status::ok)
             busy = false;
+        return result;
+    }
+    GA::Result Confirm()
+    {
+        auto result=ConfirmReviewed();
+        if (result.error!=GA::Status::ok) lastError=result.getErrorMessage();
         return result;
     }
     void DrawPanel(Drawing::RenderTarget& rt, ScreenSize screen)
@@ -498,7 +517,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
         Section(rt, kOrigin + ScreenCoordsXY{ 10, 35 }, GetNameFromTrackPath(selection));
         Row(rt, kOrigin + ScreenCoordsXY{ 8, 54 }, "Place design", Icon::path, true);
         Rule(rt, kOrigin + ScreenCoordsXY{ 8, 99 }, 148);
-        DrawModernEllipsised(rt, kOrigin + ScreenCoordsXY{ 12, 116 }, 140, "{MUTED}" + SceneryNotice());
+        DrawModernEllipsised(rt, kOrigin + ScreenCoordsXY{ 12, 116 }, 140, "{MUTED}" + (!lastError.empty()?"Review rejected / X":completed && placedOmitted?"Omitted "+std::to_string(placedOmitted)+" scenery":SceneryNotice()));
         DrawModernEllipsised(rt, kOrigin + ScreenCoordsXY{ 12, 142 }, 140, "{MUTED}" + HeightNotice());
         DrawModernEllipsised(rt, kOrigin + ScreenCoordsXY{ 12, 158 }, 140, "{MUTED}X Design options");
         DrawActionStrip(rt, screen);

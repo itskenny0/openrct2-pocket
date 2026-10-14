@@ -228,3 +228,15 @@ Private archives, parks, generated native designs and original source assets exc
 No AI mockups or composited fake interfaces. All final image bytes approved as above.
 This subsequent documentation-only publication preserves tested production source and
 ZIP bytes. Final source/ref/tree equality and publication recorded in the final handoff.
+
+
+## Explicit design substitution/warnings follow-up — 2026-10-14
+
+DESIGN-SUBSTITUTION-COMPLETION.md delivers native required/optional availability,
+explicit already loaded/researched exact-type/track-group vehicle choices, retained
+height/rotation/scenery and source-file identity, Cancel-first native quote/context
+guards, actual optional-scenery omission counts and stale/failure/access/save recovery.
+Earlier substitution-gap entries are superseded only for this scoped workflow.
+Arbitrary scenery/cross-family replacement, flat/special design geometry, native
+rollback, exhaustive operation and hardware limits remain. Existing completed
+browsing/authoring/selected-track capture packages are preserved.

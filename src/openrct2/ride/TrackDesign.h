@@ -236,6 +236,8 @@ extern bool gTrackDesignSceneryToggle;
 extern bool _trackDesignDrawingPreview;
 
 extern bool _trackDesignPlaceStateSceneryUnavailable;
+// Native failed optional scenery subactions in the last placement/query; never park state.
+extern uint32_t _trackDesignPlaceStateSceneryOmitted;
 extern bool gTrackDesignSaveMode;
 extern RideId gTrackDesignSaveRideIndex;
 

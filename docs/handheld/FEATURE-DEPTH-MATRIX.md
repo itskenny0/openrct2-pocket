@@ -548,3 +548,23 @@ Execute/serialization. Native all-scenery omission/path fallback warnings are vi
 height/rotation/scenery and source bytes preserved. Native/SDL/failure/save roundtrip
 and CTest 5/5 pass. DESIGN-SUBSTITUTION-COMPLETION.md records exact limits. Overall
 ordinary construction remains PARTIAL; no arbitrary scenery or rollback promise.
+
+## Native design substitution/warning completion — 2026-10-14 UTC
+
+Explicit loaded/researched exact native ride-type/track-group vehicle choices,
+optional scenery policy, original-file preservation and bound Cancel-first native
+reviews are delivered. Native failed optional scenery subactions now expose actual
+query/result omission counts; changed counts, files, descriptors, research and
+quotes reject. Native browser → choice → preview → cancel/apply → access/Open →
+save/reload and provisional autosave cleanup pass. Twenty-four genuine production
+512×384 captures are inspected; see DESIGN-SUBSTITUTION-COMPLETION.md for APIs,
+publication/package, test environments and exact limits. Release GUI/CLI, CTest5/5,
+15 preservation drivers under their documented contracts, 5 asset-backed construction/
+design drivers and native/SDL save/load browsing pass. The extra forced-shell
+PathActions paused-shop fixture failure is explicitly retained there.
+
+Overall ordinary gameplay stays PARTIAL: arbitrary scenery/cross-family replacement,
+flat/special design adapters, native rollback guarantees, direct selected-seat and
+exhaustive geometry/positive variants, maze/access ghosts, continuous scenery/network
+review, broader shop appearance, sustained family guests and Brick/AArch64/performance
+remain. Next: broader native shop/facility appearance, preserving delivered naming.

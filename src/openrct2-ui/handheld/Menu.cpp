@@ -1262,7 +1262,10 @@ namespace OpenRCT2::Ui::Windows
                 case Page::designFiles: return _files.Rows();
                 case Page::designVehicles: {
                     std::vector<std::string> result;
-                    for (const auto& d:_designVehicles) result.push_back(d.ToString());
+                    for (const auto& d:_designVehicles) {
+                        const auto* object=GetContext()->GetObjectManager().GetLoadedObject(d);
+                        result.push_back((object?object->GetName():std::string("Vehicle unavailable"))+" / "+d.ToString());
+                    }
                     result.push_back("Cancel / back");return result;
                 }
                 case Page::designWarnings: {
@@ -4683,7 +4686,7 @@ namespace OpenRCT2::Ui::Windows
             if (_page==Page::designVehicles || _page==Page::designWarnings || _page==Page::designConfirm) {
                 Handheld::ManagementPresentation model;
                 model.breadcrumb="Designs / Native choices";
-                model.title=_page==Page::designVehicles?"Choose loaded researched vehicle":_page==Page::designWarnings?"Availability and warnings":"Place saved design?";
+                model.title=_page==Page::designVehicles?"Choose native vehicle":_page==Page::designWarnings?"Availability and warnings":"Place saved design?";
                 model.rows=rows();model.selected=_focus.index();
                 if (_page==Page::designConfirm) {
                     model.confirmation=true;
@@ -4718,7 +4721,7 @@ namespace OpenRCT2::Ui::Windows
                     model.title=_designFile ? _designFile->path.filename().u8string() : "File unavailable";
                     if(_designMetadata) {
                         const auto& d=*_designMetadata;
-                        model.stats={{"Vehicle",std::string(d.trackAndVehicle.vehicleObject.GetName())},
+                        model.stats={{"Required vehicle",std::string(d.trackAndVehicle.vehicleObject.GetName())},
                             {"Track / maze",std::to_string(d.trackElements.size())+" / "+std::to_string(d.mazeElements.size())},
                             {"Scenery",std::to_string(d.sceneryElements.size())},
                             {"Format",trackDesignGetExtension(d.version)}};

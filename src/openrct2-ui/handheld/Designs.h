@@ -17,6 +17,8 @@ namespace OpenRCT2::Ui::Handheld::Designs
     bool ChooseVehicle(const ObjectEntryDescriptor& vehicle);
     std::string VehicleNotice();
     std::vector<std::string> WarningLines();
+    std::string LastError();
+    uint32_t PlacementSceneryOmitted();
     void End();
     bool Active();
     bool Busy();

@@ -46,9 +46,9 @@ namespace OpenRCT2::GameActions
         return getGameState().cheats.ignoreResearchStatus
             || (RideTypeIsInvented(design.trackAndVehicle.rtdIndex) && RideEntryIsInvented(index));
     }
-    void SavedTrackDesignPlaceAction::BindReview(const std::vector<int32_t>& context, const FileIdentity::Identity& source)
+    void SavedTrackDesignPlaceAction::BindReview(const std::vector<int32_t>& context, const FileIdentity::Identity& source, int32_t sceneryOmitted)
     {
-        _objectContext=context; _sourcePath=source.path.u8string();
+        _expectedSceneryOmitted=sceneryOmitted; _objectContext=context; _sourcePath=source.path.u8string();
         _sourceDigest=source.digest; _sourceSize=source.size;
         _sourceModified=source.modified.time_since_epoch().count();
     }
@@ -65,7 +65,7 @@ namespace OpenRCT2::GameActions
             _queryRide = RideId::GetNull();
         serialiser << DS_TAG(_origin) << DS_TAG(_inspection) << DS_TAG(_expectedCost) << DS_TAG(_noMoney)
                    << DS_TAG(_placeScenery) << DS_TAG(_objectContext) << DS_TAG(_sourcePath)
-                   << DS_TAG(_sourceDigest) << DS_TAG(_sourceSize) << DS_TAG(_sourceModified);
+                   << DS_TAG(_expectedSceneryOmitted) << DS_TAG(_sourceDigest) << DS_TAG(_sourceSize) << DS_TAG(_sourceModified);
         _design.Serialise(serialiser);
     }
     Result SavedTrackDesignPlaceAction::Query(GameState_t& state, Park::ParkData& park) const
@@ -107,6 +107,11 @@ namespace OpenRCT2::GameActions
             auto action = TrackDesignAction(_origin, _design, _placeScenery, _inspection);
             action.SetFlags(GetFlags());
             result = QueryNested(&action, state);
+        }
+        if (result.error == Status::ok && _expectedSceneryOmitted >= 0
+            && _trackDesignPlaceStateSceneryOmitted != static_cast<uint32_t>(_expectedSceneryOmitted))
+        {
+            result.error=Status::disallowed;result.errorMessage="Native scenery omissions changed; review again";
         }
         if (result.error == Status::ok && _expectedCost != kMoney64Undefined && result.cost != _expectedCost)
         {

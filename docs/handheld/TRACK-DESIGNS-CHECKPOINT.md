@@ -163,3 +163,15 @@ placement cancel-to-file and repository refresh are delivered. Native parsing an
 current eligibility remain authoritative; flat/special design and substitution limits
 are unchanged. The broader construction milestones already supersede the early
 wooden-only statements above; this browser does not add unsupported ride families.
+
+
+## Explicit design substitution/warnings follow-up — 2026-10-14
+
+DESIGN-SUBSTITUTION-COMPLETION.md delivers native required/optional availability,
+explicit already loaded/researched exact-type/track-group vehicle choices, retained
+height/rotation/scenery and source-file identity, Cancel-first native quote/context
+guards, actual optional-scenery omission counts and stale/failure/access/save recovery.
+Earlier substitution-gap entries are superseded only for this scoped workflow.
+Arbitrary scenery/cross-family replacement, flat/special design geometry, native
+rollback, exhaustive operation and hardware limits remain. Existing completed
+browsing/authoring/selected-track capture packages are preserved.

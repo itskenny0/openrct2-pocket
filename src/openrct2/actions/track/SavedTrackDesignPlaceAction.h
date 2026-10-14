@@ -14,6 +14,7 @@ namespace OpenRCT2::GameActions
         money64 _expectedCost{ kMoney64Undefined };
         bool _noMoney{};
         bool _placeScenery{};
+        int32_t _expectedSceneryOmitted{-1};
         std::vector<int32_t> _objectContext;
         std::string _sourcePath;
         uint64_t _sourceDigest{}, _sourceSize{};
@@ -25,7 +26,7 @@ namespace OpenRCT2::GameActions
         SavedTrackDesignPlaceAction(
             CoordsXYZD origin, const TrackDesign& design, RideInspection inspection, money64 expectedCost = kMoney64Undefined,
             bool placeScenery = false);
-        void BindReview(const std::vector<int32_t>& context, const FileIdentity::Identity& source);
+        void BindReview(const std::vector<int32_t>& context, const FileIdentity::Identity& source, int32_t sceneryOmitted = -1);
         static bool Eligible(const TrackDesign& design);
         void UsePreviewRideForQuery(RideId ride)
         {

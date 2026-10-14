@@ -107,3 +107,139 @@ Query/Execute rejection, actual virtual held-A cancellation, native insufficient
 failure/recovery, exact final subtype/cost, duplicate rejection and .park roundtrip
 with transient cleanup. CTest 5/5 rerun after shared file-identity extraction.
 End-to-end browser/access/Open/capture and broad preservation evidence follows.
+
+## Phase 2 publication
+
+Canonical `7a32f72589ce64c661c077a34ad7b3713ec3d61e`; local safety
+`8a9adb126ad52179fbd1b5dbe7455b00210f1350`; identical complete tree
+`9f8a2238afd43b0896f69186802630b4fb113570`. Native parent, all changed blobs,
+complete tree and guarded branch/ref readback verified before Phase 3.
+
+## Phase 3 — native omissions, readable recovery and end-to-end evidence
+
+Vehicle choices now show native object names with exact descriptor detail. The
+placement rail says All scenery omitted without clipping. Failed confirmation
+retains its real error in X → Availability / warnings, with bounded full UTF-8
+selected-row detail; the rail announces Review rejected. New successful reviews
+clear that transient error. Existing menu-owned pause/input/ghost rules remain.
+
+Native TrackDesignPlaceSceneryElement may swallow optional scenery subaction
+failures (notably small scenery and paths). An ephemeral native diagnostic counter
+now records the actual failed subactions in the last native query/placement. It
+resets inside TrackDesignPlaceVirtual, does not alter native outcomes/costs and is
+never park state. Query omissions appear in the Cancel-first review; its expected
+count is serialized with the native action and rechecked with the quote. Successful
+placement reports the actual native omission count before the existing access
+handoff. Missing-object all-scenery fallback and failed-subaction omissions are
+separate: when all scenery is disabled by fallback, no scenery subaction is attempted.
+No omission count is estimated from a UI layout or invented gameplay statistic.
+
+DesignSubstitutionTests now builds and exports a real native closed Monorail
+circuit and uses original assets for real rendering. An intentionally absent
+legacy source vehicle demonstrates explicit Streamlined Monorail → Small Monorail
+choice; the native parser/exporter owns the test TD6. The source stays unchanged.
+The controller sequence covers dense repository-directory browsing, empty folder,
+folder entry, required-object inspection, native alternative list/cancel, real
+preview, selected-file browser return, manual height/orientation retention, scenery
+choices, warnings, Cancel-first review, SDL virtual held-A cancellation, stale
+version/source rejection, serialized native guards, funds failure/recovery and once-
+charged placement. Native completion then hands off to actual entrances/exits,
+queue/normal landings, native Open and .park save/reload. The substituted ride's
+actual native subtype, cost, Open status and source identity are asserted.
+
+A second native exported design requests two loaded/researched small-scenery
+elements; one legal roof places, and one off-map request is skipped by the actual
+native subaction. Native query/execute report exactly one omission, the real map
+contains exactly one roof, and the once-charged native quote is exact. A changed
+expected omission count rejects. No live map/cash rollback or manual object insertion
+is used. Temporary original/research/ownership setup belongs to isolated test
+fixtures; gameplay never installs or unlocks objects.
+
+Automatic provisional saving while the selected alternative's ghost is active
+preserves the real map/cash and selected draft, restoring the native ghost afterward.
+Loading that autosave demonstrates no saved provisional ride/track or retained
+review/error/draft; loading the final native park restores the actual substituted
+Open ride. Existing browsing/load-failure/title/shutdown/pending cleanup is preserved
+by the separately rerun regression drivers. Twenty-four final 512×384 native X8
+viewport/Pocket component captures are individually inspected. These are production
+component renders of actual native fixture state, not a physical Brick or full
+SDL framebuffer recording. Original assets/generated parks/designs remain private.
+
+## Final validation and exact environment
+
+Production source remained fixed through the final GUI/CLI compilation and linked
+drivers; header changes rebuilt affected native/UI objects. The final focused
+fixture was relinked after compilation and after capture/test-only corrections.
+
+- Release GUI and CLI: PASS.
+- CTest 5/5: controller input, launcher, save-publication/preservation, file browsing,
+  named save. Shared file identity extraction rebuilt dependent standalone tests.
+- DesignSubstitutionTests: PASS, initialized native/SDL dummy plus actual virtual
+  controller, original assets, all three phases including autosave and final reload.
+- Preservation PASS: SceneryPathParityTests, ConstructionTests,
+  PresentationLifecycleTests, ParkMapInformationTests, GuestInformationTests,
+  GuestCompletionTests, StaffCompletionTests, FinanceResearchInformationTests,
+  RideConstructionTests, SeatRotationTests, FamilyOperationTests,
+  MazeConstructionTests, MiniGolfConstructionTests, SelectedTrackEditingTests.
+- PathActionsTests PASS with SDL dummy and OPENRCT2_HANDHELD unset, matching
+  tools/handheld/run_native_test.py's documented invocation. An extra invocation
+  with the Pocket frame-mode environment forced failed its paused-shop preview
+  fixture ("Paused native tick stranded shop record/changed cash"). This is
+  retained as a separate failing result; no product fix or interactive diagnosis
+  of that extra-mode fixture is claimed. It does not become a passing test by
+  changing an assertion. Other named drivers use their own explicit mode setup.
+- Asset-backed PASS: SelectedTrackEditingCapture (four families/station positions,
+  no regeneration of its delivered package), DesignCapture, RideConstructionCapture
+  (Factory Capers), MazeConstructionCapture (Factory Capers), and original Wooden
+  CustomCoasterCapture (African Diamond Mine), including the existing native
+  circuit/access/natural-guest 30,000-tick regression. Guest queue use passes;
+  sustained throughput for substituted Monorail is not claimed.
+- SaveLoadBrowsingTests: PASS, original-asset native/SDL/save/design/input failure
+  workflows. Its delivered capture ZIP was not regenerated.
+- Each actual argc contract was inspected; optional original-assets arguments
+  were used only where accepted. Python capture-tool compilation and tracked
+  diff whitespace checks pass, excluding the protected unrelated Esperanto file.
+
+Reproduce captures and the focused fixture with:
+
+```sh
+python3 tools/handheld/render_design_substitution.py --build BUILD --data DATA \
+  --assets PRIVATE_RCT2 --output CAPTURES --ninja NINJA
+```
+
+The helper keeps generated source TD6s, parks and profile outside the PNG output.
+It links the actual completed GUI objects and removes only the desktop main and
+linker dependency-output option. Original binaries/assets are never bundled.
+
+## Exact remaining ordinary gaps
+
+This closes the scoped explicit vehicle/warning recovery workflow, not 100% gameplay
+or exhaustive desktop design parity. Eligible alternatives require loaded/researched
+exact native ride-type and every actual track-group/variant support. Native operation,
+train sizing, settings rejection/clamping, clearance, supports and access still decide
+whether a particular design/vehicle/site can operate. Monorail supplies the new
+end-to-end substitution proof; every family/variant combination is not established.
+No arbitrary cross-family or individual scenery replacement, install/unlock, flat/
+special footprint saved-design adapter, parser/format expansion, automatic station/
+park-network routing or geometry repair is added. Existing native TD4/TD6 filters
+and parsing/location limits from SAVE-LOAD-BROWSING-COMPLETION.md remain unchanged.
+Missing-original files can be reached through folders even when absent from the
+eligible native repository picker. Full availability detail uses the browser; the
+small repository cards remain the existing preview selector.
+
+The native placement API is sequential. TrackDesignAction demolishes its new ride
+on a reported layout failure, but does not supply universal scenery/map rollback.
+Ignored optional failures can produce a successful partial result; the diagnostic
+counts actual failed native scenery actions, not a promise that every requested
+object is present. Legacy path mapping/default surface/railing changes remain
+native. Runtime native action serialization now carries local source-file identity;
+multiplayer/replay portability of that filesystem guard is unvalidated. No new
+Pocket gameplay park-save state exists. Native late park-import rollback limits,
+32-code-point ASCII keyboard typing, direct selected-seat editing, diagonal/special/
+exhaustive replacement, positive transitions, maze/access placement ghosts,
+continuous scenery gestures/network review, sustained family guest operation and
+physical Brick/AArch64/dense-park performance remain as recorded in the matrix.
+
+Next substantial ordinary gap: broader native shop/facility appearance, using the
+existing native naming/management and appearance actions. Naming already exists;
+do not rebuild it or infer a colour/music capability unsupported by its native object.
