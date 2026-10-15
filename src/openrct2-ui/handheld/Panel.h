@@ -454,8 +454,8 @@ namespace OpenRCT2::Ui::Handheld
         DrawCommand(rt, { 8, y }, 38, "D-pad", "Move");
         DrawCommand(rt, { 91, y }, 17, "A", remove ? "Remove" : "Place");
         DrawCommand(rt, { 180, y }, 17, "X", remove ? "Place" : "Remove");
-        DrawCommand(rt, { 271, y }, 17, "Y", "Surface");
-        DrawCommand(rt, { 358, y }, 28, "SEL", "Options");
+        DrawCommand(rt, { 271, y }, 17, "Y", "Options");
+        DrawCommand(rt, { 358, y }, 28, "SEL", "Surface");
         DrawCommand(rt, { 450, y }, 17, "B", "Back");
     }
 

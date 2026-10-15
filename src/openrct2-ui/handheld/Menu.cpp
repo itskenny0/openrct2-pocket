@@ -22,6 +22,7 @@
 #include "ParkInformation.h"
 #include "MapSubjects.h"
 #include "Paths.h"
+#include "PathSurfacePicker.h"
 #include "ResearchManagement.h"
 #include "ResearchCatalog.h"
 #include "ManagementNews.h"
@@ -83,6 +84,7 @@ namespace OpenRCT2::Ui::Windows
         build,
         paths,
         pathOptions,
+        pathSurfacePicker,
         pathUndoConfirm,
         treePicker,
         sceneryCategory,
@@ -1290,6 +1292,7 @@ namespace OpenRCT2::Ui::Windows
                              "Scenery off", "Rotate camera", "Back to placement", "Choose vehicle", "Availability / warnings" };
                 case Page::designConfirm:
                     return { "Cancel", "Place design" };
+                case Page::pathSurfacePicker:
                 case Page::trackPiecePicker:
                 case Page::designPicker:
                 case Page::treePicker:
@@ -1300,9 +1303,9 @@ namespace OpenRCT2::Ui::Windows
                     return { "Normal path", "Queue path", "Remove path", "Back to build", "Connected path", "Connected queue" };
                 case Page::pathOptions:
                     if (Handheld::Paths::IsConnected())
-                        return { "Resume", "Turn direction", "Rise", "Descend", "Flat", "Restart endpoint", "Change surface", "Undo section..." };
+                        return { "Resume", "Turn direction", "Rise", "Descend", "Flat", "Restart endpoint", "Choose surface...", "Undo section..." };
                     return { "Resume",       "Follow ground", "Raise height",  "Lower height",
-                             "Flat / slope", "Rotate slope",  "Change surface" };
+                             "Flat / slope", "Rotate slope",  "Choose surface..." };
                 case Page::pathUndoConfirm: return {"Remove last new section", "Cancel"};
                 case Page::parkInspect: return { "Load this park", "Back to files" };
                 case Page::designFiles: return _files.Rows();
@@ -1492,6 +1495,12 @@ namespace OpenRCT2::Ui::Windows
         {
             page(Page::pathOptions);
         }
+        void openPathSurfacePicker()
+        {
+            Handheld::Paths::ClearPreview();
+            page(Page::pathSurfacePicker);
+            _picker.setEntries(Handheld::PathSurfaces::Entries(), Handheld::PathSurfaces::Current());
+        }
         void refreshPicker(std::optional<Handheld::PickerIdentity> preferred = {})
         {
             auto rideEntries = Handheld::FlatRides::Entries();
@@ -1500,7 +1509,8 @@ namespace OpenRCT2::Ui::Windows
             auto custom = Handheld::CustomTracks::RideEntries();
             rideEntries.insert(rideEntries.end(), custom.begin(), custom.end());
             _picker.setEntries(
-                _page == Page::trackPiecePicker    ? Handheld::CustomTracks::Pieces()
+                _page == Page::pathSurfacePicker   ? Handheld::PathSurfaces::Entries()
+                    : _page == Page::trackPiecePicker ? Handheld::CustomTracks::Pieces()
                     : _page == Page::designPicker  ? Handheld::Designs::Entries()
                     : _page == Page::ridePicker    ? rideEntries
                     : _page == Page::shopPicker    ? Handheld::Shops::Entries()
@@ -1643,7 +1653,7 @@ namespace OpenRCT2::Ui::Windows
         }
         bool picker() const
         {
-            return _page == Page::sceneryPicker || _page == Page::trackPiecePicker || _page == Page::designPicker
+            return _page == Page::pathSurfacePicker || _page == Page::sceneryPicker || _page == Page::trackPiecePicker || _page == Page::designPicker
                 || _page == Page::treePicker || _page == Page::shopPicker || _page == Page::ridePicker;
         }
         bool treePicker() const
@@ -2264,6 +2274,9 @@ namespace OpenRCT2::Ui::Windows
                 case Page::shopDemolish:
                     page(Page::shop);
                     break;
+                case Page::pathSurfacePicker:
+                    page(Page::pathOptions);
+                    break;
                 case Page::pathUndoConfirm:
                     _pathUndo.reset();
                     page(Page::pathOptions);
@@ -2622,6 +2635,11 @@ namespace OpenRCT2::Ui::Windows
                         _status = "Shop unavailable";
                         invalidate();
                     }
+                    break;
+                case Page::pathSurfacePicker:
+                    if (_picker.selected() && Handheld::PathSurfaces::Select(_picker.selected()->identity))
+                        close();
+                    else { refreshPicker(); _status = "Surface no longer available"; invalidate(); }
                     break;
                 case Page::treePicker:
                     if (_picker.selected() && Handheld::SetTreeSelection(_picker.selected()->identity.index))
@@ -3012,7 +3030,7 @@ namespace OpenRCT2::Ui::Windows
                         else if (choice == 5)
                             Paths::BeginConnected(Paths::IsQueue());
                         else if (choice == 6)
-                            Paths::CycleSurface();
+                            openPathSurfacePicker();
                         else if (choice == 7)
                         {
                             if (_pausedHere && (gGamePaused & GAME_PAUSED_NORMAL)) { PauseToggle(); _pathUndoResumed = true; }
@@ -3047,7 +3065,7 @@ namespace OpenRCT2::Ui::Windows
                             changed = Paths::RotateSlope();
                             break;
                         case 6:
-                            Paths::CycleSurface();
+                            openPathSurfacePicker();
                             break;
                     }
                     _status = changed ? Paths::PlacementName() : "No target or height limit reached.";
@@ -5095,6 +5113,13 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::DrawManagementPanel(rt, {ContextGetWidth(), ContextGetHeight()}, model);
                 return;
             }
+            if (_page == Page::pathSurfacePicker)
+            {
+                Handheld::DrawObjectPicker(rt, {ContextGetWidth(), ContextGetHeight()}, _picker,
+                    Handheld::Paths::IsQueue() ? "Queue surfaces" : "Path surfaces", _status,
+                    "No eligible surfaces");
+                return;
+            }
             if (_page == Page::pathOptions)
             {
                 Handheld::DrawPathOptions(
@@ -5305,6 +5330,10 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = OpenPanel())
             window->openRideAccess(target);
+    }
+    void HandheldPathSurfacePickerOpen()
+    {
+        if (auto* window = OpenPanel()) window->openPathSurfacePicker();
     }
     void HandheldPathOptionsOpen()
     {

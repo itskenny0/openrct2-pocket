@@ -1046,6 +1046,8 @@ namespace OpenRCT2::Ui::Handheld
                         Windows::ScenarioSelectHandheldConfirm();
                     else if (action == Action::previousOption || action == Action::nextOption)
                         Windows::ScenarioSelectHandheldTab(action == Action::previousOption ? -1 : 1);
+                    else if (action == Action::contextPrimary)
+                        Windows::ScenarioSelectHandheldToggleLocking();
                 }
                 else if (!modal && action == Action::confirm)
                     Windows::TitleMenuHandheldConfirm();
@@ -1123,7 +1125,7 @@ namespace OpenRCT2::Ui::Handheld
                 else if (_shopTool)
                     RotateShop();
                 else if (Paths::IsActive())
-                    Windows::HandheldPathOptionsOpen();
+                    Windows::HandheldPathSurfacePickerOpen();
                 else
                 {
                     EndTerrain();
@@ -1231,10 +1233,7 @@ namespace OpenRCT2::Ui::Handheld
                     case Action::contextSecondary:
                         if (Paths::IsActive())
                         {
-                            if (Paths::IsConnected())
-                                Paths::TurnConnected();
-                            else
-                                Paths::CycleSurface();
+                            Windows::HandheldPathOptionsOpen();
                             _terrainStatus.clear();
                             _scatterFeedback = false;
                             break;
@@ -1389,7 +1388,7 @@ namespace OpenRCT2::Ui::Handheld
                 status = _sceneryTool && SceneryTools::ScatterActive() && _scatterFeedback ? SceneryTools::ScatterStatus() : _terrainStatus;
             Paths::DrawOverlay(rt, Concept::kOrigin);
             if (Paths::IsConnected())
-                DrawConstructionFooter(rt, { ContextGetWidth(), height }, Paths::ConnectedReady() ? "Extend" : "Start", "Turn");
+                DrawConstructionFooter(rt, { ContextGetWidth(), height }, Paths::ConnectedReady() ? "Extend" : "Start", "Options");
             else
                 DrawPathFooter(rt, { ContextGetWidth(), height }, status, Paths::IsRemoving());
         }

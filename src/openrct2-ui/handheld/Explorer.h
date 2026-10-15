@@ -101,6 +101,7 @@ namespace OpenRCT2::Ui::Windows
     void HandheldShopManagementMove(int x, int y);
     void HandheldShopManagementPause();
     void HandheldPathOptionsOpen();
+    void HandheldPathSurfacePickerOpen();
     void HandheldTreePickerOpen();
     void HandheldSceneryOptionsOpen();
     bool HandheldSceneryPickerIsOpen();

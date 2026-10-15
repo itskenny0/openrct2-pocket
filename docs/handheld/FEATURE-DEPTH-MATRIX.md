@@ -657,3 +657,15 @@ labels repeat placement accurately and starts manual elevation from native previ
 query height. Native repeated placement/accounting/save round-trip and CTest pass.
 See BRICK-NEXTUI-TESTING-RELEASE.md. Hardware/package validation is pending; no
 existing access relocation or advanced parity work starts in this milestone.
+
+## First Brick playtest picker follow-up — 2026-10-15
+
+- Paths: Select opens native-sprite surface grid; Y opens options. Normal/queue
+  and existing legacy adapters are filtered and revalidated; cancel preserves
+  selection and connected mode. Native placement and save/reload are tested.
+- Scenario selector: all visible rows are controller-inspectable, including
+  locked entries; locked Start remains guarded. X exposes the actual native
+  progression setting. Native controller previews/minimaps and lock icons added.
+- The broader native-sprite presentation pass remains open. See
+  [FIRST-PLAYTEST-PICKERS-COMPLETION.md](FIRST-PLAYTEST-PICKERS-COMPLETION.md)
+  for exact controls, fixture distinctions, target validation and hardware limits.
