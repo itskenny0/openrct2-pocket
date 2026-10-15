@@ -1217,6 +1217,8 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ride:
                 {
                     std::vector<std::string> result{ "Open ride", "Close ride", "Back to park" };
+                    if (_ridesTarget && Handheld::FlatRides::CanResume(*_ridesTarget))
+                        result.insert(result.begin(), "Place entrance / exit...");
                     if (_ridesTarget && Handheld::RideAccess::Supported(*_ridesTarget))
                         result.push_back("Access / paths...");
                     if (_ridesTarget && Handheld::CustomTracks::CanResume(*_ridesTarget))
@@ -2504,7 +2506,7 @@ namespace OpenRCT2::Ui::Windows
                 page(Page::ridesRoster);
                 return;
             }
-            const auto choice = _focus.index();
+            auto choice = _focus.index();
             switch (_page)
             {
                 case Page::designOptions:
@@ -3693,7 +3695,23 @@ namespace OpenRCT2::Ui::Windows
                         page(Page::ridesRoster);
                         break;
                     }
-                    const auto rows = ridesPresentationFor(Page::ridesInspect, choice).rows;
+                    auto rows = ridesPresentationFor(Page::ridesInspect, choice).rows;
+                    // Keep the placement handoff first without changing the established action indices.
+                    if (Handheld::FlatRides::CanResume(*_ridesTarget))
+                    {
+                        if (choice == 0)
+                        {
+                            const auto target = *_ridesTarget;
+                            close();
+                            Handheld::ResumeFlatRide(target.id);
+                            Handheld::RideManagement::Locate(target);
+                            break;
+                        }
+                        // Reconstruct the old ordering for the existing dispatcher below.
+                        rows.erase(rows.begin());
+                        rows.insert(rows.begin() + 7, "Place entrance / exit...");
+                        if (choice <= 7) --choice;
+                    }
                     if (choice < rows.size() && rows[choice] == "Edit track blocks...")
                     {
                         if (_pausedHere && (gGamePaused & GAME_PAUSED_NORMAL))
@@ -3839,6 +3857,19 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 }
                 case Page::ridesAccess:
+                    if (_ridesTarget && Handheld::FlatRides::CanResume(*_ridesTarget))
+                    {
+                        if (choice == 0)
+                        {
+                            const auto target = *_ridesTarget;
+                            close();
+                            Handheld::ResumeFlatRide(target.id);
+                            Handheld::RideManagement::Locate(target);
+                        }
+                        else if (choice == 1) page(Page::ridesInspect);
+                        else close();
+                        break;
+                    }
                     if (choice == 0)
                         close();
                     else if (!_ridesTarget || !Handheld::RideAccess::Inspect(*_ridesTarget))
@@ -4600,13 +4631,25 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::ride:
-                    if (_ridesTarget && choice < rows().size() && rows()[choice] == "Edit maze...")
+                    if (_ridesTarget && Handheld::FlatRides::CanResume(*_ridesTarget))
+                    {
+                        if (choice == 0)
+                        {
+                            const auto target = *_ridesTarget;
+                            close();
+                            Handheld::ResumeFlatRide(target.id);
+                            Handheld::RideManagement::Locate(target);
+                            break;
+                        }
+                        --choice;
+                    }
+                    if (_ridesTarget && _focus.index() < rows().size() && rows()[_focus.index()] == "Edit maze...")
                     {
                         const auto t = *_ridesTarget;
                         close();
                         Handheld::ResumeMaze(t.id);
                     }
-                    else if (_ridesTarget && choice < rows().size() && rows()[choice] == "Edit track blocks...")
+                    else if (_ridesTarget && _focus.index() < rows().size() && rows()[_focus.index()] == "Edit track blocks...")
                     {
                         if (_pausedHere && (gGamePaused & GAME_PAUSED_NORMAL))
                         {
@@ -5230,6 +5273,10 @@ namespace OpenRCT2::Ui::Windows
             model.rows = rows();
             model.selected = _focus.index();
             model.status = _status;
+            if (_page == Page::sceneryClearOptions)
+                model.icons = { Handheld::PanelIcon::play, Handheld::PanelIcon::none, Handheld::PanelIcon::none,
+                    Handheld::PanelIcon::tree, Handheld::PanelIcon::largeScenery, Handheld::PanelIcon::path,
+                    Handheld::PanelIcon::walls, Handheld::PanelIcon::furniture };
             if (_page == Page::pathOptions)
             {
                 model.icons = { Handheld::PanelIcon::play,  Handheld::PanelIcon::terrain, Handheld::PanelIcon::raise,
@@ -5244,9 +5291,11 @@ namespace OpenRCT2::Ui::Windows
                                 Handheld::PanelIcon::exit };
             else if (_page == Page::build)
             {
-                model.icons = { Handheld::PanelIcon::raise,   Handheld::PanelIcon::lower,   Handheld::PanelIcon::path,
-                                Handheld::PanelIcon::terrain, Handheld::PanelIcon::terrain, Handheld::PanelIcon::remove,
-                                Handheld::PanelIcon::tree,    Handheld::PanelIcon::folder,  Handheld::PanelIcon::back };
+                model.icons = { Handheld::PanelIcon::raise, Handheld::PanelIcon::lower, Handheld::PanelIcon::path,
+                    Handheld::PanelIcon::none, Handheld::PanelIcon::terrain, Handheld::PanelIcon::remove,
+                    Handheld::PanelIcon::tree, Handheld::PanelIcon::none, Handheld::PanelIcon::none,
+                    Handheld::PanelIcon::folder, Handheld::PanelIcon::largeScenery, Handheld::PanelIcon::terrain,
+                    Handheld::PanelIcon::none, Handheld::PanelIcon::back };
                 if (model.status.empty())
                     model.status = "Choose a tool, then edit in the park.";
             }

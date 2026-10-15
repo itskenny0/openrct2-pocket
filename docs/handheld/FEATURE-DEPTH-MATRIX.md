@@ -678,3 +678,12 @@ controller prompts, native tree/folder icons, Build/Paths focus return and root
 Build back-to-park are delivered. Final native component fixtures were inspected;
 physical Brick and exhaustive specialised-screen polish remain unverified/open.
 See [SLATE-UI-PAUSE-COMPLETION.md](SLATE-UI-PAUSE-COMPLETION.md).
+
+## 2026-10-15 Brick feedback: meaningful icons and access discovery
+
+See [ICONS-ACCESS-SHORTCUT-COMPLETION.md](ICONS-ACCESS-SHORTCUT-COMPLETION.md).
+Generic fallback folders removed; clear-area categories use native G2 family
+sprites and numeric settings plain text. Missing entrance/exit placement is the
+first eligible closed-ride action in both quick management and Dashboard inspection,
+and directly reachable from Access / paths. Existing native placement/ghost/cost
+rules remain; existing-access relocation/removal remains outside this milestone.

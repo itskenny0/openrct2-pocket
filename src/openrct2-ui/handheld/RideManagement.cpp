@@ -1014,7 +1014,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                            PricePermitted(*ride) ? "Admission price..." : "Price unavailable",
                            "Back to roster" };
             if (FlatRides::CanResume(*target))
-                model.rows.push_back("Finish entrances/exits...");
+                model.rows.insert(model.rows.begin(), "Place entrance / exit...");
             if (RideAccess::Supported(*target))
                 model.rows.push_back("Access / paths...");
             if (CustomTracks::CanResume(*target))

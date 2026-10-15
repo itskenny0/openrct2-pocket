@@ -72,11 +72,24 @@ namespace OpenRCT2::Ui::Handheld
         lower,
         path,
         remove,
-        tree
+        tree,
+        none,
+        largeScenery,
+        walls,
+        furniture
     };
 
     inline void DrawIcon(Drawing::RenderTarget& rt, ScreenCoordsXY pos, PanelIcon icon, bool selected = false)
     {
+        if (icon == PanelIcon::none)
+            return;
+        if (icon == PanelIcon::largeScenery || icon == PanelIcon::walls || icon == PanelIcon::furniture)
+        {
+            const auto sprite = icon == PanelIcon::largeScenery ? SPR_G2_BUTTON_LARGE_SCENERY
+                : icon == PanelIcon::walls ? SPR_G2_BUTTON_WALLS : SPR_G2_BUTTON_PATH_ADDITIONS;
+            GfxDrawSprite(rt, ImageId(sprite), pos + ScreenCoordsXY{ -5, -6 });
+            return;
+        }
         if (icon == PanelIcon::tree)
         {
             GfxDrawSprite(rt, ImageId(SPR_G2_BUTTON_TREES), pos + ScreenCoordsXY{-5, -6});
@@ -138,7 +151,8 @@ namespace OpenRCT2::Ui::Handheld
         else
             DrawIcon(rt, pos + ScreenCoordsXY{ 8, 6 }, icon, selected);
         DrawModernEllipsised(
-            rt, pos + ScreenCoordsXY{ 39, 9 }, width - 53, (selected ? "{BLACK}" : "{WHITE}") + label,
+            rt, pos + ScreenCoordsXY{ icon == PanelIcon::none ? 12 : 39, 9 },
+            width - (icon == PanelIcon::none ? 26 : 53), (selected ? "{BLACK}" : "{WHITE}") + label,
             { Drawing::Colour::white });
         if (selected)
             DrawModernText(rt, pos + ScreenCoordsXY{ width - 11, 9 }, "{BLACK}>", { Drawing::Colour::white });
@@ -244,7 +258,7 @@ namespace OpenRCT2::Ui::Handheld
         for (size_t i = first; i < model.rows.size() && i < first + 8; ++i)
             DrawIconRow(
                 rt, p + ScreenCoordsXY{ 10, 43 + static_cast<int32_t>(i - first) * kPanelRowPitch }, window.width - 20,
-                model.rows[i], i == model.selected, i < model.icons.size() ? model.icons[i] : PanelIcon::folder);
+                model.rows[i], i == model.selected, i < model.icons.size() ? model.icons[i] : PanelIcon::none);
         DrawModernEllipsised(
             rt, p + ScreenCoordsXY{ 13, window.height - 45 }, window.width - 26, model.status, { Drawing::Colour::white });
         DrawOverlayCommands(rt, window);
@@ -539,7 +553,7 @@ namespace OpenRCT2::Ui::Handheld
         for (size_t i = first; i < model.rows.size() && i < first + 8; ++i)
             DrawIconRow(
                 rt, p + ScreenCoordsXY{ 10, (model.tabs.empty() ? 64 : 82) + static_cast<int32_t>(i) * kPanelRowPitch }, 218,
-                model.rows[i], i == model.selected, i < model.icons.size() ? model.icons[i] : PanelIcon::folder);
+                model.rows[i], i == model.selected, i < model.icons.size() ? model.icons[i] : PanelIcon::none);
         DrawCard(rt, p + ScreenCoordsXY{ 238, 44 }, { window.width - 248, 150 });
         GfxDrawSprite(rt, ImageId(SPR_G2_TAB_TREE), p + ScreenCoordsXY{ 250, 50 });
         DrawModernEllipsised(

@@ -2,6 +2,7 @@
 #include "RideAccess.h"
 
 #include "Explorer.h"
+#include "FlatRides.h"
 #include "Paths.h"
 
 #include <openrct2-ui/interface/Window.h>
@@ -166,8 +167,13 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
                   "Ride inspection...", "Connected entrance queue...", "Connected exit path..." });
             model.status = "Link both access points to park paths";
         }
+        else if (FlatRides::CanResume(target))
+        {
+            model.rows = { "Place entrance / exit...", "Ride inspection...", "Back to park" };
+            model.status = "Place missing access, then connect paths";
+        }
         else
-            model.status = "Finish entrances/exits from ride inspection";
+            model.status = "Missing access: close ride, then inspect again";
         if (!feedback.empty())
             model.status = feedback;
         return model;
