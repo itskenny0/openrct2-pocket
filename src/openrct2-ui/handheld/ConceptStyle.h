@@ -54,7 +54,7 @@ namespace OpenRCT2::Ui::Handheld::Concept
     inline void DrawIcon(Drawing::RenderTarget& rt, ScreenCoordsXY p, Icon icon, bool selected = false)
     {
         const auto light = static_cast<PaletteIndex>(selected ? PocketPalette::dark : PocketPalette::primary);
-        const auto shade = static_cast<PaletteIndex>(selected ? 52 : PocketPalette::secondary);
+        const auto shade = static_cast<PaletteIndex>(selected ? PocketPalette::border : PocketPalette::secondary);
         const auto line = [&](int x1, int y1, int x2, int y2, PaletteIndex c) {
             GfxDrawLine(rt, { p + ScreenCoordsXY{ x1, y1 }, p + ScreenCoordsXY{ x2, y2 } }, c);
         };

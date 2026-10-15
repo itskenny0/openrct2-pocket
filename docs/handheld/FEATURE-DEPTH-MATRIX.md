@@ -669,3 +669,12 @@ existing access relocation or advanced parity work starts in this milestone.
 - The broader native-sprite presentation pass remains open. See
   [FIRST-PLAYTEST-PICKERS-COMPLETION.md](FIRST-PLAYTEST-PICKERS-COMPLETION.md)
   for exact controls, fixture distinctions, target validation and hardware limits.
+
+## Slate UI / pause follow-up — 2026-10-15
+
+Explicit Resume clears only native normal pause, including after native reload;
+menu-owned cleanup preserves other pause reasons. Shared slate palette, compact
+controller prompts, native tree/folder icons, Build/Paths focus return and root
+Build back-to-park are delivered. Final native component fixtures were inspected;
+physical Brick and exhaustive specialised-screen polish remain unverified/open.
+See [SLATE-UI-PAUSE-COMPLETION.md](SLATE-UI-PAUSE-COMPLETION.md).

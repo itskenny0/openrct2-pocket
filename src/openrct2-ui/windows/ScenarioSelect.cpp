@@ -152,8 +152,8 @@ namespace OpenRCT2::Ui::Windows
             setWidgets(_scenarioSelectWidgets);
             if (Handheld::IsEnabled())
             {
-                colours[0] = ColourWithFlags{ Colour::darkBlue };
-                colours[1] = ColourWithFlags{ Colour::darkBlue };
+                colours[0] = ColourWithFlags{ Colour::grey };
+                colours[1] = ColourWithFlags{ Colour::grey };
                 widgets[WIDX_BACKGROUND].right = width - 1;
                 widgets[WIDX_BACKGROUND].bottom = height - 1;
                 widgets[WIDX_TITLEBAR].right = width - 2;
@@ -702,7 +702,7 @@ namespace OpenRCT2::Ui::Windows
                             if (Handheld::IsEnabled())
                                 Rectangle::fill(
                                     rt, { 1, y, listWidth - 1, y + scenarioItemHeight - 2 },
-                                    getColourMap(Colour::yellow).light);
+                                    Handheld::Theme::gold);
                             else
                                 Rectangle::filter(
                                     rt, { 0, y, width, y + scenarioItemHeight - 1 }, FilterPaletteID::paletteDarken1);

@@ -23,14 +23,14 @@ namespace OpenRCT2::Ui::Handheld
     // The palette has no continuous RGB navy ramp, so combine ink blue with slate edges.
     namespace Theme
     {
-        inline constexpr Drawing::PaletteIndex ink = static_cast<Drawing::PaletteIndex>(118);
+        inline constexpr Drawing::PaletteIndex ink = static_cast<Drawing::PaletteIndex>(PocketPalette::panel);
         inline constexpr Drawing::PaletteIndex body = static_cast<Drawing::PaletteIndex>(10);
-        inline constexpr Drawing::PaletteIndex raised = static_cast<Drawing::PaletteIndex>(119);
+        inline constexpr Drawing::PaletteIndex raised = static_cast<Drawing::PaletteIndex>(13);
         inline constexpr Drawing::PaletteIndex edge = static_cast<Drawing::PaletteIndex>(14);
         inline constexpr Drawing::PaletteIndex highlight = static_cast<Drawing::PaletteIndex>(17);
-        inline constexpr Drawing::PaletteIndex gold = static_cast<Drawing::PaletteIndex>(53);
-        inline constexpr Drawing::PaletteIndex goldLight = static_cast<Drawing::PaletteIndex>(55);
-        inline constexpr Drawing::PaletteIndex goldShadow = static_cast<Drawing::PaletteIndex>(51);
+        inline constexpr Drawing::PaletteIndex gold = static_cast<Drawing::PaletteIndex>(PocketPalette::selection);
+        inline constexpr Drawing::PaletteIndex goldLight = static_cast<Drawing::PaletteIndex>(20);
+        inline constexpr Drawing::PaletteIndex goldShadow = static_cast<Drawing::PaletteIndex>(16);
         inline constexpr Drawing::PaletteIndex text = static_cast<Drawing::PaletteIndex>(20);
     } // namespace Theme
 
@@ -52,8 +52,7 @@ namespace OpenRCT2::Ui::Handheld
         Fill(rt, pos + ScreenCoordsXY{ 3, 3 }, { size.width - 6, size.height - 6 }, face);
         Fill(rt, pos + ScreenCoordsXY{ 1, 5 }, { size.width - 2, size.height - 10 }, face);
         Fill(rt, pos + ScreenCoordsXY{ 5, 1 }, { size.width - 10, 1 }, selected ? Theme::goldLight : Theme::highlight);
-        if (selected)
-            Fill(rt, pos + ScreenCoordsXY{ 3, 3 }, { size.width - 6, 4 }, static_cast<Drawing::PaletteIndex>(54));
+
     }
 
     inline void DrawSurface(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size)
@@ -80,7 +79,12 @@ namespace OpenRCT2::Ui::Handheld
     {
         if (icon == PanelIcon::tree)
         {
-            Concept::DrawIcon(rt, pos, Concept::Icon::tree, selected);
+            GfxDrawSprite(rt, ImageId(SPR_G2_BUTTON_TREES), pos + ScreenCoordsXY{-5, -6});
+            return;
+        }
+        if (icon == PanelIcon::folder)
+        {
+            GfxDrawSprite(rt, ImageId(SPR_G2_FOLDER), pos);
             return;
         }
         if (icon == PanelIcon::remove)
@@ -148,38 +152,32 @@ namespace OpenRCT2::Ui::Handheld
 
     inline void DrawCommand(Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t keyWidth, const char* key, const char* label)
     {
-        const bool dpad = std::string_view(key) == "D-pad";
-        const auto badgeWidth = dpad || keyWidth == 17 ? 22 : keyWidth + 4;
-        const auto top = pos.y - 3;
+        const std::string_view original(key);
+        const bool dpad = original == "D-pad";
+        const bool face = original.size() == 1 && std::string_view("ABXY").find(original.front()) != std::string_view::npos;
+        const auto top = pos.y - 1;
+        int width = 16;
         if (dpad)
         {
-            // Compact physical D-pad silhouette; no text or rectangular keycap.
-            Fill(rt, { pos.x + 8, top }, { 6, 20 }, Theme::highlight);
-            Fill(rt, { pos.x + 1, top + 7 }, { 20, 6 }, Theme::highlight);
-            Fill(rt, { pos.x + 8, top + 1 }, { 6, 18 }, Theme::text);
-            Fill(rt, { pos.x + 2, top + 7 }, { 18, 6 }, Theme::text);
-            Fill(rt, { pos.x + 9, top + 8 }, { 4, 4 }, Theme::edge);
+            // Small, crisp cross; no oversized faux hardware silhouette.
+            Fill(rt, {pos.x + 5, top}, {4, 14}, Theme::text);
+            Fill(rt, {pos.x, top + 5}, {14, 4}, Theme::text);
+            Fill(rt, {pos.x + 5, top + 5}, {4, 4}, Theme::edge);
         }
-        else if (keyWidth == 17)
+        else if (face)
         {
-            // Circular face-button badges with antialiased edges in the native palette.
-            for (int y = 0; y < 20; ++y)
-                for (int x = 0; x < 22; ++x)
-                {
-                    const float dx = x - 10.5f, dy = y - 9.5f;
-                    const float distance = std::sqrt(dx * dx + dy * dy);
-                    if (distance < 9.8f)
-                        Fill(rt, { pos.x + x, top + y }, { 1, 1 }, distance > 8.8f ? Theme::highlight : Theme::text);
-                }
+            // Compact rounded tiles replace the large antialiased discs.
+            Fill(rt, {pos.x + 2, top}, {12, 16}, Theme::text);
+            Fill(rt, {pos.x, top + 2}, {16, 12}, Theme::text);
+            DrawButtonLabel(rt, {pos.x, top}, {16, 16}, std::string(original));
         }
         else
         {
-            DrawCard(rt, { pos.x, top }, { badgeWidth, 20 });
-            Fill(rt, { pos.x + 3, top + 2 }, { badgeWidth - 6, 16 }, Theme::text);
+            const std::string name = original == "SEL" ? "SELECT" : std::string(original);
+            width = TextWidth(name);
+            DrawModernText(rt, pos, "{MUTED}" + name);
         }
-        if (!dpad)
-            DrawButtonLabel(rt, { pos.x, top }, { badgeWidth, 20 }, key);
-        DrawModernText(rt, { pos.x + badgeWidth + 5, pos.y }, label, { Drawing::Colour::white });
+        DrawModernText(rt, {pos.x + width + 5, pos.y}, label, {Drawing::Colour::white});
     }
 
     inline void DrawPanelCommands(Drawing::RenderTarget& rt, const Window& window, const char* backLabel = "Back")
@@ -452,10 +450,10 @@ namespace OpenRCT2::Ui::Handheld
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;
         DrawCommand(rt, { 8, y }, 38, "D-pad", "Move");
-        DrawCommand(rt, { 91, y }, 17, "A", remove ? "Remove" : "Place");
-        DrawCommand(rt, { 180, y }, 17, "X", remove ? "Place" : "Remove");
-        DrawCommand(rt, { 271, y }, 17, "Y", "Options");
-        DrawCommand(rt, { 358, y }, 28, "SEL", "Surface");
+        DrawCommand(rt, { 80, y }, 17, "A", remove ? "Remove" : "Place");
+        DrawCommand(rt, { 154, y }, 17, "X", remove ? "Place" : "Remove");
+        DrawCommand(rt, { 230, y }, 17, "Y", "Options");
+        DrawCommand(rt, { 312, y }, 28, "SEL", "Surface");
         DrawCommand(rt, { 450, y }, 17, "B", "Back");
     }
 

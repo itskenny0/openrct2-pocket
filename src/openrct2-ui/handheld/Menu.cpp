@@ -242,6 +242,7 @@ namespace OpenRCT2::Ui::Windows
         Page _page = Page::park;
         Handheld::ObjectPicker _picker;
         bool _pausedHere{};
+        size_t _buildFocus{}, _pathModeFocus{};
         bool _shopPickerFromBuild{};
         bool _ridePickerFromBuild{};
         bool _designPickerFromBuild{};
@@ -954,6 +955,8 @@ namespace OpenRCT2::Ui::Windows
 
         void page(Page next)
         {
+            if (_page == Page::build) _buildFocus = _focus.index();
+            if (_page == Page::paths) _pathModeFocus = _focus.index();
             if(next==Page::park || next==Page::dashboard) _managementNewsReturn=false;
             if (_paintReviewResumed && next != Page::terrainPaintConfirm) {
                 if (_pausedHere && !(gGamePaused & GAME_PAUSED_NORMAL)) PauseToggle();
@@ -1051,6 +1054,8 @@ namespace OpenRCT2::Ui::Windows
             if (next != Page::financeEditor && next != Page::financeConfirm)
                 _financeDraft.reset();
             _focus = {};
+            if (next == Page::build) _focus.move(static_cast<int>(_buildFocus), rows().size());
+            if (next == Page::paths) _focus.move(static_cast<int>(_pathModeFocus), rows().size());
             _status.clear();
             _priceDraft.reset();
             layout();
@@ -1464,8 +1469,8 @@ namespace OpenRCT2::Ui::Windows
             Handheld::CustomTracks::ClearPreview();
             setWidgets(kWidgets);
             layout();
-            colours[0] = ColourWithFlags{ Colour::darkBlue };
-            colours[1] = ColourWithFlags{ Colour::darkBlue };
+            colours[0] = ColourWithFlags{ Colour::grey };
+            colours[1] = ColourWithFlags{ Colour::grey };
             _pausedHere = gLegacyScene == LegacyScene::playing && GameIsNotPaused();
             if (_pausedHere)
                 PauseToggle();
@@ -1477,8 +1482,15 @@ namespace OpenRCT2::Ui::Windows
                 _pausedHere = false; // Our pause was already released; retain any external pause.
             if (_page == Page::designConfirm && _focus.index() == 0)
                 Handheld::Designs::CancelReview();
-            if (_pausedHere && gLegacyScene == LegacyScene::playing && GameIsPaused())
+            if (_pausedHere && gLegacyScene == LegacyScene::playing && (gGamePaused & GAME_PAUSED_NORMAL))
                 PauseToggle();
+        }
+        void resumePark()
+        {
+            if (gLegacyScene == LegacyScene::playing && (gGamePaused & GAME_PAUSED_NORMAL))
+                PauseToggle();
+            _pausedHere = false;
+            close();
         }
         void openRideAccess(const Handheld::RideManagement::Target& target)
         {
@@ -2466,8 +2478,11 @@ namespace OpenRCT2::Ui::Windows
                 case Page::exit:
                     page(Page::park);
                     break;
-                case Page::park:
+                case Page::build:
                     close();
+                    break;
+                case Page::park:
+                    resumePark();
                     break;
                 default:
                     if (gLegacyScene == LegacyScene::playing)
@@ -2655,7 +2670,7 @@ namespace OpenRCT2::Ui::Windows
                     switch (choice)
                     {
                         case 0:
-                            close();
+                            resumePark();
                             break;
                         case 1:
                             page(Page::build);

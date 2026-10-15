@@ -89,3 +89,13 @@ Reproduce normal captures with `tools/handheld/render_shell.py --frames-dir DIR`
 Use `--pages terrain-lower paths-queue paths-remove paths-ground paths-error
 path-options-last` to inspect the alternate states. This uses the same native
 software renderer and components as the normal captures.
+
+## First hardware playtest style update — 2026-10-15
+
+The user selected **Neutral slate** to replace the earlier blue/gold direction.
+Shared Pocket surfaces and focus now use native greys, smaller face-button
+prompts and unboxed Start/Select labels. Native object/terrain/path/tree/folder
+sprites and previews remain the preferred visual language where available.
+See [SLATE-UI-PAUSE-COMPLETION.md](SLATE-UI-PAUSE-COMPLETION.md) for inspected
+native component renders, menu focus changes and explicit Resume semantics.
+Specialised-screen polish and physical display review remain ongoing.
