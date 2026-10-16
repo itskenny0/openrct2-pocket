@@ -28,6 +28,11 @@ namespace OpenRCT2::Ui::Handheld
         bool rosterCards{};
         std::vector<std::string> rowDetails;
         std::vector<bool> rowEnabled;
+        std::vector<std::string> tabs;
+        size_t selectedTab{};
+        std::string headerStatus;
+        int metricHeight = 48;
+        bool contentSized{};
         size_t columns = 1; // Controller text entry uses the same content shell.
     };
     struct ManagementLayout
@@ -39,9 +44,9 @@ namespace OpenRCT2::Ui::Handheld
     {
         const int columns = model.actionGrid ? (size.width >= 360 ? 2 : 1) : static_cast<int>(std::max<size_t>(1, model.columns));
         const int statColumns = model.summaryMetrics && !model.stats.empty() ? (size.width >= 440 ? 3 : 2) : 1;
-        const int statHeight = model.summaryMetrics ? 48 : 24;
+        const int statHeight = model.summaryMetrics ? model.metricHeight : 24;
         const int statRows = (static_cast<int>(model.stats.size()) + statColumns - 1) / statColumns;
-        const int rowStart = 64 + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16
+        const int rowStart = 64 + (model.tabs.empty() ? 0 : 34) + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16
             + (model.graph.empty() ? 0 : 110) + (model.rows.empty() ? 0 : 11);
         const int rowHeight = model.rosterCards ? 46 : model.actionGrid ? 30 : columns > 1 ? 24 : 30;
         const size_t capacity = std::max(1, (size.height - rowStart - 30) / rowHeight) * columns;
@@ -50,26 +55,35 @@ namespace OpenRCT2::Ui::Handheld
     inline void DrawManagementContent(
         Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const ManagementPresentation& model, bool focused = true)
     {
+        if (model.confirmation || model.contentSized)
+        {
+            const auto measured = MeasureManagement(size, model);
+            const int rows = static_cast<int>((model.rows.size() + measured.columns - 1) / measured.columns);
+            size.height = std::min(size.height, measured.rowStart + rows * measured.rowHeight + 34);
+        }
         const int width = size.width;
         const auto layout = MeasureManagement(size, model);
         const auto [columns, rowHeight, rowStart, statColumns, statHeight, capacity] = layout;
         const size_t first = model.selected / capacity * capacity;
         const size_t visible = std::min(capacity, model.rows.size() - std::min(first, model.rows.size()));
         DrawSurface(rt, p, size);
-        DrawSectionLabel(rt, p + ScreenCoordsXY{12, 13}, width - 24, model.breadcrumb);
+        DrawSectionLabel(rt, p + ScreenCoordsXY{12, 13}, width - 24 - (model.headerStatus.empty() ? 0 : 138), model.breadcrumb);
+        if (!model.headerStatus.empty()) DrawStrongText(rt,p+ScreenCoordsXY{width-138,13},"{WHITE}"+model.headerStatus,126);
+        const int contentTop = model.tabs.empty() ? 64 : 98;
+        if (!model.tabs.empty()) DrawTabs(rt,p+ScreenCoordsXY{10,62},width-20,model.tabs,model.selectedTab);
         DrawHeadingText(rt, p + ScreenCoordsXY{12, 29},
             std::string(model.confirmation ? "{GOLD}" : "{WHITE}") + model.title, width - 24);
         Fill(rt, p + ScreenCoordsXY{12, 55}, {width - 24, 1}, Theme::edge);
         const int valueX = 14 + (width - 30) * 45 / 100;
         for (size_t i = 0; i < model.stats.size(); ++i)
         {
-            const int y = 64 + static_cast<int>(i / statColumns) * statHeight;
+            const int y = contentTop + static_cast<int>(i / statColumns) * statHeight;
             const bool highlight = focused && model.highlightedStat == i;
             if (model.summaryMetrics)
             {
                 const int cellWidth = (width - 24) / statColumns;
                 DrawMetric(rt, p + ScreenCoordsXY{12 + static_cast<int>(i % statColumns) * cellWidth, y},
-                    {cellWidth - 4, 43}, model.stats[i].first, model.stats[i].second, highlight);
+                    {cellWidth - 4, statHeight - 5}, model.stats[i].first, model.stats[i].second, highlight);
             }
             else
             {
@@ -82,7 +96,7 @@ namespace OpenRCT2::Ui::Handheld
         }
         const int statRows = (static_cast<int>(model.stats.size()) + statColumns - 1) / statColumns;
         for (size_t i = 0; i < model.bodyLines.size(); ++i)
-            DrawModernEllipsised(rt, p + ScreenCoordsXY{12, 68 + statRows * statHeight + static_cast<int>(i) * 16},
+            DrawModernEllipsised(rt, p + ScreenCoordsXY{12, contentTop + 4 + statRows * statHeight + static_cast<int>(i) * 16},
                 width - 24, "{WHITE}" + model.bodyLines[i]);
         if (!model.graph.empty())
         {

@@ -29,7 +29,7 @@
 
 namespace OpenRCT2::Ui::Handheld::Paths
 {
-    static bool active{}, removing{}, available{};
+    static bool active{}, removing{}, available{}, adjusting{};
     static bool connected{}, connectedBusy{};
     static std::optional<CoordsXYZ> endpoint;
     static FootpathSlope endpointSlope;
@@ -242,6 +242,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
         available = Windows::WindowFootpathSelectDefault();
         gFootpathSelection.isQueueSelected = queue;
         active = true;
+        adjusting = false;
         connected = connectedBusy = false;
         endpoint.reset();
         history.clear();
@@ -258,6 +259,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
     {
         ClearPreview();
         active = false;
+        adjusting = false;
         connected = connectedBusy = false;
         endpoint.reset();
         history.clear();
@@ -388,12 +390,12 @@ namespace OpenRCT2::Ui::Handheld::Paths
             connectedBusy = false;
         return result;
     }
-    bool TurnConnected()
+    bool TurnConnected(int delta)
     {
         if (!IsConnected() || connectedBusy || firstLanding)
             return false;
         ClearPreview();
-        connectedDirection = DirectionNext(connectedDirection);
+        connectedDirection = static_cast<Direction>((connectedDirection + delta % 4 + 4) & 3);
         ++accessRevision;
         RefreshConnected();
         return true;
@@ -408,6 +410,9 @@ namespace OpenRCT2::Ui::Handheld::Paths
         RefreshConnected();
         return true;
     }
+    bool LevelConnected() { return SlopeConnected(-connectedGrade); }
+    bool IsAdjusting() { return IsActive() && adjusting; }
+    void SetAdjusting(bool enabled) { adjusting = IsActive() && enabled; }
     bool IsActive()
     {
         return active;
@@ -488,7 +493,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
         fixedSlope = next;
         return true;
     }
-    bool RotateSlope()
+    bool RotateSlope(int delta)
     {
         if (!target)
             return false;
@@ -497,7 +502,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
             fixedHeight = target->z;
         auto next = fixedSlope.value_or(slope);
         next.type = FootpathSlopeType::sloped;
-        next.direction = (next.direction + 1) & 3;
+        next.direction = static_cast<Direction>((next.direction + delta % 4 + 4) & 3);
         fixedSlope = next;
         return true;
     }
@@ -510,8 +515,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
                                 : std::string(directions[connectedDirection])
                     + (connectedGrade > 0       ? " / Rise"
                            : connectedGrade < 0 ? " / Descend"
-                                                : " / Flat")
-                    + " / Y turn";
+                                                : " / Flat");
         if (removing)
             return "Remove selected path";
         if (!fixedHeight)
@@ -768,14 +772,14 @@ namespace OpenRCT2::Ui::Handheld::Paths
     {
         if (!IsConnected())
         {
-            DrawPathOverlay(rt, position, SurfaceName(), IsQueue(), IsRemoving(), PlacementName());
+            DrawPathOverlay(rt, position, SurfaceName(), IsQueue(), IsRemoving(), PlacementName(), false, IsAdjusting());
             return;
         }
         auto geometry = PlacementName();
         if (const auto hint = geometry.find(" / Y turn"); hint != std::string::npos)
             geometry.erase(hint); // Y opens settings; keep room for the actual endpoint height.
         DrawPathOverlay(rt, position, SurfaceName(), IsQueue(), false,
-            geometry + (ConnectedReady() && target ? " / Height " + std::to_string(target->z / kCoordsZStep) : " / Choose start"), true);
+            geometry + (ConnectedReady() && target ? " / Height " + std::to_string(target->z / kCoordsZStep) : " / Choose start"), true, IsAdjusting());
     }
     std::string SurfaceName()
     {

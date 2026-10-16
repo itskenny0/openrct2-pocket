@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include <SDL.h>
+#include <openrct2/Input.h>
+#include <openrct2-ui/handheld/ControllerInput.h>
+#include "RideTabNavigation.h"
+#include <openrct2-ui/handheld/RideTabs.h>
+#include <openrct2-ui/interface/Window.h>
 #include <cstring>
 #include <filesystem>
 #include <iostream>
@@ -64,8 +69,7 @@ int main(int argc,char** argv) { try {
     auto& rt=*engine.getRT();GfxClear(rt,Drawing::PaletteIndex::pi10);
     if(placement) {
      H::Paths::DrawOverlay(rt,H::Concept::kOrigin);
-     if(H::Paths::IsConnected()) H::DrawConstructionFooter(rt,{512,384},H::Paths::ConnectedReady()?"Extend":"Start","Options");
-     else H::DrawPathFooter(rt,{512,384},"",H::Paths::IsRemoving());
+     H::DrawPathFooter(rt,{512,384},"",H::Paths::IsRemoving(),H::Paths::IsConnected(),H::Paths::IsAdjusting(),H::Paths::ConnectedReady());
     } else {
      auto* window=wm->FindByClass(WindowClass::handheldMenu);Check(window,"Capture window missing");window->onDraw(rt);
     }
@@ -124,6 +128,21 @@ int main(int argc,char** argv) { try {
    gOpenRCT2NoGraphics=false;capture("connected-queue-overlay.ppm",true);gOpenRCT2NoGraphics=true;
    const auto quote=H::Paths::Action(false);Check(quote.error==GameActions::Status::ok,"Guided native landing query failed");
    Check(H::Paths::Action(true).error==GameActions::Status::ok,"Guided native landing failed");GameActions::ProcessQueue(getGameState());
+   InputSetState(InputState::normal);
+   H::ControllerInput geometryInput;
+   auto geometryPress=[&](H::Action action) {H::Frame f;f.actions={action,action};H::HandleExplorerInput(geometryInput,f);};
+   const auto originalGeometry=H::Paths::PlacementName();
+   geometryPress(H::Action::contextSecondary);
+   H::Frame turn;turn.navigateX=1;turn.panX=8;H::HandleExplorerInput(geometryInput,turn);
+   Check(H::Paths::IsAdjusting()&&H::Paths::PlacementName()!=originalGeometry,"Connected direction shortcut failed");
+   turn.navigateX=-1;turn.panX=-8;H::HandleExplorerInput(geometryInput,turn);
+   Check(H::Paths::PlacementName()==originalGeometry,"Connected reverse turn failed");
+   geometryPress(H::Action::slopeUp);
+   Check(H::Paths::PlacementName().find("Rise")!=std::string::npos,"Connected trigger slope failed");
+   geometryPress(H::Action::confirm);
+   Check(H::Paths::PlacementName().find("Flat")!=std::string::npos,"Connected Adjust A did not level");
+   gOpenRCT2NoGraphics=false;capture("connected-adjust.ppm",true);gOpenRCT2NoGraphics=true;
+   geometryPress(H::Action::back);Check(H::Paths::IsActive()&&!H::Paths::IsAdjusting(),"Connected Adjust Back ended tool");
    const auto placedCash=getGameState().park.cash;Check(placedCash==nativeCash-quote.cost,"Guided native landing accounting changed");
    gOpenRCT2NoGraphics=false;capture("connected-endpoint.ppm",true);gOpenRCT2NoGraphics=true;
    W::HandheldPathOptionsOpen();W::HandheldMenuMove(7);W::HandheldMenuConfirm();W::HandheldMenuBack();
@@ -135,60 +154,76 @@ int main(int argc,char** argv) { try {
  }
 
  const auto navigationCash=getGameState().park.cash;
- // Exercise the actual dashboard/menu dispatcher and its production renderer.
+ H::ControllerInput controller;
+ auto press=[&](H::Action action) { H::Frame frame;frame.actions={action,action};H::HandleExplorerInput(controller,frame); };
+ auto navigate=[&](int x,int y) {H::Frame frame;frame.navigateX=x;frame.navigateY=y;frame.panX=x*8;frame.panY=y*8;H::HandleExplorerInput(controller,frame);};
  gOpenRCT2NoGraphics=false;
  W::HandheldDashboardOpen();
  while(W::HandheldDashboardSectionIndex()!=0) W::HandheldDashboardMove(0,-1);
- capture("dashboard-overview.ppm");
- W::HandheldDashboardMove(1,0);
- Check(!W::HandheldDashboardRailFocused(),"Right failed to enter dashboard content");
- capture("dashboard-content.ppm");
- const auto overview=W::HandheldOverviewPresentation();
- Check(H::MeasureManagement({378,H::Layout::ContentHeight({512,384})},overview).capacity>=overview.rows.size(),"Overview still forces routine actions onto another page");
- W::HandheldDashboardSwitchPane();W::HandheldDashboardMove(0,1);
- Check(W::HandheldDashboardSectionIndex()==1,"Ride section navigation failed");
- W::HandheldDashboardMove(1,0);Check(W::HandheldRidesIsOpen(),"Ride roster did not open");
- capture("ride-roster.ppm");W::HandheldMenuConfirm();
- auto grid=W::HandheldRidesPresentation();
- Check(grid.actionGrid&&grid.summaryMetrics,"Ride detail must use action grid and metrics");
- Check(grid.selected==0,"New ride focus should start at first action");
- capture("ride-detail.ppm");
- W::HandheldDashboardMove(1,0);Check(W::HandheldRidesPresentation().selected==1,"Grid Right did not change column");
- W::HandheldDashboardMove(1,0);Check(W::HandheldRidesPresentation().selected==1,"Grid Right escaped row");
- W::HandheldDashboardMove(0,-1);Check(W::HandheldRidesPresentation().selected==1,"Grid Up changed column at top edge");
- W::HandheldDashboardMove(0,1);Check(W::HandheldRidesPresentation().selected==3,"Grid Down did not preserve column");
- W::HandheldDashboardMove(-1,0);Check(W::HandheldRidesPresentation().selected==2,"Grid Left did not change column");
- const auto measured=H::MeasureManagement({496,H::Layout::ContentHeight({512,384})},grid);
- Check(measured.rowStart+static_cast<int>(measured.capacity/measured.columns)*measured.rowHeight<=H::Layout::ContentHeight({512,384})-30,"Ride grid overlaps feedback/footer");
- const auto cap=measured.capacity;
- W::HandheldDashboardPage(1);Check(W::HandheldRidesPresentation().selected==std::min<size_t>(2+cap,grid.rows.size()-1),"Shoulder next page wrong");
- capture("ride-detail-page2.ppm");
- W::HandheldDashboardPage(-1);Check(W::HandheldRidesPresentation().selected==2,"Shoulder previous page lost offset");
- grid=W::HandheldRidesPresentation();
- const auto disabled=std::find(grid.rows.begin(),grid.rows.end(),"Price unavailable");
- if(disabled!=grid.rows.end()) {
-  W::HandheldMenuMove(static_cast<int>(disabled-grid.rows.begin())-static_cast<int>(grid.selected));
-  W::HandheldMenuConfirm();Check(W::HandheldRidesPresentation().actionGrid,"Disabled price escaped ride inspection");
-  capture("ride-disabled-action.ppm");
- }
- // Enter a non-destructive detail and return to the exact action position.
- grid=W::HandheldRidesPresentation();
- auto found=std::find(grid.rows.begin(),grid.rows.end(),"Statistics...");Check(found!=grid.rows.end(),"Statistics action missing");
- const auto pos=static_cast<size_t>(found-grid.rows.begin());W::HandheldMenuMove(static_cast<int>(pos)-static_cast<int>(grid.selected));
- W::HandheldMenuConfirm();capture("ride-statistics.ppm");W::HandheldMenuBack();
- Check(W::HandheldRidesPresentation().selected==pos,"Back lost ride action focus");
- W::HandheldDashboardSwitchPane();Check(W::HandheldDashboardRailFocused(),"Select failed to return to sections");
- W::HandheldDashboardMove(1,0);Check(W::HandheldRidesPresentation().selected==pos,"Section resume lost action focus");
- grid=W::HandheldRidesPresentation();
- const auto demolish=grid.rows.size()-1;
- W::HandheldMenuMove(static_cast<int>(demolish)-static_cast<int>(grid.selected));W::HandheldMenuConfirm();
- auto review=W::HandheldRidesPresentation();Check(review.confirmation&&review.selected==1,"Destructive review must default to Cancel");
- capture("ride-demolition-review.ppm");
- W::HandheldDashboardPage(-1);Check(W::HandheldRidesPresentation().selected==1,"Shoulder changed safe review choice");
- W::HandheldMenuBack();Check(H::RideManagement::Resolve(target),"Cancel removed ride");
- Check(W::HandheldRidesPresentation().selected==demolish,"Cancel lost demolition action focus");
- Check(getGameState().park.cash==navigationCash,"Navigation or cancellation changed cash");
- std::cout<<"PASS dashboard right-to-enter, grid axes, shoulder paging, Back and section focus retention\n";
- std::cout<<"PASS native entrance/exit point shortcuts start connected queue/normal paths without changing access/cash\n";
- std::cout<<"PASS ordinary path settings, native surface grid and cancel preserve tool/mode/cash\n";return 0;
+ capture("dashboard-overview.ppm");W::HandheldDashboardMove(1,0);
+ W::HandheldDashboardSwitchPane();W::HandheldDashboardMove(0,1);W::HandheldDashboardMove(1,0);
+ capture("ride-roster.ppm");press(H::Action::confirm);
+ auto model=W::HandheldRidesPresentation();
+ Check(model.tabs.size()==4&&model.selectedTab==0&&model.rows.front()=="Open...","Ride Overview/status group missing");
+ capture("ride-overview.ppm");
+ navigate(1,0);Check(W::HandheldRidesPresentation().selected==1,"Grid right moved incorrectly");
+ navigate(0,-1);Check(W::HandheldRidesPresentation().selected==1,"Grid top edge changed column");
+ const auto overviewFocus=W::HandheldRidesPresentation().selected;
+ press(H::Action::nextOption);model=W::HandheldRidesPresentation();
+ Check(model.selectedTab==1&&model.rows.front()=="Operations...","L/R did not enter Operations tab");
+ capture("ride-operations.ppm");
+ const auto maintenance=FocusRideTabAction("Maintenance...");press(H::Action::confirm);
+ Check(W::HandheldRidesPresentation().breadcrumb=="Rides / Maintenance","Maintenance action mapping changed");
+ press(H::Action::back);model=W::HandheldRidesPresentation();
+ Check(model.selectedTab==1&&model.selected==maintenance,"Maintenance Back lost tab focus");
+ press(H::Action::nextOption);model=W::HandheldRidesPresentation();
+ Check(model.selectedTab==2&&model.stats==H::RideManagement::Presentation(H::RideManagement::View::statistics,0,{},target).stats,"Statistics tab changed native data");
+ Check(H::MeasureManagement({496,H::Layout::ContentHeight({512,384})},model).capacity>=model.rows.size(),"Statistics actions need another page");
+ capture("ride-statistics.ppm");
+ FocusRideTabAction("Customers...");press(H::Action::confirm);press(H::Action::back);
+ Check(W::HandheldRidesPresentation().selectedTab==2,"Customer Back did not return directly to Statistics tab");
+ press(H::Action::nextOption);model=W::HandheldRidesPresentation();Check(model.selectedTab==3,"Settings tab missing");
+ capture("ride-settings.ppm");
+ const auto demolition=FocusRideTabAction("Demolish...");press(H::Action::confirm);model=W::HandheldRidesPresentation();
+ Check(model.confirmation&&model.selected==1,"Destructive review not Cancel-first");capture("confirmation.ppm");
+ press(H::Action::nextOption);Check(W::HandheldRidesPresentation().selected==1,"Shoulder escaped review");
+ press(H::Action::back);model=W::HandheldRidesPresentation();
+ Check(model.selectedTab==3&&model.selected==demolition&&H::RideManagement::Resolve(target),"Cancel lost target/tab/focus");
+ press(H::Action::nextOption);Check(W::HandheldRidesPresentation().selected==overviewFocus,"Overview tab focus not retained");
+ FocusRideTabAction("Price unavailable");press(H::Action::confirm);
+ Check(W::HandheldRidesPresentation().tabs.size()==4,"Unavailable admission opened an editor");capture("disabled-action.ppm");
+ // Admission can also be enabled by native park pricing policy; entering it never buys anything.
+ getGameState().park.flags.set(ParkFlag::freeEntry);
+ FocusRideTabAction("Admission price...");press(H::Action::confirm);
+ Check(W::HandheldRidesPresentation().editing,"Admission action did not open native price editor");
+ capture("admission-editor.ppm");press(H::Action::back);
+ W::HandheldDashboardSwitchPane();W::HandheldDashboardMove(1,0);
+ Check(W::HandheldRidesPresentation().selectedTab==0,"Dashboard section resume lost tab");
+ W::HandheldDashboardPause();W::HandheldMenuBack();WindowCullDead();
+ H::Paths::Begin(false);
+ InteractionInfo hit{};hit.interactionType=ViewportInteractionItem::terrain;hit.Loc={960,960};hit.Element=reinterpret_cast<TileElement*>(MapGetSurfaceElementAt(CoordsXY{960,960}));
+ H::Paths::UpdateTargetFromInfo(hit);
+ InputSetState(InputState::normal);
+ auto before=H::Paths::PlacementName();press(H::Action::slopeUp);
+ Check(H::Paths::PlacementName()!=before&&!wm->FindByClass(WindowClass::handheldMenu),"Free height shortcut opened menu or did nothing");
+ capture("path-elevation.ppm",true);
+ const auto view=WindowGetMain()->viewport->viewPos;
+ press(H::Action::contextSecondary);Check(H::Paths::IsAdjusting(),"Y did not enter Adjust mode");
+ navigate(1,0);navigate(0,-1);
+ Check(WindowGetMain()->viewport->viewPos.x==view.x,"Adjust D-pad leaked horizontal pan");
+ capture("path-adjust.ppm",true);
+ press(H::Action::confirm);Check(getGameState().park.cash==navigationCash,"Adjust A placed a path");
+ press(H::Action::openBuild);Check(W::HandheldObjectPickerIsOpen(),"Adjust Select lost surface grid");
+ capture("path-surface-picker.ppm");press(H::Action::back);
+ Check(H::Paths::IsAdjusting(),"Surface Back lost Adjust mode");
+ press(H::Action::contextPrimary);Check(wm->FindByClass(WindowClass::handheldMenu),"Adjust X did not open More");
+ press(H::Action::back);Check(H::Paths::IsAdjusting(),"More Back lost tool mode");
+ press(H::Action::back);Check(H::Paths::IsActive()&&!H::Paths::IsAdjusting(),"Adjust Back ended tool");
+ capture("path-build.ppm",true);
+ press(H::Action::back);Check(!H::Paths::IsActive(),"Build Back failed to end tool");
+ H::Paths::Begin(false);Check(!H::Paths::IsAdjusting(),"New tool inherited Adjust mode");H::Paths::End();
+ Check(getGameState().park.cash==navigationCash,"Navigation/adjustment/cancel changed cash");
+ std::cout<<"PASS semantic ride tabs / native action mapping / per-tab focus / direct statistics / safe review\n";
+ std::cout<<"PASS direct free path elevation / modal geometry without placement / surface and More return / Build Back\n";
+ return 0;
  }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

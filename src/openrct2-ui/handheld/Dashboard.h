@@ -147,9 +147,10 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
                     std::string(focused ? "{BLACK}" : "{MUTED}") + "Unavailable");
         }
         }
-        const auto workspace = expanded ? rail : content;
+        const auto workspace = model.confirmation ? ScreenCoordsXY{(screen.width-360)/2, Layout::margin+20} : expanded ? rail : content;
         DrawManagementContent(
-            rt, workspace, {screen.width - workspace.x - Layout::margin, height}, model, state.focus == Focus::content);
+            rt, workspace, {model.confirmation ? 360 : screen.width - workspace.x - Layout::margin,
+                model.confirmation ? height-20 : height}, model, state.focus == Focus::content);
         DrawActionStrip(rt, screen);
         const int y = screen.height - 21;
         const bool ridePaging = state.section == Section::rides && state.focus == Focus::content && sectionRoot;
@@ -158,7 +159,7 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
             state.focus == Focus::rail ? "Enter" : !model.primaryAction.empty() ? model.primaryAction.c_str()
                 : model.editing ? "Review" : model.confirmation ? "Confirm" : "Select");
         DrawCommand(rt, {ridePaging ? 190 : 272, y}, 17, "B", state.focus == Focus::rail ? "Park" : "Back");
-        if (ridePaging) DrawCommand(rt, {270, y}, 28, "L/R", "Page");
+        if (ridePaging) DrawCommand(rt, {270, y}, 28, "L/R", model.tabs.empty() ? "Page" : "Tab");
         DrawCommand(rt, {ridePaging ? 370 : 386, y}, 28,
             state.focus == Focus::rail ? "L/R" : sectionRoot ? "SEL" : "START",
             state.focus == Focus::rail ? "Section" : sectionRoot ? "Sections" : "Park");

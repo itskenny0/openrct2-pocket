@@ -208,7 +208,7 @@ namespace OpenRCT2::Ui::Handheld
         Fill(rt, p, size, selected ? Theme::gold : Theme::raised);
         DrawModernEllipsised(rt, p + ScreenCoordsXY{8, 9}, size.width - 16,
             std::string(selected ? "{BLACK}" : "{MUTED}") + label);
-        DrawStrongText(rt, p + ScreenCoordsXY{8, 27},
+        DrawStrongText(rt, p + ScreenCoordsXY{8, size.height >= 40 ? 27 : 23},
             std::string(selected ? "{BLACK}" : "{WHITE}") + value, size.width - 16);
     }
 
@@ -480,11 +480,11 @@ namespace OpenRCT2::Ui::Handheld
 
     inline void DrawPathOverlay(
         Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& surface, bool queue, bool remove,
-        const std::string& placement = "Ground / auto slope", bool connected = false)
+        const std::string& placement = "Ground / auto slope", bool connected = false, bool adjusting = false)
     {
-        DrawSurface(rt, pos, {164, 146});
+        DrawSurface(rt, pos, {164, adjusting ? 174 : 146});
         DrawIcon(rt, pos + ScreenCoordsXY{10, 12}, PanelIcon::path);
-        DrawStrongText(rt, pos + ScreenCoordsXY{36, 14}, connected ? "{WHITE}Extend path" : "{WHITE}Paths", 116);
+        DrawStrongText(rt, pos + ScreenCoordsXY{36, 14}, adjusting ? "{WHITE}Adjust path" : connected ? "{WHITE}Extend path" : "{WHITE}Paths", 116);
         Fill(rt, pos + ScreenCoordsXY{8, 35}, {148, 22}, Theme::raised);
         DrawStrongText(rt, pos + ScreenCoordsXY{14, 42},
             remove ? "{WHITE}REMOVE" : queue ? "{WHITE}QUEUE" : "{WHITE}FOOTPATH", 136);
@@ -494,19 +494,36 @@ namespace OpenRCT2::Ui::Handheld
             "{MUTED}" + (remove ? std::string("Existing tile height") : placement.substr(0, slash)));
         if (!remove && slash != std::string::npos)
             DrawModernEllipsised(rt, pos + ScreenCoordsXY{12, 109}, 140, "{MUTED}" + placement.substr(slash + 3));
-        DrawCommand(rt, pos + ScreenCoordsXY{12, 128}, 17, "Y", "Settings");
+        if (adjusting)
+        {
+            DrawModernText(rt,pos+ScreenCoordsXY{12,128},"{WHITE}Left/Right  Turn");
+            DrawModernText(rt,pos+ScreenCoordsXY{12,148},connected ? "{WHITE}Up/Down  Slope" : "{WHITE}Up/Down  Height");
+        }
+        else DrawCommand(rt,pos+ScreenCoordsXY{12,128},32,"L2/R2",connected ? "Slope" : "Height");
     }
 
-    inline void DrawPathFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::string&, bool remove = false)
+    inline void DrawPathFooter(
+        Drawing::RenderTarget& rt, ScreenSize screen, const std::string&, bool remove = false,
+        bool connected = false, bool adjusting = false, bool ready = false)
     {
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;
-        DrawCommand(rt, { 8, y }, 38, "D-pad", "Move");
-        DrawCommand(rt, { 80, y }, 17, "A", remove ? "Remove" : "Place");
-        DrawCommand(rt, { 154, y }, 17, "X", remove ? "Place" : "Remove");
-        DrawCommand(rt, { 230, y }, 17, "Y", "Options");
-        DrawCommand(rt, { 312, y }, 28, "SEL", "Surface");
-        DrawCommand(rt, { 450, y }, 17, "B", "Back");
+        if (adjusting)
+        {
+            DrawCommand(rt,{12,y},38,"D-pad","Adjust");
+            DrawCommand(rt,{140,y},17,"A",connected ? "Flat" : "Flat/slope");
+            DrawCommand(rt,{268,y},17,"X","More");
+            DrawCommand(rt,{396,y},17,"B","Build");
+        }
+        else
+        {
+            DrawCommand(rt,{8,y},38,"D-pad","Move");
+            DrawCommand(rt,{80,y},17,"A",connected ? ready ? "Extend" : "Start" : remove ? "Remove" : "Place");
+            DrawCommand(rt,{154,y},17,"X",connected ? "View" : remove ? "Place" : "Remove");
+            DrawCommand(rt,{230,y},17,"Y","Adjust");
+            DrawCommand(rt,{312,y},28,"SEL","Surface");
+            DrawCommand(rt,{450,y},17,"B","Back");
+        }
     }
 
     inline void DrawCostBadge(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& amount)
@@ -555,7 +572,7 @@ namespace OpenRCT2::Ui::Handheld
         const auto y = screen.height - 21;
         DrawCommand(rt, {12, y}, 38, "D-pad", "Choose");
         DrawCommand(rt, {184, y}, 17, "A", "Apply");
-        DrawCommand(rt, {356, y}, 17, "B", "Build");
+        DrawCommand(rt, {356, y}, 17, "B", "Tool");
     }
 
     inline void DrawMapFocus(Drawing::RenderTarget& rt, ScreenCoordsXY centre)

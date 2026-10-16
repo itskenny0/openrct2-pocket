@@ -901,6 +901,38 @@ namespace OpenRCT2::Ui::Handheld
         }
         if (HandleMenuInput(input, frame))
             return;
+        if (Paths::IsAdjusting() && CanExplore())
+        {
+            bool changed = true;
+            if (frame.navigateX)
+                changed = Paths::IsConnected() ? Paths::TurnConnected(frame.navigateX) : Paths::RotateSlope(frame.navigateX);
+            if (frame.navigateY)
+                changed = Paths::IsConnected() ? Paths::SlopeConnected(-frame.navigateY) : Paths::ChangeHeight(-frame.navigateY);
+            if (!changed) _terrainStatus = "Choose a target or check the height limit";
+            else if (frame.navigateX || frame.navigateY) _terrainStatus.clear();
+            for (const auto action : frame.actions)
+            {
+                if (action == Action::back || action == Action::contextSecondary) Paths::SetAdjusting(false);
+                else if (action == Action::confirm)
+                {
+                    if (Paths::IsConnected()) Paths::LevelConnected();
+                    else Paths::CycleSlope();
+                }
+                else if (action == Action::contextPrimary) Windows::HandheldPathOptionsOpen();
+                else if (action == Action::openBuild) Windows::HandheldPathSurfacePickerOpen();
+                else if (action == Action::openMenu) Windows::HandheldDashboardOpen();
+                else if (action == Action::previousOption || action == Action::nextOption)
+                    Windows::MainWindowZoom(action == Action::nextOption, false);
+                else if (action == Action::slopeDown || action == Action::slopeUp)
+                {
+                    if (Paths::IsConnected()) Paths::SlopeConnected(action == Action::slopeUp ? 1 : -1);
+                    else Paths::ChangeHeight(action == Action::slopeUp ? 1 : -1);
+                }
+                input.suspend();
+                break;
+            }
+            return; // Adjusting geometry never pans or places a path.
+        }
         if (Mazes::Active() && CanExplore())
         {
             for (const auto action : frame.actions)
@@ -1236,7 +1268,7 @@ namespace OpenRCT2::Ui::Handheld
                     case Action::contextSecondary:
                         if (Paths::IsActive())
                         {
-                            Windows::HandheldPathOptionsOpen();
+                            Paths::SetAdjusting(true);
                             _terrainStatus.clear();
                             _scatterFeedback = false;
                             break;
@@ -1292,6 +1324,8 @@ namespace OpenRCT2::Ui::Handheld
                             Designs::SetScenery(action == Action::slopeUp);
                         else if (Paths::IsConnected())
                             Paths::SlopeConnected(action == Action::slopeUp ? 1 : -1);
+                        else if (Paths::IsActive())
+                            Paths::ChangeHeight(action == Action::slopeUp ? 1 : -1);
                         else if (_sceneryTool)
                             SceneryTools::Configure(action == Action::slopeUp ? 4 : 5);
                         break;
@@ -1390,10 +1424,8 @@ namespace OpenRCT2::Ui::Handheld
             if (!_terrainStatus.empty())
                 status = _sceneryTool && SceneryTools::ScatterActive() && _scatterFeedback ? SceneryTools::ScatterStatus() : _terrainStatus;
             Paths::DrawOverlay(rt, Concept::kOrigin);
-            if (Paths::IsConnected())
-                DrawConstructionFooter(rt, { ContextGetWidth(), height }, Paths::ConnectedReady() ? "Extend" : "Start", "Options");
-            else
-                DrawPathFooter(rt, { ContextGetWidth(), height }, status, Paths::IsRemoving());
+            DrawPathFooter(rt, {ContextGetWidth(),height},status,Paths::IsRemoving(),
+                Paths::IsConnected(),Paths::IsAdjusting(),Paths::ConnectedReady());
         }
         else
         {

@@ -29,7 +29,10 @@ namespace OpenRCT2::Ui::Handheld::Paths
     GameActions::Result Undo(const UndoDraft&, bool execute);
     bool IsConnected();
     bool ConnectedReady();
-    bool TurnConnected();
+    bool TurnConnected(int delta = 1);
+    bool LevelConnected();
+    bool IsAdjusting();
+    void SetAdjusting(bool enabled);
     bool SlopeConnected(int delta);
     void End();
     bool IsActive();
@@ -46,7 +49,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
     bool SetPlacementHeight(int32_t z);
     void UseHeightPlane(bool enabled, std::optional<CoordsXY> source = {});
     bool CycleSlope();
-    bool RotateSlope();
+    bool RotateSlope(int delta = 1);
     void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position);
     std::string PlacementName();
     void UpdateTarget(ScreenCoordsXY cursor);

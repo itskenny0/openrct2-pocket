@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Real SDL/window lifecycle with public engine data; graphics-disabled native park fixture.
 #include <SDL.h>
+#include "RideTabNavigation.h"
 #include <iostream>
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/handheld/AreaTools.h>
@@ -182,21 +183,15 @@ int main(int argc, char** argv)
             frame.actions = { action, action };
             Require(H::HandleMenuInput(input, frame), "Ride depth semantic handoff failed");
         };
-        // Action grids retain focus on return. Address semantic actions explicitly
-        // here; UiRedesignTests separately exercises physical grid navigation.
-        const auto focusRideAction = [&](size_t row) {
-            const auto current = W::HandheldRidesPresentation();
-            Require(current.actionGrid && row < current.rows.size(), "Ride action grid/target missing");
-            W::HandheldMenuMove(static_cast<int>(row) - static_cast<int>(current.selected));
-        };
+        const auto focusRideAction = [&](const std::string& label) { FocusRideTabAction(label); };
         std::cout << "Native wooden mode / lift bounds / coupled waiting / no-money passed" << std::endl;
         W::HandheldDashboardOpen();
         W::HandheldDashboardMove(0, 1);
         press(H::Action::confirm);
         press(H::Action::confirm);
         auto model = W::HandheldRidesPresentation();
-        focusRideAction(1);
-        press(H::Action::confirm);
+        W::HandheldDashboardPage(1);
+        W::HandheldDashboardPage(1);
         W::HandheldDashboardMove(0, 2);
         press(H::Action::confirm);
         Require(
@@ -222,8 +217,7 @@ int main(int argc, char** argv)
             "Graph scroll reads beyond samples");
         ride->measurement = std::move(nativeMeasurement);
         press(H::Action::back);
-        press(H::Action::back);
-        focusRideAction(model.rows.size() - 8);
+        focusRideAction("Rename...");
         press(H::Action::confirm);
         const auto beforeName = ride->getName();
         Require(
@@ -246,11 +240,11 @@ int main(int argc, char** argv)
             "Name cancel changed name/lost keyboard");
         press(H::Action::back);
         Require(W::HandheldRidesPresentation().breadcrumb == "Park dashboard / Rides", "Name back lost inspector");
-        focusRideAction(model.rows.size() - 7);
+        focusRideAction("Appearance...");
         press(H::Action::confirm);
         Require(W::HandheldRidesPresentation().breadcrumb == "Rides / Appearance", "Appearance route lost");
         press(H::Action::back);
-        focusRideAction(model.rows.size() - 6);
+        focusRideAction("Music...");
         press(H::Action::confirm);
         Require(W::HandheldRidesPresentation().breadcrumb == "Rides / Music", "Music route lost");
         press(H::Action::openBuild);
@@ -258,7 +252,7 @@ int main(int argc, char** argv)
         press(H::Action::openBuild);
         Require(W::HandheldRidesPresentation().breadcrumb == "Rides / Music", "Music resume lost");
         press(H::Action::back);
-        focusRideAction(model.rows.size() - 4);
+        focusRideAction("Dispatch...");
         press(H::Action::confirm);
         Require(W::HandheldRidesPresentation().breadcrumb == "Rides / Dispatch", "Dispatch route lost");
         press(H::Action::openBuild);
@@ -315,14 +309,14 @@ int main(int argc, char** argv)
             "Cancel changed dispatch/parent");
         press(H::Action::back);
         model = W::HandheldRidesPresentation();
-        focusRideAction(model.rows.size() - 5);
+        focusRideAction("Vehicles...");
         press(H::Action::confirm);
         Require(
             W::HandheldRidesPresentation().breadcrumb == "Rides / Vehicles" && W::HandheldRidesPresentation().rows.size() == 1,
             "Trackless vehicle page fabricated editable counts");
         press(H::Action::back);
         model = W::HandheldRidesPresentation();
-        focusRideAction(model.rows.size() - 3);
+        focusRideAction("Operations...");
         press(H::Action::confirm);
         Require(W::HandheldRidesPresentation().breadcrumb == "Rides / Operations", "Operations route lost");
         press(H::Action::openBuild);
@@ -416,7 +410,7 @@ int main(int argc, char** argv)
                   << std::endl;
         press(H::Action::back);
         model = W::HandheldRidesPresentation();
-        focusRideAction(model.rows.size() - 1);
+        focusRideAction("Demolish...");
         press(H::Action::confirm);
         Require(
             W::HandheldRidesPresentation().confirmation && W::HandheldRidesPresentation().selected == 1,
@@ -427,7 +421,7 @@ int main(int argc, char** argv)
             R::Resolve(target) && state.park.cash == settingsCash && GameIsPaused(),
             "Cancel demolished/charged or lost Dashboard pause");
         model = W::HandheldRidesPresentation();
-        focusRideAction(model.rows.size() - 2);
+        focusRideAction("Maintenance...");
         press(H::Action::confirm);
         Require(W::HandheldRidesPresentation().breadcrumb == "Rides / Maintenance", "Maintenance route lost");
         press(H::Action::confirm);
@@ -456,7 +450,7 @@ int main(int argc, char** argv)
             "Refurbish cancel changed state/pause/parent");
         press(H::Action::back);
         model = W::HandheldRidesPresentation();
-        focusRideAction(model.rows.size() - 1);
+        focusRideAction("Demolish...");
         press(H::Action::confirm);
         press(H::Action::openMenu);
         press(H::Action::back);
@@ -470,7 +464,7 @@ int main(int argc, char** argv)
         press(H::Action::confirm);
         press(H::Action::confirm);
         model = W::HandheldRidesPresentation();
-        focusRideAction(model.rows.size() - 1);
+        focusRideAction("Demolish...");
         press(H::Action::confirm);
         W::HandheldDashboardMove(0, -1);
         press(H::Action::confirm);
@@ -493,7 +487,7 @@ int main(int argc, char** argv)
         press(H::Action::confirm);
         press(H::Action::confirm);
         model = W::HandheldRidesPresentation();
-        focusRideAction(model.rows.size() - 1);
+        focusRideAction("Demolish...");
         press(H::Action::confirm);
         W::HandheldDashboardMove(0, -1);
         press(H::Action::confirm);

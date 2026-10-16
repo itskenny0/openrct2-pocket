@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include <SDL.h>
+#include "RideTabNavigation.h"
 #include <iostream>
 #include <array>
 #include <cstring>
@@ -76,7 +77,7 @@ int main(int argc,char** argv)
   W::HandheldRideAccessOpen(target);W::HandheldMenuConfirm();WindowCullDead();
   Check(F::CurrentStage()==F::Stage::entrance,"Access page first action did not resume placement");F::End();
   W::HandheldRideAccessOpen(target);W::HandheldMenuMove(1);W::HandheldMenuConfirm();
-  Check(W::HandheldRidesPresentation().rows.front()=="Place entrance / exit...","Inspection entry misplaced");
+  FocusRideTabAction("Place entrance / exit...");
   W::HandheldMenuConfirm();WindowCullDead();
   Check(F::CurrentStage()==F::Stage::entrance,"Inspection first action did not resume placement");F::End();
   Check(snapshot()==before && state.park.cash==cash && std::memcmp(&station,&GetRide(target.id)->getStation(),sizeof(station))==0,"Navigation modified map/cash/station");

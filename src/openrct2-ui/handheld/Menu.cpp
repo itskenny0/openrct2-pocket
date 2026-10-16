@@ -28,6 +28,7 @@
 #include "ManagementNews.h"
 #include "RideAccess.h"
 #include "RideManagement.h"
+#include "RideTabs.h"
 #include "RightsTools.h"
 #include "SaveSlots.h"
 #include "FileBrowsing.h"
@@ -424,6 +425,8 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::RideManagement::Draft> _ridesDraft;
         size_t _ridesRosterFocus{};
         size_t _ridesInspectFocus{};
+        Handheld::RideTabs::State _rideTabs;
+        bool _ridesTabChild{};
         bool _ridesBusy{};
         std::vector<Handheld::RideAccess::ExistingPoint> _accessPoints;
         std::optional<Handheld::RideAccess::ExistingPoint> _accessPoint;
@@ -665,6 +668,12 @@ namespace OpenRCT2::Ui::Windows
                     : current == Page::ridesPrice       ? View::price
                                                         : View::confirmation,
                 selected, _ridesRoster, _ridesTarget, _ridesDraft, _status, _rideGraphMetric, _rideGraphOffset);
+            if (current == Page::ridesInspect)
+            {
+                const auto stats = Handheld::RideManagement::Presentation(View::statistics,0,{},_ridesTarget);
+                model = Handheld::RideTabs::Compose(model,stats,_rideTabs,selected);
+            }
+            if (current == Page::ridesRoster) model.contentSized = true;
             if (current == Page::ridesCustomers && _ridesTarget && Handheld::RideManagement::Resolve(*_ridesTarget))
                 model.rows.insert(model.rows.end(), { "Guests riding...", "Guests queuing...", "Guests thinking about ride..." });
             return model;
@@ -1035,7 +1044,10 @@ namespace OpenRCT2::Ui::Windows
             _overviewBusy = false;
             ++_overviewRequest;
             if (_page == Page::ridesInspect)
+            {
                 _ridesInspectFocus = _focus.index();
+                _rideTabs.save(_focus.index());
+            }
             if (_page == Page::ridesRoster)
                 _ridesRosterFocus = _focus.index();
             if (next == Page::ridesRoster)
@@ -1099,7 +1111,7 @@ namespace OpenRCT2::Ui::Windows
                 _financeDraft.reset();
             _focus = {};
             if (next == Page::ridesInspect)
-                _focus.move(static_cast<int>(std::min(_ridesInspectFocus, rows().size() - 1)), rows().size());
+                _focus.move(static_cast<int>(std::min(_rideTabs.rows[_rideTabs.tab], rows().size() - 1)), rows().size());
             if (next == Page::build) _focus.move(static_cast<int>(_buildFocus), rows().size());
             if (next == Page::paths) _focus.move(static_cast<int>(_pathModeFocus), rows().size());
             if (next == Page::pathOptions) _focus.move(static_cast<int>(_pathOptionsFocus[Handheld::Paths::IsConnected()]), rows().size());
@@ -1919,6 +1931,8 @@ namespace OpenRCT2::Ui::Windows
         {
             _rideId = id;
             _ridesInspectFocus = 0;
+            _rideTabs = {};
+            _ridesTabChild = false;
             _ridesTarget = Handheld::RideManagement::Identify(id);
             _shop = Handheld::ShopManagement::Capture(id);
             const auto* ride = GetRide(id);
@@ -2125,6 +2139,16 @@ namespace OpenRCT2::Ui::Windows
             if (dashboardRailFocused())
             {
                 _dashboard.move(direction);
+                _status.clear();
+                invalidate();
+                return;
+            }
+            if (_page == Page::ridesInspect)
+            {
+                _rideTabs.save(_focus.index());
+                const auto remembered = _rideTabs.move(direction);
+                _focus = {};
+                _focus.move(static_cast<int>(std::min(remembered,rows().size()-1)),rows().size());
                 _status.clear();
                 invalidate();
                 return;
@@ -2494,7 +2518,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ridesGraphs:
                 case Page::ridesCustomers:
                 case Page::ridesEarnings:
-                    page(Page::ridesStats);
+                    page(_ridesTabChild ? Page::ridesInspect : Page::ridesStats);
                     break;
                 case Page::ridesStats:
                     page(
@@ -3692,6 +3716,8 @@ namespace OpenRCT2::Ui::Windows
                 case Page::ridesRoster:
                     _ridesRosterFocus = choice;
                     _ridesInspectFocus = 0;
+                    _rideTabs = {};
+                    _ridesTabChild = false;
                     if (choice >= _ridesRoster.size())
                         page(Page::dashboard);
                     else if (Handheld::RideManagement::Resolve(_ridesRoster[choice]))
@@ -3840,7 +3866,20 @@ namespace OpenRCT2::Ui::Windows
                         page(Page::ridesRoster);
                         break;
                     }
-                    auto rows = ridesPresentationFor(Page::ridesInspect, choice).rows;
+                    _rideTabs.save(_focus.index());
+                    if (_rideTabs.tab == Handheld::RideTabs::statistics)
+                    {
+                        _ridesTabChild = true;
+                        if (choice == 2) Handheld::RideManagement::BeginGraphs(*_ridesTarget);
+                        page(choice == 0 ? Page::ridesCustomers : choice == 1 ? Page::ridesEarnings : Page::ridesGraphs);
+                        break;
+                    }
+                    auto nativeModel = Handheld::RideManagement::Presentation(
+                        Handheld::RideManagement::View::inspection,0,_ridesRoster,_ridesTarget);
+                    const auto indices = Handheld::RideTabs::Indices(nativeModel,_rideTabs.tab);
+                    if (choice >= indices.size()) break;
+                    choice = indices[choice];
+                    auto rows = nativeModel.rows;
                     const auto accessRow = std::find(rows.begin(), rows.end(), "Entrances / exits...");
                     if (accessRow != rows.end())
                     {
