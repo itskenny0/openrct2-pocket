@@ -645,6 +645,9 @@ namespace OpenRCT2::Ui::Handheld
                     Windows::HandheldScenerySearchOpen();
                 else if(Windows::HandheldDesignPickerIsOpen() && action==Action::contextPrimary)
                     Windows::HandheldDesignFilesOpen();
+                else if (Windows::HandheldDashboardIsOpen()
+                    && (action == Action::previousOption || action == Action::nextOption))
+                    Windows::HandheldDashboardPage(action == Action::previousOption ? -1 : 1);
                 else if (action == Action::confirm)
                     Windows::HandheldMenuConfirm();
                 else if (action == Action::openBuild && Windows::HandheldDashboardIsOpen())

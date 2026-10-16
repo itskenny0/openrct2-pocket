@@ -1,0 +1,12 @@
+PauseResumeTests PASS
+RideAccessRelocationTests PASS
+AccessShortcutTests PASS
+MazeAccessPreviewTests PASS
+SceneryPathParityTests PASS
+PresentationLifecycleTests PASS
+ConstructionTests PASS
+MazeConstructionTests PASS
+RideConstructionTests PASS
+PathScenarioUsabilityTests PASS
+OrdinaryPlayUiTests PASS
+PathActionsTests PASS

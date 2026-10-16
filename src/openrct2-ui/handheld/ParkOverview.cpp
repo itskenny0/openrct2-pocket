@@ -101,6 +101,8 @@ namespace OpenRCT2::Ui::Handheld::ParkOverview
                 model.status = Finances::Feedback(query);
             return model;
         }
+        model.summaryMetrics = true;
+        model.actionGrid = true;
         model.stats = { { "Park status", status },
                         { "Guests in park", std::to_string(park.numGuestsInPark) },
                         { "Park rating", std::to_string(park.rating) + " / 999" },
@@ -124,7 +126,7 @@ namespace OpenRCT2::Ui::Handheld::ParkOverview
         model.bodyLines.push_back("Objective: " + Outcome());
         model.rows = { StatusPermitted() ? (park.flags.has(ParkFlag::parkOpen) ? "Close park..." : "Open park...")
                                          : "Park status locked",
-                       Finances::Available(Finances::Field::admission) ? "Admission / Finances..." : "Admission unavailable", "Park map...", "Park news...", "Park awards...", "Park history..." };
+                       Finances::Available(Finances::Field::admission) ? "Admission..." : "Admission unavailable", "Park map...", "Park news...", "Park awards...", "Park history..." };
         return model;
     }
 } // namespace OpenRCT2::Ui::Handheld::ParkOverview

@@ -981,10 +981,13 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         model.status = feedback;
         if (view == View::roster)
         {
+            model.rosterCards = true;
             for (const auto& entry : roster)
             {
                 const auto* ride = Resolve(entry);
-                model.rows.push_back(ride ? ride->getName() + " / " + Status(*ride) : "Ride unavailable");
+                model.rows.push_back(ride ? ride->getName() : "Ride unavailable");
+                model.rowDetails.push_back(ride ? Status(*ride) + "  |  Queue " + std::to_string(ride->getTotalQueueLength()) : "No longer in park");
+                model.rowEnabled.push_back(ride != nullptr);
             }
             model.rows.push_back("Back to dashboard");
             if (roster.empty())
@@ -1001,6 +1004,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         model.title = ride->getName();
         if (view == View::inspection)
         {
+            model.summaryMetrics = true;
+            model.actionGrid = true;
             model.stats = { { "Status", Status(*ride) },
                             { "Admission",
                               getGameState().park.flags.has(ParkFlag::noMoney) ? "Not applicable"

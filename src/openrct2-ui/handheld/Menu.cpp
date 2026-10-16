@@ -423,6 +423,7 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::RideManagement::Target> _ridesTarget;
         std::optional<Handheld::RideManagement::Draft> _ridesDraft;
         size_t _ridesRosterFocus{};
+        size_t _ridesInspectFocus{};
         bool _ridesBusy{};
         std::vector<Handheld::RideAccess::ExistingPoint> _accessPoints;
         std::optional<Handheld::RideAccess::ExistingPoint> _accessPoint;
@@ -1033,6 +1034,8 @@ namespace OpenRCT2::Ui::Windows
                 _overviewDraft.reset();
             _overviewBusy = false;
             ++_overviewRequest;
+            if (_page == Page::ridesInspect)
+                _ridesInspectFocus = _focus.index();
             if (_page == Page::ridesRoster)
                 _ridesRosterFocus = _focus.index();
             if (next == Page::ridesRoster)
@@ -1095,6 +1098,8 @@ namespace OpenRCT2::Ui::Windows
             if (next != Page::financeEditor && next != Page::financeConfirm)
                 _financeDraft.reset();
             _focus = {};
+            if (next == Page::ridesInspect)
+                _focus.move(static_cast<int>(std::min(_ridesInspectFocus, rows().size() - 1)), rows().size());
             if (next == Page::build) _focus.move(static_cast<int>(_buildFocus), rows().size());
             if (next == Page::paths) _focus.move(static_cast<int>(_pathModeFocus), rows().size());
             if (next == Page::pathOptions) _focus.move(static_cast<int>(_pathOptionsFocus[Handheld::Paths::IsConnected()]), rows().size());
@@ -1913,6 +1918,7 @@ namespace OpenRCT2::Ui::Windows
         void openRide(RideId id)
         {
             _rideId = id;
+            _ridesInspectFocus = 0;
             _ridesTarget = Handheld::RideManagement::Identify(id);
             _shop = Handheld::ShopManagement::Capture(id);
             const auto* ride = GetRide(id);
@@ -2022,6 +2028,29 @@ namespace OpenRCT2::Ui::Windows
                     _status.clear();
                     invalidate();
                 }
+                else if (x > 0)
+                    enterDashboardContent();
+            }
+            else if (_page == Page::ridesInspect || _page == Page::overview)
+            {
+                const auto count = rows().size();
+                const auto current = _focus.index();
+                // A two-column grid: horizontal movement stays in its row;
+                // vertical movement preserves its column, including the final odd row.
+                size_t next = current;
+                if (y)
+                {
+                    const auto candidate = static_cast<int>(current) + y * 2;
+                    if (candidate >= 0 && candidate < static_cast<int>(count))
+                        next = static_cast<size_t>(candidate);
+                    else if (y > 0 && current / 2 < (count - 1) / 2)
+                        next = count - 1; // Enter a final short row without wrapping at the edge.
+                }
+                else if (x < 0 && current % 2) --next;
+                else if (x > 0 && current % 2 == 0 && current + 1 < count) ++next;
+                _focus.move(static_cast<int>(next) - static_cast<int>(current), count);
+                _status.clear();
+                invalidate();
             }
             else if (marketingManagement())
             {
@@ -2090,6 +2119,30 @@ namespace OpenRCT2::Ui::Windows
                 financeMove(x, y);
             else if (y)
                 move(y);
+        }
+        void dashboardPage(int direction)
+        {
+            if (dashboardRailFocused())
+            {
+                _dashboard.move(direction);
+                _status.clear();
+                invalidate();
+                return;
+            }
+            if (!dashboardCanSwitch() || _managementNewsReturn || _guestRideInspection || _guestMapReturn)
+                return;
+            Handheld::ManagementPresentation model;
+            if (ridesManagement()) model = ridesPresentationFor(_page, _focus.index());
+            else return; // Remaining adapters migrate with their own navigation tests.
+            const auto workspaceWidth = ContextGetWidth() - 2 * Handheld::Layout::margin;
+            const auto capacity = Handheld::MeasureManagement(
+                {workspaceWidth, Handheld::Layout::ContentHeight({ContextGetWidth(), ContextGetHeight()})}, model).capacity;
+            const auto current = _focus.index();
+            const auto next = std::clamp<int>(static_cast<int>(current) + direction * static_cast<int>(capacity),
+                0, static_cast<int>(rows().size()) - 1);
+            _focus.move(next - static_cast<int>(current), rows().size());
+            _status.clear();
+            invalidate();
         }
         void openStaffPatrolOptions()
         {
@@ -3638,6 +3691,7 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::ridesRoster:
                     _ridesRosterFocus = choice;
+                    _ridesInspectFocus = 0;
                     if (choice >= _ridesRoster.size())
                         page(Page::dashboard);
                     else if (Handheld::RideManagement::Resolve(_ridesRoster[choice]))
@@ -5871,6 +5925,11 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->dashboardMove(x, y);
+    }
+    void HandheldDashboardPage(int direction)
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            static_cast<HandheldMenuWindow*>(window)->dashboardPage(direction);
     }
     void HandheldDashboardSwitchPane()
     {

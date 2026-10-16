@@ -22,91 +22,118 @@ namespace OpenRCT2::Ui::Handheld
         std::vector<std::string> bodyLines; // Optional native wrapped read-only detail; section controls paging.
         std::vector<int32_t> graph{};
         std::string graphRange;
+        // Presentation metadata never changes native action indices.
+        bool summaryMetrics{};
+        bool actionGrid{};
+        bool rosterCards{};
+        std::vector<std::string> rowDetails;
+        std::vector<bool> rowEnabled;
         size_t columns = 1; // Controller text entry uses the same content shell.
     };
+    struct ManagementLayout
+    {
+        int columns, rowHeight, rowStart, statColumns, statHeight;
+        size_t capacity;
+    };
+    inline ManagementLayout MeasureManagement(ScreenSize size, const ManagementPresentation& model)
+    {
+        const int columns = model.actionGrid ? (size.width >= 360 ? 2 : 1) : static_cast<int>(std::max<size_t>(1, model.columns));
+        const int statColumns = model.summaryMetrics && !model.stats.empty() ? (size.width >= 440 ? 3 : 2) : 1;
+        const int statHeight = model.summaryMetrics ? 48 : 24;
+        const int statRows = (static_cast<int>(model.stats.size()) + statColumns - 1) / statColumns;
+        const int rowStart = 64 + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16
+            + (model.graph.empty() ? 0 : 110) + (model.rows.empty() ? 0 : 11);
+        const int rowHeight = model.rosterCards ? 46 : model.actionGrid ? 30 : columns > 1 ? 24 : 30;
+        const size_t capacity = std::max(1, (size.height - rowStart - 30) / rowHeight) * columns;
+        return {columns, rowHeight, rowStart, statColumns, statHeight, capacity};
+    }
     inline void DrawManagementContent(
         Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const ManagementPresentation& model, bool focused = true)
     {
-        using namespace Concept;
         const int width = size.width;
-        const int valueX = 14 + (width - 30) * 45 / 100;
-        const int graphHeight = model.graph.empty() ? 0 : 110;
-        const int rowStart = graphHeight + 70 + static_cast<int>(model.stats.size()) * 24
-            + static_cast<int>(model.bodyLines.size()) * 16;
-        const auto columns = std::max<size_t>(1, model.columns);
-        const int rowHeight = columns > 1 ? 24 : 30;
-        const size_t capacity = std::max(1, (size.height - rowStart - 30) / rowHeight) * columns;
+        const auto layout = MeasureManagement(size, model);
+        const auto [columns, rowHeight, rowStart, statColumns, statHeight, capacity] = layout;
         const size_t first = model.selected / capacity * capacity;
         const size_t visible = std::min(capacity, model.rows.size() - std::min(first, model.rows.size()));
-        const int height = std::min(
-            size.height, rowStart + static_cast<int>((visible + columns - 1) / columns) * rowHeight + 30);
-        Box(rt, p, { width, height });
-        DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, 12 }, width - 20, "{MUTED}" + model.breadcrumb);
-        DrawStrongText(
-            rt, p + ScreenCoordsXY{ 10, 32 }, std::string(model.confirmation ? "{GOLD}" : "{WHITE}") + model.title, width - 20);
-        Rule(rt, p + ScreenCoordsXY{ 10, 54 }, width - 20);
+        DrawSurface(rt, p, size);
+        DrawSectionLabel(rt, p + ScreenCoordsXY{12, 13}, width - 24, model.breadcrumb);
+        DrawHeadingText(rt, p + ScreenCoordsXY{12, 29},
+            std::string(model.confirmation ? "{GOLD}" : "{WHITE}") + model.title, width - 24);
+        Fill(rt, p + ScreenCoordsXY{12, 55}, {width - 24, 1}, Theme::edge);
+        const int valueX = 14 + (width - 30) * 45 / 100;
         for (size_t i = 0; i < model.stats.size(); ++i)
         {
-            const int y = 63 + static_cast<int>(i) * 24;
+            const int y = 64 + static_cast<int>(i / statColumns) * statHeight;
             const bool highlight = focused && model.highlightedStat == i;
-            if (highlight)
-                Box(rt, p + ScreenCoordsXY{ 8, y - 3 }, { width - 16, 23 }, true);
-            const auto colour = highlight ? "{BLACK}" : "{MUTED}";
-            DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, y + 4 }, valueX - 20, std::string(colour) + model.stats[i].first);
-            DrawModernEllipsised(
-                rt, p + ScreenCoordsXY{ valueX, y + 4 }, width - valueX - 10,
-                std::string(highlight ? "{BLACK}" : "{WHITE}") + model.stats[i].second);
+            if (model.summaryMetrics)
+            {
+                const int cellWidth = (width - 24) / statColumns;
+                DrawMetric(rt, p + ScreenCoordsXY{12 + static_cast<int>(i % statColumns) * cellWidth, y},
+                    {cellWidth - 4, 43}, model.stats[i].first, model.stats[i].second, highlight);
+            }
+            else
+            {
+                if (highlight) Fill(rt, p + ScreenCoordsXY{8, y}, {width - 16, 23}, Theme::gold);
+                DrawModernEllipsised(rt, p + ScreenCoordsXY{12, y + 6}, valueX - 24,
+                    std::string(highlight ? "{BLACK}" : "{MUTED}") + model.stats[i].first);
+                DrawModernEllipsised(rt, p + ScreenCoordsXY{valueX, y + 6}, width - valueX - 12,
+                    std::string(highlight ? "{BLACK}" : "{WHITE}") + model.stats[i].second);
+            }
         }
+        const int statRows = (static_cast<int>(model.stats.size()) + statColumns - 1) / statColumns;
         for (size_t i = 0; i < model.bodyLines.size(); ++i)
-            DrawModernEllipsised(
-                rt, p + ScreenCoordsXY{ 10, 67 + static_cast<int>(model.stats.size()) * 24 + static_cast<int>(i) * 16 },
-                width - 20, "{WHITE}" + model.bodyLines[i]);
+            DrawModernEllipsised(rt, p + ScreenCoordsXY{12, 68 + statRows * statHeight + static_cast<int>(i) * 16},
+                width - 24, "{WHITE}" + model.bodyLines[i]);
         if (!model.graph.empty())
         {
             const auto [low, high] = std::minmax_element(model.graph.begin(), model.graph.end());
             const int range = std::max(1, *high - *low);
-            const int plotTop = rowStart - graphHeight;
-            const int plotBottom = plotTop + 80;
-            const int plotWidth = width - 24;
-            GfxDrawLine(
-                rt, { p + ScreenCoordsXY{ 10, plotBottom }, p + ScreenCoordsXY{ width - 10, plotBottom } },
-                static_cast<Drawing::PaletteIndex>(PocketPalette::separator));
+            const int plotBottom = rowStart - 35;
+            const int plotWidth = width - 28;
+            Fill(rt, p + ScreenCoordsXY{12, plotBottom}, {width - 24, 1}, Theme::edge);
             for (size_t i = 1; i < model.graph.size(); ++i)
             {
-                auto point = [&](size_t n) {
-                    return p
-                        + ScreenCoordsXY{ 12 + static_cast<int>(n * plotWidth / (model.graph.size() - 1)),
-                                          plotBottom - (model.graph[n] - *low) * 76 / range };
+                const auto point = [&](size_t n) {
+                    return p + ScreenCoordsXY{14 + static_cast<int>(n * plotWidth / (model.graph.size() - 1)),
+                        plotBottom - (model.graph[n] - *low) * 76 / range};
                 };
-                GfxDrawLine(rt, { point(i - 1), point(i) }, static_cast<Drawing::PaletteIndex>(PocketPalette::selection));
+                GfxDrawLine(rt, {point(i - 1), point(i)}, Theme::gold);
             }
-            DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, plotBottom + 7 }, width - 20, "{MUTED}" + model.graphRange);
+            DrawSectionLabel(rt, p + ScreenCoordsXY{12, plotBottom + 8}, width - 24, model.graphRange);
         }
+        if (!model.rows.empty() && model.bodyLines.empty())
+            DrawSectionLabel(rt, p + ScreenCoordsXY{12, rowStart - 12}, width - 24,
+                model.confirmation ? "REVIEW & DECIDE" : model.rosterCards ? "CHOOSE A RIDE" : "ACTIONS");
         for (size_t i = first; i < first + visible; ++i)
         {
             const int y = rowStart + static_cast<int>((i - first) / columns) * rowHeight;
-            const int cellWidth = (width - 16) / columns;
-            const int x = 8 + static_cast<int>((i - first) % columns) * cellWidth;
-            const bool selected = focused && i == model.selected;
-            if (selected)
-                Box(rt, p + ScreenCoordsXY{ x, y }, { cellWidth, rowHeight - 2 }, true);
-            const auto& label = model.rows[i];
-            const bool unavailable = label.find("unavailable") != std::string::npos
-                || label.find("Unavailable") != std::string::npos;
-            DrawModernEllipsised(
-                rt, p + ScreenCoordsXY{ x + (columns > 1 ? 3 : 7), y + (columns > 1 ? 6 : 9) },
-                cellWidth - (columns > 1 ? 6 : 14),
-                std::string(
-                    selected          ? "{BLACK}"
-                        : unavailable ? "{MUTED}"
-                                      : "{WHITE}")
-                    + label);
+            const int cellWidth = (width - 20) / columns;
+            const int x = 10 + static_cast<int>((i - first) % columns) * cellWidth;
+            const bool enabled = i < model.rowEnabled.size() ? model.rowEnabled[i]
+                : model.rows[i].find("unavailable") == std::string::npos && model.rows[i].find("Unavailable") == std::string::npos;
+            if (columns > 2) // Native on-screen keyboard retains its compact cells.
+            {
+                if (focused && i == model.selected) Fill(rt, p + ScreenCoordsXY{x, y}, {cellWidth - 2, rowHeight - 2}, Theme::gold);
+                DrawModernEllipsised(rt, p + ScreenCoordsXY{x + 3, y + 6}, cellWidth - 6,
+                    std::string(focused && i == model.selected ? "{BLACK}" : "{WHITE}") + model.rows[i]);
+            }
+            else
+                DrawActionRow(rt, p + ScreenCoordsXY{x, y}, {cellWidth - 4, rowHeight - 2}, model.rows[i],
+                    i < model.rowDetails.size() ? model.rowDetails[i] : "", focused && i == model.selected, enabled);
         }
-        const auto status = model.status.empty() && model.rows.size() > capacity ? "Page "
-                + std::to_string(first / capacity + 1) + " / " + std::to_string((model.rows.size() + capacity - 1) / capacity)
-                                                                                 : model.status;
-        if (!status.empty())
-            DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, height - 16 }, width - 20, "{MUTED}" + status);
+        // Feedback and overflow have independent lines, so failures never hide pagination.
+        if (!model.status.empty())
+            DrawModernEllipsised(rt, p + ScreenCoordsXY{12, size.height - 29}, width - 24, "{WHITE}" + model.status);
+        DrawPagePosition(rt, p + ScreenCoordsXY{12, size.height - 13}, width - 24, model.selected, model.rows.size(), capacity);
+        if (model.rows.size() > capacity)
+        {
+            const int trackHeight = std::max(8, size.height - rowStart - 40);
+            Fill(rt, p + ScreenCoordsXY{width - 6, rowStart}, {2, trackHeight}, Theme::raised);
+            const auto pages = (model.rows.size() + capacity - 1) / capacity;
+            const int thumb = std::max(3, trackHeight / static_cast<int>(pages));
+            Fill(rt, p + ScreenCoordsXY{width - 6, rowStart + static_cast<int>(model.selected / capacity) * (trackHeight - thumb) / static_cast<int>(pages - 1)},
+                {2, thumb}, Theme::gold);
+        }
     }
     // Compatibility wrapper for construction-era captures; Dashboard uses the content region directly.
     inline void DrawManagementPanel(Drawing::RenderTarget& rt, ScreenSize screen, const ManagementPresentation& model)

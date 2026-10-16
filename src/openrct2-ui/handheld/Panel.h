@@ -194,6 +194,55 @@ namespace OpenRCT2::Ui::Handheld
         DrawModernText(rt, {pos.x + width + 5, pos.y}, label, {Drawing::Colour::white});
     }
 
+    // Shared hierarchy for summaries, construction and management. These surfaces
+    // deliberately distinguish information from controller-focusable actions.
+    inline void DrawSectionLabel(Drawing::RenderTarget& rt, ScreenCoordsXY p, int width, const std::string& text)
+    {
+        DrawModernEllipsised(rt, p, width, "{MUTED}" + text);
+    }
+
+    inline void DrawMetric(
+        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& label,
+        const std::string& value, bool selected = false)
+    {
+        Fill(rt, p, size, selected ? Theme::gold : Theme::raised);
+        DrawModernEllipsised(rt, p + ScreenCoordsXY{8, 9}, size.width - 16,
+            std::string(selected ? "{BLACK}" : "{MUTED}") + label);
+        DrawStrongText(rt, p + ScreenCoordsXY{8, 27},
+            std::string(selected ? "{BLACK}" : "{WHITE}") + value, size.width - 16);
+    }
+
+    inline void DrawActionRow(
+        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& title,
+        const std::string& subtitle, bool focused, bool enabled = true, PanelIcon icon = PanelIcon::none)
+    {
+        Fill(rt, p, size, focused ? Theme::gold : Theme::ink);
+        if (focused)
+            Fill(rt, p, {3, size.height}, Theme::text);
+        else
+            Fill(rt, p + ScreenCoordsXY{0, size.height - 1}, {size.width, 1}, Theme::raised);
+        const auto colour = focused ? "{BLACK}" : enabled ? "{WHITE}" : "{MUTED}";
+        const int inset = icon == PanelIcon::none ? 10 : 36;
+        DrawIcon(rt, p + ScreenCoordsXY{9, 8}, icon, focused);
+        DrawStrongText(rt, p + ScreenCoordsXY{inset, subtitle.empty() ? (size.height - 12) / 2 + 3 : 10},
+            std::string(colour) + title, size.width - inset - 22);
+        if (!subtitle.empty())
+            DrawModernEllipsised(rt, p + ScreenCoordsXY{inset, 27}, size.width - inset - 22,
+                std::string(focused ? "{BLACK}" : "{MUTED}") + subtitle);
+        DrawModernText(rt, p + ScreenCoordsXY{size.width - 15, (size.height - 12) / 2 + 3},
+            std::string(colour) + (enabled ? ">" : "-"));
+    }
+
+    inline void DrawPagePosition(
+        Drawing::RenderTarget& rt, ScreenCoordsXY p, int width, size_t selected, size_t count, size_t capacity)
+    {
+        if (count <= capacity || !capacity)
+            return;
+        DrawModernEllipsised(rt, p, width,
+            "{MUTED}Page " + std::to_string(selected / capacity + 1) + " / "
+                + std::to_string((count + capacity - 1) / capacity));
+    }
+
     inline void DrawPanelCommands(Drawing::RenderTarget& rt, const Window& window, const char* backLabel = "Back")
     {
         const auto pos = window.windowPos + ScreenCoordsXY{ 1, window.height - 29 };
@@ -431,32 +480,21 @@ namespace OpenRCT2::Ui::Handheld
 
     inline void DrawPathOverlay(
         Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& surface, bool queue, bool remove,
-        const std::string& placement = "Ground / auto slope")
+        const std::string& placement = "Ground / auto slope", bool connected = false)
     {
-        using namespace Concept;
-        Box(rt, pos, kTerrainOverlaySize);
-        Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, "Path type");
-        Row(rt, pos + ScreenCoordsXY{ 8, 34 }, queue ? "Queue path" : "Normal path", queue ? Icon::queue : Icon::path, !remove);
-        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 12, 69 }, 140, "{MUTED}" + surface);
-        Rule(rt, pos + ScreenCoordsXY{ 8, 91 }, 148);
-        Section(rt, pos + ScreenCoordsXY{ 10, 103 }, "Slope");
+        DrawSurface(rt, pos, {164, 146});
+        DrawIcon(rt, pos + ScreenCoordsXY{10, 12}, PanelIcon::path);
+        DrawStrongText(rt, pos + ScreenCoordsXY{36, 14}, connected ? "{WHITE}Extend path" : "{WHITE}Paths", 116);
+        Fill(rt, pos + ScreenCoordsXY{8, 35}, {148, 22}, Theme::raised);
+        DrawStrongText(rt, pos + ScreenCoordsXY{14, 42},
+            remove ? "{WHITE}REMOVE" : queue ? "{WHITE}QUEUE" : "{WHITE}FOOTPATH", 136);
+        DrawModernEllipsised(rt, pos + ScreenCoordsXY{12, 70}, 140, "{WHITE}" + surface);
         const auto slash = placement.find(" / ");
-        const auto slope = slash == std::string::npos ? "Follow ground" : placement.substr(slash + 3);
-        Row(rt, pos + ScreenCoordsXY{ 8, 125 },
-            remove                      ? "Existing path"
-                : slope == "auto slope" ? "Auto slope"
-                                        : slope,
-            slope.starts_with("Rise") ? Icon::slope : Icon::path, !remove);
-        DrawModernEllipsised(
-            rt, pos + ScreenCoordsXY{ 12, 160 }, 140,
-            "{MUTED}"
-                + (remove                           ? std::string("Uses tile height")
-                       : slash == std::string::npos ? placement
-                                                    : placement.substr(0, slash)));
-        Rule(rt, pos + ScreenCoordsXY{ 8, 181 }, 148);
-        Section(rt, pos + ScreenCoordsXY{ 10, 193 }, "Options");
-        Row(rt, pos + ScreenCoordsXY{ 8, 215 }, "Path options", Icon::options, false);
-        Row(rt, pos + ScreenCoordsXY{ 8, 243 }, "Remove", Icon::remove, remove);
+        DrawModernEllipsised(rt, pos + ScreenCoordsXY{12, 91}, 140,
+            "{MUTED}" + (remove ? std::string("Existing tile height") : placement.substr(0, slash)));
+        if (!remove && slash != std::string::npos)
+            DrawModernEllipsised(rt, pos + ScreenCoordsXY{12, 109}, 140, "{MUTED}" + placement.substr(slash + 3));
+        DrawCommand(rt, pos + ScreenCoordsXY{12, 128}, 17, "Y", "Settings");
     }
 
     inline void DrawPathFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::string&, bool remove = false)
@@ -500,48 +538,24 @@ namespace OpenRCT2::Ui::Handheld
         Drawing::RenderTarget& rt, ScreenSize screen, const std::vector<std::string>& rows, size_t selected,
         const std::string& status)
     {
-        using namespace Concept;
-        const auto p = kMenuOrigin;
-        // A settings menu can use a wider rail than a live placement tool.
-        // Keep every action readable while leaving the park cursor at x=256 clear.
-        constexpr int width = 228;
-        Box(rt, p, { width, Layout::ContentHeight(screen) });
-        DrawStrongText(rt, p + ScreenCoordsXY{10, 12}, "{WHITE}Path options", width - 20);
-        DrawModernEllipsised(rt, p + ScreenCoordsXY{10, 32}, width - 20, "{MUTED}" + status);
-        const auto section = [&](int y, const char* label) {
-            DrawModernEllipsised(rt, p + ScreenCoordsXY{10, y}, width - 20, std::string("{MUTED}") + label);
-        };
-        const auto row = [&](size_t i, int y, Icon icon) {
-            const auto at = p + ScreenCoordsXY{8, y};
-            const bool active = i == selected;
-            if (active) Box(rt, at, {width - 16, kRowHeight}, true);
-            DrawIcon(rt, at + ScreenCoordsXY{7, 5}, icon, active);
-            if (active) DrawStrongText(rt, at + ScreenCoordsXY{31, 9}, "{BLACK}" + rows[i], width - 54);
-            else DrawModernEllipsised(rt, at + ScreenCoordsXY{31, 9}, width - 54, "{WHITE}" + rows[i]);
-        };
-        if (rows.size() > 7)
-        {
-            const int positions[] = {52, 108, 136, 164, 192, 248, 276, 304};
-            const Icon icons[] = {Icon::play, Icon::options, Icon::rise, Icon::lower,
-                                  Icon::slope, Icon::options, Icon::path, Icon::remove};
-            section(87, "Direction / slope");
-            section(227, "Surface / recovery");
-            for (size_t i = 0; i < rows.size() && i < 8; ++i) row(i, positions[i], icons[i]);
-        }
-        else
-        {
-            const int positions[] = {52, 108, 136, 164, 220, 248, 304};
-            const Icon icons[] = {Icon::play, Icon::ground, Icon::rise, Icon::lower, Icon::slope, Icon::options, Icon::path};
-            section(87, "Height");
-            section(199, "Slope");
-            section(283, "Surface");
-            for (size_t i = 0; i < rows.size() && i < 7; ++i) row(i, positions[i], icons[i]);
-        }
+        const auto p = Layout::menuOrigin;
+        constexpr int width = 240;
+        DrawSurface(rt, p, {width, Layout::ContentHeight(screen)});
+        DrawSectionLabel(rt, p + ScreenCoordsXY{12, 13}, width - 24, "BUILD / PATHS");
+        DrawHeadingText(rt, p + ScreenCoordsXY{12, 28}, "{WHITE}Path settings", width - 24);
+        DrawModernEllipsised(rt, p + ScreenCoordsXY{12, 54}, width - 24, "{MUTED}" + status);
+        const bool connected = rows.size() > 7;
+        const int positions[] = {76, 127, 155, 183, 211, 254, 282, 310};
+        DrawSectionLabel(rt, p + ScreenCoordsXY{12, 111}, width - 24, connected ? "DIRECTION & SLOPE" : "HEIGHT & SLOPE");
+        DrawSectionLabel(rt, p + ScreenCoordsXY{12, 238}, width - 24, connected ? "SURFACE & RECOVERY" : "ORIENTATION & SURFACE");
+        for (size_t i = 0; i < rows.size() && i < 8; ++i)
+            DrawActionRow(rt, p + ScreenCoordsXY{8, positions[i]}, {width - 16, i == 0 ? 30 : 27},
+                i == 0 ? "Return to building" : rows[i], "", selected == i);
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;
-        DrawCommand(rt, { 12, y }, 38, "D-pad", "Choose");
-        DrawCommand(rt, { 184, y }, 17, "A", "Select");
-        DrawCommand(rt, { 356, y }, 17, "B", "Back");
+        DrawCommand(rt, {12, y}, 38, "D-pad", "Choose");
+        DrawCommand(rt, {184, y}, 17, "A", "Apply");
+        DrawCommand(rt, {356, y}, 17, "B", "Build");
     }
 
     inline void DrawMapFocus(Drawing::RenderTarget& rt, ScreenCoordsXY centre)

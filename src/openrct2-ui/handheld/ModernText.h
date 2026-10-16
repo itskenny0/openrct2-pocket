@@ -3,6 +3,7 @@
 #include "PocketPalette.h"
 #include "PocketSansData.h"
 #include "PocketSansStrongData.h"
+#include "PocketSansHeadingData.h"
 
 #include <algorithm>
 #include <array>
@@ -74,18 +75,18 @@ namespace OpenRCT2::Ui::Handheld
         return ramp.colours[coverage];
     }
 
-    inline int TextWidth(const std::string& text, bool strong = false)
+    inline int TextWidth(const std::string& text, bool strong = false, bool heading = false)
     {
         int width = 0;
         for (const unsigned char c : text)
             if (c >= 32 && c < 127)
-                width += strong ? PocketSansStrong::kAdvance[c - 32] : PocketSans::kAdvance[c - 32];
+                width += heading ? PocketSansHeading::kAdvance[c - 32] : strong ? PocketSansStrong::kAdvance[c - 32] : PocketSans::kAdvance[c - 32];
         return width;
     }
 
     inline void DrawModernText(
         Drawing::RenderTarget& rt, ScreenCoordsXY pos, std::string text, TextPaint paint = {}, int maxWidth = 0,
-        bool strong = false)
+        bool strong = false, bool heading = false)
     {
         Ink ink = paint.colour.colour == Drawing::Colour::yellow ? Ink::gold : Ink::light;
         for (const auto& prefix : { std::string("{BLACK}"), std::string("{WHITE}"), std::string("{YELLOW}"),
@@ -110,22 +111,23 @@ namespace OpenRCT2::Ui::Handheld
                 drawText(rt, pos, text, paint);
             return;
         }
-        if (maxWidth > 0 && TextWidth(text, strong) > maxWidth)
+        if (maxWidth > 0 && TextWidth(text, strong, heading) > maxWidth)
         {
-            while (!text.empty() && TextWidth(text + "...", strong) > maxWidth)
+            while (!text.empty() && TextWidth(text + "...", strong, heading) > maxWidth)
                 text.pop_back();
             text += "...";
         }
-        const int width = TextWidth(text, strong);
+        const int width = TextWidth(text, strong, heading);
         if (paint.alignment == TextAlignment::centre)
             pos.x -= width / 2;
         else if (paint.alignment == TextAlignment::right)
             pos.x -= width;
         for (const unsigned char c : text)
         {
-            const auto glyph = strong ? PocketSansStrong::kCoverage[c - 32] : PocketSans::kCoverage[c - 32];
-            const auto glyphWidth = strong ? PocketSansStrong::kWidth : PocketSans::kWidth;
-            for (int y = 0; y < PocketSans::kHeight; ++y)
+            const auto glyph = heading ? PocketSansHeading::kCoverage[c - 32] : strong ? PocketSansStrong::kCoverage[c - 32] : PocketSans::kCoverage[c - 32];
+            const auto glyphWidth = heading ? PocketSansHeading::kWidth : strong ? PocketSansStrong::kWidth : PocketSans::kWidth;
+            const auto glyphHeight = heading ? PocketSansHeading::kHeight : PocketSans::kHeight;
+            for (int y = 0; y < glyphHeight; ++y)
                 for (int x = 0; x < glyphWidth; ++x)
                 {
                     const int px = pos.x + x, py = pos.y + y - 3;
@@ -138,8 +140,13 @@ namespace OpenRCT2::Ui::Handheld
                     auto& pixel = rt.bits[(py - rt.y) * rt.LineStride() + px - rt.x];
                     pixel = BlendGlyph(ink, pixel, coverage);
                 }
-            pos.x += strong ? PocketSansStrong::kAdvance[c - 32] : PocketSans::kAdvance[c - 32];
+            pos.x += heading ? PocketSansHeading::kAdvance[c - 32] : strong ? PocketSansStrong::kAdvance[c - 32] : PocketSans::kAdvance[c - 32];
         }
+    }
+
+    inline void DrawHeadingText(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& text, int maxWidth)
+    {
+        DrawModernText(rt, pos, text, {}, maxWidth, true, true);
     }
 
     inline void DrawStrongText(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& text, int maxWidth = 0)
