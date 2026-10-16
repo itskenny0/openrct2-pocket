@@ -772,11 +772,12 @@ namespace OpenRCT2::Ui::Handheld::Paths
             return;
         }
         DrawConstructionOverlay(
-            rt, position, "Connected paths", SurfaceName(),
+            rt, position, IsQueue() ? "Connected queue" : "Connected path", SurfaceName(),
             firstLanding ? (IsQueue() ? "Queue / A build" : "Normal / A build")
                          : (IsQueue() ? "Queue / A extend" : "Normal / A extend"),
             PlacementName(),
-            ConnectedReady() && target ? "Height " + std::to_string(target->z / kCoordsZStep) : "A: choose existing path");
+            ConnectedReady() && target ? "Height " + std::to_string(target->z / kCoordsZStep) : "A: choose existing path",
+            IsQueue() ? Concept::Icon::queue : Concept::Icon::path);
     }
     std::string SurfaceName()
     {

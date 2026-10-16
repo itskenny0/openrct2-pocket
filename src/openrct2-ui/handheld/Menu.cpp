@@ -246,6 +246,7 @@ namespace OpenRCT2::Ui::Windows
         Handheld::ObjectPicker _picker;
         bool _pausedHere{};
         size_t _buildFocus{}, _pathModeFocus{};
+        std::array<size_t, 2> _pathOptionsFocus{};
         bool _shopPickerFromBuild{};
         bool _ridePickerFromBuild{};
         bool _designPickerFromBuild{};
@@ -635,6 +636,8 @@ namespace OpenRCT2::Ui::Windows
                     model.rows = Handheld::RideAccess::Current(point)
                         ? std::vector<std::string>{"Move access...", "Remove access...", "Back to access list"}
                         : std::vector<std::string>{"Back to access list"};
+                    if (canConnectAccessPoint())
+                        model.rows.insert(model.rows.end() - 1, point.exit ? "Connect exit path..." : "Connect entrance queue...");
                     const auto* ride = Handheld::RideManagement::Resolve(point.target);
                     model.status = !Handheld::RideAccess::Current(point) ? "Access changed; select it again"
                         : ride && ride->status == RideStatus::closed ? "Move keeps source until Apply" : "Close the ride before editing access";
@@ -994,6 +997,7 @@ namespace OpenRCT2::Ui::Windows
         {
             if (_page == Page::build) _buildFocus = _focus.index();
             if (_page == Page::paths) _pathModeFocus = _focus.index();
+            if (_page == Page::pathOptions) _pathOptionsFocus[Handheld::Paths::IsConnected()] = _focus.index();
             if(next==Page::park || next==Page::dashboard) _managementNewsReturn=false;
             if (_paintReviewResumed && next != Page::terrainPaintConfirm) {
                 if (_pausedHere && !(gGamePaused & GAME_PAUSED_NORMAL)) PauseToggle();
@@ -1093,6 +1097,7 @@ namespace OpenRCT2::Ui::Windows
             _focus = {};
             if (next == Page::build) _focus.move(static_cast<int>(_buildFocus), rows().size());
             if (next == Page::paths) _focus.move(static_cast<int>(_pathModeFocus), rows().size());
+            if (next == Page::pathOptions) _focus.move(static_cast<int>(_pathOptionsFocus[Handheld::Paths::IsConnected()]), rows().size());
             _status.clear();
             _priceDraft.reset();
             layout();
@@ -1537,6 +1542,14 @@ namespace OpenRCT2::Ui::Windows
             _pausedHere = false;
             close();
         }
+        bool canConnectAccessPoint() const
+        {
+            if (!_accessPoint || !Handheld::RideAccess::Current(*_accessPoint)) return false;
+            const auto state = Handheld::RideAccess::Inspect(_accessPoint->target);
+            // The existing guided handoff chooses Inspect's next unresolved station.
+            // Only offer it here when that is the point actually being inspected.
+            return state && (_accessPoint->exit ? state->exit.station : state->entrance.station) == _accessPoint->station;
+        }
         void openAccessManagement()
         {
             if (!_ridesTarget) return;
@@ -1582,6 +1595,7 @@ namespace OpenRCT2::Ui::Windows
         void openPathSurfacePicker()
         {
             Handheld::Paths::ClearPreview();
+            _pathOptionsFocus[Handheld::Paths::IsConnected()] = 6;
             page(Page::pathSurfacePicker);
             _picker.setEntries(Handheld::PathSurfaces::Entries(), Handheld::PathSurfaces::Current());
         }
@@ -3948,7 +3962,15 @@ namespace OpenRCT2::Ui::Windows
                     else page(Page::ridesInspect);
                     break;
                 case Page::accessPoint:
-                    if (!_accessPoint || !Handheld::RideAccess::Current(*_accessPoint) || choice >= 2) openAccessManagement();
+                    if (choice == 2 && canConnectAccessPoint())
+                    {
+                        const auto point = *_accessPoint;
+                        // BeginPaths revalidates native access and locates its outside landing.
+                        // Retain this page on a failed handoff instead of silently closing it.
+                        if (Handheld::RideAccess::BeginPaths(point.target, point.exit, true)) close();
+                        else { _status = "Cannot start path here; return to ride inspection"; invalidate(); }
+                    }
+                    else if (!_accessPoint || !Handheld::RideAccess::Current(*_accessPoint) || choice >= 2) openAccessManagement();
                     else if (choice == 0)
                     {
                         const auto point = *_accessPoint;

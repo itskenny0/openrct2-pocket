@@ -502,25 +502,40 @@ namespace OpenRCT2::Ui::Handheld
     {
         using namespace Concept;
         const auto p = kMenuOrigin;
-        Box(rt, p, { kRailWidth, Layout::ContentHeight(screen) });
-        Heading(rt, p + ScreenCoordsXY{ 10, 12 }, "Path options");
-        DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, 32 }, 144, "{MUTED}" + status);
+        // A settings menu can use a wider rail than a live placement tool.
+        // Keep every action readable while leaving the park cursor at x=256 clear.
+        constexpr int width = 228;
+        Box(rt, p, { width, Layout::ContentHeight(screen) });
+        DrawStrongText(rt, p + ScreenCoordsXY{10, 12}, "{WHITE}Path options", width - 20);
+        DrawModernEllipsised(rt, p + ScreenCoordsXY{10, 32}, width - 20, "{MUTED}" + status);
+        const auto section = [&](int y, const char* label) {
+            DrawModernEllipsised(rt, p + ScreenCoordsXY{10, y}, width - 20, std::string("{MUTED}") + label);
+        };
+        const auto row = [&](size_t i, int y, Icon icon) {
+            const auto at = p + ScreenCoordsXY{8, y};
+            const bool active = i == selected;
+            if (active) Box(rt, at, {width - 16, kRowHeight}, true);
+            DrawIcon(rt, at + ScreenCoordsXY{7, 5}, icon, active);
+            if (active) DrawStrongText(rt, at + ScreenCoordsXY{31, 9}, "{BLACK}" + rows[i], width - 54);
+            else DrawModernEllipsised(rt, at + ScreenCoordsXY{31, 9}, width - 54, "{WHITE}" + rows[i]);
+        };
         if (rows.size() > 7)
         {
+            const int positions[] = {52, 108, 136, 164, 192, 248, 276, 304};
             const Icon icons[] = {Icon::play, Icon::options, Icon::rise, Icon::lower,
-                                  Icon::slope, Icon::options, Icon::path, Icon::options};
-            for (size_t i = 0; i < rows.size() && i < 8; ++i)
-                Row(rt, p + ScreenCoordsXY{8, 52 + static_cast<int32_t>(i) * 32}, rows[i], icons[i], i == selected);
+                                  Icon::slope, Icon::options, Icon::path, Icon::remove};
+            section(87, "Direction / slope");
+            section(227, "Surface / recovery");
+            for (size_t i = 0; i < rows.size() && i < 8; ++i) row(i, positions[i], icons[i]);
         }
         else
         {
-        const int rowY[] = { 52, 108, 136, 164, 220, 248, 304 };
-        const Icon icons[] = { Icon::play, Icon::ground, Icon::rise, Icon::lower, Icon::slope, Icon::options, Icon::path };
-        Section(rt, p + ScreenCoordsXY{ 10, 87 }, "Height");
-        Section(rt, p + ScreenCoordsXY{ 10, 199 }, "Slope");
-        Section(rt, p + ScreenCoordsXY{ 10, 283 }, "Surface");
-        for (size_t i = 0; i < rows.size() && i < 7; ++i)
-            Row(rt, p + ScreenCoordsXY{ 8, rowY[i] }, rows[i], icons[i], i == selected);
+            const int positions[] = {52, 108, 136, 164, 220, 248, 304};
+            const Icon icons[] = {Icon::play, Icon::ground, Icon::rise, Icon::lower, Icon::slope, Icon::options, Icon::path};
+            section(87, "Height");
+            section(199, "Slope");
+            section(283, "Surface");
+            for (size_t i = 0; i < rows.size() && i < 7; ++i) row(i, positions[i], icons[i]);
         }
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;

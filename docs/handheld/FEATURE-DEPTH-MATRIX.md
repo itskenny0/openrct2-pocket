@@ -697,3 +697,12 @@ Cancel-first native move/remove reviews, serialized context/quote guards and nat
 queue/path/maze recovery are delivered. Native relocation is sequential, with no
 rollback/atomicity claim. Both access types have representative Carousel/Maze/Monorail
 coverage; exhaustive families/multi-station operation and hardware remain unclaimed.
+
+## 2026-10-16 bounded ordinary-play UI polish
+
+See [ORDINARY-PLAY-UI-POLISH-COMPLETION.md](ORDINARY-PLAY-UI-POLISH-COMPLETION.md).
+Wider readable/grouped path settings, retained surface/undo return focus, direct
+station-matched connected queue/path shortcuts in existing-access inspection and
+correct native connected-path icons are delivered. Twelve final native/SDL drivers,
+CTest 5/5 and four inspected production component renders cover this bounded pass.
+No new simulation, advanced parity or physical/performance claim is added.
