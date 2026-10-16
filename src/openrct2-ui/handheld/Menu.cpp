@@ -165,6 +165,9 @@ namespace OpenRCT2::Ui::Windows
         trackReplaceConfirm,
         trackSpeedConfirm,
         ridesAccess,
+        accessManage,
+        accessPoint,
+        accessReview,
         ridesStats,
         ridesCustomers,
         ridesStations,
@@ -420,6 +423,10 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::RideManagement::Draft> _ridesDraft;
         size_t _ridesRosterFocus{};
         bool _ridesBusy{};
+        std::vector<Handheld::RideAccess::ExistingPoint> _accessPoints;
+        std::optional<Handheld::RideAccess::ExistingPoint> _accessPoint;
+        std::optional<Handheld::RideAccess::EditDraft> _accessDraft;
+        size_t _accessFocus{};
         Handheld::TextEntry _nameEntry;
         Page _scenerySearchParent = Page::sceneryOptions;
         size_t _scenerySearchRow{};
@@ -473,7 +480,8 @@ namespace OpenRCT2::Ui::Windows
         }
         bool ridesManagement() const
         {
-            return trackManagement() || _page == Page::ridesRoster || _page == Page::ridesInspect || _page == Page::ridesGraphs
+            return _page == Page::accessManage || _page == Page::accessPoint || _page == Page::accessReview
+                || trackManagement() || _page == Page::ridesRoster || _page == Page::ridesInspect || _page == Page::ridesGraphs
                 || _page == Page::ridesStations || _page == Page::ridesCustomers || _page == Page::ridesEarnings
                 || _page == Page::ridesStats || _page == Page::ridesVehicles || _page == Page::ridesName
                 || _page == Page::designName || _page == Page::designScenery || _page == Page::designExport
@@ -603,6 +611,35 @@ namespace OpenRCT2::Ui::Windows
                 if (!_status.empty())
                     model.status = _status;
                 model.primaryAction = "Type";
+                return model;
+            }
+            if (current == Page::accessReview && _accessDraft)
+                return Handheld::RideAccess::ReviewPresentation(*_accessDraft, selected, _status);
+            if (current == Page::accessManage || current == Page::accessPoint)
+            {
+                Handheld::ManagementPresentation model;
+                model.title = "Entrances / exits"; model.breadcrumb = "Rides / Access"; model.selected = selected;
+                if (current == Page::accessManage)
+                {
+                    for (const auto& point : _accessPoints) model.rows.push_back(Handheld::RideAccess::PointLabel(point));
+                    model.rows.push_back("Back to ride");
+                    model.status = _accessPoints.empty() ? "No supported existing access points" : "Select a station entrance or exit";
+                }
+                else if (_accessPoint)
+                {
+                    const auto& point = *_accessPoint;
+                    model.title = Handheld::RideAccess::PointLabel(point);
+                    model.bodyLines = {"Tile " + std::to_string(point.source.x / 32) + "," + std::to_string(point.source.y / 32),
+                        "Height Z " + std::to_string(point.source.z) + " / direction " + std::to_string(point.source.direction),
+                        "Native edit updates queues / paths.", "Maze hedges follow native access rules."};
+                    model.rows = Handheld::RideAccess::Current(point)
+                        ? std::vector<std::string>{"Move access...", "Remove access...", "Back to access list"}
+                        : std::vector<std::string>{"Back to access list"};
+                    const auto* ride = Handheld::RideManagement::Resolve(point.target);
+                    model.status = !Handheld::RideAccess::Current(point) ? "Access changed; select it again"
+                        : ride && ride->status == RideStatus::closed ? "Move keeps source until Apply" : "Close the ride before editing access";
+                }
+                if (!_status.empty()) model.status = _status;
                 return model;
             }
             if (current == Page::ridesAccess && _ridesTarget)
@@ -1076,7 +1113,7 @@ namespace OpenRCT2::Ui::Windows
                 _focus.move(static_cast<int32_t>(std::min(_guestRideFocus, rows().size() - 1)), rows().size());
             if (next == Page::guestRoster)
                 _focus.move(static_cast<int32_t>(std::min(_guestRosterFocus, rows().size() - 1)), rows().size());
-            if (next == Page::saveReview || next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish
+            if (next == Page::accessReview || next == Page::saveReview || next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish
                 || next == Page::overviewConfirm || next == Page::ridesConfirm || next == Page::financeConfirm
                 || next == Page::marketingConfirm || next == Page::staffHire || next == Page::staffDismiss
                 || next == Page::staffNameConfirm || next == Page::guestNameConfirm || next == Page::guestTracking
@@ -1147,6 +1184,9 @@ namespace OpenRCT2::Ui::Windows
                 case Page::trackSpeedConfirm:
                 case Page::ridesRoster:
                 case Page::ridesInspect:
+                case Page::accessManage:
+                case Page::accessPoint:
+                case Page::accessReview:
                 case Page::ridesAccess:
                 case Page::ridesVehicles:
                 case Page::ridesName:
@@ -1220,7 +1260,10 @@ namespace OpenRCT2::Ui::Windows
                     if (_ridesTarget && Handheld::FlatRides::CanResume(*_ridesTarget))
                         result.insert(result.begin(), "Place entrance / exit...");
                     if (_ridesTarget && Handheld::RideAccess::Supported(*_ridesTarget))
+                    {
+                        result.insert(result.begin() + (Handheld::FlatRides::CanResume(*_ridesTarget) ? 1 : 0), "Entrances / exits...");
                         result.push_back("Access / paths...");
+                    }
                     if (_ridesTarget && Handheld::CustomTracks::CanResume(*_ridesTarget))
                         result.push_back("Continue track...");
                     if (_ridesTarget && Handheld::Mazes::CanResume(*_ridesTarget))
@@ -1493,6 +1536,33 @@ namespace OpenRCT2::Ui::Windows
                 PauseToggle();
             _pausedHere = false;
             close();
+        }
+        void openAccessManagement()
+        {
+            if (!_ridesTarget) return;
+            _accessPoints = Handheld::RideAccess::Existing(*_ridesTarget);
+            _dashboard.section = Handheld::Dashboard::Section::rides;
+            _dashboard.focus = Handheld::Dashboard::Focus::content;
+            page(Page::accessManage);
+            _focus.move(static_cast<int32_t>(std::min(_accessFocus, _accessPoints.size())), rows().size());
+        }
+        void openAccessReview(const Handheld::RideAccess::EditDraft& draft)
+        {
+            _ridesTarget = draft.point.target; _accessPoint = draft.point; _accessDraft.emplace(draft);
+            _dashboard.section = Handheld::Dashboard::Section::rides;
+            _dashboard.focus = Handheld::Dashboard::Focus::content;
+            page(Page::accessReview);
+        }
+        void cancelAccessReview()
+        {
+            if (!_accessDraft) { openAccessManagement(); return; }
+            const auto draft = *_accessDraft; _accessDraft.reset();
+            if (Handheld::FlatRides::CanResume(draft.point.target))
+            {
+                Handheld::EndTerrain(); openRideAccess(draft.point.target);
+            }
+            else if (draft.remove) page(Page::accessPoint);
+            else close(); // Existing relocation cursor remains; no native change on Cancel.
         }
         void openRideAccess(const Handheld::RideManagement::Target& target)
         {
@@ -2333,6 +2403,13 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::ridesName:
                     page(_ridesTarget && _ridesTarget->shop ? Page::shop : Page::ridesInspect);
+                    break;
+                case Page::accessManage:
+                    page(Page::ridesInspect); break;
+                case Page::accessPoint:
+                    openAccessManagement(); break;
+                case Page::accessReview:
+                    if (!_ridesBusy) cancelAccessReview();
                     break;
                 case Page::ridesAccess:
                 case Page::ridesVehicles:
@@ -3696,6 +3773,13 @@ namespace OpenRCT2::Ui::Windows
                         break;
                     }
                     auto rows = ridesPresentationFor(Page::ridesInspect, choice).rows;
+                    const auto accessRow = std::find(rows.begin(), rows.end(), "Entrances / exits...");
+                    if (accessRow != rows.end())
+                    {
+                        const auto index = static_cast<size_t>(accessRow - rows.begin());
+                        if (choice == index) { openAccessManagement(); break; }
+                        rows.erase(accessRow); if (choice > index) --choice;
+                    }
                     // Keep the placement handoff first without changing the established action indices.
                     if (Handheld::FlatRides::CanResume(*_ridesTarget))
                     {
@@ -3856,6 +3940,64 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 }
+                case Page::accessManage:
+                    if (choice < _accessPoints.size())
+                    {
+                        _accessFocus = choice; _accessPoint = _accessPoints[choice]; page(Page::accessPoint);
+                    }
+                    else page(Page::ridesInspect);
+                    break;
+                case Page::accessPoint:
+                    if (!_accessPoint || !Handheld::RideAccess::Current(*_accessPoint) || choice >= 2) openAccessManagement();
+                    else if (choice == 0)
+                    {
+                        const auto point = *_accessPoint;
+                        if (Handheld::RideManagement::Resolve(point.target)->status != RideStatus::closed)
+                        { _status = "Close ride before moving access"; invalidate(); break; }
+                        close();
+                        if (!Handheld::RideAccess::BeginRelocation(point))
+                            GetWindowManager()->ShowError("Cannot move access", "Access changed; select it again");
+                        else Handheld::RideManagement::Locate(point.target);
+                    }
+                    else
+                    {
+                        if (_pausedHere && (gGamePaused & GAME_PAUSED_NORMAL)) { PauseToggle(); _ridesReviewResumed = true; }
+                        std::string error;
+                        auto draft = Handheld::RideAccess::Review(*_accessPoint, {}, error);
+                        if (draft) openAccessReview(*draft);
+                        else { _status = error; invalidate(); }
+                    }
+                    break;
+                case Page::accessReview:
+                    if (choice != 0) { cancelAccessReview(); break; }
+                    if (_accessDraft)
+                    {
+                        if (_pausedHere && (gGamePaused & GAME_PAUSED_NORMAL)) { PauseToggle(); _ridesReviewResumed = true; }
+                        auto action = _accessDraft->action;
+                        const auto request = ++_ridesRequest;
+                        const auto target = _accessDraft->point.target;
+                        _ridesBusy = true;
+                        action.SetCallback([request,target,lifetime=std::weak_ptr<int>(_ridesLifetime)](const auto*, const GameActions::Result* result) {
+                            const auto alive = lifetime.lock();
+                            if (!alive) return;
+                            auto* base = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+                            if (!base) return;
+                            auto* window = static_cast<HandheldMenuWindow*>(base);
+                            if (window->_ridesLifetime != alive || window->_ridesRequest != request || window->_page != Page::accessReview) return;
+                            window->_ridesBusy = false;
+                            if (result->error == GameActions::Status::ok)
+                            {
+                                Handheld::EndTerrain(); window->_accessDraft.reset(); window->openRideAccess(target);
+                                window->_status = "Access edited; check queue / path connections";
+                            }
+                            else window->_status = result->getErrorMessage().empty() ? result->getErrorTitle() : result->getErrorMessage();
+                            window->invalidate();
+                        });
+                        const auto result = GameActions::Execute(&action, getGameState());
+                        if (result.error != GameActions::Status::ok) { _ridesBusy = false; _status = result.getErrorMessage().empty() ? result.getErrorTitle() : result.getErrorMessage(); }
+                        invalidate();
+                    }
+                    break;
                 case Page::ridesAccess:
                     if (_ridesTarget && Handheld::FlatRides::CanResume(*_ridesTarget))
                     {
@@ -4631,6 +4773,12 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::ride:
+                    if (_ridesTarget && Handheld::RideAccess::Supported(*_ridesTarget))
+                    {
+                        const size_t index = Handheld::FlatRides::CanResume(*_ridesTarget) ? 1 : 0;
+                        if (choice == index) { openAccessManagement(); break; }
+                        if (choice > index) --choice;
+                    }
                     if (_ridesTarget && Handheld::FlatRides::CanResume(*_ridesTarget))
                     {
                         if (choice == 0)
@@ -5389,6 +5537,10 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = OpenPanel())
             window->openBuild();
+    }
+    void HandheldAccessReviewOpen(const Handheld::RideAccess::EditDraft& draft)
+    {
+        if (auto* window = OpenPanel()) window->openAccessReview(draft);
     }
     void HandheldRideAccessOpen(const Handheld::RideManagement::Target& target)
     {

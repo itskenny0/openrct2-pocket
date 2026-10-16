@@ -217,3 +217,10 @@ native ghost entries, with nested provisional/save and paused-tick cleanup. See
 MAZE-ACCESS-PREVIEW-COMPLETION.md for completed native/SDL/asset validation,
 29-capture package, guards, recovery and precise remaining limits. Existing access
 relocation/removal and exhaustive family cases are not delivered by that follow-up.
+
+## Existing access follow-up — 2026-10-16
+
+See RIDE-ACCESS-RELOCATION-COMPLETION.md for guarded native existing entrance/exit
+inspection, relocation and explicit removal. Earlier statements that existing
+access editing is absent are superseded only within its audited station scope.
+Missing-access shortcuts/previews remain; relocation is sequential, not atomic.

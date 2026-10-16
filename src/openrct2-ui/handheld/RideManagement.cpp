@@ -1016,7 +1016,10 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             if (FlatRides::CanResume(*target))
                 model.rows.insert(model.rows.begin(), "Place entrance / exit...");
             if (RideAccess::Supported(*target))
+            {
+                model.rows.insert(model.rows.begin() + (FlatRides::CanResume(*target) ? 1 : 0), "Entrances / exits...");
                 model.rows.push_back("Access / paths...");
+            }
             if (CustomTracks::CanResume(*target))
                 model.rows.push_back("Continue track...");
             if (Mazes::CanResume(*target))

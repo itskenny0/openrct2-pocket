@@ -3,6 +3,7 @@
 
 #include "TrackPreview.h"
 #include "AccessPreview.h"
+#include "RideAccess.h"
 
 #include <openrct2/actions/ride/FlatRideEntrancePlaceAction.h>
 #include <openrct2/actions/ride/FlatRidePlaceAction.h>
@@ -14,6 +15,7 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
     static Direction direction{};
     static std::optional<RideManagement::Target> target;
     static bool busy{};
+    static std::optional<RideAccess::ExistingPoint> editing;
     static StationIndex stationIndex{ StationIndex::FromUnderlying(0) };
     static uint64_t revision{};
     struct Request
@@ -83,6 +85,7 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
     {
         ClearPreview();
         stage = Stage::inactive;
+        editing.reset();
         busy = false;
         target.reset();
         ++revision;
@@ -135,6 +138,14 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
         target = t;
         selected = t.object;
         NextStation();
+        return true;
+    }
+    bool ResumeExisting(const RideAccess::ExistingPoint& point)
+    {
+        if (!RideAccess::Current(point) || RideManagement::Resolve(point.target)->status != RideStatus::closed) return false;
+        End();
+        editing = point; target = point.target; selected = point.target.object; stationIndex = point.station;
+        stage = point.exit ? Stage::exit : Stage::entrance;
         return true;
     }
     void Rotate()
@@ -226,11 +237,20 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
             return Invalid("Ride no longer available");
         const bool isExit = stage == Stage::exit;
         const auto& station = GetRide(target->id)->getStation(stationIndex);
-        if (!(isExit ? station.exit : station.entrance).isNull())
+        if (!editing && !(isExit ? station.exit : station.entrance).isNull())
             return Invalid("Entrance/exit already placed; resume construction");
         const auto location = EntranceLocation(tile);
         if (!location)
             return Invalid("Choose a free tile beside the ride");
+        if (editing)
+        {
+            std::string error;
+            auto draft = RideAccess::Review(*editing, *location, error);
+            if (!draft) return Invalid(error);
+            const auto quote = GameActions::Query(&draft->action, getGameState());
+            if (execute && quote.error == GameActions::Status::ok) Windows::HandheldAccessReviewOpen(*draft);
+            return quote;
+        }
         auto action = GameActions::FlatRideEntrancePlaceAction(target->id, *location, isExit, stationIndex);
         const auto result = AccessPreview::Bind(action,*location);
         if (!execute || result.error != GameActions::Status::ok){if(execute && result.error!=GameActions::Status::ok)ClearPreview();return result;}
@@ -255,7 +275,8 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
         if((stage==Stage::entrance || stage==Stage::exit) && !busy && target) {
             preview.clear();ghost.reset();requested.reset();
             const auto loc=EntranceLocation(tile);
-            if(loc)AccessPreview::Update(*target,*loc,stage==Stage::exit,stationIndex);else AccessPreview::Clear();
+            if (editing && !RideAccess::Current(*editing)) { AccessPreview::Clear(); return; }
+            if(loc)AccessPreview::Update(*target,*loc,stage==Stage::exit,stationIndex,editing.has_value());else AccessPreview::Clear();
             return;
         }
         if (stage != Stage::ride || busy)
@@ -295,7 +316,7 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
         const bool placing = stage == Stage::ride;
         const auto p = kOrigin;
         Box(rt, p, { kRailWidth, 146 });
-        Heading(rt, p + ScreenCoordsXY{ 10, 12 }, "Build ride");
+        Heading(rt, p + ScreenCoordsXY{ 10, 12 }, editing ? "Move ride access" : "Build ride");
         Section(rt, p + ScreenCoordsXY{ 10, 35 }, Name());
         Row(rt, p + ScreenCoordsXY{ 8, 54 },
             placing                        ? "Place ride"
@@ -309,7 +330,7 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;
         DrawCommand(rt, { 8, y }, 38, "D-pad", "Move");
-        DrawCommand(rt, { 115, y }, 17, "A", "Place");
+        DrawCommand(rt, { 115, y }, 17, "A", editing ? "Review" : "Place");
         if (placing)
         {
             DrawCommand(rt, { 207, y }, 17, "Y", "Rides");

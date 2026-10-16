@@ -242,3 +242,10 @@ was saved and made downloadable; completed prior capture packages remain intact.
 The sole preserved unrelated working-tree edit is data/language/eo-ZZ.txt, SHA256
 e37ba559b4d9d761e74f2bb284d1ec762b813e789655c0495a882c83651890b5, excluded
 from all milestone commits. No next subsystem has started.
+
+## Existing access follow-up — 2026-10-16
+
+See RIDE-ACCESS-RELOCATION-COMPLETION.md for guarded native existing entrance/exit
+inspection, relocation and explicit removal. Earlier statements that existing
+access editing is absent are superseded only within its audited station scope.
+Missing-access shortcuts/previews remain; relocation is sequential, not atomic.

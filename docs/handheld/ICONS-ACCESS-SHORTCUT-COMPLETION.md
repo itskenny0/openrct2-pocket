@@ -65,3 +65,10 @@ directory (normally Tools/tg5040/OpenRCT2 Pocket.pak/game) and launch.sh into th
 Publication follows the canonical parent above with expected_sha / force=false,
 each changed blob verified and complete source-tree comparison, then branch and
 native commit parent/tree readback. Esperanto bytes remain unchanged and excluded.
+
+## Existing access follow-up — 2026-10-16
+
+See RIDE-ACCESS-RELOCATION-COMPLETION.md for guarded native existing entrance/exit
+inspection, relocation and explicit removal. Earlier statements that existing
+access editing is absent are superseded only within its audited station scope.
+Missing-access shortcuts/previews remain; relocation is sequential, not atomic.

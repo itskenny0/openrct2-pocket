@@ -4,6 +4,7 @@
 #include "RideManagement.h"
 
 #include <openrct2/ride/FlatRidePlacement.h>
+namespace OpenRCT2::Ui::Handheld::RideAccess { struct ExistingPoint; }
 namespace OpenRCT2::Ui::Handheld::FlatRides
 {
     enum class Stage
@@ -18,6 +19,7 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
     std::string Name();
     bool Begin(ObjectEntryIndex index);
     bool Resume(const RideManagement::Target& target);
+    bool ResumeExisting(const RideAccess::ExistingPoint& point);
     bool CanResume(const RideManagement::Target& target);
     void End();
     Stage CurrentStage();

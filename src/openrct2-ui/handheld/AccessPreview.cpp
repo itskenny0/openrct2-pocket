@@ -5,7 +5,7 @@
 #include <openrct2/world/tile_element/EntranceElement.h>
 namespace OpenRCT2::Ui::Handheld::AccessPreview
 {
-    struct Request {RideManagement::Target target;CoordsXYZD location;bool exit;StationIndex station;
+    struct Request {RideManagement::Target target;CoordsXYZD location;bool exit;StationIndex station;bool relocation{};
         std::vector<int64_t> context;money64 cost;};
     static std::optional<Request> requested,ghost;
     static uint32_t depth{};
@@ -18,15 +18,16 @@ namespace OpenRCT2::Ui::Handheld::AccessPreview
         ghost.reset();
     }
     void Clear(){requested.reset();Remove();}
-    void Update(const RideManagement::Target& target,CoordsXYZD location,bool exit,StationIndex station)
+    void Update(const RideManagement::Target& target,CoordsXYZD location,bool exit,StationIndex station,bool relocation)
     {
         const auto* ride=RideManagement::Resolve(target);
         if(!ride){Clear();return;}
         auto context=AccessPlacementContext::Capture(*ride,location);
         GameActions::FlatRideEntrancePlaceAction action(target.id,location,exit,station);
+        if (relocation) action.EditExisting();
         auto q=GameActions::Query(&action,getGameState());
         if(q.error!=GameActions::Status::ok){Clear();return;}
-        Request next{target,location,exit,station,context,q.cost};
+        Request next{target,location,exit,station,relocation,context,q.cost};
         requested.emplace(next);
         if(depth)return;
         if(ghost && ghost->location==location && ghost->target==target && ghost->exit==exit && ghost->station==station && ghost->context==context)return;
@@ -39,7 +40,7 @@ namespace OpenRCT2::Ui::Handheld::AccessPreview
     void Restore(){if(!depth || --depth || !requested)return;const auto old=*requested;
         const auto* ride=RideManagement::Resolve(old.target);
         if(!ride || old.context!=AccessPlacementContext::Capture(*ride,old.location)){Clear();return;}
-        Update(old.target,old.location,old.exit,old.station);}
+        Update(old.target,old.location,old.exit,old.station,old.relocation);}
     GameActions::Result Bind(GameActions::FlatRideEntrancePlaceAction& action,CoordsXYZD location)
     {
         if(requested && requested->location==location){action.GuardContext(requested->context,requested->cost);}

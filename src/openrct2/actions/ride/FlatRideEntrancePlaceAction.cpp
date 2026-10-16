@@ -5,6 +5,8 @@
 #include "../../ride/AccessPlacementContext.h"
 #include "../GameActionRunner.h"
 #include "RideEntranceExitPlaceAction.h"
+#include "RideEntranceExitRemoveAction.h"
+#include "../../world/tile_element/EntranceElement.h"
 namespace OpenRCT2::GameActions
 {
     FlatRideEntrancePlaceAction::FlatRideEntrancePlaceAction(
@@ -35,7 +37,7 @@ namespace OpenRCT2::GameActions
     {
         GameAction::Serialise(s);
         s << DS_TAG(_ride) << DS_TAG(_location) << DS_TAG(_exit) << DS_TAG(_object) << DS_TAG(_buildDate) << DS_TAG(_start)
-          << DS_TAG(_entrance) << DS_TAG(_station) << DS_TAG(_context) << DS_TAG(_quote);
+          << DS_TAG(_entrance) << DS_TAG(_station) << DS_TAG(_context) << DS_TAG(_quote) << DS_TAG(_editExisting) << DS_TAG(_removeExisting);
     }
     Result FlatRideEntrancePlaceAction::Query(GameState_t& state, Park::ParkData& park) const
     {
@@ -51,9 +53,33 @@ namespace OpenRCT2::GameActions
             return invalid();
         if(_context.empty() || _context!=AccessPlacementContext::Capture(*ride,_location))return invalid();
         const auto& station = ride->getStation(_station);
-        if (station.start != _start || station.entrance != _entrance || !(_exit ? station.exit : station.entrance).isNull()
-            || (_exit && station.entrance.isNull()))
+        if (station.start != _start || station.entrance != _entrance || (_editExisting ? (_exit ? station.exit : station.entrance).isNull()
+                              : !(_exit ? station.exit : station.entrance).isNull())
+            || (!_editExisting && _exit && station.entrance.isNull()))
             return invalid();
+        if (_editExisting)
+        {
+            const auto source = (_exit ? station.exit : station.entrance).toCoordsXYZD();
+            const EntranceElement* first = nullptr;
+            for (const auto* element : TileElementsView<EntranceElement>(source))
+            {
+                if (element->getRideIndex() == _ride && element->getStationIndex() == _station
+                    && element->getEntranceType() == (_exit ? EntranceType::rideExit : EntranceType::rideEntrance))
+                { first = element; break; }
+            }
+            // Match the exact first element that the native removal subaction resolves.
+            if (!first || first->isGhost() || first->getBaseZ() != source.z || first->getDirection() != source.direction)
+                return invalid();
+        }
+        if (_removeExisting)
+        {
+            if (!_editExisting || GetFlags().has(CommandFlag::ghost)) return invalid();
+            auto action = RideEntranceExitRemoveAction((_exit ? station.exit : station.entrance).toCoordsXY(), _ride, _station, _exit);
+            action.SetFlags(GetFlags());
+            auto result = QueryNested(&action, state);
+            if (_quote != kMoney64Undefined && result.error == Status::ok && result.cost != _quote) return invalid();
+            return result;
+        }
         const auto location = FlatRidePlacement::EntranceLocation(*ride, _location, _station);
         if (!location || *location != _location)
             return invalid();
@@ -69,6 +95,13 @@ namespace OpenRCT2::GameActions
         auto valid = Query(state, park);
         if (valid.error != Status::ok)
             return valid;
+        if (_removeExisting)
+        {
+            const auto& station = GetRide(_ride)->getStation(_station);
+            auto remove = RideEntranceExitRemoveAction((_exit ? station.exit : station.entrance).toCoordsXY(), _ride, _station, _exit);
+            remove.SetFlags(GetFlags());
+            return ExecuteNested(&remove, state);
+        }
         auto action = RideEntranceExitPlaceAction(_location, _location.direction, _ride, _station, _exit);
         action.SetFlags(GetFlags());
         if(GetFlags().has(CommandFlag::ghost))action.SetPureGhost();

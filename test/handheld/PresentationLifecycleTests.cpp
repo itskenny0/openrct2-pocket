@@ -102,10 +102,8 @@ int main(int argc, char** argv)
         Require(!top(), "Build menu retained HUD");
         W::HandheldMenuBack();
         H::UpdateExplorer(input);
-        Require(!top(), "Build Back skipped its existing pause-menu level");
-        W::HandheldMenuBack();
-        H::UpdateExplorer(input);
-        Require(top(), "Build cancellation lost HUD");
+        // Published slate navigation returns root Build directly to the park.
+        Require(!Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu) && top(), "Root Build cancellation lost park/HUD return");
         H::EndTerrain();
         // Metadata-only fixture for type-specific management; no fabricated operating track or guests.
         namespace R = H::RideManagement;
@@ -113,6 +111,12 @@ int main(int argc, char** argv)
         Require(object, "Public wooden object metadata missing");
         auto* ride = RideAllocateAtIndex(RideId::FromUnderlying(0));
         Require(ride, "Ride UI fixture allocation failed");
+        // Bare allocation does not perform RideCreateAction's station initialization.
+        // This metadata-only fixture has no track or access; zero coordinates are real map positions.
+        for (auto& station : ride->getStations())
+        {
+            station.start.setNull(); station.entrance.setNull(); station.exit.setNull();
+        }
         ride->type = RIDE_TYPE_WOODEN_ROLLER_COASTER;
         ride->subtype = context->GetObjectManager().GetLoadedObjectEntryIndex(object);
         ride->status = RideStatus::closed;
@@ -255,6 +259,8 @@ int main(int argc, char** argv)
         press(H::Action::openBuild);
         Require(W::HandheldRidesPresentation().breadcrumb == "Rides / Dispatch", "Dispatch resume lost");
         const auto dispatchBefore = ride->departFlags;
+        // The offscreen SDL test window cannot acquire foreground device focus.
+        SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
         Require(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) == 0, "Dispatch SDL init failed");
         {
             H::ControllerInput controller;

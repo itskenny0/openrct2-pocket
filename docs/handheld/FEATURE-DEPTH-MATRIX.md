@@ -687,3 +687,13 @@ sprites and numeric settings plain text. Missing entrance/exit placement is the
 first eligible closed-ride action in both quick management and Dashboard inspection,
 and directly reachable from Access / paths. Existing native placement/ghost/cost
 rules remain; existing-access relocation/removal remains outside this milestone.
+
+## 2026-10-16 existing entrance/exit editing
+
+[RIDE-ACCESS-RELOCATION-COMPLETION.md](RIDE-ACCESS-RELOCATION-COMPLETION.md)
+supersedes the earlier missing existing-access editing entry for audited native
+station contexts. Station/type inspection, retained-source pure relocation ghost,
+Cancel-first native move/remove reviews, serialized context/quote guards and native
+queue/path/maze recovery are delivered. Native relocation is sequential, with no
+rollback/atomicity claim. Both access types have representative Carousel/Maze/Monorail
+coverage; exhaustive families/multi-station operation and hardware remain unclaimed.
