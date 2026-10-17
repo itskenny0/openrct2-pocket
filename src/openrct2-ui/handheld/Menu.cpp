@@ -1627,7 +1627,7 @@ namespace OpenRCT2::Ui::Windows
         {
             page(Page::pathOptions);
         }
-        bool _terrainMaterialEdge{}, _sceneryPickerDirect{};
+        bool _terrainMaterialEdge{}, _sceneryPickerDirect{}, _pathSurfaceDirect{};
         void openTerrainMaterialPicker(bool edge)
         {
             _terrainMaterialEdge=edge;
@@ -1641,8 +1641,9 @@ namespace OpenRCT2::Ui::Windows
         {
             page(Page::sceneryPicker);_sceneryPickerDirect=true;refreshPicker();
         }
-        void openPathSurfacePicker()
+        void openPathSurfacePicker(bool direct = false)
         {
+            _pathSurfaceDirect = direct;
             Handheld::Paths::ClearPreview();
             _pathOptionsFocus[Handheld::Paths::IsConnected()] = 6;
             page(Page::pathSurfacePicker);
@@ -2563,7 +2564,8 @@ namespace OpenRCT2::Ui::Windows
                 case Page::terrainMaterialPicker:
                     close();break;
                 case Page::pathSurfacePicker:
-                    page(Page::pathOptions);
+                    if (_pathSurfaceDirect) close();
+                    else page(Page::pathOptions);
                     break;
                 case Page::pathUndoConfirm:
                     _pathUndo.reset();
@@ -5809,7 +5811,7 @@ namespace OpenRCT2::Ui::Windows
     }
     void HandheldPathSurfacePickerOpen()
     {
-        if (auto* window = OpenPanel()) window->openPathSurfacePicker();
+        if (auto* window = OpenPanel()) window->openPathSurfacePicker(true);
     }
     void HandheldPathOptionsOpen()
     {

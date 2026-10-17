@@ -1,0 +1,7 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+PASS path grid apply/cancel, normal/queue filtering, stale descriptors, native accounting and save/reload
+scenario index out of date
+Building scenario index (6 items)
+Finished building scenario index in 0.02 seconds.
+PASS native exports plus native-classified legacy index fixture, expert/locked navigation, guarded start, explicit setting and stable focus

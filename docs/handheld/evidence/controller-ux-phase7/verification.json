@@ -1,0 +1,95 @@
+{
+  "baseline_commit": "8824460cea0fcca2caa37d471b036b6b4d8e158e",
+  "baseline_tree": "c803617b4d0c1597fe9e54a45e886a972b264a19",
+  "build": {
+    "architecture": "Linux x86-64",
+    "compiler": "GCC 13.3",
+    "clean_native_engine_gui_cli": true,
+    "physical_Brick": false,
+    "new_AArch64_binary": false,
+    "scripting": true,
+    "profile_disabled": [
+      "HTTP",
+      "network",
+      "OpenGL",
+      "TTF",
+      "FLAC",
+      "Vorbis"
+    ],
+    "local_warning_workaround": "ScenarioPatcher.cpp only: -Wno-error=stringop-overflow (picosha2.hpp GCC false positive); native source unchanged",
+    "binary_sha256": {
+      "openrct2": "28da54265276b7cb329be9bed62749ad3dc71bb2ecb256bc1187ba83f3e6e431",
+      "openrct2-cli": "d418d4506ca88ab1ba74c5e5c1d17189000a72f89c9d15526cc99935ca854461",
+      "libopenrct2.a": "c6b8ab432028de93bbcb6377523488a8611f9c9989ffcad82e6c1dda662fa94d"
+    },
+    "engine_data_sha256": {
+      "g2.dat": "449c42b6e204ff1213bdf339ba73fe707fd0ca10eeff861be48bd32732ef32a0",
+      "fonts.dat": "b738cb4158d2805d493d84bf9dfc940112d5cfd559eb492ba23ee842dbaa16e2",
+      "palettes.dat": "b034508d144e008a6d30ebb2357899cfc07173bc9168f62073554055cfd411e0",
+      "tracks.dat": "4a827880181836fcef12bb39a8bb1512612e1d0aecbceacf34f7f9a6cc2e3349"
+    }
+  },
+  "tests": {
+    "PathBatchTests": 0,
+    "preservation": {
+      "PathActionsTests": 0,
+      "PathScenarioUsabilityTests": 0,
+      "SceneryPathParityTests": 0,
+      "PauseResumeTests": 0,
+      "PresentationLifecycleTests": 0,
+      "AccessShortcutTests": 0,
+      "RideAccessRelocationTests": 0,
+      "ConstructionTests": 0,
+      "UiRedesignTests": 0,
+      "ConstructionUxTests": 0,
+      "RideFlowTests": 0,
+      "PeopleUxTests": 0
+    },
+    "standalone_ctest": {
+      "passed": 5,
+      "failed": 0
+    }
+  },
+  "desktop_timings_us": {
+    "1000_cached_preview_calls": 24,
+    "64_tile_native_queue": 324
+  },
+  "transaction": "Explicitly reviewed sequential native actions, not atomic. Known invalid selections reject before review. Runtime failure stops, reports N/M, retains native completed tiles/costs; tested exact first-tile charge.",
+  "captures": {
+    "source": "Desktop offscreen native runtime fixture, original user G1 + official objects",
+    "logical_dimensions": [
+      512,
+      384
+    ],
+    "individual_count": 15,
+    "physical_hardware_validation": false,
+    "sha256": {
+      "01-line-preview.png": "2a97725fa770f9a725760110961531e8dbef79999ca37fb2eae61e78e4accedc",
+      "02-line-review.png": "4e980d5fbc58a924cedc3cab3cd20c8528f110277276ca34d4b24ee2d7c3b1a7",
+      "03-line-built.png": "6ec52dde33771089362ef1a6935f69a952b8306ca77a5a02ba7c45e7fbe28e63",
+      "04-line-alignment.png": "a78e2ff300aa6c348ed531651c1d35e9d738c53c288cce08f3c798213aa9ed09",
+      "05-fill-preview.png": "dafcafb7df6b89055454700cfe4e22b8b2ce6e6b269c795d6fdf5a521c80a147",
+      "06-fill-built.png": "01c2646134f174e88b27ff3985fde4ba27fcdd888f54db544821fdc3915c54a4",
+      "07-queue-preview.png": "e7674c24ec80b94e789f57be363665a9f5da8826d7dc7acaaf3c2f0b149f2712",
+      "08-blocked-preview.png": "1cb527e4a71cadb6ac6fcf5f83a2ce2d68b599c9055c0ccef3c43dc6d4f28c36",
+      "09-stopped-result.png": "9691d9915ea6e4646205a176c79382d6d43350ddc62cfb3de79e9ab4835eb6c9",
+      "10-mode-adjust.png": "772654cf8cec00e3f30eedc61eaa3fda9c306339b59b4702a092f697ecacdf27",
+      "11-surface-selection.png": "12da5c5930c67563d14998a4bcc7d0e89adf806a2e0b4f41304ee8264087b6d9",
+      "12-existing-path-preview.png": "741101f73fbff49dfe336ee15995a82c5f111e1e6231abf892a06cd86e62aa50",
+      "13-water-blocked.png": "24b4d16d5a9d1fa7685c5798a78f8f76a07a8e3905ceb7555922e00e8f4f2c7d",
+      "14-elevated-fill-preview.png": "b6e781c9ba472273afcca867f65f32f4c1c8ad6851964b6794d4b077d9d1736e",
+      "15-selection-limit.png": "2935375aeb8215dcf5a7aefa77f3140a4d2835585190b29c49eff64dfeb2c3d2",
+      "contact-sheet.png": "cc2263dfc4fc89c604faa5d4d46ee3eadb2f7c22b9e88d8c815831d302524be2"
+    },
+    "repository_publication": "PNGs omitted pending explicit user permission; generated screenshots supplied separately"
+  },
+  "limitations": [
+    "No atomic rollback or batch undo",
+    "Flat horizontal/vertical Line and flat Fill; 64 inclusive tiles maximum",
+    "Footprint overlays, not textured ghosts",
+    "Context panel can obscure part of a rectangle",
+    "Physical Brick, crowded park timing and long translations untested",
+    "Optional Phase 5 bright-sand diagnostic not resolved or counted as passed"
+  ],
+  "log_normalization": "Trailing whitespace and line endings normalized for Git; outcome/diagnostic content retained"
+}

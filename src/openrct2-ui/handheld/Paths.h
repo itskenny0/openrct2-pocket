@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "RideManagement.h"
+#include "PathSelection.h"
 
 #include <array>
 #include <openrct2/actions/GameActionResult.h>
@@ -15,6 +16,14 @@ namespace OpenRCT2
 }
 namespace OpenRCT2::Ui::Handheld::Paths
 {
+    BuildMode Mode();
+    bool CycleMode(int delta);
+    bool CancelSelection();
+    bool SelectionOwnsInput();
+    bool BatchActive();
+    std::string BatchMessage();
+    void DrawBatchWorld(Drawing::RenderTarget& rt);
+    void DrawFooter(Drawing::RenderTarget& rt, ScreenSize screen);
     void Begin(bool queue, bool remove = false);
     void BeginConnected(bool queue);
     bool BeginConnectedAccess(const RideManagement::Target&, StationIndex, bool exit, CoordsXYZD outside);

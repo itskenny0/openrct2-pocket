@@ -14,6 +14,7 @@
 #include <openrct2/drawing/Rectangle.h>
 #include <openrct2/drawing/Text.h>
 #include <string_view>
+#include <sstream>
 
 namespace OpenRCT2::Ui::Handheld
 {
@@ -482,9 +483,9 @@ namespace OpenRCT2::Ui::Handheld
         Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& surface, bool queue, bool remove,
         const std::string& placement = "Ground / auto slope", bool connected = false, bool adjusting = false)
     {
-        DrawSurface(rt, pos, {164, adjusting ? 174 : 146});
+        DrawSurface(rt, pos, {164, adjusting ? connected ? 174 : 194 : 146});
         DrawIcon(rt, pos + ScreenCoordsXY{10, 12}, PanelIcon::path);
-        DrawStrongText(rt, pos + ScreenCoordsXY{36, 14}, adjusting ? "{WHITE}Adjust path" : connected ? "{WHITE}Extend path" : "{WHITE}Paths", 116);
+        DrawStrongText(rt, pos + ScreenCoordsXY{36, 14}, adjusting ? "{WHITE}Adjust path" : connected ? "{WHITE}Extend path" : "{WHITE}Single path", 116);
         Fill(rt, pos + ScreenCoordsXY{8, 35}, {148, 22}, Theme::raised);
         DrawStrongText(rt, pos + ScreenCoordsXY{14, 42},
             remove ? "{WHITE}REMOVE" : queue ? "{WHITE}QUEUE" : "{WHITE}FOOTPATH", 136);
@@ -526,11 +527,12 @@ namespace OpenRCT2::Ui::Handheld
         }
     }
 
-    inline void DrawCostBadge(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& amount)
+    inline void DrawCostBadge(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& amount, bool quote = false)
     {
         Concept::Box(rt, pos, { 160, 26 });
-        DrawModernText(rt, pos + ScreenCoordsXY{ 8, 8 }, "{MUTED}Cost:");
-        DrawStrongText(rt, pos + ScreenCoordsXY{ 43, 8 }, "{POSITIVE}" + amount, 109);
+        DrawModernText(rt, pos + ScreenCoordsXY{ 8, 8 }, quote ? "{MUTED}Quote:" : "{MUTED}Cost:");
+        const int valueX = quote ? 50 : 43;
+        DrawStrongText(rt, pos + ScreenCoordsXY{ valueX, 8 }, "{POSITIVE}" + amount, 152 - valueX);
     }
 
     inline void DrawContextMessage(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& text)
@@ -549,6 +551,32 @@ namespace OpenRCT2::Ui::Handheld
         DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 10, 7 }, 140, "{WHITE}" + text.substr(0, split));
         if (split < text.size())
             DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 10, 24 }, 140, "{MUTED}" + text.substr(split));
+    }
+
+    // Bounded, content-sized feedback for a selection-wide native rejection or result.
+    inline void DrawConstructionMessage(Drawing::RenderTarget& rt, ScreenSize screen, const std::string& text)
+    {
+        constexpr int width = 216;
+        std::vector<std::string> lines;
+        std::istringstream words(text);
+        std::string line, word;
+        while (words >> word)
+        {
+            const auto candidate = line.empty() ? word : line + " " + word;
+            if (!line.empty() && TextWidth(candidate) > width - 20 && lines.size() < 3)
+            {
+                lines.push_back(line);
+                line = word;
+            }
+            else line = candidate;
+        }
+        if (!line.empty()) lines.push_back(line);
+        const ScreenSize size{width,16+static_cast<int>(lines.size())*17};
+        const auto pos = Layout::ContextOrigin(screen,{screen.width-Layout::margin-width,screen.height},size);
+        DrawSurface(rt,pos,size);
+        for (size_t i=0;i<lines.size();++i)
+            DrawModernEllipsised(rt,pos+ScreenCoordsXY{10,8+static_cast<int>(i)*17},width-20,
+                (i==0 ? "{WHITE}" : "{MUTED}")+lines[i]);
     }
 
     inline void DrawPathOptions(

@@ -996,11 +996,25 @@ namespace OpenRCT2::Ui::Handheld
             }
             return; // Adjustment owns the D-pad; never leaks into viewport pan or purchase.
         }
+        if (Paths::SelectionOwnsInput() && CanExplore())
+        {
+            for (const auto action : frame.actions)
+            {
+                if (action == Action::back) Paths::CancelSelection();
+                else if (action == Action::confirm)
+                {
+                    const auto result=Paths::Action(true);
+                    _terrainStatus=result.error==GameActions::Status::ok ? "" : result.getErrorMessage();
+                }
+                input.suspend(); break;
+            }
+            return;
+        }
         if (Paths::IsAdjusting() && CanExplore())
         {
             bool changed = true;
             if (frame.navigateX)
-                changed = Paths::IsConnected() ? Paths::TurnConnected(frame.navigateX) : Paths::RotateSlope(frame.navigateX);
+                changed = Paths::BatchActive() ? true : Paths::IsConnected() ? Paths::TurnConnected(frame.navigateX) : Paths::RotateSlope(frame.navigateX);
             if (frame.navigateY)
                 changed = Paths::IsConnected() ? Paths::SlopeConnected(-frame.navigateY) : Paths::ChangeHeight(-frame.navigateY);
             if (!changed) _terrainStatus = "Choose a target or check the height limit";
@@ -1010,14 +1024,19 @@ namespace OpenRCT2::Ui::Handheld
                 if (action == Action::back || action == Action::contextSecondary) Paths::SetAdjusting(false);
                 else if (action == Action::confirm)
                 {
-                    if (Paths::IsConnected()) Paths::LevelConnected();
+                    if (Paths::BatchActive()) Paths::SetAdjusting(false);
+                    else if (Paths::IsConnected()) Paths::LevelConnected();
                     else Paths::CycleSlope();
                 }
                 else if (action == Action::contextPrimary) Windows::HandheldPathOptionsOpen();
                 else if (action == Action::openBuild) Windows::HandheldPathSurfacePickerOpen();
                 else if (action == Action::openMenu) Windows::HandheldDashboardOpen();
                 else if (action == Action::previousOption || action == Action::nextOption)
-                    Windows::MainWindowZoom(action == Action::nextOption, false);
+                {
+                    if (!Paths::IsConnected()) Paths::CycleMode(action == Action::nextOption ? 1 : -1);
+                    else Windows::MainWindowZoom(action == Action::nextOption, false);
+                    _terrainStatus.clear();
+                }
                 else if (action == Action::slopeDown || action == Action::slopeUp)
                 {
                     if (Paths::IsConnected()) Paths::SlopeConnected(action == Action::slopeUp ? 1 : -1);
@@ -1194,6 +1213,10 @@ namespace OpenRCT2::Ui::Handheld
             }
             if (action == Action::back)
             {
+                if (Paths::IsActive() && CanExplore() && Paths::CancelSelection())
+                {
+                    _terrainStatus.clear(); input.suspend(); return;
+                }
                 if (wm->FindByClass(WindowClass::error) != nullptr || gInputFlags.has(InputFlag::toolActive))
                     Invoke(ShortcutId::kInterfaceCancelConstruction);
                 else if (wm->FindByClass(WindowClass::dropdown) != nullptr)
@@ -1272,7 +1295,7 @@ namespace OpenRCT2::Ui::Handheld
                         if (Paths::IsActive())
                         {
                             const auto result = Paths::Action(true);
-                            _terrainStatus = result.error == GameActions::Status::ok ? "Path change requested."
+                            _terrainStatus = result.error == GameActions::Status::ok ? Paths::BatchActive() ? "" : "Path change requested."
                                                                                      : result.getErrorMessage();
                         }
                         else if (_sceneryClearTool && _terrainTile)
@@ -1534,9 +1557,14 @@ namespace OpenRCT2::Ui::Handheld
                 status = result.getErrorMessage();
             if (!_terrainStatus.empty())
                 status = _sceneryTool && SceneryTools::ScatterActive() && _scatterFeedback ? SceneryTools::ScatterStatus() : _terrainStatus;
+            if (Paths::BatchActive())
+            {
+                if (!Paths::BatchMessage().empty()) status=Paths::BatchMessage();
+                else if (result.error != GameActions::Status::ok) status=result.getErrorMessage();
+            }
+            Paths::DrawBatchWorld(rt);
             Paths::DrawOverlay(rt, Concept::kOrigin);
-            DrawPathFooter(rt, {ContextGetWidth(),height},status,Paths::IsRemoving(),
-                Paths::IsConnected(),Paths::IsAdjusting(),Paths::ConnectedReady());
+            Paths::DrawFooter(rt, {ContextGetWidth(),height});
         }
         else
         {
@@ -1619,11 +1647,13 @@ namespace OpenRCT2::Ui::Handheld
                 DrawGameplayFooter(
                     rt, { ContextGetWidth(), height }, status, _terrainActive, _surfaceTool || _colourRide.has_value());
         }
-        const bool feedback = !_terrainStatus.empty();
-        if ((_terrainActive || Paths::IsActive()) && (feedback || costAmount.empty()))
+        const bool feedback = !_terrainStatus.empty() || (Paths::BatchActive() && !Paths::BatchMessage().empty());
+        if (Paths::BatchActive() && (feedback || costAmount.empty()))
+            DrawConstructionMessage(rt,{ContextGetWidth(),height},status);
+        else if ((_terrainActive || Paths::IsActive()) && (feedback || costAmount.empty()))
             DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), status);
         else if (!costAmount.empty())
-            DrawCostBadge(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), costAmount);
+            DrawCostBadge(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), costAmount, Paths::BatchActive());
         if (GuestFollow::Current() && !_terrainActive && !Paths::IsActive())
             DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), status);
         // High contrast, fixed map focus; this does not move the desktop pointer.

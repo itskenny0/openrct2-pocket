@@ -1,3 +1,6 @@
+> Current controller additions: [Phase 7 Line and Fill](CONTROLLER-UX-PHASE7.md).
+> The notes below describe the earlier native-surface foundation.
+
 # Pocket modern UI and paths — 0.7 checkpoint
 
 Target: TrimUI Brick / NextUI + PortMaster, AArch64. Logical UI 512 × 384.

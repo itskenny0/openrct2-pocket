@@ -1,0 +1,56 @@
+-- The CXX compiler identification is GNU 13.3.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found PkgConfig: /usr/bin/pkg-config (found version "1.8.1")
+-- Checking for module 'sdl2>=2.0.14'
+--   Found sdl2, version 2.30.0
+-- Configuring done (0.2s)
+-- Generating done (0.0s)
+-- Build files have been written to: /workspace/scratch/d2d0a4acf14b/p7-input-tests
+[1/9] Building CXX object CMakeFiles/handheld-save-tests.dir/SaveSlotsTests.cpp.o
+[2/9] Linking CXX executable handheld-save-tests
+[3/9] Building CXX object CMakeFiles/handheld-named-save-tests.dir/NamedSaveTests.cpp.o
+In file included from /workspace/scratch/d2d0a4acf14b/openrct2-pocket/test/handheld/NamedSaveTests.cpp:2:
+/workspace/scratch/d2d0a4acf14b/openrct2-pocket/test/handheld/../../src/openrct2-ui/handheld/NamedSave.h: In static member function ‘static std::optional<OpenRCT2::Ui::Handheld::NamedSave::Draft> OpenRCT2::Ui::Handheld::NamedSave::Draft::Review(const std::filesystem::__cxx11::path&, const std::string&, std::string&)’:
+/workspace/scratch/d2d0a4acf14b/openrct2-pocket/test/handheld/../../src/openrct2-ui/handheld/NamedSave.h:38:53: warning: ‘std::filesystem::__cxx11::path std::filesystem::__cxx11::u8path(const _Source&) [with _Source = std::__cxx11::basic_string<char>; _Require = path; _CharT = char]’ is deprecated: use 'path((const char8_t*)&*source)' instead [-Wdeprecated-declarations]
+   38 |                 d.destination=d.directory/fs::u8path(name);
+      |                                           ~~~~~~~~~~^~~~~~
+In file included from /usr/include/c++/13/filesystem:49,
+                 from /workspace/scratch/d2d0a4acf14b/openrct2-pocket/test/handheld/../../src/openrct2-ui/handheld/../../openrct2/core/FileIdentity.h:3,
+                 from /workspace/scratch/d2d0a4acf14b/openrct2-pocket/test/handheld/../../src/openrct2-ui/handheld/FileBrowsing.h:3,
+                 from /workspace/scratch/d2d0a4acf14b/openrct2-pocket/test/handheld/../../src/openrct2-ui/handheld/NamedSave.h:3:
+/usr/include/c++/13/bits/fs_path.h:843:5: note: declared here
+  843 |     u8path(const _Source& __source)
+      |     ^~~~~~
+/workspace/scratch/d2d0a4acf14b/openrct2-pocket/test/handheld/NamedSaveTests.cpp: In function ‘int main()’:
+/workspace/scratch/d2d0a4acf14b/openrct2-pocket/test/handheld/NamedSaveTests.cpp:16:61: warning: ‘std::filesystem::__cxx11::path std::filesystem::__cxx11::u8path(const _Source&) [with _Source = char [14]; _Require = path; _CharT = char]’ is deprecated: use 'path((const char8_t*)&*source)' instead [-Wdeprecated-declarations]
+   16 |     check(fresh && fresh->destination.filename()==fs::u8path("Résumé.park") && fresh->Current());
+      |                                                   ~~~~~~~~~~^~~~~~~~~~~~~~~
+/usr/include/c++/13/bits/fs_path.h:843:5: note: declared here
+  843 |     u8path(const _Source& __source)
+      |     ^~~~~~
+[4/9] Building CXX object CMakeFiles/handheld-input-tests.dir/workspace/scratch/d2d0a4acf14b/openrct2-pocket/src/openrct2-ui/handheld/ControllerInput.cpp.o
+[5/9] Building CXX object CMakeFiles/handheld-file-browsing-tests.dir/FileBrowsingTests.cpp.o
+[6/9] Building CXX object CMakeFiles/handheld-input-tests.dir/ControllerInputTests.cpp.o
+[7/9] Linking CXX executable handheld-named-save-tests
+[8/9] Linking CXX executable handheld-file-browsing-tests
+[9/9] Linking CXX executable handheld-input-tests
+Internal ctest changing into directory: /workspace/scratch/d2d0a4acf14b/p7-input-tests
+Test project /workspace/scratch/d2d0a4acf14b/p7-input-tests
+    Start 1: handheld-input
+1/5 Test #1: handheld-input ...................   Passed    0.02 sec
+    Start 2: handheld-launcher
+2/5 Test #2: handheld-launcher ................   Passed    0.04 sec
+    Start 3: handheld-save-preservation
+3/5 Test #3: handheld-save-preservation .......   Passed    0.00 sec
+    Start 4: handheld-file-browsing
+4/5 Test #4: handheld-file-browsing ...........   Passed    0.01 sec
+    Start 5: handheld-named-save
+5/5 Test #5: handheld-named-save ..............   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 5
+
+Total Test time (real) =   0.08 sec
