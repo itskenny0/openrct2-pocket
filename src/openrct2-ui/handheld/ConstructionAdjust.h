@@ -105,6 +105,7 @@ namespace OpenRCT2::Ui::Handheld::ConstructionAdjust
                   { "A", apply },
                   { "Y", "Adjust" },
                   { "SEL", scenery ? SceneryTools::CanRotate() ? "Turn" : "Auto" : "Material" },
+                  { "L1/R1", "Zoom" },
                   { "B", "Back" } });
         }
     }

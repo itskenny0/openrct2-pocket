@@ -78,7 +78,7 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 
 - Description: Contextual controller hints need a complete journey audit.
 - Severity: Minor
-- Status: Deferred
+- Status: Unverified
 - Source: Previous review; Phase 6 hints inspected in captures
 - Reproduction: Exercise every Build/Adjust, tab, modifier, map and placement state.
 - Suggested solution: Correct hints against actual dispatch; avoid hidden actions.
@@ -86,17 +86,21 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 
 - Phase 8A verification: Phase 8A replaces fixed footer coordinates with shared measured two-lane glyphs; representative bounds and runtime captures pass. Full input-journey accuracy, camera access and mode transitions remain Phase 8B.
 
+- Phase 8B verification: Desktop journey audit completed: shared stable footer zones, correct catalog Page/Camera and placement Zoom hints, existing tool-specific bindings retained. Sixteen native runtime drivers and logical-resolution captures cover representative journeys. Full translated/controller hardware matrix remains unverified. See `CONTROLLER-UX-PHASE8B.md`.
+
 ## S-06 — Shared
 
 - Description: Back and focus restoration require remaining-system coverage.
 - Severity: Major
-- Status: Deferred
+- Status: Unverified
 - Source: Previous review; representative Phase 6 automated returns pass
 - Reproduction: Traverse submenus, cancellation, tool return and section/park return.
-- Suggested solution: Preserve caller/tab/selection; document intentional draft discard.
+- Suggested solution: Preserve caller/tab/selection; review meaningful draft changes before leaving.
 - Relevant files/components: Menu.cpp; TabbedActions.h
 
 - Phase 8A verification: Phase 8B: comprehensive Back, draft-loss prevention, caller/tab selection and focus restoration. Phase 8A retains native behavior; passing representative journey tests do not establish full-system/device coverage.
+
+- Phase 8B verification: Desktop nested returns, roster/tab focus, guarded research/duty exits, camera return and repeated cancellation verified in runtime drivers. Existing caller bookmarks retained. Complete ordinary-play/device coverage remains unverified. See `CONTROLLER-UX-PHASE8B.md`.
 
 ## R-01 — Ride management
 
@@ -141,6 +145,8 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 - Reproduction: Build turns, banking, slopes, special pieces and resume/return.
 - Suggested solution: Audit displayed hints and actual mappings together.
 - Relevant files/components: Explorer.cpp; CustomTracks.cpp
+
+- Phase 8B verification: Coaster catalog X Camera shortcut and compact mode badge verified. A/B/Select return from Camera without building; Y/triggers cannot edit geometry there. Existing catalog Camera option retained. Ergonomics and complex-piece device QA remain open. See `CONTROLLER-UX-PHASE8B.md`.
 
 ## C-01 — Scenery / landscaping
 
@@ -208,6 +214,8 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 - Suggested solution: Broaden integration/device checks; do not call passing case a defect.
 - Relevant files/components: Menu.cpp; StaffManagement.cpp; PeopleUxTests.cpp
 
+- Phase 8B verification: PeopleUxTests verifies duty B -> Continue, tab -> Discard (native orders unchanged), queued Apply -> requested tab, explicit Apply/Cancel, patrol return and employee roster focus. Physical-device cancellation remains unverified. See `CONTROLLER-UX-PHASE8B.md`.
+
 ## G-01 — Guests
 
 - Description: Needs could communicate direction and importance more clearly.
@@ -219,6 +227,8 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 - Relevant files/components: PeopleTabs.h; GuestManagement.cpp
 
 - Phase 8A verification: Needs preserve all six native normalized values, add higher/lower-is-better labels, and use native Guest.cpp thought/attention predicates for amber ! markers. Boundary tests cover toilet 159/160 and nausea 139/140; low/high runtime captures are included. No percentage severity bands or recommendations were invented.
+
+- Phase 8B verification: Removed repeated per-card higher/lower captions in favor of one shared explanation. Six native values/meters and native attention predicates remain. Good/attention boundary captures and tests pass; no new severity thresholds. See `CONTROLLER-UX-PHASE8B.md`.
 
 ## G-02 — Guests
 
@@ -398,10 +408,68 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 
 - Description: B or changing a tab discards an unapplied research plan.
 - Severity: Minor
-- Status: Deferred
+- Status: Fixed
 - Source: Phase 8A source, native fixture tests and capture review
 - Reproduction: Use the corresponding Phase 8A runtime fixture.
 - Implementation / next step: Phase 8B must evaluate a discard review / draft preservation with consistent Back behavior. Phase 8A keeps the existing behavior and clearly labels the unsaved draft and consequence.
 - Evidence: `CONTROLLER-UX-PHASE8A.md`; `captures/controller-ux-phase8a/`; `evidence/controller-ux-phase8a/`.
 
-Inventory: **37 entries**; 2 Confirmed, 16 Unverified, 16 Fixed, 3 Deferred.
+
+
+- Phase 8B verification: Fixed: research Back/Select/Start/tab changes review pending edits; Continue/B retains draft and focus, Discard leaves native values untouched, Apply waits for native callback. Review Cancel now preserves the plan. ManagementUxTests verifies navigation, native queue, repeated confirmation and recurring research accounting. See `CONTROLLER-UX-PHASE8B.md`.
+
+## P8B-F1 — Dashboard
+
+- Description: Unchanged Park actions paginated after visual-polish layout changes.
+- Severity: Minor
+- Status: Fixed
+- Source: Phase 8B source audit and native regression fixtures
+- Implementation / verification: The rail preview uses compact metrics/actions; the footer reserves its measured 28/44-pixel height. Native 00-dashboard.png shows all six actions with no page indicator. No actions removed.
+- Evidence: `CONTROLLER-UX-PHASE8B.md`; `captures/controller-ux-phase8b/`; `evidence/controller-ux-phase8b/`.
+
+## P8B-F2 — Shared footer
+
+- Description: A/B prompt placement and two-row distribution varied between contexts.
+- Severity: Minor
+- Status: Fixed
+- Source: Phase 8B source audit and native regression fixtures
+- Implementation / verification: MeasureFooter anchors navigation left, A center and B right; secondary controls pack contiguously. Bounds tests verify no lost hints or overlaps at 512x384; native management, construction and confirmation captures reviewed.
+- Evidence: `CONTROLLER-UX-PHASE8B.md`; `captures/controller-ux-phase8b/`; `evidence/controller-ux-phase8b/`.
+
+## P8B-F3 — Staff
+
+- Description: Tab/Back navigation could silently reset changed duty drafts.
+- Severity: Minor
+- Status: Fixed
+- Source: Phase 8B source audit and native regression fixtures
+- Implementation / verification: Shared guarded draft exit preserves Continue focus, Apply native queue and Discard semantics; PeopleUxTests covers native orders and subsequent patrol/tab return.
+- Evidence: `CONTROLLER-UX-PHASE8B.md`; `captures/controller-ux-phase8b/`; `evidence/controller-ux-phase8b/`.
+
+## P8B-F4 — Construction camera
+
+- Description: Camera mode could still build or change construction geometry.
+- Severity: Minor
+- Status: Fixed
+- Source: Phase 8B source audit and native regression fixtures
+- Implementation / verification: Coaster and maze A return to Build; Y/trigger editing suppressed in Camera. Coaster Select -> X Camera is explicit in catalog footer. RideFlowTests verifies draft/cash preservation and existing camera return.
+- Evidence: `CONTROLLER-UX-PHASE8B.md`; `captures/controller-ux-phase8b/`; `evidence/controller-ux-phase8b/`.
+
+## P8B-F5 — Guest Needs
+
+- Description: Direction explanations repeated across cards and crowded meters.
+- Severity: Minor
+- Status: Fixed
+- Source: Phase 8B source audit and native regression fixtures
+- Implementation / verification: One shared two-line legend, compact native attention markers and 56-pixel cards preserve all native values. PeopleUxTests boundary cases and native logical-resolution captures reviewed.
+- Evidence: `CONTROLLER-UX-PHASE8B.md`; `captures/controller-ux-phase8b/`; `evidence/controller-ux-phase8b/`.
+
+## P8B-F6 — Visual catalogs
+
+- Description: Long visual catalogs lacked shoulder paging despite management roster paging.
+- Severity: Minor
+- Status: Fixed
+- Source: Phase 8B source audit and native regression fixtures
+- Implementation / verification: L1/R1 moves one six-item page, clamps at boundaries and preserves selected identity during refresh. Shared picker tests and native track catalog capture verify controls.
+- Evidence: `CONTROLLER-UX-PHASE8B.md`; `captures/controller-ux-phase8b/`; `evidence/controller-ux-phase8b/`.
+
+Inventory: **43 entries**; 2 Confirmed, 18 Unverified, 23 Fixed, 0 Deferred.

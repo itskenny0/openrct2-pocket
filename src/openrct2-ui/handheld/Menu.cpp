@@ -351,8 +351,13 @@ namespace OpenRCT2::Ui::Windows
         }
         void researchTab(size_t tab)
         {
+            if (tab != _researchTabs.tab && guardLeave([this, tab] { researchTab(tab); }))
+                return;
             _researchTabs.save(_focus.index());_researchTabs.tab=tab;
-            _researchDraft=tab==1?std::optional{Handheld::ResearchManagement::Begin()}:std::nullopt;
+            if (tab == 1 && !_researchDraft)
+                _researchDraft = Handheld::ResearchManagement::Begin();
+            if (tab != 1)
+                _researchDraft.reset();
             _focus={};_focus.move(static_cast<int>(std::min(_researchTabs.rows[tab],rows().size()-1)),rows().size());
             _status.clear();invalidate();
         }
@@ -782,6 +787,8 @@ namespace OpenRCT2::Ui::Windows
         }
         Handheld::ManagementPresentation staffPresentation() const
         {
+            if (_leaveAction)
+                return leavePresentation();
             return staffPresentationFor(_page, _focus.index());
         }
         bool financeManagement() const
@@ -794,6 +801,8 @@ namespace OpenRCT2::Ui::Windows
         }
         Handheld::ManagementPresentation researchPresentation() const
         {
+            if (_leaveAction)
+                return leavePresentation();
             using Handheld::ResearchManagement::View;
             if(_page==Page::research) return Handheld::ParkManagementTabs::Research(_researchTabs.tab,_focus.index(),_researchDraft,_status);
             if(_page==Page::researchConfirm&&_researchDraft) return Handheld::ParkManagementTabs::ResearchReview(*_researchDraft,_focus.index(),_status);
@@ -1051,8 +1060,124 @@ namespace OpenRCT2::Ui::Windows
                     : ScreenCoordsXY{ 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
         }
 
+        std::function<void()> _leaveAction;
+        size_t _leaveFocus{};
+        bool _leaveStaff{};
+        bool researchDirty() const
+        {
+            return _page == Page::research && _researchTabs.tab == 1 && _researchDraft
+                && (_researchDraft->funding != _researchDraft->baselineFunding
+                    || _researchDraft->priorities != _researchDraft->baselinePriorities);
+        }
+        bool dutiesDirty() const
+        {
+            return _page == Page::staffInspect && _staffTabs.tab == 1 && _staffTarget
+                && Handheld::StaffManagement::Resolve(*_staffTarget) && _ordersDraft != _ordersBaseline;
+        }
+        bool guardLeave(std::function<void()> action)
+        {
+            if (_leaveAction)
+                return true;
+            if (!researchDirty() && !dutiesDirty())
+                return false;
+            _leaveFocus = _focus.index();
+            _leaveStaff = dutiesDirty();
+            _leaveAction = std::move(action);
+            _focus = {};
+            _status.clear();
+            invalidate();
+            return true;
+        }
+        Handheld::ManagementPresentation leavePresentation() const
+        {
+            Handheld::ManagementPresentation m;
+            m.breadcrumb = "Unsaved changes";
+            m.title = _leaveStaff ? "Keep duty changes?" : "Keep research changes?";
+            m.confirmation = true;
+            m.headerInk = "{CAUTION}";
+            m.headerStatus = "Unsaved";
+            m.bodyLines = { "Your park has not changed.", "Apply to save, or discard only these edits." };
+            m.rows = { "Continue editing", "Apply changes", "Discard changes" };
+            m.rowEnabled = std::vector<bool>(3, !_civicBusy);
+            m.selected = _focus.index();
+            m.status = _civicBusy ? "Applying changes..." : _status;
+            return m;
+        }
+        void finishLeave(bool discard)
+        {
+            if (discard)
+            {
+                if (_leaveStaff && _staffTarget)
+                {
+                    if (const auto* staff = Handheld::StaffManagement::Resolve(*_staffTarget))
+                        _ordersBaseline = _ordersDraft = staff->staffOrders;
+                }
+                else
+                    _researchDraft = Handheld::ResearchManagement::Begin();
+            }
+            auto action = std::move(_leaveAction);
+            _leaveAction = {};
+            _focus = {};
+            _focus.move(static_cast<int>(_leaveFocus), rows().size());
+            _status.clear();
+            if (action)
+                action();
+        }
+        void confirmLeave()
+        {
+            if (_civicBusy)
+                return;
+            if (_focus.index() == 0)
+            {
+                cancelLeave();
+                return;
+            }
+            if (_focus.index() == 2)
+            {
+                finishLeave(true);
+                return;
+            }
+            _civicBusy = true;
+            auto callback = [this,
+                             lifetime = std::weak_ptr<int>(_civicLifetime)](const auto*, const GameActions::Result* outcome) {
+                if (lifetime.expired())
+                    return;
+                _civicBusy = false;
+                if (!_leaveAction)
+                    return;
+                if (outcome->error == GameActions::Status::ok)
+                    finishLeave(true);
+                else
+                {
+                    _status = Handheld::Finances::Feedback(*outcome);
+                    invalidate();
+                }
+            };
+            const auto result = _leaveStaff
+                ? Handheld::StaffManagement::SetOrders(*_staffTarget, _ordersBaseline, _ordersDraft, true, callback)
+                : Handheld::ResearchManagement::Action(*_researchDraft, true, callback);
+            if (result.error != GameActions::Status::ok)
+            {
+                _civicBusy = false;
+                _status = Handheld::Finances::Feedback(result);
+            }
+            invalidate();
+        }
+        void cancelLeave()
+        {
+            if (_civicBusy)
+                return;
+            _leaveAction = {};
+            _focus = {};
+            _focus.move(static_cast<int>(_leaveFocus), rows().size());
+            _status.clear();
+            invalidate();
+        }
+
         void page(Page next)
         {
+            if (next != _page && next != Page::researchConfirm && guardLeave([this, next] { page(next); }))
+                return;
             if(next==Page::sceneryPicker && _page!=Page::scenerySearch) _sceneryPickerDirect=false;
             if (_page == Page::build) _buildFocus = _focus.index();
             if (_page == Page::paths) _pathModeFocus = _focus.index();
@@ -1218,6 +1343,8 @@ namespace OpenRCT2::Ui::Windows
         }
         std::vector<std::string> rows() const
         {
+            if (_leaveAction)
+                return leavePresentation().rows;
             switch (_page)
             {
                 case Page::park:
@@ -1837,6 +1964,14 @@ namespace OpenRCT2::Ui::Windows
             _status = "Cost " + Handheld::FormatMoney(Handheld::Designs::ReviewCost()) + " / "
                 + (Handheld::Designs::HeightOffset() ? Handheld::Designs::HeightNotice() : Handheld::Designs::SceneryNotice());
         }
+        bool pickerCamera()
+        {
+            if (_page != Page::trackPiecePicker || !Handheld::CustomTracks::Active())
+                return false;
+            close();
+            Handheld::CustomTracks::ToggleCamera();
+            return true;
+        }
         void openTrackPiecePicker()
         {
             Handheld::CustomTracks::ClearPreview();
@@ -2138,6 +2273,8 @@ namespace OpenRCT2::Ui::Windows
         }
         void dashboardPause()
         {
+            if (guardLeave([this] { dashboardPause(); }))
+                return;
             if(_civicBusy)return;
             _managementNewsReturn=false;
             _guestRideInspection=false;
@@ -2148,6 +2285,8 @@ namespace OpenRCT2::Ui::Windows
         }
         void dashboardSwitchPane()
         {
+            if (guardLeave([this] { dashboardSwitchPane(); }))
+                return;
             if (_managementNewsReturn || _guestRideInspection || _guestMapReturn) return;
             if (!managementShell() || !dashboardCanSwitch())
                 return;
@@ -2164,6 +2303,12 @@ namespace OpenRCT2::Ui::Windows
         }
         void dashboardMove(int x, int y)
         {
+            if (_leaveAction)
+            {
+                if (!_civicBusy)
+                    move(y ? y : x);
+                return;
+            }
             if (dashboardRailFocused())
             {
                 if (y)
@@ -2292,6 +2437,10 @@ namespace OpenRCT2::Ui::Windows
         }
         void dashboardPage(int direction)
         {
+            if (_leaveAction)
+                return;
+            if (dutiesDirty() && guardLeave([this, direction] { dashboardPage(direction); }))
+                return;
             if (dashboardRailFocused())
             {
                 _dashboard.move(direction);
@@ -2333,7 +2482,12 @@ namespace OpenRCT2::Ui::Windows
             else return;
             const auto workspaceWidth = ContextGetWidth() - 2 * Handheld::Layout::margin;
             const auto capacity = Handheld::MeasureManagement(
-                {workspaceWidth, Handheld::Layout::ContentHeight({ContextGetWidth(), ContextGetHeight()})}, model).capacity;
+                                      { workspaceWidth,
+                                        Handheld::Dashboard::ContentHeight(
+                                            { ContextGetWidth(), ContextGetHeight() }, _dashboard, model,
+                                            dashboardCanSwitch()) },
+                                      model)
+                                      .capacity;
             const auto current = _focus.index();
             const auto listStart=model.denseRoster?3:0;
             const auto next = std::clamp<int>(std::max(static_cast<int>(current),listStart) + direction * static_cast<int>(capacity),
@@ -2426,6 +2580,8 @@ namespace OpenRCT2::Ui::Windows
         }
         Handheld::ManagementPresentation managementPresentation() const
         {
+            if (_leaveAction)
+                return leavePresentation();
             if(_page==Page::finances)return financeWorkspace();
             if(overviewManagement())return overviewPresentation();
             if(researchManagement())return researchPresentation();
@@ -2436,6 +2592,8 @@ namespace OpenRCT2::Ui::Windows
         }
         bool managementContext()
         {
+            if (_leaveAction)
+                return true;
             if(_page!=Page::research||_researchTabs.tab!=1||!_researchDraft)return false;
             if(Handheld::ResearchManagement::FundingAvailable())
             {Handheld::ResearchManagement::AdjustFunding(*_researchDraft,_researchDraft->funding==3?-3:1);_status.clear();}
@@ -2507,6 +2665,13 @@ namespace OpenRCT2::Ui::Windows
         }
         void back()
         {
+            if (_leaveAction)
+            {
+                cancelLeave();
+                return;
+            }
+            if (guardLeave([this] { back(); }))
+                return;
             if(_civicBusy)return;
             if (_guestRideInspection && (_page == Page::ridesInspect || _page == Page::ridesRoster))
             {
@@ -2885,6 +3050,11 @@ namespace OpenRCT2::Ui::Windows
         }
         void confirm()
         {
+            if (_leaveAction)
+            {
+                confirmLeave();
+                return;
+            }
             if (_shopAppearanceBusy) return;
             if (_civicBusy || (overviewManagement() && _overviewBusy) || (ridesManagement() && _ridesBusy)
                 || (marketingManagement() && _marketingBusy))
@@ -5040,7 +5210,9 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::researchConfirm:
                     if (choice == 1)
-                    { _researchDraft=Handheld::ResearchManagement::Begin();page(Page::research); }
+                    {
+                        page(Page::research);
+                    }
                     else if (choice == 0 && _researchDraft)
                     {
                         _civicBusy=true;
@@ -5386,6 +5558,14 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
+            if (_leaveAction)
+            {
+                Handheld::DrawManagementContent(rt, { 80, 32 }, { 352, 292 }, leavePresentation());
+                Handheld::DrawFooter(
+                    rt, { ContextGetWidth(), ContextGetHeight() },
+                    { { "D-pad", "Choose" }, { "A", _civicBusy ? "Wait" : "Select" }, { "B", _civicBusy ? "Wait" : "Edit" } });
+                return;
+            }
             if (_page==Page::designVehicles || _page==Page::designWarnings || _page==Page::designConfirm) {
                 Handheld::ManagementPresentation model;
                 model.breadcrumb="Designs / Native choices";
@@ -5567,6 +5747,11 @@ namespace OpenRCT2::Ui::Windows
                                                            : View::confirmation,
                         _focus.index(), _financeDraft, _status);
                 }
+                if (_page == Page::dashboard)
+                {
+                    model.metricHeight = 40;
+                    model.rowHeight = 26;
+                }
                 Handheld::Dashboard::Draw(
                     rt, { ContextGetWidth(), ContextGetHeight() }, _dashboard, model, dashboardCanSwitch());
                 if(_page==Page::finances&&_financeTabs.tab==2)
@@ -5598,7 +5783,8 @@ namespace OpenRCT2::Ui::Windows
             if (_page == Page::trackPiecePicker)
             {
                 Handheld::DrawObjectPicker(
-                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Track pieces", _status, "No compatible pieces", false, "Ride");
+                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Track pieces", _status, "No compatible pieces",
+                    false, "Ride", "Camera");
                 return;
             }
             if (_page == Page::designPicker)
@@ -6345,3 +6531,12 @@ namespace OpenRCT2::Ui::Windows
     }
 }
 
+namespace OpenRCT2::Ui::Windows
+{
+    bool HandheldObjectPickerCamera()
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            return static_cast<HandheldMenuWindow*>(window)->pickerCamera();
+        return false;
+    }
+} // namespace OpenRCT2::Ui::Windows

@@ -129,10 +129,36 @@ int main(int argc, char** argv)
         Check(sm().tabs.size()==4,"Hire did not open employee workspace");const auto employee=S::Roster().front();capture("03-employee-overview.png");
         press(H::Action::nextOption);const auto baseline=S::Resolve(employee)->staffOrders;press(H::Action::confirm);
         Check(S::Resolve(employee)->staffOrders==baseline,"Duties draft changed native orders");Check(sm().headerStatus=="Unsaved duties"&&sm().headerInk=="{CAUTION}","Duty draft not visibly unsaved");capture("04-employee-duties.png");
+        const auto dutyFocus = sm().selected;
+        press(H::Action::back);
+        Check(sm().title == "Keep duty changes?", "Duty Back silently discarded edits");
+        capture("04a-duty-leave-review.png");
+        press(H::Action::back);
+        Check(sm().headerStatus == "Unsaved duties" && sm().selected == dutyFocus, "Continue editing lost duty focus/draft");
+        press(H::Action::nextOption);
+        Check(sm().title == "Keep duty changes?", "Duty tab switch bypassed guard");
+        select(sm, "Discard changes");
+        press(H::Action::confirm);
+        Check(sm().selectedTab == 2 && S::Resolve(employee)->staffOrders == baseline, "Duty discard changed native orders");
+        press(H::Action::previousOption);
+        press(H::Action::confirm);
         select(sm,"Cancel");press(H::Action::confirm);Check(S::Resolve(employee)->staffOrders==baseline,"Duties Cancel applied native draft");
         W::HandheldMenuMove(-static_cast<int>(sm().selected));press(H::Action::confirm);
         select(sm,"Apply orders");press(H::Action::confirm);GameActions::ProcessQueue(state);Check(S::Resolve(employee)->staffOrders!=(baseline),"Inline native orders not applied");
-        press(H::Action::nextOption);press(H::Action::confirm);Check(H::StaffPatrol::Active(),"Patrol handoff failed");
+        const auto appliedOrders = S::Resolve(employee)->staffOrders;
+        W::HandheldMenuMove(-static_cast<int>(sm().selected));
+        press(H::Action::confirm);
+        press(H::Action::nextOption);
+        select(sm, "Apply changes");
+        press(H::Action::confirm);
+        Check(S::Resolve(employee)->staffOrders == appliedOrders, "Duty guard bypassed native queue");
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Check(
+            sm().selectedTab == 2 && S::Resolve(employee)->staffOrders != appliedOrders,
+            "Guarded duty Apply failed or lost requested tab");
+        press(H::Action::confirm);
+        Check(H::StaffPatrol::Active(), "Patrol handoff failed");
         Check(H::StaffPatrol::Action(CoordsXY{320,320},true).error==GameActions::Status::ok,"Native patrol paint failed");GameActions::ProcessQueue(state);H::StaffPatrol::ShowOverlay();capture("05-patrol-edit.png");
         press(H::Action::openBuild);press(H::Action::back);Check(H::StaffPatrol::Active(),"Patrol options Back ended tool");
         press(H::Action::back);Check(sm().selectedTab==2&&sm().selected==0,"Patrol return lost tab/focus");

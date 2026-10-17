@@ -50,8 +50,20 @@ namespace OpenRCT2::Ui::Handheld
             }
             _focus = _entries.empty() ? 0 : std::min(_focus, _entries.size() - 1);
         }
+        void pageBy(int direction)
+        {
+            if (_entries.empty())
+                return;
+            _focus = static_cast<size_t>(std::clamp<int64_t>(
+                static_cast<int64_t>(_focus) + direction * static_cast<int64_t>(pageSize), 0, _entries.size() - 1));
+        }
         void move(int x, int y)
         {
+            if (y > 1 || y < -1)
+            {
+                pageBy(y > 0 ? 1 : -1);
+                return;
+            }
             if (_entries.empty())
                 return;
             if (y != 0)
@@ -99,7 +111,7 @@ namespace OpenRCT2::Ui::Handheld
     inline void DrawObjectPicker(
         Drawing::RenderTarget& rt, ScreenSize screen, const ObjectPicker& picker, const std::string& title,
         const std::string& status = {}, const std::string& emptyLabel = "No objects available", bool searchControl = false,
-        const std::string& startAction = "Pause")
+        const std::string& startAction = "Pause", const std::string& extraAction = "")
     {
         using namespace Concept;
         const auto p = kMenuOrigin;
@@ -146,11 +158,13 @@ namespace OpenRCT2::Ui::Handheld
         DrawModernText(
             rt, p + ScreenCoordsXY{ 12, detailTop + 54 },
             "{MUTED}" + (status.empty() ? std::to_string(entries.size()) + " available" : status), {}, 296);
-        DrawFooter(
-            rt, screen,
-            { { "D-pad", "Choose" },
-              { "A", "Select" },
-              { "B", "Back" },
-              { searchControl ? "X" : "START", searchControl ? "Search" : startAction } });
+        std::vector<ControlHint> hints{ { "D-pad", "Choose" },
+                                        { "A", "Select" },
+                                        { "B", "Back" },
+                                        { "L1/R1", "Page" },
+                                        { searchControl ? "X" : "START", searchControl ? "Search" : startAction } };
+        if (!extraAction.empty())
+            hints.push_back({ "X", extraAction });
+        DrawFooter(rt, screen, hints);
     }
 } // namespace OpenRCT2::Ui::Handheld

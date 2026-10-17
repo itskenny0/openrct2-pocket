@@ -670,6 +670,12 @@ namespace OpenRCT2::Ui::Handheld
                     Windows::HandheldParkMapControl(-1);
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::nextOption)
                     Windows::HandheldParkMapControl(1);
+                else if (action == Action::contextPrimary && Windows::HandheldObjectPickerCamera())
+                { /* Accessible without a stick-click; camera preserves the construction draft. */
+                }
+                else if (
+                    Windows::HandheldObjectPickerIsOpen() && (action == Action::previousOption || action == Action::nextOption))
+                    Windows::HandheldObjectPickerMove(0, action == Action::nextOption ? 2 : -2);
                 else if (Windows::HandheldSceneryPickerIsOpen() && action == Action::contextPrimary)
                     Windows::HandheldScenerySearchOpen();
                 else if(Windows::HandheldDesignPickerIsOpen() && action==Action::contextPrimary)
@@ -1059,7 +1065,9 @@ namespace OpenRCT2::Ui::Handheld
                 {
                     if (action == Action::confirm)
                     {
-                        if (Mazes::Picking())
+                        if (Mazes::CameraMode())
+                            Mazes::ToggleCamera();
+                        else if (Mazes::Picking())
                             Mazes::SelectCell(true);
                         else
                             Mazes::Confirm();
@@ -1079,7 +1087,10 @@ namespace OpenRCT2::Ui::Handheld
                             Mazes::Turn(action == Action::nextOption ? 1 : -1);
                     }
                     else if (action == Action::slopeDown || action == Action::slopeUp)
-                        Mazes::Height(action == Action::slopeUp ? 1 : -1);
+                    {
+                        if (!Mazes::CameraMode())
+                            Mazes::Height(action == Action::slopeUp ? 1 : -1);
+                    }
                     else if (action == Action::contextPrimary)
                     {
                         if (Mazes::CameraMode())
@@ -1087,7 +1098,8 @@ namespace OpenRCT2::Ui::Handheld
                         else
                             Mazes::Move();
                     }
-                    else if (action == Action::contextSecondary && !Mazes::Reviewing() && !Mazes::Picking())
+                    else if (
+                        action == Action::contextSecondary && !Mazes::CameraMode() && !Mazes::Reviewing() && !Mazes::Picking())
                         Mazes::ReviewRemoval();
                     else if (action == Action::openBuild)
                         Mazes::ToggleCamera();
@@ -1106,13 +1118,23 @@ namespace OpenRCT2::Ui::Handheld
                 if (action == Action::openMenu)
                     Windows::HandheldDashboardOpen();
                 else if (action == Action::openBuild)
-                    Windows::HandheldTrackPiecePickerOpen();
+                {
+                    if (CustomTracks::CameraMode())
+                        CustomTracks::ToggleCamera();
+                    else
+                        Windows::HandheldTrackPiecePickerOpen();
+                }
                 else if (action == Action::cameraMode)
                     CustomTracks::ToggleCamera();
                 else if (!CustomTracks::Busy())
                 {
                     if (action == Action::confirm)
-                        CustomTracks::Action(true);
+                    {
+                        if (CustomTracks::CameraMode())
+                            CustomTracks::ToggleCamera();
+                        else
+                            CustomTracks::Action(true);
+                    }
                     else if (action == Action::back)
                     {
                         if(CustomTracks::CameraMode()) CustomTracks::ToggleCamera();
@@ -1128,7 +1150,7 @@ namespace OpenRCT2::Ui::Handheld
                         else
                             CustomTracks::Bank();
                     }
-                    else if (action == Action::contextSecondary)
+                    else if (action == Action::contextSecondary && !CustomTracks::CameraMode())
                     {
                         if (CustomTracks::StationPlacement())
                             CustomTracks::Rotate();
@@ -1143,7 +1165,10 @@ namespace OpenRCT2::Ui::Handheld
                             CustomTracks::Cycle(action == Action::nextOption ? 1 : -1);
                     }
                     else if (action == Action::slopeDown || action == Action::slopeUp)
-                        CustomTracks::Slope(action == Action::slopeUp ? 1 : -1);
+                    {
+                        if (!CustomTracks::CameraMode())
+                            CustomTracks::Slope(action == Action::slopeUp ? 1 : -1);
+                    }
                 }
                 input.suspend();
                 break;
@@ -1662,3 +1687,4 @@ namespace OpenRCT2::Ui::Handheld
         DrawMapFocus(rt, c);
     }
 } // namespace OpenRCT2::Ui::Handheld
+

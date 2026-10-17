@@ -137,6 +137,7 @@ namespace OpenRCT2::Ui::Windows
     void HandheldDesignOptionsOpen();
     void HandheldDesignReviewPause();
     bool HandheldObjectPickerIsOpen();
+    bool HandheldObjectPickerCamera();
     void HandheldObjectPickerMove(int x, int y);
     void HandheldObjectPickerPause();
     ObjectEntryIndex HandheldObjectPickerFocus();
@@ -145,3 +146,4 @@ namespace OpenRCT2::Ui::Windows
     void HandheldTreePickerPause();
     ObjectEntryIndex HandheldTreePickerFocus();
 } // namespace OpenRCT2::Ui::Windows
+

@@ -47,7 +47,7 @@ namespace OpenRCT2::Ui::Handheld::PeopleTabs
             const bool changed = draft != StaffManagement::Resolve(target)->staffOrders;
             model.headerStatus = changed ? "Unsaved duties" : "Current duties";
             model.headerInk = changed ? "{CAUTION}" : "{WHITE}";
-            model.status = changed ? "Unsaved / Apply orders saves / B discards" : "No duty changes pending";
+            model.status = changed ? "Unsaved / Apply saves / B reviews changes" : "No duty changes pending";
             model.bodyLines={"A toggles duties. Apply orders saves changes."};
             if(StaffManagement::Orders(target.type).empty()) {model.rows={"Overview"};model.bodyLines={"This role has no configurable duties."};}
         } else {
@@ -97,7 +97,8 @@ namespace OpenRCT2::Ui::Handheld::PeopleTabs
         model.summaryMetrics=true;model.metricHeight=40;
         if(tabs.tab==1) {
             model.stats=GuestManagement::Presentation(V::needs,0,{},target).stats;
-            model.metricHeight=60;model.rows={"Overview"};
+            model.metricHeight = 56;
+            model.rows = { "Overview" };
             for (size_t i = 0; i < model.stats.size(); ++i)
             {
                 model.meters.push_back(std::stoi(model.stats[i].second));
@@ -112,8 +113,7 @@ namespace OpenRCT2::Ui::Handheld::PeopleTabs
                                     guest->toilet >= 160 };
             for (size_t i = 0; i < model.stats.size(); ++i)
                 model.meterAttention.push_back(attention[i]);
-            model.bodyLines = { "+ More is better   ! Native need / thought trigger",
-                                "Hunger, thirst, nausea and toilet: less is better." };
+            model.bodyLines = { "Happiness / energy: higher is better.", "Other needs: lower is better.  ! Needs attention" };
         } else if(tabs.tab==2) {
             model.rows = GuestManagement::Thoughts(*guest);
             for(auto& thought:model.rows)thought=ThoughtLabel(ParkInformation::PlainText(thought,true));

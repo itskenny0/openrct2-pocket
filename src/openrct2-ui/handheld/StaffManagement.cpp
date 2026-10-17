@@ -167,7 +167,8 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         action.SetCallback(std::move(callback));
         return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
     }
-    GameActions::Result SetOrders(const Target& target, uint8_t baseline, uint8_t value, bool execute)
+    GameActions::Result SetOrders(
+        const Target& target, uint8_t baseline, uint8_t value, bool execute, GameActions::GameAction::Callback_t callback)
     {
         const auto* staff = Resolve(target);
         if (!staff)
@@ -180,6 +181,7 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         if ((value & ~mask) != (baseline & ~mask))
             return Invalid("Unsupported orders");
         GameActions::StaffSetOrdersAction action(target.id, value);
+        action.SetCallback(std::move(callback));
         return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
     }
     GameActions::Result Dismiss(const Target& target, bool execute)
@@ -364,3 +366,4 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         return model;
     }
 } // namespace OpenRCT2::Ui::Handheld::StaffManagement
+

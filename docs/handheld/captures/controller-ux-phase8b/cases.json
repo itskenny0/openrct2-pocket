@@ -1,0 +1,200 @@
+[
+  {
+    "label": "Dashboard",
+    "file": "01-dashboard.png",
+    "fixture": "people/24-dashboard.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Ride Overview",
+    "file": "02-ride-overview.png",
+    "fixture": "ride/02-park-ride-overview.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Ride Operations",
+    "file": "03-ride-operations.png",
+    "fixture": "ride/03-ride-operations.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Coaster Build",
+    "file": "04-coaster-build.png",
+    "fixture": "ride/07-coaster-build.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Track pieces",
+    "file": "05-track-pieces.png",
+    "fixture": "ride/09-track-pieces.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Path Line",
+    "file": "06-path-line.png",
+    "fixture": "path/01-line-preview.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Path Fill",
+    "file": "07-path-fill.png",
+    "fixture": "path/05-fill-preview.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Scenery Adjust",
+    "file": "08-scenery-adjust.png",
+    "fixture": "people/21-scenery-adjust.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Landscape Adjust",
+    "file": "09-landscape-adjust.png",
+    "fixture": "people/23-landscape-adjust.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Staff roster",
+    "file": "10-staff-roster.png",
+    "fixture": "people/07-staff-roster.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Staff duties",
+    "file": "11-staff-duties.png",
+    "fixture": "people/04-employee-duties.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Guest Needs",
+    "file": "12-guest-needs.png",
+    "fixture": "people/10-guest-needs.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Financial History",
+    "file": "13-financial-history.png",
+    "fixture": "management/03-finance-history.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Research controls",
+    "file": "14-research-controls.png",
+    "fixture": "management/14-research-settings.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Marketing",
+    "file": "15-marketing.png",
+    "fixture": "management/23-marketing-active.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Destructive review",
+    "file": "16-destructive-review.png",
+    "fixture": "ride/06-demolition-review.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Duty leave decision",
+    "file": "17-duty-leave-decision.png",
+    "fixture": "people/04a-duty-leave-review.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Research leave decision",
+    "file": "18-research-leave-decision.png",
+    "fixture": "management/15a-research-leave-review.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Coaster Camera",
+    "file": "19-coaster-camera.png",
+    "fixture": "ride/09a-track-camera.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Guest attention",
+    "file": "20-guest-attention.png",
+    "fixture": "people/10b-guest-needs-attention.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Line review",
+    "file": "21-line-review.png",
+    "fixture": "path/02-line-review.png",
+    "size": [
+      512,
+      384
+    ]
+  },
+  {
+    "label": "Staff patrol",
+    "file": "22-staff-patrol.png",
+    "fixture": "people/05-patrol-edit.png",
+    "size": [
+      512,
+      384
+    ]
+  }
+]

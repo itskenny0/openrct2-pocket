@@ -459,46 +459,89 @@ namespace OpenRCT2::Ui::Handheld
 
     inline void DrawActionStrip(Drawing::RenderTarget& rt, ScreenSize screen)
     {
-        const ScreenCoordsXY p{ 0, screen.height - kActionStripHeight };
-        Fill(rt, p, { screen.width, kActionStripHeight }, static_cast<Drawing::PaletteIndex>(PocketPalette::panel));
+        const ScreenCoordsXY p{ 0, screen.height - 28 };
+        Fill(rt, p, { screen.width, 28 }, static_cast<Drawing::PaletteIndex>(PocketPalette::panel));
         Concept::Rule(rt, p, screen.width);
     }
 
-    // Primary lane: movement, action, Back. Secondary lane: all other supplied
-    // controls. Use actual font advances; callers never position hints by hand.
     inline std::vector<ControlPlacement> MeasureFooter(ScreenSize screen, const std::vector<ControlHint>& hints)
     {
-        std::array<std::vector<ControlHint>, 2> lanes;
-        for (const auto& hint : hints)
-            if (!hint.label.empty())
-                lanes[hint.key == "D-pad" || hint.key == "A" || hint.key == "B" ? 0 : 1].push_back(hint);
-        std::stable_sort(lanes[0].begin(), lanes[0].end(), [](const auto& a, const auto& b) {
-            const auto rank = [](const auto& h) { return h.key == "D-pad" ? 0 : h.key == "A" ? 1 : 2; };
-            return rank(a) < rank(b);
-        });
-        std::vector<ControlPlacement> result;
-        for (size_t row = 0; row < lanes.size(); ++row)
+        std::vector<ControlPlacement> primary;
+        std::vector<ControlHint> extras;
+        int leftEnd = 8, actionEnd = screen.width * 39 / 100, backStart = screen.width - 8;
+        for (const auto& h : hints)
         {
-            const auto& lane = lanes[row];
-            int total = 0;
-            for (const auto& h : lane)
-                total += ControlHintWidth(h);
-            const int gap = lane.size() > 1 ? std::max(0, (screen.width - 16 - total) / static_cast<int>(lane.size() - 1)) : 0;
-            int x = 8;
-            for (const auto& hint : lane)
+            if (h.label.empty())
+                continue;
+            const int width = ControlHintWidth(h);
+            if (h.key == "D-pad")
             {
-                const int width = ControlHintWidth(hint);
-                result.push_back({ hint, x, screen.height - Layout::actionHeight + 7 + static_cast<int>(row) * 20, width });
-                x += width + gap;
+                primary.push_back({ h, 8, 0, width });
+                leftEnd = 8 + width;
+            }
+            else if (h.key == "A")
+            {
+                primary.push_back({ h, screen.width * 39 / 100, 0, width });
+                actionEnd = screen.width * 39 / 100 + width;
+            }
+            else if (h.key == "B")
+            {
+                backStart = std::min(screen.width - 104, screen.width - 8 - width);
+                primary.push_back({ h, backStart, 0, width });
+            }
+            else
+                extras.push_back(h);
+        }
+        const auto fixed = primary;
+        int x = leftEnd + 8;
+        bool second = false;
+        for (const auto& h : extras)
+        {
+            const int width = ControlHintWidth(h);
+            if (x + width > screen.width * 39 / 100 - 8)
+                x = std::max(x, actionEnd + 8);
+            if (x + width > backStart - 8)
+            {
+                second = true;
+                break;
+            }
+            primary.push_back({ h, x, 0, width });
+            x += width + 8;
+        }
+        if (second)
+        {
+            primary = fixed;
+            x = 8;
+            for (const auto& h : extras)
+            {
+                const int width = ControlHintWidth(h);
+                primary.push_back({ h, x, 1, width });
+                x += width + 8;
             }
         }
-        return result;
+        const int height = second ? 44 : 28;
+        for (auto& item : primary)
+            item.y = screen.height - height + 7 + item.y * 20;
+        return primary;
+    }
+    inline int FooterHeight(ScreenSize screen, const std::vector<ControlHint>& hints)
+    {
+        const auto items = MeasureFooter(screen, hints);
+        return std::any_of(items.begin(), items.end(), [&](const auto& p) { return p.y < screen.height - 21; }) ? 44 : 28;
     }
     inline void DrawFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::vector<ControlHint>& hints)
     {
-        DrawActionStrip(rt, screen);
-        for (const auto& placement : MeasureFooter(screen, hints))
-            DrawCommand(rt, { placement.x, placement.y }, 0, placement.hint.key.c_str(), placement.hint.label.c_str());
+        const int height = FooterHeight(screen, hints);
+        Fill(rt, { 0, screen.height - height }, { screen.width, height }, Theme::ink);
+        Concept::Rule(rt, { 0, screen.height - height }, screen.width);
+        for (const auto& p : MeasureFooter(screen, hints))
+            DrawCommand(rt, { p.x, p.y }, 0, p.hint.key.c_str(), p.hint.label.c_str());
+    }
+    inline void DrawModeBadge(Drawing::RenderTarget& rt, ScreenCoordsXY p, const std::string& label)
+    {
+        const int width = TextWidth(label, true) + 12;
+        Fill(rt, p, { width, 18 }, Theme::raised);
+        DrawStrongText(rt, p + ScreenCoordsXY{ 6, 5 }, "{WHITE}" + label, width - 12);
     }
 
     inline void DrawShopFooter(Drawing::RenderTarget& rt, ScreenSize screen)
@@ -536,7 +579,15 @@ namespace OpenRCT2::Ui::Handheld
         }
         else
         {
-            DrawFooter(rt, screen, { { "A", "Inspect" }, { "B", "Back" }, { "SEL", "Build" }, { "START", "Park" } });
+            DrawFooter(
+                rt, screen,
+                { { "D-pad", "Move" },
+                  { "A", "Inspect" },
+                  { "B", "Back" },
+                  { "SEL", "Build" },
+                  { "START", "Park" },
+                  { "L1/R1", "Zoom" },
+                  { "X", "Rotate" } });
         }
     }
 
@@ -591,6 +642,7 @@ namespace OpenRCT2::Ui::Handheld
                                  : "Remove" },
                   { "Y", "Adjust" },
                   { "SEL", "Surface" },
+                  { "L1/R1", "Zoom" },
                   { "B", "Back" } });
         }
     }

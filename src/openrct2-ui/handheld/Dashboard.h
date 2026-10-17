@@ -94,6 +94,41 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         else if (category == 5) { line(6,0,12,0);line(7,1,7,7);line(11,1,11,7);line(7,7,1,17);line(11,7,17,17);line(1,17,17,17);line(4,13,14,13); }
         else { line(2,6,7,6);line(7,6,16,1);line(16,1,16,15);line(16,15,7,10);line(7,10,2,10);line(2,10,2,6);line(6,11,8,18);line(8,18,11,18); }
     }
+    inline std::vector<ControlHint> Hints(const State& state, const ManagementPresentation& model, bool sectionRoot)
+    {
+        std::vector<ControlHint> hints{ { "D-pad",
+                                          state.focus == Focus::rail         ? "Section"
+                                              : model.navigationHint.empty() ? model.editing ? "Adjust" : "Choose"
+                                                                             : model.navigationHint },
+                                        { "A",
+                                          state.focus == Focus::rail         ? "Enter"
+                                              : !model.primaryAction.empty() ? model.primaryAction
+                                              : model.editing                ? "Review"
+                                              : model.confirmation           ? "Confirm"
+                                                                             : "Select" },
+                                        { "B",
+                                          state.focus == Focus::rail ? "Park"
+                                              : model.confirmation   ? "Cancel"
+                                                                     : "Back" } };
+        if (state.focus == Focus::content && !model.tabs.empty())
+            hints.push_back({ "L1/R1", "Tab" });
+        else if (state.focus == Focus::content && (model.denseRoster || (state.section == Section::rides && sectionRoot)))
+            hints.push_back({ "L1/R1", "Page" });
+        else if (state.focus == Focus::rail)
+            hints.push_back({ "L1/R1", "Section" });
+        if (state.focus == Focus::content && !model.contextualAction.empty())
+            hints.push_back({ "X", model.contextualAction });
+        hints.push_back(
+            { state.focus == Focus::rail || sectionRoot || !model.tabs.empty() || model.denseRoster ? "SELECT" : "START",
+              state.focus == Focus::rail                                    ? "Enter"
+                  : sectionRoot || !model.tabs.empty() || model.denseRoster ? "Sections"
+                                                                            : "Park" });
+        return hints;
+    }
+    inline int ContentHeight(ScreenSize screen, const State& state, const ManagementPresentation& model, bool sectionRoot)
+    {
+        return screen.height - FooterHeight(screen, Hints(state, model, sectionRoot)) - 2 * Layout::margin;
+    }
     inline void Draw(
         Drawing::RenderTarget& rt, ScreenSize screen, const State& state, const ManagementPresentation& model, bool sectionRoot)
     {
@@ -101,7 +136,7 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         constexpr int railWidth = 112;
         const auto rail = Layout::menuOrigin;
         const auto content = rail + ScreenCoordsXY{ railWidth + Layout::gutter, 0 };
-        const int height = Layout::ContentHeight(screen);
+        const int height = ContentHeight(screen, state, model, sectionRoot);
         const bool expanded = state.focus == Focus::content;
         if (!expanded)
         {
@@ -151,33 +186,6 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         DrawManagementContent(
             rt, workspace, {model.confirmation ? 360 : screen.width - workspace.x - Layout::margin,
                 model.confirmation ? height-20 : height}, model, state.focus == Focus::content);
-        std::vector<ControlHint> hints{ { "D-pad",
-                                          state.focus == Focus::rail         ? "Section"
-                                              : model.navigationHint.empty() ? model.editing ? "Adjust" : "Choose"
-                                                                             : model.navigationHint },
-                                        { "A",
-                                          state.focus == Focus::rail         ? "Enter"
-                                              : !model.primaryAction.empty() ? model.primaryAction
-                                              : model.editing                ? "Review"
-                                              : model.confirmation           ? "Confirm"
-                                                                             : "Select" },
-                                        { "B",
-                                          state.focus == Focus::rail ? "Park"
-                                              : model.confirmation   ? "Cancel"
-                                                                     : "Back" } };
-        if (state.focus == Focus::content && !model.tabs.empty())
-            hints.push_back({ "L1/R1", "Tab" });
-        else if (state.focus == Focus::content && (model.denseRoster || (state.section == Section::rides && sectionRoot)))
-            hints.push_back({ "L1/R1", "Page" });
-        else if (state.focus == Focus::rail)
-            hints.push_back({ "L1/R1", "Section" });
-        if (state.focus == Focus::content && !model.contextualAction.empty())
-            hints.push_back({ "X", model.contextualAction });
-        hints.push_back(
-            { state.focus == Focus::rail || sectionRoot || !model.tabs.empty() || model.denseRoster ? "SELECT" : "START",
-              state.focus == Focus::rail                                    ? "Enter"
-                  : sectionRoot || !model.tabs.empty() || model.denseRoster ? "Sections"
-                                                                            : "Park" });
-        DrawFooter(rt, screen, hints);
+        DrawFooter(rt, screen, Hints(state, model, sectionRoot));
     }
 } // namespace OpenRCT2::Ui::Handheld::Dashboard

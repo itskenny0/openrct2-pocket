@@ -94,6 +94,11 @@ int main(int argc,char** argv)
             auto* window=wm->FindByClass(WindowClass::handheldMenu);Check(window,"Capture menu missing");window->onDraw(rt);
             Image image;image.Width=512;image.Height=384;image.Depth=8;image.Stride=rt.LineStride();image.Palette=Drawing::gPalette;const auto* bytes=reinterpret_cast<uint8_t*>(rt.bits);image.Pixels.assign(bytes,bytes+rt.LineStride()*rt.height);
             Imaging::WriteToFile((std::filesystem::path(dir)/name).string(),image,ImageFormat::png);engine.EndDraw();};
+        W::HandheldDashboardOpen();
+        capture("00-dashboard.png");
+        press(H::Action::back);
+        WindowCullDead();
+        Check(!W::HandheldDashboardIsOpen(), "Dashboard rail Back did not return to park");
         open(4);Check(model().tabs.size()==4&&model().selectedTab==0,"Finance tabs missing");
         Check(model().stats[2].second==H::FormatMoney(270.00_GBP),"Month net not native signed ledger total");capture("01-finance-overview.png");
         press(H::Action::nextOption);Check(model().rowValues.size()==14,"Ledger omitted categories/values");
@@ -128,12 +133,70 @@ int main(int argc,char** argv)
         Check(model().rows.size()==9&&model().rowEnabled.size()==9,"Research priority group missing");capture("14-research-settings.png");
         press(H::Action::contextPrimary);Check(state.researchFundingLevel==funding,"X funding applied without review");
         W::HandheldMenuMove(1);press(H::Action::confirm);Check(state.researchPriorities==priorities&&model().headerStatus=="Unsaved draft","Priority draft applied or hidden");capture("15-research-draft.png");
-        press(H::Action::previousOption);press(H::Action::nextOption);Check(model().headerStatus=="Current settings"&&state.researchPriorities==priorities,"Tab cancellation saved settings");
+        const auto draftFocus = model().selected;
+        press(H::Action::openBuild);
+        Check(model().title == "Keep research changes?", "Select dropped research draft");
+        press(H::Action::back);
+        Check(
+            model().selected == draftFocus && model().headerStatus == "Unsaved draft", "Select cancellation lost draft focus");
+        press(H::Action::openMenu);
+        Check(model().title == "Keep research changes?", "Start dropped research draft");
+        press(H::Action::back);
+        press(H::Action::previousOption);
+        Check(model().title == "Keep research changes?", "Research tab change silently discarded draft");
+        capture("15a-research-leave-review.png");
+        press(H::Action::back);
+        Check(model().headerStatus == "Unsaved draft" && model().selectedTab == 1, "B did not continue editing research");
+        press(H::Action::back);
+        select("Discard changes");
+        press(H::Action::confirm);
+        Check(
+            W::HandheldDashboardRailFocused() && state.researchPriorities == priorities
+                && state.researchFundingLevel == funding,
+            "Discard changed native settings or failed return");
+        press(H::Action::confirm);
+        if (model().selectedTab != 1)
+            press(H::Action::nextOption);
+        Check(model().headerStatus == "Current settings", "Discard left stale research draft");
         press(H::Action::contextPrimary);select("Review settings...");press(H::Action::confirm);Check(model().rows.size()==2&&model().selected==1,"Research review not compact/Cancel-first");capture("16-research-review.png");
         press(H::Action::back);Check(model().headerStatus=="Unsaved draft"&&model().selectedTab==1,"Research review Back lost draft");
+        select("Review settings...");
+        press(H::Action::confirm);
+        press(H::Action::confirm);
+        Check(model().headerStatus == "Unsaved draft", "Explicit review Cancel discarded research draft");
         select("Review settings...");press(H::Action::confirm);select("Apply settings");press(H::Action::confirm);GameActions::ProcessQueue(state);
         Check(state.researchFundingLevel==2&&state.researchPriorities==priorities,"Research plan applied wrong native values");
         Check(model().headerStatus=="Current settings","Applied research retained stale baseline");
+        press(H::Action::contextPrimary);
+        press(H::Action::previousOption);
+        select("Apply changes");
+        press(H::Action::confirm);
+        Check(state.researchFundingLevel == 2, "Guarded Apply bypassed native queue");
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Check(
+            state.researchFundingLevel == 3 && model().selectedTab == 0,
+            "Guarded research Apply failed requested tab transition");
+        press(H::Action::nextOption);
+        press(H::Action::contextPrimary);
+        press(H::Action::previousOption);
+        select("Apply changes");
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        press(H::Action::nextOption);
+        press(H::Action::contextPrimary);
+        press(H::Action::previousOption);
+        select("Apply changes");
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        press(H::Action::nextOption);
+        press(H::Action::contextPrimary);
+        press(H::Action::previousOption);
+        select("Apply changes");
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        press(H::Action::nextOption);
+        Check(state.researchFundingLevel == 2, "Research cycle fixture did not restore normal funding");
         const auto beforeResearch=park.cash;FinancePayResearch();Check(park.cash==beforeResearch-kResearchCosts[2]/4,"Native recurring research charge changed");
         press(H::Action::previousOption);select("Invention catalog...");press(H::Action::confirm);capture("17-research-catalog.png");press(H::Action::back);Check(model().selectedTab==0&&model().selected==1,"Catalog return lost focus");
         // Campaign selection is now at the workspace root; target and duration adjust inline, full target browsing remains.
@@ -163,3 +226,4 @@ int main(int argc,char** argv)
     }
     catch(const std::exception& e){std::cerr<<e.what()<<"\n";return 1;}
 }
+

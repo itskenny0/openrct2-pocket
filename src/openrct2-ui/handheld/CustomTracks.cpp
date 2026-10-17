@@ -1035,7 +1035,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                 ? "{MUTED}Seat " + std::to_string(placementSeat) + (placementInverted ? " / Inv" : " / SEL options")
                 : placementInverted ? "{WHITE}Inverted / START Ride"
                                     : "{WHITE}START Ride / SEL Pieces");
-        DrawModernText(rt, p + ScreenCoordsXY{ 10, 230 }, "{WHITE}L2/R2 Slope | SEL Pieces");
+        DrawModernText(
+            rt, p + ScreenCoordsXY{ 10, 230 }, camera ? "{WHITE}D-pad Pan / B Build" : "{WHITE}L2/R2 Slope / Select Pieces");
         static const char* directions[]{"West","South","East","North"};
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 186 },
@@ -1043,23 +1044,22 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         Drawing::RenderTarget preview;
         if (ClipRenderTarget(preview, rt, p + ScreenCoordsXY{ 146, 135 }, 60, 62))
             DrawPiecePreview(preview, selected);
-        DrawFooter(
-            rt, screen,
-            { { "A", "Build" },
-              { "B",
-                camera                   ? "Build"
-                    : replacement        ? "Cancel"
-                    : StationPlacement() ? "Cancel"
-                                         : "Undo" },
-              { "L/R", camera ? "Zoom" : "Piece" },
-              { "X",
-                camera                                   ? "Rotate"
-                    : trackTypeHasSpeedSetting(selected) ? "Speed +"
-                                                         : "Bank" },
-              { "Y",
-                StationPlacement()                       ? "Turn"
-                    : trackTypeHasSpeedSetting(selected) ? "Speed -"
-                                                         : "Chain" } });
+        DrawModeBadge(rt, p + ScreenCoordsXY{ 144, 8 }, camera ? "CAMERA" : "BUILD");
+        std::vector<ControlHint> hints{ { "D-pad", "Move" },
+                                        { "A", camera ? "Build mode" : "Build" },
+                                        { "B",
+                                          camera                                  ? "Build"
+                                              : replacement || StationPlacement() ? "Cancel"
+                                                                                  : "Undo" },
+                                        { "L1/R1", camera ? "Zoom" : "Piece" },
+                                        { "X",
+                                          camera                                   ? "Rotate"
+                                              : trackTypeHasSpeedSetting(selected) ? "Speed +"
+                                                                                   : "Bank" },
+                                        { "SELECT", camera ? "Build" : "Pieces" } };
+        if (!camera)
+            hints.push_back({ "Y", StationPlacement() ? "Turn" : trackTypeHasSpeedSetting(selected) ? "Speed -" : "Chain" });
+        DrawFooter(rt, screen, hints);
         const auto q = Action(false);
         if (q.error == GA::Status::ok)
             DrawCostBadge(rt, Layout::ContextAnchor(screen, kContextSize, true), FormatMoney(q.cost));

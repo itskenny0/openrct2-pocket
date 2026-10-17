@@ -1,0 +1,17 @@
+/workspace/scratch/3dd26b9bb351/repo/src/openrct2-ui/handheld/SceneryTools.cpp: In function ‘Configure’:
+/workspace/scratch/3dd26b9bb351/repo/src/openrct2-ui/handheld/SceneryTools.cpp:370:32: warning: ‘MEM[(union _Storage *)&previewHeight]._M_value’ may be used uninitialized [-Wmaybe-uninitialized]
+  370 |                 current.height = *previewHeight;
+      |                                ^
+/workspace/scratch/3dd26b9bb351/repo/src/openrct2-ui/handheld/SceneryTools.cpp:363:20: note: ‘MEM[(union _Storage *)&previewHeight]._M_value’ was declared here
+  363 |         const auto previewHeight = ghost && requested && requested->settings == current
+      |                    ^
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+Building object index (2504 items)
+Finished building object index in 0.06 seconds.
+Building track design index (0 items)
+Finished building track design index in 0.00 seconds.
+Building scenario index (0 items)
+Finished building scenario index in 0.00 seconds.
+PASS native park selection / modern tabs / contextual access / camera preservation / safe status and demolition reviews
+PASS coaster Undo/piece/camera/return, flat access cancellation/completion, maze camera/leave, roster focus restoration

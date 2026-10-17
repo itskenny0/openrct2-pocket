@@ -135,14 +135,8 @@ namespace OpenRCT2::Ui::Handheld
             Fill(
                 rt, start, { (cellWidth - 6) * std::clamp(model.meters[i], 0, 100) / 100, 3 },
                 static_cast<Drawing::PaletteIndex>(ink));
-            if (directional)
-                DrawModernText(
-                    rt, start + ScreenCoordsXY{ 0, -13 },
-                    std::string(
-                        attention                          ? "{CAUTION}! Needs attention"
-                            : model.meterDirections[i] > 0 ? "{MUTED}+ Higher is better"
-                                                           : "{MUTED}- Lower is better"),
-                    {}, cellWidth - 6);
+            if (directional && attention)
+                DrawModernText(rt, start + ScreenCoordsXY{ 0, -13 }, "{CAUTION}! Attention", {}, cellWidth - 6);
         }
         for(size_t i=0;i<model.toolbarCount && i<model.rows.size();++i)
         {

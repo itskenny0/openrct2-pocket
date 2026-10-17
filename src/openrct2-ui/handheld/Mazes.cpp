@@ -434,19 +434,22 @@ namespace OpenRCT2::Ui::Handheld::Mazes
             rt, p + ScreenCoordsXY{ 10, 108 }, "{WHITE}Height " + (cursor ? std::to_string(cursor->z / 8) : "Unavailable"));
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 132 },
-            review          ? "{MUTED}L/R Select option"
+            camera          ? "{WHITE}D-pad Pan / X Rotate"
+                : review    ? "{MUTED}L1/R1 Select option"
                 : Picking() ? "{MUTED}Corner " + std::to_string(quadrant + 1) + "/4 L2/R2"
                             : "{MUTED}X Move | Y Remove");
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 154 },
-            review          ? "{MUTED}A Apply | B Cancel"
+            camera          ? "{WHITE}A / B Return to build"
+                : review    ? "{MUTED}A Apply | B Cancel"
                 : Picking() ? "{MUTED}A Select maze cell"
                 : placed    ? "{WHITE}B Return to ride"
                             : "{MUTED}L2/R2 Height");
         DrawModernText(rt, p + ScreenCoordsXY{ 10, 178 }, "{WHITE}SEL Camera | START Ride");
         DrawActionStrip(rt, screen);
         std::vector<ControlHint> hints{ { "A",
-                                          review          ? "Select"
+                                          camera          ? "Build mode"
+                                              : review    ? "Select"
                                               : Picking() ? "Pick"
                                                           : "Build" },
                                         { "B",

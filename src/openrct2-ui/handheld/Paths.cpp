@@ -925,6 +925,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
                   { "A", batch.start ? "Review" : "Start" },
                   { "Y", "Adjust" },
                   { "SEL", "Surface" },
+                  { "L1/R1", "Zoom" },
                   { "B", batch.start ? "Cancel" : "Exit" } });
         }
     }

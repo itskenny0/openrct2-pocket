@@ -20,8 +20,14 @@ static void CheckVisualPolishLayout()
     };
     for(const auto& hints:cases)
     {
-        const auto layout=H::MeasureFooter({512,384},hints);
+        auto layout = H::MeasureFooter({ 512, 384 }, hints);
         Check(layout.size()==hints.size(),"Footer hid an essential action");
+        for(const auto& item:layout) {
+            if(item.hint.key=="A")Check(item.x==199,"Primary A position drifted between modes");
+            if(item.hint.key=="B")Check(item.x==408,"Back B position drifted between modes");
+        }
+        std::sort(
+            layout.begin(), layout.end(), [](const auto& a, const auto& b) { return a.y == b.y ? a.x < b.x : a.y < b.y; });
         std::array<int,2> right{0,0};
         for(const auto& item:layout)
         {
@@ -31,6 +37,18 @@ static void CheckVisualPolishLayout()
             right[lane]=item.x+item.width;
         }
     }
+    Check(H::FooterHeight({ 512, 384 }, cases[7]) == 28, "Simple dialog should use one footer row");
+    H::ObjectPicker picker;
+    std::vector<H::PickerEntry> entries;
+    for (int i = 0; i < 21; ++i)
+        entries.push_back({ { ObjectType::ride, static_cast<ObjectEntryIndex>(i) }, "Item" });
+    picker.setEntries(entries);
+    picker.move(0, 2);
+    Check(picker.focus() == 6, "Shoulder did not advance one catalog page");
+    picker.move(0, -2);
+    Check(picker.focus() == 0, "Catalog reverse page lost focus");
+    picker.move(0, -2);
+    Check(picker.focus() == 0, "Catalog paging wrapped at top");
     Check(H::ControlKey("L/R")=="L1/R1"&&H::ControlKey("L2/R2")=="L2/R2","Shoulder generations ambiguous");
     Check(H::PeopleTabs::ThoughtLabel("\xE2\x80\x9C" "I am hungry" "\xE2\x80\x9D")=="\"I am hungry\"","Native thought punctuation forced the small fallback font");
     H::ManagementPresentation model;

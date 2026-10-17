@@ -118,7 +118,7 @@ namespace OpenRCT2::Ui::Handheld::ParkManagementTabs
             }
             m.rows.insert(m.rows.end(),{"Review settings...","Discard draft"});
             m.rowEnabled.insert(m.rowEnabled.end(),{changed,true});m.primaryAction=row<7?"Toggle":"Select";
-            m.status=changed?"Unsaved / B or tab change discards":"No changes pending";
+            m.status = changed ? "Unsaved / B or tab change reviews edits" : "No changes pending";
             const auto query=ResearchManagement::Action(d,false);
             if(query.error!=GameActions::Status::ok)m.status=Finances::Feedback(query);
         }

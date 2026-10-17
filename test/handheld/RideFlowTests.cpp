@@ -155,7 +155,28 @@ int main(int argc, char** argv)
         press(H::Action::openBuild);Check(W::HandheldObjectPickerIsOpen(),"Piece catalog missing");capture("09-track-pieces.png");
         press(H::Action::openMenu);Check(!C::Active()&&W::HandheldRidesPresentation().tabs.size()==4,"Start from piece catalog failed to return to ride");
         FocusRideTabAction("Continue track...");press(H::Action::confirm);press(H::Action::openBuild);press(H::Action::back);WindowCullDead();
-        Check(C::Active(),"Piece Back ended builder");press(H::Action::openBuild);pickTrackOption("camera");Check(C::CameraMode(),"D-pad camera selection failed");press(H::Action::back);Check(C::Active()&&!C::CameraMode(),"Camera Back failed to return to building");
+        Check(C::Active(), "Piece Back ended builder");
+        const auto cameraPiece = C::Selection();
+        const auto cameraEndpoint = C::Endpoint();
+        const auto cameraCash = state.park.cash;
+        press(H::Action::openBuild);
+        press(H::Action::contextPrimary);
+        Check(C::CameraMode() && !W::HandheldObjectPickerIsOpen(), "Brick X camera shortcut unavailable");
+        const auto beforePan=WindowGetMain()->savedViewPos;
+        H::Frame pan;pan.panX=8;H::HandleExplorerInput(input,pan);
+        Check(WindowGetMain()->savedViewPos!=beforePan,"Construction camera D-pad did not pan");
+        press(H::Action::slopeUp);press(H::Action::contextSecondary);
+        capture("09a-track-camera.png");
+        press(H::Action::confirm);
+        Check(
+            !C::CameraMode() && C::Selection() == cameraPiece && C::Endpoint() == cameraEndpoint
+                && state.park.cash == cameraCash,
+            "Camera A placed track or changed draft");
+        press(H::Action::openBuild);
+        pickTrackOption("camera");
+        Check(C::CameraMode(), "D-pad camera selection failed");
+        press(H::Action::back);
+        Check(C::Active() && !C::CameraMode(), "Camera Back failed to return to building");
         press(H::Action::openMenu);Check(!C::Active()&&W::HandheldRidesPresentation().tabs.size()==4,"Coaster Start did not return to ride");
         const auto resume=FocusRideTabAction("Continue track...");press(H::Action::confirm);Check(C::Active(),"Continue track failed");press(H::Action::openMenu);
         Check(W::HandheldRidesPresentation().selectedTab==1&&W::HandheldRidesPresentation().selected==resume,"Coaster return lost Operations focus");
@@ -163,7 +184,10 @@ int main(int argc, char** argv)
         Check(!C::Active()&&W::HandheldRidesPresentation().selectedTab==1,"Picker leave failed to return to ride");closeMenu();
         const auto mazeIndex=load("rct2.ride.hmaze",RIDE_TYPE_MAZE);Check(H::BeginMaze(mazeIndex),"Maze begin failed");GameActions::ProcessQueue(state);M::Update(CoordsXY{960,1280});focus({976,1296,40});
         Check(M::Build(true).error==GameActions::Status::ok,"Maze native cell failed");GameActions::ProcessQueue(state);const auto maze=*M::Target();capture("10-maze-build.png");
-        const auto mazeCash=state.park.cash;M::ToggleCamera();press(H::Action::back);Check(M::Active()&&!M::CameraMode(),"Maze camera Back left builder");
+        const auto mazeCash=state.park.cash;M::ToggleCamera();const auto mazeCursor=M::Cursor();
+        press(H::Action::slopeUp);press(H::Action::contextSecondary);Check(M::Cursor()==mazeCursor&&!M::Reviewing(),"Maze camera edited geometry");
+        press(H::Action::confirm);Check(!M::CameraMode()&&state.park.cash==mazeCash,"Maze camera A built a cell");
+        M::ToggleCamera();press(H::Action::back);Check(M::Active()&&!M::CameraMode(),"Maze camera Back left builder");
         press(H::Action::back);Check(!M::Active()&&W::HandheldRidesPresentation().tabs.size()==4&&H::RideManagement::Resolve(maze)&&state.park.cash==mazeCash,"Maze leave changed native state");closeMenu();
         W::HandheldDashboardOpen();while(W::HandheldDashboardSectionIndex()!=1)W::HandheldDashboardMove(0,1);W::HandheldDashboardMove(1,0);
         const auto roster=W::HandheldRidesPresentation();const auto row=std::find(roster.rows.begin(),roster.rows.end(),GetRide(coaster.id)->getName());Check(row!=roster.rows.end(),"Coaster missing from roster");
