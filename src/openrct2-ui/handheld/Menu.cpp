@@ -30,6 +30,7 @@
 #include "RideAccess.h"
 #include "RideManagement.h"
 #include "RideTabs.h"
+#include "RideNavigation.h"
 #include "RightsTools.h"
 #include "SaveSlots.h"
 #include "FileBrowsing.h"
@@ -427,6 +428,7 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::RideManagement::Draft> _ridesDraft;
         size_t _ridesRosterFocus{};
         size_t _ridesInspectFocus{};
+        bool _rideFromPark{};
         Handheld::RideTabs::State _rideTabs;
         bool _ridesTabChild{};
         bool _ridesBusy{};
@@ -674,6 +676,7 @@ namespace OpenRCT2::Ui::Windows
             {
                 const auto stats = Handheld::RideManagement::Presentation(View::statistics,0,{},_ridesTarget);
                 model = Handheld::RideTabs::Compose(model,stats,_rideTabs,selected);
+                if (_ridesTarget && Handheld::RideAccess::Supported(*_ridesTarget)) model.contextualAction = "Access";
             }
             if (current == Page::ridesRoster) model.contentSized = true;
             if (current == Page::ridesCustomers && _ridesTarget && Handheld::RideManagement::Resolve(*_ridesTarget))
@@ -1946,6 +1949,34 @@ namespace OpenRCT2::Ui::Windows
                     && Handheld::FlatRides::CurrentStage() != Handheld::FlatRides::Stage::ride))
                 close();
         }
+        Handheld::RideNavigation::Context rideContext() const
+        {
+            return {*_ridesTarget,_rideTabs,_rideFromPark,_ridesRosterFocus};
+        }
+        template<typename Begin> void launchRideTool(Begin begin)
+        {
+            const auto context=rideContext();
+            close();
+            if(begin()) Handheld::RideNavigation::construction=context;
+            else HandheldRideReturn(context.target,context);
+        }
+        bool quickRideAccess()
+        {
+            if(_page!=Page::ridesInspect || !_ridesTarget || !Handheld::RideAccess::Supported(*_ridesTarget)) return false;
+            _rideTabs.save(_focus.index());
+            if(Handheld::FlatRides::CanResume(*_ridesTarget)) openRideAccess(*_ridesTarget);else openAccessManagement();
+            return true;
+        }
+        void returnRide(const Handheld::RideManagement::Target& target, const std::optional<Handheld::RideNavigation::Context>& context)
+        {
+            if(!Handheld::RideManagement::Resolve(target)) { close();return; }
+            openRide(target.id);
+            if(context && context->target==target)
+            {
+                _rideTabs=context->tabs;_rideFromPark=context->fromPark;_ridesRosterFocus=context->rosterFocus;
+                _focus={};_focus.move(static_cast<int>(_rideTabs.rows[_rideTabs.tab]),rows().size());invalidate();
+            }
+        }
         void openRide(RideId id)
         {
             _rideId = id;
@@ -1962,7 +1993,18 @@ namespace OpenRCT2::Ui::Windows
                 PauseToggle();
                 _pausedHere = false;
             }
-            page(isShop ? Page::shop : Page::ride);
+            _rideFromPark=true;
+            if(isShop) page(Page::shop);
+            else
+            {
+                _dashboard.section=Handheld::Dashboard::Section::rides;
+                _dashboard.focus=Handheld::Dashboard::Focus::content;
+                page(Page::ridesInspect);
+                // Incomplete native access remains a one-press contextual action.
+                const auto visible=rows();
+                const auto place=std::find(visible.begin(),visible.end(),"Place entrance / exit...");
+                if(place!=visible.end()) _focus.move(static_cast<int>(place-visible.begin()),visible.size());
+            }
         }
         void openLoad()
         {
@@ -2501,7 +2543,7 @@ namespace OpenRCT2::Ui::Windows
                     page(Page::trackBlock);
                     break;
                 case Page::ridesInspect:
-                    page(Page::ridesRoster);
+                    if(_rideFromPark) close();else page(Page::ridesRoster);
                     break;
                 case Page::designExport:
                     Handheld::DesignAuthoring::CancelReview();
@@ -2767,8 +2809,11 @@ namespace OpenRCT2::Ui::Windows
                         const auto key = _picker.selected()->identity.key;
                         if (key == "leave")
                         {
+                            const auto target = Handheld::CustomTracks::Target();
+                            const auto context = Handheld::RideNavigation::Take();
                             Handheld::EndTerrain();
                             close();
+                            if (target) HandheldRideReturn(*target, context);
                         }
                         else if (key == "camera")
                         {
@@ -3739,6 +3784,7 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::ridesRoster:
+                    _rideFromPark=false;
                     _ridesRosterFocus = choice;
                     _ridesInspectFocus = 0;
                     _rideTabs = {};
@@ -3783,16 +3829,16 @@ namespace OpenRCT2::Ui::Windows
                     else if (ridesPresentationFor(Page::trackBlock, choice).rows[choice] == "Continue section...")
                     {
                         const auto block = *_trackBlock;
-                        close();
-                        if (!Handheld::ResumeCustomTrackFrom(block.ride, block.origin, block.type))
+                        launchRideTool([=] { return Handheld::ResumeCustomTrackFrom(block.ride, block.origin, block.type); });
+                        if (!Handheld::CustomTracks::Active())
                             GetWindowManager()->ShowError(
                                 "Cannot continue section", "No compatible forward endpoint; select again");
                     }
                     else if (ridesPresentationFor(Page::trackBlock, choice).rows[choice] == "Build backward...")
                     {
                         const auto block = *_trackBlock;
-                        close();
-                        if (!Handheld::ResumeCustomTrackFrom(block.ride, block.origin, block.type, true))
+                        launchRideTool([=] { return Handheld::ResumeCustomTrackFrom(block.ride, block.origin, block.type, true); });
+                        if (!Handheld::CustomTracks::Active())
                             GetWindowManager()->ShowError("Cannot build backward", "No compatible backward endpoint; select again");
                     }
                     else if (ridesPresentationFor(Page::trackBlock,choice).rows[choice] == "Replace block...")
@@ -3844,9 +3890,10 @@ namespace OpenRCT2::Ui::Windows
                         const auto block = *_trackBlock;
                         const auto cost = _trackCost;
                         const auto context = _trackContext;
+                        const auto navigation=rideContext();
                         close();
                         const auto result = Handheld::TrackEditing::RemoveForReplacement(block, cost, true,
-                            [block](const auto*, const GameActions::Result* outcome) {
+                            [block,navigation](const auto*, const GameActions::Result* outcome) {
                                 if (outcome->error != GameActions::Status::ok)
                                 {
                                     HandheldRideOpen(block.ride.id);
@@ -3859,6 +3906,7 @@ namespace OpenRCT2::Ui::Windows
                                     HandheldRideOpen(block.ride.id);
                                     GetWindowManager()->ShowError("Track removed", "Use native Continue track / Access to recover");
                                 }
+                                else Handheld::RideNavigation::construction=navigation;
                             }, context);
                         if (result.error != GameActions::Status::ok)
                         {
@@ -3918,8 +3966,7 @@ namespace OpenRCT2::Ui::Windows
                         if (choice == 0)
                         {
                             const auto target = *_ridesTarget;
-                            close();
-                            Handheld::ResumeFlatRide(target.id);
+                            launchRideTool([=] { return Handheld::ResumeFlatRide(target.id); });
                             Handheld::RideManagement::Locate(target);
                             break;
                         }
@@ -4012,8 +4059,7 @@ namespace OpenRCT2::Ui::Windows
                     if (choice < rows.size() && rows[choice] == "Edit maze...")
                     {
                         const auto t = *_ridesTarget;
-                        close();
-                        Handheld::ResumeMaze(t.id);
+                        launchRideTool([=] { return Handheld::ResumeMaze(t.id); });
                         break;
                     }
                     if (choice == 0)
@@ -4045,14 +4091,12 @@ namespace OpenRCT2::Ui::Windows
                                 + (Handheld::RideAccess::Supported(*_ridesTarget) ? 1u : 0u))
                     {
                         const auto target = *_ridesTarget;
-                        close();
-                        Handheld::ResumeCustomTrack(target.id);
+                        launchRideTool([=] { return Handheld::ResumeCustomTrack(target.id); });
                     }
                     else if (choice == 7 && Handheld::FlatRides::CanResume(*_ridesTarget))
                     {
                         const auto target = *_ridesTarget;
-                        close();
-                        Handheld::ResumeFlatRide(target.id);
+                        launchRideTool([=] { return Handheld::ResumeFlatRide(target.id); });
                         Handheld::RideManagement::Locate(target);
                     }
                     else
@@ -4085,7 +4129,9 @@ namespace OpenRCT2::Ui::Windows
                         const auto point = *_accessPoint;
                         // BeginPaths revalidates native access and locates its outside landing.
                         // Retain this page on a failed handoff instead of silently closing it.
-                        if (Handheld::RideAccess::BeginPaths(point.target, point.exit, true)) close();
+                        const auto context=rideContext();
+                        if (Handheld::RideAccess::BeginPaths(point.target, point.exit, true))
+                        {Handheld::RideNavigation::construction=context;close();}
                         else { _status = "Cannot start path here; return to ride inspection"; invalidate(); }
                     }
                     else if (!_accessPoint || !Handheld::RideAccess::Current(*_accessPoint) || choice >= 2) openAccessManagement();
@@ -4094,8 +4140,8 @@ namespace OpenRCT2::Ui::Windows
                         const auto point = *_accessPoint;
                         if (Handheld::RideManagement::Resolve(point.target)->status != RideStatus::closed)
                         { _status = "Close ride before moving access"; invalidate(); break; }
-                        close();
-                        if (!Handheld::RideAccess::BeginRelocation(point))
+                        launchRideTool([=] { return Handheld::RideAccess::BeginRelocation(point); });
+                        if (Handheld::FlatRides::CurrentStage()==Handheld::FlatRides::Stage::inactive)
                             GetWindowManager()->ShowError("Cannot move access", "Access changed; select it again");
                         else Handheld::RideManagement::Locate(point.target);
                     }
@@ -4144,8 +4190,7 @@ namespace OpenRCT2::Ui::Windows
                         if (choice == 0)
                         {
                             const auto target = *_ridesTarget;
-                            close();
-                            Handheld::ResumeFlatRide(target.id);
+                            launchRideTool([=] { return Handheld::ResumeFlatRide(target.id); });
                             Handheld::RideManagement::Locate(target);
                         }
                         else if (choice == 1) page(Page::ridesInspect);
@@ -4162,14 +4207,14 @@ namespace OpenRCT2::Ui::Windows
                     else if (choice == 1 || choice == 2)
                     {
                         const auto target = *_ridesTarget;
-                        close();
-                        Handheld::RideAccess::BeginPaths(target, choice == 2);
+                        const auto exit=choice==2;
+                        launchRideTool([=] {return Handheld::RideAccess::BeginPaths(target,exit);});
                     }
                     else if (choice == 5 || choice == 6)
                     {
                         const auto target = *_ridesTarget;
-                        close();
-                        Handheld::RideAccess::BeginPaths(target, choice == 6, true);
+                        const auto exit=choice==6;
+                        launchRideTool([=] {return Handheld::RideAccess::BeginPaths(target,exit,true);});
                     }
                     else if (choice == 3)
                     {
@@ -4924,8 +4969,7 @@ namespace OpenRCT2::Ui::Windows
                         if (choice == 0)
                         {
                             const auto target = *_ridesTarget;
-                            close();
-                            Handheld::ResumeFlatRide(target.id);
+                            launchRideTool([=] { return Handheld::ResumeFlatRide(target.id); });
                             Handheld::RideManagement::Locate(target);
                             break;
                         }
@@ -4934,8 +4978,7 @@ namespace OpenRCT2::Ui::Windows
                     if (_ridesTarget && _focus.index() < rows().size() && rows()[_focus.index()] == "Edit maze...")
                     {
                         const auto t = *_ridesTarget;
-                        close();
-                        Handheld::ResumeMaze(t.id);
+                        launchRideTool([=] { return Handheld::ResumeMaze(t.id); });
                     }
                     else if (_ridesTarget && _focus.index() < rows().size() && rows()[_focus.index()] == "Edit track blocks...")
                     {
@@ -4955,8 +4998,7 @@ namespace OpenRCT2::Ui::Windows
                         && choice == (Handheld::RideAccess::Supported(*_ridesTarget) ? 4u : 3u))
                     {
                         const auto target = *_ridesTarget;
-                        close();
-                        Handheld::ResumeCustomTrack(target.id);
+                        launchRideTool([=] { return Handheld::ResumeCustomTrack(target.id); });
                     }
                     else if (choice == 3 && _ridesTarget && Handheld::RideAccess::Supported(*_ridesTarget))
                         openRideAccess(*_ridesTarget);
@@ -5349,7 +5391,7 @@ namespace OpenRCT2::Ui::Windows
             if (_page == Page::trackPiecePicker)
             {
                 Handheld::DrawObjectPicker(
-                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Track pieces", _status, "No compatible pieces");
+                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Track pieces", _status, "No compatible pieces", false, "Ride");
                 return;
             }
             if (_page == Page::designPicker)
@@ -5725,6 +5767,15 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->back();
+    }
+    void HandheldRideReturn(const Handheld::RideManagement::Target& target, const std::optional<Handheld::RideNavigation::Context>& context)
+    {
+        if(auto* window=OpenPanel()) window->returnRide(target,context);
+    }
+    bool HandheldRideQuickAccess()
+    {
+        auto* window=GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window && static_cast<HandheldMenuWindow*>(window)->quickRideAccess();
     }
     void HandheldRideOpen(RideId ride)
     {

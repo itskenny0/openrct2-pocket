@@ -7,6 +7,7 @@
 #include <openrct2/object/Object.h>
 #include "PeepPlacement.h"
 #include "RideManagement.h"
+#include "RideNavigation.h"
 #include "SceneryTools.h"
 #include "StaffManagement.h"
 #include <openrct2/ride/TrackConstructionSupport.h>
@@ -70,6 +71,8 @@ namespace OpenRCT2::Ui::Handheld
 namespace OpenRCT2::Ui::Windows
 {
     void HandheldRideOpen(RideId ride);
+    void HandheldRideReturn(const Handheld::RideManagement::Target& target, const std::optional<Handheld::RideNavigation::Context>& context = {});
+    bool HandheldRideQuickAccess();
     void HandheldRideAccessOpen(const Handheld::RideManagement::Target& target);
     Handheld::ManagementPresentation HandheldDashboardPresentation(size_t selected);
     void HandheldDashboardOpen();

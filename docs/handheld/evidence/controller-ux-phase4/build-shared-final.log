@@ -1,0 +1,16 @@
+Rebuilding changed dependencies: 14
+CMakeFiles/openrct2.dir/src/openrct2-ui/ProvisionalElements.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/WindowManager.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/UiContext.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/FlatRides.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/Designs.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/CustomTracks.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/Explorer.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/Mazes.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/RideAccess.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/Shops.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/SceneryTools.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/input/InputManager.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/RideManagement.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/Menu.cpp.o PASS
+PASS exact changed sources / AArch64 GUI and CLI

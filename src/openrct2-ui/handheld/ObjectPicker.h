@@ -98,7 +98,8 @@ namespace OpenRCT2::Ui::Handheld
 
     inline void DrawObjectPicker(
         Drawing::RenderTarget& rt, ScreenSize screen, const ObjectPicker& picker, const std::string& title,
-        const std::string& status = {}, const std::string& emptyLabel = "No objects available", bool searchControl = false)
+        const std::string& status = {}, const std::string& emptyLabel = "No objects available", bool searchControl = false,
+        const std::string& startAction = "Pause")
     {
         using namespace Concept;
         const auto p = kMenuOrigin;
@@ -151,6 +152,6 @@ namespace OpenRCT2::Ui::Handheld
         DrawCommand(rt, { 140, y }, 17, "A", "Select");
         DrawCommand(rt, { 268, y }, 17, "B", "Back");
         if (searchControl) DrawCommand(rt, {396,y},17,"X","Search");
-        else DrawCommand(rt, { 396, y }, 38, "START", "Pause");
+        else DrawCommand(rt, { 396, y }, 38, "START", startAction.c_str());
     }
 } // namespace OpenRCT2::Ui::Handheld

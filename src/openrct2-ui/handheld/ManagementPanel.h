@@ -17,6 +17,7 @@ namespace OpenRCT2::Ui::Handheld
         std::optional<size_t> highlightedStat;
         std::string status;
         std::string primaryAction;
+        std::string contextualAction;
         bool editing{};
         bool confirmation{};
         std::vector<std::string> bodyLines; // Optional native wrapped read-only detail; section controls paging.

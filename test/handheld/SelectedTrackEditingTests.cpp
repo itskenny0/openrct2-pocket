@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Native initialized scenario fixture; construction and editing use real actions.
 #include <SDL.h>
+#include "RideTabNavigation.h"
 #include <filesystem>
 #include <iostream>
 #include <openrct2-ui/UiContext.h>
@@ -117,7 +118,7 @@ int main(int argc, char** argv)
         back.actions.push_back(H::Action::back);
         auto openBlock = [&] {
             W::HandheldRideOpen(ride.id);
-            W::HandheldMenuMove(3 + (H::RideAccess::Supported(ride) ? 1 : 0) + (C::CanResume(ride) ? 1 : 0));
+            FocusRideTabAction("Edit track blocks...");
             H::HandleMenuInput(controller, confirm);
             H::HandleMenuInput(controller, confirm);
         };
@@ -186,7 +187,7 @@ int main(int argc, char** argv)
             if (family == 0)
             {
                 W::HandheldRideOpen(target.id);
-                W::HandheldMenuMove(3 + (H::RideAccess::Supported(target) ? 1 : 0) + (C::CanResume(target) ? 1 : 0));
+                FocusRideTabAction("Edit track blocks...");
                 H::HandleMenuInput(controller, confirm);
                 H::HandleMenuInput(controller, confirm);
                 auto choices = W::HandheldRidesPresentation().rows;

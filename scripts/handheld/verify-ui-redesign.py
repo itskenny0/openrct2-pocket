@@ -3,8 +3,8 @@
 """Link the UI milestone driver against an existing Ninja GUI build and run it.
 
 Build openrct2 first. For cross builds, --runner-prefix can specify QEMU and the
-matching target loader/library path. Captures use public metadata and native
-fixture state; they are component renders, not physical device screenshots.
+matching target loader/library path. Captures use production UI and native fixture state, not physical device screenshots.
+RideFlowTests additionally renders the native park using privately installed RCT2 assets.
 """
 import argparse
 from pathlib import Path
@@ -14,14 +14,17 @@ import shutil
 import subprocess
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--driver", choices=["UiRedesignTests", "ConstructionUxTests"], default="UiRedesignTests")
+parser.add_argument("--driver", choices=["UiRedesignTests", "ConstructionUxTests", "RideFlowTests"], default="UiRedesignTests")
 parser.add_argument("--build", type=Path, required=True)
 parser.add_argument("--data", type=Path, required=True)
 parser.add_argument("--profile", type=Path, required=True)
 parser.add_argument("--captures", type=Path, required=True)
+parser.add_argument("--rct2-assets", type=Path, help="Private installed RCT2 root containing Data/g1.dat")
 parser.add_argument("--ninja", default=shutil.which("ninja") or "ninja")
 parser.add_argument("--runner-prefix", default="")
 args = parser.parse_args()
+if args.driver == "RideFlowTests" and (not args.rct2_assets or not (args.rct2_assets / "Data/g1.dat").is_file()):
+    parser.error("RideFlowTests requires --rct2-assets with an installed Data/g1.dat")
 repo = Path(__file__).resolve().parents[2]
 build = args.build.resolve()
 commands = subprocess.check_output(
@@ -40,14 +43,18 @@ start = link.index(compiler)
 end = link.index("&&", start) if "&&" in link[start:] else len(link)
 link = [v for v in link[start:end] if not v.endswith("/Ui.cpp.o")]
 out = link.index("-o")
-binary = build / ("handheld-ui-redesign-tests" if args.driver == "UiRedesignTests" else "handheld-construction-ux-tests")
+binary = build / {"UiRedesignTests": "handheld-ui-redesign-tests", "ConstructionUxTests": "handheld-construction-ux-tests",
+                  "RideFlowTests": "handheld-ride-flow-tests"}[args.driver]
 link[out + 1] = str(binary)
 link.insert(out, str(repo / "test/handheld" / (args.driver + ".cpp")))
 link[1:1] = ["-std=c++20", *includes, f"-I{repo / 'src'}", f"-I{repo / 'src/thirdparty'}"]
 subprocess.run(link, cwd=build, check=True)
 env = os.environ.copy()
 env.update(SDL_VIDEODRIVER="offscreen", SDL_AUDIODRIVER="dummy")
+if args.driver == "RideFlowTests":
+    env["POCKET_RIDE_FLOW_CAPTURES"] = str(args.captures.resolve())
+fixture_input = args.rct2_assets if args.driver == "RideFlowTests" else args.captures
 subprocess.run(
     [*shlex.split(args.runner_prefix), str(binary), str(args.data.resolve()),
-     str(args.profile.resolve()), str(args.captures.resolve())], env=env, check=True
+     str(args.profile.resolve()), str(fixture_input.resolve())], env=env, check=True
 )

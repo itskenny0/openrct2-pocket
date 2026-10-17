@@ -162,7 +162,7 @@ int main(int argc,char** argv)
     }
     engine.EndDraw();
    };
-   W::HandheldRideOpen(target.id);W::HandheldMenuConfirm();capture("access-list.ppm");W::HandheldMenuConfirm();capture("access-inspection.ppm");
+   W::HandheldRideOpen(target.id);Check(W::HandheldRideQuickAccess(),"Modern access shortcut missing");capture("access-list.ppm");W::HandheldMenuConfirm();capture("access-inspection.ppm");
    wm->CloseByClass(WindowClass::handheldMenu);WindowCullDead();
    W::HandheldAccessReviewOpen(*captureDraft);capture("move-review.ppm");
    wm->CloseByClass(WindowClass::handheldMenu);WindowCullDead();

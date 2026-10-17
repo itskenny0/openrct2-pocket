@@ -315,9 +315,9 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
         using namespace Concept;
         const bool placing = stage == Stage::ride;
         const auto p = kOrigin;
-        Box(rt, p, { kRailWidth, 146 });
+        Box(rt, p, { kRailWidth, 174 });
         Heading(rt, p + ScreenCoordsXY{ 10, 12 }, editing ? "Move ride access" : "Build ride");
-        Section(rt, p + ScreenCoordsXY{ 10, 35 }, Name());
+        DrawStrongText(rt,p+ScreenCoordsXY{10,35},"{WHITE}"+Name(),144);
         Row(rt, p + ScreenCoordsXY{ 8, 54 },
             placing                        ? "Place ride"
                 : stage == Stage::entrance ? "Entrance"
@@ -327,15 +327,17 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
         DrawModernEllipsised(
             rt, p + ScreenCoordsXY{ 12, 116 }, 140,
             placing ? "{MUTED}Ground placement" : "{MUTED}Station " + std::to_string(stationIndex.ToUnderlying() + 1));
+        DrawModernEllipsised(rt,p+ScreenCoordsXY{12,140},140,placing ? "{WHITE}Direction "+std::to_string(direction+1) : "{WHITE}START/B Return to ride");
         DrawActionStrip(rt, screen);
         const auto y = screen.height - 21;
         DrawCommand(rt, { 8, y }, 38, "D-pad", "Move");
-        DrawCommand(rt, { 115, y }, 17, "A", editing ? "Review" : "Place");
+        DrawCommand(rt, { 110, y }, 17, "A", editing ? "Review" : "Place");
         if (placing)
         {
-            DrawCommand(rt, { 207, y }, 17, "Y", "Rides");
-            DrawCommand(rt, { 299, y }, 30, "SEL", "Turn");
+            DrawCommand(rt, { 190, y }, 17, "Y", "Rides");
+            DrawCommand(rt, { 262, y }, 30, "SEL", "Turn");
         }
-        DrawCommand(rt, { 420, y }, 17, "B", "Back");
+        DrawCommand(rt,{350,y},38,"START",target ? "Ride" : "Park");
+        DrawCommand(rt, { 450, y }, 17, "B", target ? "Ride" : "Cancel");
     }
 } // namespace OpenRCT2::Ui::Handheld::FlatRides

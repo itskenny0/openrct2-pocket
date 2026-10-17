@@ -1,0 +1,115 @@
+{
+  "baseline_commit": "5e1539d7dae84fd8269d0bddd327a71b5170461d",
+  "baseline_tree": "de0eb3654caf4b6358d448e914df1411ac7c94e0",
+  "build": {
+    "gui_translation_units_recompiled": 160,
+    "targets": [
+      "openrct2",
+      "openrct2-cli"
+    ],
+    "architecture": "AArch64",
+    "compiler": "GCC 16.2 glibc 2.26 SDK",
+    "engine_archive": "Retained native engine archive, unchanged engine source; not a full clean engine rebuild",
+    "gui_sha256": "c4cd3633253d1552fa1195230c72a2b53d4187be17e2df8e69770b980c061286",
+    "cli_sha256": "7b013ee9eb929ed998123e05cc4b29e378bfde7dcbefbd832626608eb710f5f2"
+  },
+  "runtime": {
+    "executor": "QEMU AArch64",
+    "assets": "User-supplied private installed RCT2 Data/ObjData; g1.dat loaded",
+    "scenario": "Native initialized owned-land scenario fixture with real GameActions",
+    "renderer": "Native ViewportRender + production UI into X8 512x384",
+    "interactive_desktop_session": false,
+    "physical_trimui_brick": false,
+    "hardware_warning": "Headless SDL hardware renderer reports Resize invalid renderer; software capture succeeds"
+  },
+  "new_driver": {
+    "RideFlowTests": 0
+  },
+  "preservation_drivers": {
+    "PauseResumeTests": 0,
+    "RideAccessRelocationTests": 0,
+    "MazeAccessPreviewTests": 0,
+    "AccessShortcutTests": 0,
+    "SceneryPathParityTests": 0,
+    "ConstructionTests": 0,
+    "PathActionsTests": 0,
+    "PresentationLifecycleTests": 0,
+    "MazeConstructionTests": 0,
+    "RideConstructionTests": 0,
+    "PathScenarioUsabilityTests": 0,
+    "OrdinaryPlayUiTests": 0,
+    "UiRedesignTests": 0,
+    "ConstructionUxTests": 0,
+    "SelectedTrackEditingTests": 0,
+    "SeatRotationTests": 0,
+    "FamilyOperationTests": 0
+  },
+  "captures": {
+    "01-flat-placement.png": {
+      "width": 512,
+      "height": 384,
+      "sha256": "52baf635ca76138e2985d43c8355273d2ab0a4ae26c139bf8731e44d396bd56a"
+    },
+    "02-park-ride-overview.png": {
+      "width": 512,
+      "height": 384,
+      "sha256": "8fcddd0b8af9607df20ce11d1f33c5fba9097c36b226a3db4b6d8d60637c53ef"
+    },
+    "03-ride-operations.png": {
+      "width": 512,
+      "height": 384,
+      "sha256": "99c58a19cd762d30fb256b76ec5848eccc81fa7848d662235031dc5813f5456c"
+    },
+    "04-access-placement.png": {
+      "width": 512,
+      "height": 384,
+      "sha256": "ece255a3f1971a86c28764952be1a5b6336142c4461f9ddad8f2e9a1221c5929"
+    },
+    "05-existing-access.png": {
+      "width": 512,
+      "height": 384,
+      "sha256": "8f35a0952c8761738a33b1970a7e3d9f8b3e7c62bf337881c23a32399416b2c0"
+    },
+    "05a-open-ride.png": {
+      "width": 512,
+      "height": 384,
+      "sha256": "4455af2ed21a38895712fe65cdbb7d12be3a6be3089020fb2ec76164f4125a60"
+    },
+    "06-demolition-review.png": {
+      "width": 512,
+      "height": 384,
+      "sha256": "1bfbc0bfa9b56fa9c2cd1359ec37ff08ea8a16ac4351957bd0292697879daed0"
+    },
+    "07-coaster-build.png": {
+      "width": 512,
+      "height": 384,
+      "sha256": "7081c64154314f221f3778acf05dd6d7c7673e6203a64fc4299305323c4bdf0f"
+    },
+    "08-coaster-adjust.png": {
+      "width": 512,
+      "height": 384,
+      "sha256": "7081a28a149e6327ad85e8983b09cafbb32c1545826fbdf011031ff93a705617"
+    },
+    "09-track-pieces.png": {
+      "width": 512,
+      "height": 384,
+      "sha256": "5da8d16178c226c058004e886ec5a98a3789f13d7a5e9372ad2a7684b03efac7"
+    },
+    "10-maze-build.png": {
+      "width": 512,
+      "height": 384,
+      "sha256": "f970a29eaf30960684efd724febcd299c4900d0ae1caedf694e086c2c4eecb43"
+    },
+    "11-roster-return.png": {
+      "width": 512,
+      "height": 384,
+      "sha256": "3325014a496cfca329dc6e6db28abfedc0f2ffde87c015a33e28a258efa28115"
+    },
+    "contact-sheet.png": {
+      "width": 1024,
+      "height": 1640,
+      "sha256": "387816e14aa63eb089dccc9a881361d305ddb107b3b14520ff73452b7f9c6057"
+    }
+  },
+  "physical_2x_output": "Source/config inspected; not physically verified"
+}

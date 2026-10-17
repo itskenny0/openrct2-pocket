@@ -429,9 +429,9 @@ namespace OpenRCT2::Ui::Handheld::Mazes
                    : (camera ? "{BLACK}Camera controls" : "{BLACK}Half-tile segments"),
             136);
         static const char* directions[]{ "West", "South", "East", "North" };
-        DrawModernText(rt, p + ScreenCoordsXY{ 10, 86 }, "{MUTED}Direction " + std::string(directions[direction]));
+        DrawModernText(rt, p + ScreenCoordsXY{ 10, 86 }, "{WHITE}Direction " + std::string(directions[direction]));
         DrawModernText(
-            rt, p + ScreenCoordsXY{ 10, 108 }, "{MUTED}Height " + (cursor ? std::to_string(cursor->z / 8) : "Unavailable"));
+            rt, p + ScreenCoordsXY{ 10, 108 }, "{WHITE}Height " + (cursor ? std::to_string(cursor->z / 8) : "Unavailable"));
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 132 },
             review          ? "{MUTED}L/R Select option"
@@ -441,15 +441,16 @@ namespace OpenRCT2::Ui::Handheld::Mazes
             rt, p + ScreenCoordsXY{ 10, 154 },
             review          ? "{MUTED}A Apply | B Cancel"
                 : Picking() ? "{MUTED}A Select maze cell"
-                : placed    ? "{MUTED}B Finish / access"
+                : placed    ? "{WHITE}B Return to ride"
                             : "{MUTED}L2/R2 Height");
-        DrawModernText(rt, p + ScreenCoordsXY{ 10, 178 }, "{MUTED}SEL Camera | START");
+        DrawModernText(rt, p + ScreenCoordsXY{ 10, 178 }, "{WHITE}SEL Camera | START Ride");
         DrawActionStrip(rt, screen);
         DrawCommand(rt, { 8, screen.height - 21 }, 17, "A", review ? "Select" : Picking() ? "Pick" : "Build");
-        DrawCommand(rt, { 112, screen.height - 21 }, 17, "B", review ? "Cancel" : "Leave");
-        DrawCommand(rt, { 220, screen.height - 21 }, 30, "L/R", review ? "Choice" : (camera ? "Zoom" : "Direction"));
+        DrawCommand(rt, { 98, screen.height - 21 }, 17, "B", review ? "Cancel" : camera ? "Build" : "Ride");
+        DrawCommand(rt, { 188, screen.height - 21 }, 30, "L/R", review ? "Choice" : (camera ? "Zoom" : "Direction"));
         if (!review)
-            DrawCommand(rt, { 374, screen.height - 21 }, 17, "X", camera ? "Rotate" : "Move");
+            DrawCommand(rt, { 318, screen.height - 21 }, 17, "X", camera ? "Rotate" : "Move");
+        DrawCommand(rt,{420,screen.height-21},38,"START","Ride");
         const auto q = review ? Apply(GA::MazeBuildMode::fill, false) : Picking() ? SelectCell(false) : Build(false);
         if (!feedback.empty())
             DrawContextMessage(rt, Layout::ContextAnchor(screen, kContextSize, true), feedback);

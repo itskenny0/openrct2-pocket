@@ -99,6 +99,21 @@ namespace OpenRCT2::Ui::Handheld
             && !CustomTracks::Active() && !Mazes::Active() && FlatRides::CurrentStage()==FlatRides::Stage::inactive;
     }
 
+    static std::optional<RideManagement::Target> ConstructionRide()
+    {
+        if(CustomTracks::Active()) return CustomTracks::Target();
+        if(Mazes::Active()) return Mazes::Target();
+        if(FlatRides::CurrentStage()!=FlatRides::Stage::inactive) return FlatRides::Target();
+        if(Paths::IsActive() && _ridePathAccess) return _ridePathAccess;
+        return {};
+    }
+    static void ReturnFromRideTool(const std::optional<RideManagement::Target>& target)
+    {
+        const auto context=RideNavigation::Take();
+        EndTerrain();
+        if(target && RideManagement::Resolve(*target)) Windows::HandheldRideReturn(*target,context);
+    }
+
     static bool AccessTargetValid()
     {
         return _ridePathAccess && RideAccess::PointValid(*_ridePathAccess, _accessStation, _accessExit, _accessOutside);
@@ -114,6 +129,7 @@ namespace OpenRCT2::Ui::Handheld
 
     void BeginTerrain(bool raise)
     {
+        RideNavigation::construction.reset();
         _constructionAdjust.reset();
         PeepPlacement::End();
         StaffPatrol::End();
@@ -373,6 +389,7 @@ namespace OpenRCT2::Ui::Handheld
 
     void EndTerrain()
     {
+        RideNavigation::construction.reset();
         _constructionAdjust.reset();
         PeepPlacement::End();
         StaffPatrol::End();
@@ -660,6 +677,8 @@ namespace OpenRCT2::Ui::Handheld
                 else if (Windows::HandheldDashboardIsOpen()
                     && (action == Action::previousOption || action == Action::nextOption))
                     Windows::HandheldDashboardPage(action == Action::previousOption ? -1 : 1);
+                else if (action == Action::contextPrimary && Windows::HandheldRideQuickAccess())
+                { /* Contextual access shortcut at the tab root only. */ }
                 else if (action == Action::confirm)
                     Windows::HandheldMenuConfirm();
                 else if (action == Action::openBuild && Windows::HandheldDashboardIsOpen())
@@ -703,29 +722,31 @@ namespace OpenRCT2::Ui::Handheld
         if (CustomTracks::Completed())
         {
             const auto target = *CustomTracks::Completed();
+            const auto context=RideNavigation::Take();
             EndTerrain();
             if (FlatRides::CanResume(target))
-                ResumeFlatRide(target.id);
-            else if (RideAccess::Inspect(target))
-                Windows::HandheldRideAccessOpen(target);
+            {
+                if(ResumeFlatRide(target.id)) RideNavigation::construction=context;
+            }
+            else Windows::HandheldRideReturn(target,context);
             input.suspend();
         }
         if (Designs::Completed())
         {
             const auto target = *Designs::Completed();
+            const auto context=RideNavigation::Take();
             EndTerrain();
             if (FlatRides::CanResume(target))
-                ResumeFlatRide(target.id);
-            else if (RideAccess::Inspect(target))
-                Windows::HandheldRideAccessOpen(target);
+            {
+                if(ResumeFlatRide(target.id)) RideNavigation::construction=context;
+            }
+            else Windows::HandheldRideReturn(target,context);
             input.suspend();
         }
         if (_terrainActive && FlatRides::CurrentStage() == FlatRides::Stage::inactive && FlatRides::Target())
         {
-            const auto target = *FlatRides::Target();
-            EndTerrain();
-            if (RideAccess::Inspect(target))
-                Windows::HandheldRideAccessOpen(target);
+            const auto target = FlatRides::Target();
+            ReturnFromRideTool(target);
             input.suspend();
         }
         if (PeepPlacement::Active())
@@ -911,6 +932,17 @@ namespace OpenRCT2::Ui::Handheld
             input.suspend();
             return;
         }
+        const auto constructionRide=ConstructionRide();
+        if(constructionRide && std::find(frame.actions.begin(),frame.actions.end(),Action::openMenu)!=frame.actions.end()
+            && !CustomTracks::Busy() && !FlatRides::Busy() && !Mazes::Busy()
+            && !HasTextOrModalInput() && (CanExplore() || wm->FindByClass(WindowClass::handheldMenu)))
+        {
+            const auto context=RideNavigation::Take();
+            wm->CloseByClass(WindowClass::handheldMenu);
+            RideNavigation::construction=context;
+            ReturnFromRideTool(constructionRide);
+            input.suspend();return;
+        }
         if (HandleMenuInput(input, frame))
             return;
         if (_constructionAdjust.active && (_sceneryTool || _areaTool) && CanExplore())
@@ -1015,13 +1047,8 @@ namespace OpenRCT2::Ui::Handheld
                     {
                         if (Mazes::Reviewing())
                             Mazes::Cancel();
-                        else
-                        {
-                            const auto t = Mazes::Target();
-                            EndTerrain();
-                            if (t && RideManagement::Resolve(*t))
-                                Windows::HandheldRideOpen(t->id);
-                        }
+                        else if(Mazes::CameraMode()) Mazes::ToggleCamera();
+                        else ReturnFromRideTool(Mazes::Target());
                     }
                     else if (action == Action::previousOption || action == Action::nextOption)
                     {
@@ -1067,14 +1094,9 @@ namespace OpenRCT2::Ui::Handheld
                         CustomTracks::Action(true);
                     else if (action == Action::back)
                     {
-                        if (CustomTracks::Replacing())
-                        {
-                            const auto target = CustomTracks::Target();
-                            EndTerrain();
-                            if (target) Windows::HandheldRideOpen(target->id);
-                        }
-                        else if (CustomTracks::StationPlacement())
-                            EndTerrain();
+                        if(CustomTracks::CameraMode()) CustomTracks::ToggleCamera();
+                        else if (CustomTracks::Replacing() || CustomTracks::StationPlacement())
+                            ReturnFromRideTool(CustomTracks::Target());
                         else
                             CustomTracks::Undo();
                     }
@@ -1180,6 +1202,8 @@ namespace OpenRCT2::Ui::Handheld
                 {
                     const bool designBrowser=Designs::Active() && Designs::BrowserReturn();
                     const auto access = _ridePathAccess;
+                    const auto ride=ConstructionRide();
+                    const auto context=RideNavigation::Take();
                     const auto person = PeepPlacement::target;
                     const auto employee = StaffPatrol::target;
                     EndTerrain();
@@ -1190,8 +1214,8 @@ namespace OpenRCT2::Ui::Handheld
                         Windows::HandheldStaffOpen(*person->staff);
                     if (employee && StaffManagement::Resolve(*employee))
                         Windows::HandheldStaffOpen(employee);
-                    if (access && RideManagement::Resolve(*access))
-                        Windows::HandheldRideAccessOpen(*access);
+                    if (ride && RideManagement::Resolve(*ride)) Windows::HandheldRideReturn(*ride,context);
+                    else if (access && RideManagement::Resolve(*access)) Windows::HandheldRideAccessOpen(*access);
                 }
                 else if (const auto followed = GuestFollow::Current(); followed && CanExplore())
                     Windows::HandheldGuestOpen(*followed);

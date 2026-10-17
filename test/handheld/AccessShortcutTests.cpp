@@ -82,7 +82,8 @@ int main(int argc,char** argv)
   Check(F::CurrentStage()==F::Stage::entrance,"Inspection first action did not resume placement");F::End();
   Check(snapshot()==before && state.park.cash==cash && std::memcmp(&station,&GetRide(target.id)->getStation(),sizeof(station))==0,"Navigation modified map/cash/station");
   // Moving past the new first action must still reach the original Close operation.
-  W::HandheldRideOpen(target.id);W::HandheldMenuMove(3);W::HandheldMenuConfirm();GA::ProcessQueue(state);
+  W::HandheldRideOpen(target.id);FocusRideTabAction("Close...");W::HandheldMenuConfirm();
+  Check(W::HandheldRidesPresentation().confirmation,"Close did not enter native review");W::HandheldMenuBack();GA::ProcessQueue(state);
   Check(GetRide(target.id)->status==RideStatus::closed && F::CurrentStage()==F::Stage::inactive,"Shortcut shifted Close into a placement action");
   wm->CloseByClass(WindowClass::handheldMenu);WindowCullDead();
   if(argc==4) {

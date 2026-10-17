@@ -112,7 +112,7 @@ int main(int argc,char** argv) { try {
  for(int i=0;i<2;++i) {
   const auto handoffCash=getGameState().park.cash;
   const auto point=H::RideAccess::Existing(target).at(i); // Refresh context after the preceding real landing changed nearby paths.
-  W::HandheldRideOpen(target.id);W::HandheldMenuConfirm();W::HandheldMenuMove(i);W::HandheldMenuConfirm();
+  W::HandheldRideOpen(target.id);Check(W::HandheldRideQuickAccess(),"Modern access shortcut missing");W::HandheldMenuMove(i);W::HandheldMenuConfirm();
   const auto model=W::HandheldRidesPresentation();Check(model.rows.size()==4&&model.rows[2]==(i?"Connect exit path...":"Connect entrance queue..."),"Point path handoff missing");
   W::HandheldMenuMove(2);
   if(i==0) {gOpenRCT2NoGraphics=false;capture("access-path-shortcut.ppm");gOpenRCT2NoGraphics=true;}

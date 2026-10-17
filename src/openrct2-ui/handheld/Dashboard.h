@@ -153,6 +153,14 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
                 model.confirmation ? height-20 : height}, model, state.focus == Focus::content);
         DrawActionStrip(rt, screen);
         const int y = screen.height - 21;
+        if(!model.tabs.empty())
+        {
+            DrawCommand(rt,{8,y},38,"D-pad","Move");DrawCommand(rt,{82,y},17,"A","Select");
+            DrawCommand(rt,{164,y},17,"B","Back");DrawCommand(rt,{238,y},28,"L/R","Tab");
+            if (!model.contextualAction.empty()) DrawCommand(rt,{318,y},17,"X",model.contextualAction.c_str());
+            DrawCommand(rt,{402,y},28,"SEL","Sections");
+            return;
+        }
         const bool ridePaging = state.section == Section::rides && state.focus == Focus::content && sectionRoot;
         DrawCommand(rt, {10, y}, 38, "D-pad", model.editing ? "Adjust" : model.actionGrid ? "Move" : "Choose");
         DrawCommand(rt, {ridePaging ? 100 : 154, y}, 17, "A",

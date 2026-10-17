@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include <openrct2-ui/handheld/RideAccess.h>
 #include <openrct2/Input.h>
+#include "RideTabNavigation.h"
 #include <openrct2/interface/Window.h>
 static void TestRideAccess(
     IContext& context, const std::string& profile, bool realUi, const Ui::Handheld::RideManagement::Target& target)
@@ -27,8 +28,8 @@ static void TestRideAccess(
         H::UpdateExplorer(input);
         Require(
             W::HandheldDashboardIsOpen() && W::HandheldRidesPresentation().selected == 0,
-            "Completed ride did not offer optional Cancel-first access handoff");
-        W::HandheldMenuConfirm();
+            "Completed ride did not return to modern management");
+        W::HandheldMenuBack();
         Require(!W::HandheldDashboardIsOpen() && !P::IsActive(), "Completion handoff trapped construction");
     }
     H::EndTerrain();
@@ -85,10 +86,9 @@ static void TestRideAccess(
         Require(
             W::HandheldDashboardIsOpen() && !P::IsActive() && W::HandheldRidesPresentation().selected == 0,
             "Guided path B did not recover access / leaked confirmation");
-        W::HandheldMenuConfirm();
+        W::HandheldMenuBack();
         W::HandheldRideOpen(target.id);
-        for (int n = 0; n < 3; ++n)
-            W::HandheldMenuMove(1);
+        FocusRideTabAction("Access / paths...");
         W::HandheldMenuConfirm();
         Require(W::HandheldRidesPresentation().rows.size() == 7, "Park ride inspection cannot recover access");
         for (int n = 0; n < 5; ++n)
