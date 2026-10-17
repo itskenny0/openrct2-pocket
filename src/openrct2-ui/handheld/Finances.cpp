@@ -31,7 +31,7 @@ namespace OpenRCT2::Ui::Handheld::Finances
         else if (direction < 0)
             draft.value = draft.value <= step ? 0 : draft.value - step;
     }
-    GameActions::Result Action(const Draft& draft, bool execute)
+    GameActions::Result Action(const Draft& draft, bool execute, GameActions::GameAction::Callback_t callback)
     {
         GameActions::Result invalid;
         invalid.error = GameActions::Status::disallowed;
@@ -49,9 +49,11 @@ namespace OpenRCT2::Ui::Handheld::Finances
         if (draft.field == Field::loan)
         {
             auto action = GameActions::ParkSetLoanAction(draft.value);
+            action.SetCallback(std::move(callback));
             return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
         }
         auto action = GameActions::ParkSetEntranceFeeAction(draft.value);
+        action.SetCallback(std::move(callback));
         return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
     }
     std::string Feedback(const GameActions::Result& result)
@@ -103,6 +105,7 @@ namespace OpenRCT2::Ui::Handheld::Finances
         const bool loan = draft->field == Field::loan;
         model.title = loan ? "Loan balance" : "Park admission";
         model.editing = view == View::editor;
+        model.contentSized=true;
         model.confirmation = view == View::confirmation;
         model.stats = { { "Current", FormatMoney(draft->baseline) },
                         { model.editing ? "Draft" : "New value", FormatMoney(draft->value) } };

@@ -22,7 +22,7 @@ namespace OpenRCT2::Ui::Handheld::ResearchManagement
     Draft Begin();
     void AdjustFunding(Draft& draft, int direction);
     void ToggleCategory(Draft& draft, size_t category);
-    GameActions::Result Action(const Draft& draft, bool execute);
+    GameActions::Result Action(const Draft& draft, bool execute, GameActions::GameAction::Callback_t callback = {});
     ManagementPresentation Presentation(
         View view, size_t selected, const std::optional<Draft>& draft = {}, const std::string& status = {});
 } // namespace OpenRCT2::Ui::Handheld::ResearchManagement

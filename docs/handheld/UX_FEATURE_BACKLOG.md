@@ -13,6 +13,11 @@ native validation, accounting and save compatibility in any future implementatio
   a clearly communicated progress/cancellation policy.
 - Bulk path removal with explicit native per-tile refund and failure review.
 
-The recommended separate management milestone remains finances, research,
-marketing and remaining park management, using actionable native summaries and
-consistent focus/return behavior. Do not mix that redesign into path construction.
+- Optional guest-needs semantic emphasis, only after native meanings/thresholds
+  are verified. Current neutral native-value bars and directional explanation
+  remain valid; do not invent health diagnoses or gameplay scores.
+
+Finance/research/marketing/park workspaces are now implemented in Phase 6 after
+Phase 7. The next milestone is full-system consistency, populated-park integration
+and physical-device readiness. See `CONTROLLER-UX-PHASE6.md` and the separate
+verified/verification-task polish backlog. These proposals are not promised scope.

@@ -27,7 +27,7 @@ namespace OpenRCT2::Ui::Handheld::Finances
     bool Available(Field field);
     Draft Begin(Field field);
     void Adjust(Draft& draft, int direction);
-    GameActions::Result Action(const Draft& draft, bool execute);
+    GameActions::Result Action(const Draft& draft, bool execute, GameActions::GameAction::Callback_t callback = {});
     std::string Feedback(const GameActions::Result& result);
     std::pair<money64, money64> MonthlyTotals();
     ManagementPresentation Presentation(

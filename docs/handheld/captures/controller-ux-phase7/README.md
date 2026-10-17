@@ -6,9 +6,9 @@ The park is a native initialized test fixture. These are not mockups, blank
 component backgrounds, QEMU output, mature-park play sessions or physical Brick
 screenshots. Original asset files are not included.
 
-PNG files are supplied separately, and are omitted from this source publication
-pending explicit permission to publish imagery derived from private game assets.
-The recorded filenames and hashes identify the produced evidence.
+PNG publication was explicitly authorized by the user with the Phase 6 implementation
+request. These original Phase 7 captures are now included; their recorded hashes
+and original milestone provenance are retained. Raw asset files are excluded.
 
 `contact-sheet.png` shows six representative views. The fifteen individual PNGs
 are all exactly 512×384:

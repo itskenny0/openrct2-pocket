@@ -85,6 +85,8 @@ namespace OpenRCT2::Ui::Windows
     size_t HandheldDashboardSectionIndex();
     bool HandheldOverviewIsOpen();
     Handheld::ManagementPresentation HandheldOverviewPresentation();
+    Handheld::ManagementPresentation HandheldManagementPresentation();
+    bool HandheldManagementContext();
     bool HandheldRidesIsOpen();
     Handheld::ManagementPresentation HandheldRidesPresentation();
     Handheld::ManagementPresentation HandheldShopAppearancePresentation();

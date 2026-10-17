@@ -172,6 +172,7 @@ namespace OpenRCT2::Ui::Handheld::MarketingManagement
         if (view == View::active)
         {
             model.title = Name(activeType);
+            model.contentSized=true;model.summaryMetrics=true;model.metricColumns=2;
             if (const auto* campaign = MarketingGetCampaign(activeType))
                 model.stats = { { "Target", ActiveTarget(*campaign) },
                                 { "Weeks left", std::to_string(campaign->weeksLeft) },
@@ -211,10 +212,15 @@ namespace OpenRCT2::Ui::Handheld::MarketingManagement
         const auto cost = query.error == GameActions::Status::ok ? query.cost : kMoney64Undefined;
         if (view == View::editor)
         {
+            model.summaryMetrics=true;model.metricColumns=2;model.contentSized=true;model.rowHeight=40;
             model.stats = { { "Per week", noMoney ? "Not applicable" : FormatMoney(nominal) },
                             { "Total cost", noMoney ? "Not applicable" : FormatMoney(cost) } };
             if (NeedsTarget(draft->type))
+            {
                 model.rows.push_back(draft->target ? "Target: " + TargetName(*draft->target) : "Choose target...");
+                model.rowDetails.push_back("Left/Right browse / A opens full list");
+            }
+            model.rowDetails.push_back("Left/Right adjusts 2 to 12 weeks");
             model.rows.push_back("Duration: " + std::to_string(draft->weeks) + " weeks");
             model.rows.push_back("Review campaign...");
             model.rows.push_back("Cancel");

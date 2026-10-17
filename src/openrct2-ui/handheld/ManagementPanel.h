@@ -39,6 +39,11 @@ namespace OpenRCT2::Ui::Handheld
         size_t selectedTab{};
         std::string headerStatus;
         int metricHeight = 48;
+        int metricColumns{};
+        int rowHeight{};
+        int reservedHeight{}; // Space for specialized native charts, never synthetic graph data.
+        std::string navigationHint;
+        std::vector<std::string> rowValues; // Dense label/value reports; values are not actions.
         bool contentSized{};
         size_t columns = 1; // Controller text entry uses the same content shell.
     };
@@ -50,12 +55,12 @@ namespace OpenRCT2::Ui::Handheld
     inline ManagementLayout MeasureManagement(ScreenSize size, const ManagementPresentation& model)
     {
         const int columns = model.actionGrid ? (size.width >= 360 ? 2 : 1) : static_cast<int>(std::max<size_t>(1, model.columns));
-        const int statColumns = model.summaryMetrics && !model.stats.empty() ? (size.width >= 440 ? 3 : 2) : 1;
+        const int statColumns = model.summaryMetrics && !model.stats.empty() ? (model.metricColumns ? model.metricColumns : size.width >= 440 ? 3 : 2) : 1;
         const int statHeight = model.summaryMetrics ? model.metricHeight : 24;
         const int statRows = (static_cast<int>(model.stats.size()) + statColumns - 1) / statColumns;
         const int rowStart = 64 + (model.tabs.empty() ? 0 : 34) + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16
-            + (model.graph.empty() ? 0 : 110) + (model.rows.empty() ? 0 : 11) + (model.toolbarCount ? 36 : 0);
-        const int rowHeight = model.denseRoster ? 38 : model.rosterCards ? 46 : model.actionGrid ? 30 : columns > 1 ? 24 : 30;
+            + model.reservedHeight + (model.graph.empty() ? 0 : 110) + (model.rows.empty() ? 0 : 11) + (model.toolbarCount ? 36 : 0);
+        const int rowHeight = model.rowHeight ? model.rowHeight : model.denseRoster ? 38 : model.rosterCards ? 46 : model.actionGrid ? 30 : columns > 1 ? 24 : 30;
         const size_t capacity = std::max(1, (size.height - rowStart - 30) / rowHeight) * columns;
         return {columns, rowHeight, rowStart, statColumns, statHeight, capacity};
     }
@@ -153,6 +158,15 @@ namespace OpenRCT2::Ui::Handheld
                 if (focused && i == model.selected) Fill(rt, p + ScreenCoordsXY{x, y}, {cellWidth - 2, rowHeight - 2}, Theme::gold);
                 DrawModernEllipsised(rt, p + ScreenCoordsXY{x + 3, y + 6}, cellWidth - 6,
                     std::string(focused && i == model.selected ? "{BLACK}" : "{WHITE}") + model.rows[i]);
+            }
+            else if (i < model.rowValues.size())
+            {
+                const bool selected=focused&&i==model.selected;
+                if(selected)Fill(rt,p+ScreenCoordsXY{x,y},{cellWidth-4,rowHeight-2},Theme::gold);
+                DrawModernEllipsised(rt,p+ScreenCoordsXY{x+8,y+7},cellWidth-164,
+                    std::string(selected?"{BLACK}":"{WHITE}")+model.rows[i]);
+                DrawModernEllipsised(rt,p+ScreenCoordsXY{x+cellWidth-150,y+7},140,
+                    std::string(selected?"{BLACK}":"{WHITE}")+model.rowValues[i]);
             }
             else
                 DrawActionRow(rt, p + ScreenCoordsXY{x, y}, {cellWidth - 4, rowHeight - 2}, model.rows[i],

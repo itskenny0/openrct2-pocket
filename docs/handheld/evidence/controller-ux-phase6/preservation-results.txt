@@ -1,0 +1,12 @@
+PathScenarioUsabilityTests 0
+SceneryPathParityTests 0
+PauseResumeTests 0
+AccessShortcutTests 0
+PresentationLifecycleTests 0
+RideAccessRelocationTests 0
+PathActionsTests 0
+ConstructionTests 0
+UiRedesignTests 0
+ConstructionUxTests 0
+RideFlowTests 0
+PeopleUxTests 0

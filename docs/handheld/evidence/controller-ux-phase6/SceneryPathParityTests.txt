@@ -1,0 +1,4 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+Native clear categories/bounds, stale reviews, whole multi-tile refunds, cancellation, paths preserved/opt-in passed
+Scenery groups, native banner/sign styles, stale/bounds, SDL Cancel-first and persistence passed

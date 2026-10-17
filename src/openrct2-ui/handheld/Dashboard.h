@@ -102,7 +102,7 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         const auto rail = Layout::menuOrigin;
         const auto content = rail + ScreenCoordsXY{ railWidth + Layout::gutter, 0 };
         const int height = Layout::ContentHeight(screen);
-        const bool expanded = (state.section == Section::rides || state.section == Section::staff || state.section == Section::guests) && state.focus == Focus::content;
+        const bool expanded = state.focus == Focus::content;
         if (!expanded)
         {
         DrawSurface(rt, rail, { railWidth, height });
@@ -155,7 +155,7 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         const int y = screen.height - 21;
         if(!model.tabs.empty())
         {
-            DrawCommand(rt,{8,y},38,"D-pad","Move");DrawCommand(rt,{82,y},17,"A","Select");
+            DrawCommand(rt,{8,y},38,"D-pad",model.navigationHint.empty()?"Move":model.navigationHint.c_str());DrawCommand(rt,{82,y},17,"A",model.primaryAction.empty()?"Select":model.primaryAction.c_str());
             DrawCommand(rt,{164,y},17,"B","Back");DrawCommand(rt,{238,y},28,"L/R","Tab");
             if (!model.contextualAction.empty()) DrawCommand(rt,{318,y},17,"X",model.contextualAction.c_str());
             DrawCommand(rt,{402,y},28,"SEL","Sections");

@@ -677,6 +677,8 @@ namespace OpenRCT2::Ui::Handheld
                 else if (Windows::HandheldDashboardIsOpen()
                     && (action == Action::previousOption || action == Action::nextOption))
                     Windows::HandheldDashboardPage(action == Action::previousOption ? -1 : 1);
+                else if (action == Action::contextPrimary && Windows::HandheldManagementContext())
+                { /* Draft-only research funding shortcut. */ }
                 else if (action == Action::contextPrimary && Windows::HandheldRideQuickAccess())
                 { /* Contextual access shortcut at the tab root only. */ }
                 else if (action == Action::confirm)

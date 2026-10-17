@@ -33,7 +33,9 @@ namespace OpenRCT2::Ui::Handheld::FinanceInformation
     {
         auto ft = Formatter();
         ft.Add<uint16_t>(month);
-        return ParkInformation::PlainText(FormatStringIDLegacy(STR_FINANCES_SUMMARY_MONTH_HEADING, ft.Data()), true);
+        Date period;period.monthsElapsed=month;
+        return ParkInformation::PlainText(FormatStringIDLegacy(STR_FINANCES_SUMMARY_MONTH_HEADING, ft.Data()), true)
+            +" / Year "+std::to_string(period.GetYear()+1);
     }
     struct Ledger
     {
@@ -134,14 +136,15 @@ namespace OpenRCT2::Ui::Handheld::FinanceInformation
                                                                         : "Waiting for native weekly history";
         return model;
     }
-    inline void DrawHistory(Drawing::RenderTarget& rt, size_t graph)
+    inline void DrawHistory(Drawing::RenderTarget& rt, size_t graph,
+        ScreenRect bounds = {{138,150},{476,234}}, int32_t sample=-1)
     {
         if (getGameState().park.flags.has(ParkFlag::noMoney))
             return;
         graph %= 3;
         Graph::GraphProperties<money64> props{};
         props.series = Series(graph);
-        props.hoverIdx = -1;
+        props.hoverIdx = -1; // Controller-selected value is displayed above the native plot.
         // Same magnitude/leading-digit range as desktop Finances, within ordinary native monetary bounds.
         money64 magnitude = 0;
         for (size_t i = 0; i < 64; ++i)
@@ -156,7 +159,12 @@ namespace OpenRCT2::Ui::Handheld::FinanceInformation
         props.darkBackground = true;
         props.breakOnMissing = true;
         props.lineCol = ColourWithFlags{ Drawing::Colour::grey };
-        props.RecalculateLayout({ { 138, 150 }, { 476, 234 } }, 5, 64);
+        props.RecalculateLayout(bounds, 5, 64);
         Graph::DrawFinanceGraph(rt, props);
+        if(sample>=0&&sample<64&&props.series[sample]!=kMoney64Undefined)
+        {
+            const int x=props.internalBounds.getRight()-sample*props.xStepPx;
+            GfxDrawDashedLine(rt,{{x,props.internalBounds.getTop()},{x,props.internalBounds.getBottom()}},3,Theme::gold);
+        }
     }
 } // namespace OpenRCT2::Ui::Handheld::FinanceInformation

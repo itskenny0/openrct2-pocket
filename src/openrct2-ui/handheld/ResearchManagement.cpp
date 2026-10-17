@@ -44,7 +44,7 @@ namespace OpenRCT2::Ui::Handheld::ResearchManagement
         if (category < 7 && (AvailableCategories() & (1u << category)))
             draft.priorities ^= 1u << category;
     }
-    GameActions::Result Action(const Draft& draft, bool execute)
+    GameActions::Result Action(const Draft& draft, bool execute, GameActions::GameAction::Callback_t callback)
     {
         const auto& state = getGameState();
         GameActions::Result invalid;
@@ -58,6 +58,7 @@ namespace OpenRCT2::Ui::Handheld::ResearchManagement
         else
         {
             auto action = GameActions::ParkSetResearchFundingAction(draft.priorities, draft.funding);
+            action.SetCallback(std::move(callback));
             return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
         }
         return invalid;

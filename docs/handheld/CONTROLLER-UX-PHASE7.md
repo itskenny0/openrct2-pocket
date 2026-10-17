@@ -185,9 +185,10 @@ scenery parity, pause, presentation lifecycle, access/relocation, construction,
 ride flow and staff/guest workspaces. Python runner checks and targeted Git
 whitespace checks passed.
 
-The 15 captures and contact sheet were produced and supplied separately. PNGs
-are omitted from this source publication pending explicit permission to publish
-asset-derived imagery; the capture README and verification hashes are included.
+The 15 captures and contact sheet were initially supplied separately. The user
+explicitly authorized repository publication with Phase 6; those original PNGs
+are now included, retaining the recorded hashes and original provenance. Raw
+asset files are excluded.
 
 The 512×384 captures are real **desktop offscreen native runtime fixture** renders
 with the user's original G1 graphics and official objects. They include live Line
