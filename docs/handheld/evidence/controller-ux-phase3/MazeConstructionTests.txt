@@ -1,0 +1,5 @@
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+track design index out of date
+Building track design index (1 items)
+Finished building track design index in 0.02 seconds.
+Native maze availability/create/half-cells/multi-tiles/move/fill/cancel/stale/identity/bounds/ownership/cost/access/save passed

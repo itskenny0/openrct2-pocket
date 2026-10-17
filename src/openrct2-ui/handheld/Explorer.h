@@ -105,6 +105,8 @@ namespace OpenRCT2::Ui::Windows
     void HandheldPathSurfacePickerOpen();
     void HandheldTreePickerOpen();
     void HandheldSceneryOptionsOpen();
+    void HandheldSceneryCatalogOpen();
+    void HandheldTerrainMaterialPickerOpen(bool edge);
     bool HandheldSceneryPickerIsOpen();
     void HandheldScenerySearchOpen();
     void HandheldSceneryStyleOpen(const Handheld::SceneryTools::Target& target);

@@ -426,9 +426,12 @@ int main(int argc, char** argv)
         H::EndTerrain();
         H::BeginSurface(); H::Frame quickColourOptions; quickColourOptions.actions={H::Action::contextSecondary,H::Action::contextSecondary};
         H::HandleExplorerInput(controller,quickColourOptions);
-        Check(Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu) && A::settings.operation==A::Operation::paint
+        Check(!Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu) && A::settings.operation==A::Operation::paint
             && A::settings.width==1 && A::settings.height==1 && A::settings.surface!=kObjectEntryIndexNull,
-            "Quick surface did not hand off native selection into colour/area options");
+            "Quick surface did not hand off native selection into Paint adjustment");
+        H::Frame moreOptions;moreOptions.actions={H::Action::contextPrimary,H::Action::contextPrimary};
+        H::HandleExplorerInput(controller,moreOptions);
+        Check(Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu),"Paint Adjust More did not retain expanded options");
         Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
         H::EndTerrain(); terrainPanel=false; captureFocus={656,656,32};
         const auto cash = state.park.cash;

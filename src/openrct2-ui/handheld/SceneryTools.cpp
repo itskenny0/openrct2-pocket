@@ -217,6 +217,13 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                 return g.name;
         return "Group unavailable";
     }
+    bool CanRotate()
+    {
+        if(current.category==Category::additions) return false;
+        if(current.category!=Category::small) return true;
+        const auto* e=ObjectEntryManager::GetObjectEntry<SmallSceneryEntry>(current.object);
+        return e && e->flags.has(SmallSceneryFlag::isRotatable);
+    }
     std::array<bool, 3> Channels(Category c, ObjectEntryIndex i)
     {
         if (c == Category::small)
@@ -329,19 +336,26 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                 "Pick placed object", "A Select / B Back", "No placement or charge");
             return;
         }
-        DrawConstructionOverlay(
-            rt, position, s.category == Category::additions ? "Path furniture" : "Scenery", Name(s),
-            s.mode == Mode::place          ? (ScatterActive() ? "Scatter " + std::to_string(s.scatterSize) + " x " + std::to_string(s.scatterSize) : "Place")
-                : s.mode == Mode::recolour ? "Recolour"
-                : s.mode == Mode::remove   ? "Remove"
-                                           : "Pick placed object",
-            s.category == Category::additions     ? "Native path edges"
-                : s.category == Category::walls   ? "Wall edge " + std::to_string(s.direction + 1)
-                : s.category == Category::banners ? "Path edge " + std::to_string(s.direction + 1)
-                : s.category == Category::large
-                ? "Direction " + std::to_string(s.direction + 1) + " / multi-tile"
-                : "Direction " + std::to_string(s.direction + 1) + " / Q" + std::to_string(s.quadrant + 1),
-            ScatterActive() ? ScatterStatus() : s.height ? "Height " + std::to_string(s.height) : "Automatic height");
+        DrawSurface(rt,position,{164,228});
+        DrawHeadingText(rt,position+ScreenCoordsXY{12,12},"Scenery",140);
+        if(const auto* object=GetContext()->GetObjectManager().GetLoadedObject(Type(s.category),s.object))
+        {
+            Drawing::RenderTarget preview;
+            if(ClipRenderTarget(preview,rt,position+ScreenCoordsXY{12,42},60,62))
+            {
+                preview.zoom_level=ZoomLevel{2};
+                object->DrawPreview(preview,preview.zoom_level.ApplyTo(60),preview.zoom_level.ApplyTo(62));
+            }
+        }
+        DrawStrongText(rt,position+ScreenCoordsXY{80,48},s.mode==Mode::place ? "Place" : s.mode==Mode::recolour ? "Recolour" : "Remove",72);
+        DrawModernEllipsised(rt,position+ScreenCoordsXY{80,72},72,ScatterActive() ? "{WHITE}Scatter" : "{MUTED}Single");
+        DrawModernEllipsised(rt,position+ScreenCoordsXY{12,116},140,"{WHITE}"+Name(s));
+        DrawModernEllipsised(rt,position+ScreenCoordsXY{12,140},140,s.category==Category::additions ? "{MUTED}Native path edges"
+            : "{MUTED}Direction "+std::to_string(s.direction+1)+(s.category==Category::small ? " / Q"+std::to_string(s.quadrant+1) : ""));
+        DrawModernEllipsised(rt,position+ScreenCoordsXY{12,160},140,ScatterActive() ? "{WHITE}"+ScatterStatus()
+            : s.height ? "{MUTED}Height "+std::to_string(s.height) : "{MUTED}Automatic height");
+        DrawModernText(rt,position+ScreenCoordsXY{12,186},"{WHITE}L2/R2 Height");
+        DrawModernText(rt,position+ScreenCoordsXY{12,207},"{WHITE}Y Adjust | X Camera");
     }
     static GameActions::Result Query(std::optional<CoordsXY> tile, const Settings& s);
     void Configure(size_t row, int delta)

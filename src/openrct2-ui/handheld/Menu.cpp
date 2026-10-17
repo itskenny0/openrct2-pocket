@@ -23,6 +23,7 @@
 #include "MapSubjects.h"
 #include "Paths.h"
 #include "PathSurfacePicker.h"
+#include "TerrainMaterials.h"
 #include "ResearchManagement.h"
 #include "ResearchCatalog.h"
 #include "ManagementNews.h"
@@ -86,6 +87,7 @@ namespace OpenRCT2::Ui::Windows
         paths,
         pathOptions,
         pathSurfacePicker,
+        terrainMaterialPicker,
         pathUndoConfirm,
         treePicker,
         sceneryCategory,
@@ -1005,6 +1007,7 @@ namespace OpenRCT2::Ui::Windows
 
         void page(Page next)
         {
+            if(next==Page::sceneryPicker && _page!=Page::scenerySearch) _sceneryPickerDirect=false;
             if (_page == Page::build) _buildFocus = _focus.index();
             if (_page == Page::paths) _pathModeFocus = _focus.index();
             if (_page == Page::pathOptions) _pathOptionsFocus[Handheld::Paths::IsConnected()] = _focus.index();
@@ -1364,6 +1367,7 @@ namespace OpenRCT2::Ui::Windows
                              "Scenery off", "Rotate camera", "Back to placement", "Choose vehicle", "Availability / warnings" };
                 case Page::designConfirm:
                     return { "Cancel", "Place design" };
+                case Page::terrainMaterialPicker:
                 case Page::pathSurfacePicker:
                 case Page::trackPiecePicker:
                 case Page::designPicker:
@@ -1609,6 +1613,20 @@ namespace OpenRCT2::Ui::Windows
         {
             page(Page::pathOptions);
         }
+        bool _terrainMaterialEdge{}, _sceneryPickerDirect{};
+        void openTerrainMaterialPicker(bool edge)
+        {
+            _terrainMaterialEdge=edge;
+            page(Page::terrainMaterialPicker);
+            const auto entries=Handheld::TerrainMaterials::Entries(edge);
+            const auto index=edge ? Handheld::AreaTools::settings.edge : Handheld::AreaTools::settings.surface;
+            const auto it=std::find_if(entries.begin(),entries.end(),[&](const auto& e){return e.identity.index==index;});
+            _picker.setEntries(entries,it==entries.end() ? std::nullopt : std::optional{it->identity});
+        }
+        void openSceneryCatalog()
+        {
+            page(Page::sceneryPicker);_sceneryPickerDirect=true;refreshPicker();
+        }
         void openPathSurfacePicker()
         {
             Handheld::Paths::ClearPreview();
@@ -1624,7 +1642,8 @@ namespace OpenRCT2::Ui::Windows
             auto custom = Handheld::CustomTracks::RideEntries();
             rideEntries.insert(rideEntries.end(), custom.begin(), custom.end());
             _picker.setEntries(
-                _page == Page::pathSurfacePicker   ? Handheld::PathSurfaces::Entries()
+                _page == Page::terrainMaterialPicker ? Handheld::TerrainMaterials::Entries(_terrainMaterialEdge)
+                    : _page == Page::pathSurfacePicker   ? Handheld::PathSurfaces::Entries()
                     : _page == Page::trackPiecePicker ? Handheld::CustomTracks::Pieces()
                     : _page == Page::designPicker  ? Handheld::Designs::Entries()
                     : _page == Page::ridePicker    ? rideEntries
@@ -1768,7 +1787,7 @@ namespace OpenRCT2::Ui::Windows
         }
         bool picker() const
         {
-            return _page == Page::pathSurfacePicker || _page == Page::sceneryPicker || _page == Page::trackPiecePicker || _page == Page::designPicker
+            return _page == Page::terrainMaterialPicker || _page == Page::pathSurfacePicker || _page == Page::sceneryPicker || _page == Page::trackPiecePicker || _page == Page::designPicker
                 || _page == Page::treePicker || _page == Page::shopPicker || _page == Page::ridePicker;
         }
         bool treePicker() const
@@ -2353,7 +2372,7 @@ namespace OpenRCT2::Ui::Windows
                     page(Page::build);
                     break;
                 case Page::sceneryPicker:
-                    page(Page::sceneryOptions);
+                    if(_sceneryPickerDirect) close();else page(Page::sceneryOptions);
                     break;
                 case Page::rightsConfirm:
                     _rightsDraft.reset();
@@ -2449,6 +2468,8 @@ namespace OpenRCT2::Ui::Windows
                 case Page::shopDemolish:
                     page(Page::shop);
                     break;
+                case Page::terrainMaterialPicker:
+                    close();break;
                 case Page::pathSurfacePicker:
                     page(Page::pathOptions);
                     break;
@@ -2820,6 +2841,10 @@ namespace OpenRCT2::Ui::Windows
                         _status = "Shop unavailable";
                         invalidate();
                     }
+                    break;
+                case Page::terrainMaterialPicker:
+                    if (_picker.selected() && Handheld::TerrainMaterials::Select(_terrainMaterialEdge,_picker.selected()->identity)) close();
+                    else {refreshPicker();_status="Material changed; select again";invalidate();}
                     break;
                 case Page::pathSurfacePicker:
                     if (_picker.selected() && Handheld::PathSurfaces::Select(_picker.selected()->identity))
@@ -5434,6 +5459,12 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::DrawManagementPanel(rt, {ContextGetWidth(), ContextGetHeight()}, model);
                 return;
             }
+            if (_page == Page::terrainMaterialPicker)
+            {
+                Handheld::DrawObjectPicker(rt,{ContextGetWidth(),ContextGetHeight()},_picker,
+                    _terrainMaterialEdge ? "Terrain edges" : "Terrain surfaces",_status,"No loaded materials");
+                return;
+            }
             if (_page == Page::pathSurfacePicker)
             {
                 Handheld::DrawObjectPicker(rt, {ContextGetWidth(), ContextGetHeight()}, _picker,
@@ -5828,6 +5859,14 @@ namespace OpenRCT2::Ui::Windows
     void HandheldSceneryStyleOpen(const Handheld::SceneryTools::Target& target)
     {
         if (auto* window = OpenPanel()) window->openSceneryStyle(target);
+    }
+    void HandheldSceneryCatalogOpen()
+    {
+        if(auto* window=OpenPanel()) window->openSceneryCatalog();
+    }
+    void HandheldTerrainMaterialPickerOpen(bool edge)
+    {
+        if(auto* window=OpenPanel()) window->openTerrainMaterialPicker(edge);
     }
     void HandheldSceneryOptionsOpen()
     {

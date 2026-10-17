@@ -1,0 +1,18 @@
+{
+  "build-redesign/openrct2": "93c2dff6b06cfc48282cb4f7dbf8a6a62720542fedc803409350f737de54ff5c",
+  "build-redesign/openrct2-cli": "7b013ee9eb929ed998123e05cc4b29e378bfde7dcbefbd832626608eb710f5f2",
+  "build-redesign/libopenrct2.a": "33c6440052fa4e830d9d2ee92f2b094e35abbb42637a80b847f24db46a84a5a2",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase3/01-scenery-catalog.png": "d57b3400ce25dbb51f567179fd87afdda5026856f3ce963a93237d4fd8335219",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase3/02-scenery-build.png": "1fdff54ea0204288a0960457badfc27d1ceb07613bfebfcdc611f781bf07c960",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase3/03-scenery-colour.png": "c0f6bb91cc2679100adef43070f120ce17d5430d08d21b343641ff6933ba56d0",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase3/03a-scenery-orientation.png": "1bbd38ac69ea4ce4c9dc75a6b9cbefbc383b6f96d2ff338dcf8394430cafef2e",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase3/04a-scenery-mode.png": "3c687d53d9e6404b25a5eb3ca21f9a6a9270d8e98d5071bc24e325fd63f0f9c2",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase3/05-eyedropper.png": "d4a03e607ceec0640fe677dbd2b2d7aea14b2caff2a7fdde057063bdf6856f91",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase3/06-scatter-adjust.png": "58ed0e6bfcf89815687ebc17a2ac7c21eca315a19017f73f68716baa115f6437",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase3/07-terrain-brush.png": "ae203990f54a213068df441c5ca4d8a95ef5bc64d53fbb1aca088cbe4b3676d2",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase3/08-terrain-surfaces.png": "28e1fc4c34a8181d5b689b39bf6ecde412f6a5b18c42aa760f39a5cd550ad59a",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase3/09-terrain-edges.png": "a8b32f4cef42d63c379458ecb3bf17bb6d8661f9132370f30e46a4bbb38b22e9",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase3/09a-terrain-paint-adjust.png": "d949024b7723e294f3684ed7add2c79565011cd964d82e8c0c55da0cedebc880",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase3/10-terrain-build.png": "909985be2273e95dae8cbe20c9acfc6e14cbefe3bc174dabbcfc7f312fc276b1",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase3/contact-sheet.png": "57c7549372a951af47ed634ed00fcd652f911bfcb11c2759e2058ec92280399e"
+}

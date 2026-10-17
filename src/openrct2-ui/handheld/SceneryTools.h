@@ -84,6 +84,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     std::string CategoryName(Category category);
     std::vector<std::string> Categories();
     std::string Name(const Settings& settings);
+    bool CanRotate();
     std::array<bool, 3> Channels(Category category, ObjectEntryIndex object);
     std::vector<std::string> Options();
     void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position, const std::optional<Target>& hovered = {});

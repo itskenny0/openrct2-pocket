@@ -9,6 +9,7 @@
 #include "AreaTools.h"
 #include "ConstructionPanel.h"
 #include "ControllerInput.h"
+#include "ConstructionAdjust.h"
 #include "Currency.h"
 #include "CustomTracks.h"
 #include "Designs.h"
@@ -60,6 +61,7 @@
 
 namespace OpenRCT2::Ui::Handheld
 {
+    static ConstructionAdjust::State _constructionAdjust;
     static bool _terrainActive{};
     static bool _waterTool{};
     static bool _surfaceTool{};
@@ -89,6 +91,14 @@ namespace OpenRCT2::Ui::Handheld
     static bool _accessExit{};
     static CoordsXYZD _accessOutside{};
 
+    static bool SimpleTerrain()
+    {
+        return _terrainActive && !_areaTool && !_surfaceTool && !_treeTool && !_shopTool
+            && !_sceneryRemovalTool && !_sceneryTool && !_sceneryClearTool && !_rightsTool && !_colourRide
+            && !PeepPlacement::Active() && !StaffPatrol::Active() && !Designs::Active()
+            && !CustomTracks::Active() && !Mazes::Active() && FlatRides::CurrentStage()==FlatRides::Stage::inactive;
+    }
+
     static bool AccessTargetValid()
     {
         return _ridePathAccess && RideAccess::PointValid(*_ridePathAccess, _accessStation, _accessExit, _accessOutside);
@@ -104,6 +114,7 @@ namespace OpenRCT2::Ui::Handheld
 
     void BeginTerrain(bool raise)
     {
+        _constructionAdjust.reset();
         PeepPlacement::End();
         StaffPatrol::End();
         _ridePathAccess.reset();
@@ -362,6 +373,7 @@ namespace OpenRCT2::Ui::Handheld
 
     void EndTerrain()
     {
+        _constructionAdjust.reset();
         PeepPlacement::End();
         StaffPatrol::End();
         _ridePathAccess.reset();
@@ -901,6 +913,57 @@ namespace OpenRCT2::Ui::Handheld
         }
         if (HandleMenuInput(input, frame))
             return;
+        if (_constructionAdjust.active && (_sceneryTool || _areaTool) && CanExplore())
+        {
+            auto indices=_sceneryTool ? ConstructionAdjust::SceneryRows(_constructionAdjust.focus.tab)
+                : ConstructionAdjust::TerrainRows(_constructionAdjust.focus.tab);
+            _constructionAdjust.move(frame.navigateY,indices.size());
+            const auto row=indices[_constructionAdjust.row];
+            const bool enabled=_sceneryTool ? ConstructionAdjust::SceneryEnabled(row) : ConstructionAdjust::TerrainEnabled(row);
+            if(frame.navigateX)
+            {
+                if(!enabled) _terrainStatus="Unavailable for this object or operation";
+                else
+                {
+                    if(_sceneryTool) SceneryTools::Configure(row,frame.navigateX);
+                    else AreaTools::Configure(row,frame.navigateX);
+                    _terrainStatus.clear();_scatterFeedback=false;
+                }
+            }
+            for(const auto action:frame.actions)
+            {
+                if(action==Action::back || action==Action::contextSecondary) _constructionAdjust.active=false;
+                else if(action==Action::confirm)
+                {
+                    if(_areaTool && _constructionAdjust.focus.tab==2 && row<=6)
+                        Windows::HandheldTerrainMaterialPickerOpen(row==6);
+                    else _constructionAdjust.active=false; // Return to building, never place on this press.
+                }
+                else if(action==Action::contextPrimary)
+                {
+                    if(_sceneryTool) Windows::HandheldSceneryOptionsOpen();else Windows::HandheldAreaOptionsOpen();
+                }
+                else if(action==Action::openBuild)
+                {
+                    if(_sceneryTool) Windows::HandheldSceneryCatalogOpen();
+                    else Windows::HandheldTerrainMaterialPickerOpen(_constructionAdjust.focus.tab==2 && row==6);
+                }
+                else if(action==Action::previousOption || action==Action::nextOption)
+                {
+                    _constructionAdjust.tab(action==Action::nextOption ? 1 : -1,_sceneryTool ? 4 : 3);
+                    _terrainStatus.clear();
+                }
+                else if(action==Action::slopeDown || action==Action::slopeUp)
+                {
+                    if(_sceneryTool) SceneryTools::Configure(action==Action::slopeUp ? 4 : 5);
+                    else AreaTools::Configure(1,action==Action::slopeUp ? 1 : -1);
+                    _terrainStatus.clear();_scatterFeedback=false;
+                }
+                else if(action==Action::openMenu) Windows::HandheldDashboardOpen();
+                input.suspend();break;
+            }
+            return; // Adjustment owns the D-pad; never leaks into viewport pan or purchase.
+        }
         if (Paths::IsAdjusting() && CanExplore())
         {
             bool changed = true;
@@ -1151,12 +1214,22 @@ namespace OpenRCT2::Ui::Handheld
                     Windows::HandheldStaffPatrolOptionsOpen();
                 else if (_rightsTool)
                     Windows::HandheldRightsOptionsOpen();
+                else if (_surfaceTool)
+                {
+                    AreaTools::settings={};AreaTools::settings.operation=AreaTools::Operation::paint;
+                    AreaTools::settings.surface=_surfaceIndex;AreaTools::ResetColours();
+                    _surfaceTool=false;_areaTool=true;
+                    Windows::HandheldTerrainMaterialPickerOpen(false);
+                }
                 else if (_areaTool)
-                    Windows::HandheldAreaOptionsOpen();
+                    Windows::HandheldTerrainMaterialPickerOpen(false);
                 else if (_sceneryClearTool)
                     Windows::HandheldSceneryClearOptionsOpen();
                 else if (_sceneryTool)
-                    Windows::HandheldSceneryOptionsOpen();
+                {
+                    if(ConstructionAdjust::SceneryEnabled(2)) SceneryTools::Configure(2);
+                    else _terrainStatus="Rotation is automatic for this object";
+                }
                 else if (_shopTool)
                     RotateShop();
                 else if (Paths::IsActive())
@@ -1290,11 +1363,11 @@ namespace OpenRCT2::Ui::Handheld
                             else if (_rightsTool)
                                 Windows::HandheldRightsOptionsOpen();
                             else if (_areaTool)
-                                Windows::HandheldAreaOptionsOpen();
+                                _constructionAdjust.active=true;
                             else if (_sceneryClearTool)
                                 Windows::HandheldSceneryClearOptionsOpen();
                             else if (_sceneryTool)
-                                Windows::HandheldSceneryOptionsOpen();
+                                _constructionAdjust.active=true;
                             else if (_treeTool)
                             {
                                 Windows::HandheldTreePickerOpen();
@@ -1306,10 +1379,18 @@ namespace OpenRCT2::Ui::Handheld
                                 AreaTools::settings={}; AreaTools::settings.operation=AreaTools::Operation::paint;
                                 AreaTools::settings.surface=_surfaceIndex; AreaTools::ResetColours();
                                 _surfaceTool=false; _areaTool=true;
-                                Windows::HandheldAreaOptionsOpen();
+                                _constructionAdjust.active=true;
+                                _constructionAdjust.focus.tab=2; _constructionAdjust.row=0;
                             }
                             else if (!_sceneryRemovalTool)
-                                _raiseLand = !_raiseLand;
+                            {
+                                _areaTool=true;
+                                AreaTools::settings.operation=_waterTool
+                                    ? (_raiseLand ? AreaTools::Operation::waterRaise : AreaTools::Operation::waterLower)
+                                    : (_raiseLand ? AreaTools::Operation::raise : AreaTools::Operation::lower);
+                                _waterTool=false;
+                                _constructionAdjust.active=true;
+                            }
                             _terrainStatus.clear();
                             _scatterFeedback = false;
                         }
@@ -1328,6 +1409,10 @@ namespace OpenRCT2::Ui::Handheld
                             Paths::ChangeHeight(action == Action::slopeUp ? 1 : -1);
                         else if (_sceneryTool)
                             SceneryTools::Configure(action == Action::slopeUp ? 4 : 5);
+                        else if (_areaTool)
+                            AreaTools::Configure(1,action == Action::slopeUp ? 1 : -1);
+                        else if(SimpleTerrain())
+                            _raiseLand=action==Action::slopeUp;
                         break;
                     case Action::cameraMode:
                         break;
@@ -1388,6 +1473,7 @@ namespace OpenRCT2::Ui::Handheld
                 : _shopTool                                               ? "PLACE SHOP"
                 : _treeTool                                               ? "PLACE TREE"
                 : _sceneryTool                                            ? "SCENERY"
+                : _areaTool                                               ? AreaTools::operations[static_cast<size_t>(AreaTools::settings.operation)]
                 : _colourRide                                             ? "TRACK SCHEME " + std::to_string(_colourScheme + 1)
                 : _sceneryRemovalTool                                     ? "REMOVE SCENERY"
                 : _surfaceTool                                            ? "PAINT SURFACE"
@@ -1447,8 +1533,13 @@ namespace OpenRCT2::Ui::Handheld
                         "A: Purchase review", RightsTools::Summary(_terrainTile, RightsTools::settings),
                         std::to_string(RightsTools::settings.width) + " x " + std::to_string(RightsTools::settings.height)
                             + " tiles");
+                else if ((_areaTool || _sceneryTool) && _constructionAdjust.active)
+                    ConstructionAdjust::Draw(rt,Concept::kOrigin,_constructionAdjust,_sceneryTool);
                 else if (_areaTool)
+                {
                     AreaTools::DrawOverlay(rt,Concept::kOrigin);
+                    DrawModernText(rt,Concept::kOrigin+ScreenCoordsXY{12,260},"{WHITE}L2/R2 Operation");
+                }
                 else if (_sceneryClearTool)
                     SceneryClear::DrawOverlay(rt, Concept::kOrigin);
                 else if (_sceneryTool)
@@ -1463,7 +1554,10 @@ namespace OpenRCT2::Ui::Handheld
                 else if (_surfaceTool)
                     DrawSurfaceOverlay(rt, Concept::kOrigin, Surface::Name(_surfaceIndex));
                 else
+                {
                     DrawTerrainOverlay(rt, Concept::kOrigin, _raiseLand, _waterTool);
+                    DrawModernText(rt,Concept::kOrigin+ScreenCoordsXY{12,184},"{WHITE}L2 Lower | R2 Raise");
+                }
             }
             if (Designs::Active() || FlatRides::CurrentStage() != FlatRides::Stage::inactive)
             { /* The shared ride panel owns its action strip. */
@@ -1478,17 +1572,24 @@ namespace OpenRCT2::Ui::Handheld
                 DrawConstructionFooter(rt, { ContextGetWidth(), height }, "Review", "Options");
             else if (_sceneryClearTool)
                 DrawConstructionFooter(rt, {ContextGetWidth(), height}, "Review", "Options");
-            else if (_areaTool)
-                DrawConstructionFooter(rt, { ContextGetWidth(), height }, AreaTools::settings.operation==AreaTools::Operation::paint?"Review":"Apply", "Brush");
-            else if (_sceneryTool)
-                DrawConstructionFooter(rt, { ContextGetWidth(), height },
-                    SceneryTools::Current().mode == SceneryTools::Mode::pick ? "Pick" : SceneryTools::ScatterActive() && !SceneryTools::ScatterReviewed() ? "Review" : "Apply", "Options");
+            else if (_areaTool || _sceneryTool)
+                ConstructionAdjust::Footer(rt,{ContextGetWidth(),height},_constructionAdjust.active,_sceneryTool,
+                    _areaTool ? AreaTools::settings.operation==AreaTools::Operation::paint ? "Review" : "Apply"
+                    : SceneryTools::Current().mode==SceneryTools::Mode::pick ? "Pick"
+                    : SceneryTools::ScatterActive() ? SceneryTools::ScatterReviewed() ? "Apply" : "Review"
+                    : SceneryTools::Current().mode==SceneryTools::Mode::remove ? "Remove"
+                    : SceneryTools::Current().mode==SceneryTools::Mode::recolour ? "Paint" : "Place",
+                    _areaTool && _constructionAdjust.active && _constructionAdjust.focus.tab==2 && _constructionAdjust.row<2);
             else if (_treeTool)
                 DrawTreeFooter(rt, { ContextGetWidth(), height });
             else if (_colourRide)
                 DrawTrackColourFooter(rt, { ContextGetWidth(), height });
             else if (_sceneryRemovalTool)
                 DrawSceneryRemovalFooter(rt, { ContextGetWidth(), height });
+            else if(_surfaceTool)
+                ConstructionAdjust::Footer(rt,{ContextGetWidth(),height},false,false,"Paint");
+            else if(SimpleTerrain())
+                DrawConstructionFooter(rt,{ContextGetWidth(),height},"Apply","Adjust");
             else
                 DrawGameplayFooter(
                     rt, { ContextGetWidth(), height }, status, _terrainActive, _surfaceTool || _colourRide.has_value());

@@ -14,6 +14,7 @@ import shutil
 import subprocess
 
 parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--driver", choices=["UiRedesignTests", "ConstructionUxTests"], default="UiRedesignTests")
 parser.add_argument("--build", type=Path, required=True)
 parser.add_argument("--data", type=Path, required=True)
 parser.add_argument("--profile", type=Path, required=True)
@@ -39,9 +40,9 @@ start = link.index(compiler)
 end = link.index("&&", start) if "&&" in link[start:] else len(link)
 link = [v for v in link[start:end] if not v.endswith("/Ui.cpp.o")]
 out = link.index("-o")
-binary = build / "handheld-ui-redesign-tests"
+binary = build / ("handheld-ui-redesign-tests" if args.driver == "UiRedesignTests" else "handheld-construction-ux-tests")
 link[out + 1] = str(binary)
-link.insert(out, str(repo / "test/handheld/UiRedesignTests.cpp"))
+link.insert(out, str(repo / "test/handheld" / (args.driver + ".cpp")))
 link[1:1] = ["-std=c++20", *includes, f"-I{repo / 'src'}", f"-I{repo / 'src/thirdparty'}"]
 subprocess.run(link, cwd=build, check=True)
 env = os.environ.copy()
