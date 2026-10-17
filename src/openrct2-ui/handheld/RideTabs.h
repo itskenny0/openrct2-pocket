@@ -47,8 +47,17 @@ namespace OpenRCT2::Ui::Handheld::RideTabs
         model.selectedTab = state.tab;
         model.headerStatus = source.stats.empty() ? "" : source.stats.front().second;
         model.selected = selected;
+        model.headerInk = model.headerStatus == "Crashed" || model.headerStatus == "Broken down" ? "{DANGER}"
+            : model.headerStatus == "Open"                                                       ? "{POSITIVE}"
+            : model.headerStatus == "Testing"                                                    ? "{CAUTION}"
+                                                                                                 : "{WHITE}";
+        if (state.tab == overview)
+            for (const auto& stat : stats.stats)
+                if (stat.first == "Reliability" || stat.first == "Customers" || stat.first == "Profit / hour")
+                    model.stats.push_back(stat);
         model.rows.clear(); model.rowEnabled.clear(); model.rowDetails.clear();
-        model.metricHeight = 40;
+        model.metricHeight = state.tab==overview?38:40;
+        if(state.tab==overview)model.rowHeight=26;
         if (state.tab == statistics)
         {
             model.stats = stats.stats;
@@ -69,3 +78,4 @@ namespace OpenRCT2::Ui::Handheld::RideTabs
         return model;
     }
 } // namespace OpenRCT2::Ui::Handheld::RideTabs
+

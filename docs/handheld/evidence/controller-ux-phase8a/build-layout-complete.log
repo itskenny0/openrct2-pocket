@@ -1,0 +1,17 @@
+ninja: Entering directory `build'
+[0/2] Re-checking globbed directories...
+[1/8] Building CXX object CMakeFiles/openrct2.dir/src/openrct2-ui/input/InputManager.cpp.o
+[2/8] Building CXX object CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/RideAccess.cpp.o
+[3/8] Building CXX object CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/CustomTracks.cpp.o
+[4/8] Building CXX object CMakeFiles/openrct2.dir/src/openrct2-ui/WindowManager.cpp.o
+[5/8] Building CXX object CMakeFiles/openrct2.dir/src/openrct2-ui/UiContext.cpp.o
+[6/8] Building CXX object CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/Explorer.cpp.o
+[7/8] Building CXX object CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/Menu.cpp.o
+[8/8] Linking CXX executable openrct2
+/workspace/scratch/3dd26b9bb351/repo/src/openrct2-ui/handheld/SceneryTools.cpp: In function ‘Configure’:
+/workspace/scratch/3dd26b9bb351/repo/src/openrct2-ui/handheld/SceneryTools.cpp:370:32: warning: ‘MEM[(union _Storage *)&previewHeight]._M_value’ may be used uninitialized [-Wmaybe-uninitialized]
+  370 |                 current.height = *previewHeight;
+      |                                ^
+/workspace/scratch/3dd26b9bb351/repo/src/openrct2-ui/handheld/SceneryTools.cpp:363:20: note: ‘MEM[(union _Storage *)&previewHeight]._M_value’ was declared here
+  363 |         const auto previewHeight = ghost && requested && requested->settings == current
+      |                    ^

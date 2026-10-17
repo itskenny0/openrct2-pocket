@@ -189,10 +189,10 @@ namespace OpenRCT2::Ui::Handheld::ShopManagement
         }
         if (!feedback.empty())
             text(view == View::inspection ? 330 : 237, "{MUTED}" + feedback);
-        DrawActionStrip(rt, screen);
-        const auto y = screen.height - 21;
-        DrawCommand(rt, { 12, y }, 38, "D-pad", view == View::prices ? "Price / item" : "Choose");
-        DrawCommand(rt, { 198, y }, 17, "A", view == View::prices ? "Apply" : "Select");
-        DrawCommand(rt, { 370, y }, 17, "B", "Back");
+        DrawFooter(
+            rt, screen,
+            { { "D-pad", view == View::prices ? "Price / item" : "Choose" },
+              { "A", view == View::prices ? "Apply" : "Select" },
+              { "B", "Back" } });
     }
 } // namespace OpenRCT2::Ui::Handheld::ShopManagement

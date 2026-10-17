@@ -151,31 +151,33 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         DrawManagementContent(
             rt, workspace, {model.confirmation ? 360 : screen.width - workspace.x - Layout::margin,
                 model.confirmation ? height-20 : height}, model, state.focus == Focus::content);
-        DrawActionStrip(rt, screen);
-        const int y = screen.height - 21;
-        if(!model.tabs.empty())
-        {
-            DrawCommand(rt,{8,y},38,"D-pad",model.navigationHint.empty()?"Move":model.navigationHint.c_str());DrawCommand(rt,{82,y},17,"A",model.primaryAction.empty()?"Select":model.primaryAction.c_str());
-            DrawCommand(rt,{164,y},17,"B","Back");DrawCommand(rt,{238,y},28,"L/R","Tab");
-            if (!model.contextualAction.empty()) DrawCommand(rt,{318,y},17,"X",model.contextualAction.c_str());
-            DrawCommand(rt,{402,y},28,"SEL","Sections");
-            return;
-        }
-        if(model.denseRoster && state.focus==Focus::content) {
-            DrawCommand(rt,{8,y},38,"D-pad","Choose");DrawCommand(rt,{126,y},17,"A","Select");
-            DrawCommand(rt,{225,y},17,"B","Back");DrawCommand(rt,{316,y},28,"L/R","Page");
-            DrawCommand(rt,{402,y},28,"SEL","Sections");return;
-        }
-        const bool ridePaging = state.section == Section::rides && state.focus == Focus::content && sectionRoot;
-        DrawCommand(rt, {10, y}, 38, "D-pad", model.editing ? "Adjust" : model.actionGrid ? "Move" : "Choose");
-        DrawCommand(rt, {ridePaging ? 100 : 154, y}, 17, "A",
-            state.focus == Focus::rail ? "Enter" : !model.primaryAction.empty() ? model.primaryAction.c_str()
-                : model.editing ? "Review" : model.confirmation ? "Confirm" : "Select");
-        DrawCommand(rt, {ridePaging ? 190 : 272, y}, 17, "B", state.focus == Focus::rail ? "Park" : "Back");
-        if (ridePaging) DrawCommand(rt, {270, y}, 28, "L/R", model.tabs.empty() ? "Page" : "Tab");
-        DrawCommand(rt, {ridePaging ? 370 : 386, y}, 28,
-            state.focus == Focus::rail ? "L/R" : sectionRoot ? "SEL" : "START",
-            state.focus == Focus::rail ? "Section" : sectionRoot ? "Sections" : "Park");
-
+        std::vector<ControlHint> hints{ { "D-pad",
+                                          state.focus == Focus::rail         ? "Section"
+                                              : model.navigationHint.empty() ? model.editing ? "Adjust" : "Choose"
+                                                                             : model.navigationHint },
+                                        { "A",
+                                          state.focus == Focus::rail         ? "Enter"
+                                              : !model.primaryAction.empty() ? model.primaryAction
+                                              : model.editing                ? "Review"
+                                              : model.confirmation           ? "Confirm"
+                                                                             : "Select" },
+                                        { "B",
+                                          state.focus == Focus::rail ? "Park"
+                                              : model.confirmation   ? "Cancel"
+                                                                     : "Back" } };
+        if (state.focus == Focus::content && !model.tabs.empty())
+            hints.push_back({ "L1/R1", "Tab" });
+        else if (state.focus == Focus::content && (model.denseRoster || (state.section == Section::rides && sectionRoot)))
+            hints.push_back({ "L1/R1", "Page" });
+        else if (state.focus == Focus::rail)
+            hints.push_back({ "L1/R1", "Section" });
+        if (state.focus == Focus::content && !model.contextualAction.empty())
+            hints.push_back({ "X", model.contextualAction });
+        hints.push_back(
+            { state.focus == Focus::rail || sectionRoot || !model.tabs.empty() || model.denseRoster ? "SELECT" : "START",
+              state.focus == Focus::rail                                    ? "Enter"
+                  : sectionRoot || !model.tabs.empty() || model.denseRoster ? "Sections"
+                                                                            : "Park" });
+        DrawFooter(rt, screen, hints);
     }
 } // namespace OpenRCT2::Ui::Handheld::Dashboard

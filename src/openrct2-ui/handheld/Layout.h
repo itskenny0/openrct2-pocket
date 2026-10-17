@@ -9,7 +9,7 @@ namespace OpenRCT2::Ui::Handheld::Layout
     inline constexpr int hudTop = 6;
     inline constexpr int hudHeight = 24;
     inline constexpr int gutter = 6;
-    inline constexpr int actionHeight = 28;
+    inline constexpr int actionHeight = 44;
     inline constexpr ScreenCoordsXY menuOrigin{ margin, margin };
     inline constexpr ScreenCoordsXY toolOrigin{ margin, hudTop + hudHeight + gutter };
 

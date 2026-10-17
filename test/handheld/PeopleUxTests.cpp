@@ -54,6 +54,7 @@ static void Check(bool ok, const char* message)
     if (!ok)
         throw std::runtime_error(message);
 }
+#include "VisualPolishChecks.h"
 int main(int argc, char** argv)
 {
     try
@@ -119,6 +120,7 @@ int main(int argc, char** argv)
         focus({336,336,16});
         auto sm=[](){return W::HandheldStaffPresentation();};auto gm=[](){return W::HandheldGuestsPresentation();};
         auto select=[&](auto model,const char* label){const auto m=model();const auto f=std::find(m.rows.begin(),m.rows.end(),label);Check(f!=m.rows.end(),label);W::HandheldMenuMove(static_cast<int>(f-m.rows.begin())-static_cast<int>(m.selected));};
+        CheckVisualPolishLayout();
         const auto initialCash=state.park.cash;W::HandheldStaffOpen({});H::Frame top;top.navigateY=-1;H::HandleExplorerInput(input,top);Check(sm().selected==0,"Toolbar Up wrapped to list tail");capture("01-staff-empty.png");
         press(H::Action::confirm);Check(sm().title=="Choose staff role","Hire toolbar failed");press(H::Action::confirm);
         Check(sm().confirmation&&sm().selected==1,"Hire is not Cancel-first");capture("02-hire-review.png");
@@ -126,7 +128,7 @@ int main(int argc, char** argv)
         Check(S::Roster().size()==1&&state.park.cash==initialCash,"Native hire cost/duplicate protection changed");
         Check(sm().tabs.size()==4,"Hire did not open employee workspace");const auto employee=S::Roster().front();capture("03-employee-overview.png");
         press(H::Action::nextOption);const auto baseline=S::Resolve(employee)->staffOrders;press(H::Action::confirm);
-        Check(S::Resolve(employee)->staffOrders==baseline,"Duties draft changed native orders");capture("04-employee-duties.png");
+        Check(S::Resolve(employee)->staffOrders==baseline,"Duties draft changed native orders");Check(sm().headerStatus=="Unsaved duties"&&sm().headerInk=="{CAUTION}","Duty draft not visibly unsaved");capture("04-employee-duties.png");
         select(sm,"Cancel");press(H::Action::confirm);Check(S::Resolve(employee)->staffOrders==baseline,"Duties Cancel applied native draft");
         W::HandheldMenuMove(-static_cast<int>(sm().selected));press(H::Action::confirm);
         select(sm,"Apply orders");press(H::Action::confirm);GameActions::ProcessQueue(state);Check(S::Resolve(employee)->staffOrders!=(baseline),"Inline native orders not applied");
@@ -145,9 +147,10 @@ int main(int argc, char** argv)
         const auto row=sm().selected;press(H::Action::confirm);press(H::Action::back);Check(sm().selected==row,"Staff roster focus lost");
         const auto pageStart=sm().selected;press(H::Action::nextOption);Check(sm().selected>pageStart,"Staff shoulder paging failed");capture("08-staff-page.png");closeMenu();
         const auto guest=G::Roster().front();Check(!G::Resolve(guest)->getName().empty(),"Native real-name object missing");W::HandheldGuestOpen(guest);Check(gm().tabs.size()==4,"Guest workspace missing");capture("09-guest-overview.png");
+
         const auto* native=G::Resolve(guest);const auto happy=native->happiness;const auto cash=native->cashInPocket;
-        press(H::Action::nextOption);Check(gm().stats==G::Presentation(G::View::needs,0,{},guest).stats&&gm().meters.size()==6,"Needs differs from native normalization");capture("10-guest-needs.png");
-        press(H::Action::nextOption);capture("11-guest-thoughts.png");press(H::Action::confirm);Check(!gm().bodyLines.empty(),"Thought full text unavailable");press(H::Action::back);Check(gm().selectedTab==2,"Thought Back lost tab");
+        press(H::Action::nextOption);Check(gm().stats==G::Presentation(G::View::needs,0,{},guest).stats&&gm().meters.size()==6,"Needs differs from native normalization");capture("10-guest-needs.png");CheckGuestNeedBoundaries(*state.entities.tryGetEntity<Guest>(guest.id),capture);
+        press(H::Action::nextOption);const auto thoughtRows=gm().rows;Check(std::all_of(thoughtRows.front().begin(),thoughtRows.front().end(),[](unsigned char c){return c>=32&&c<127;}),"English thoughts still force fallback font");capture("11-guest-thoughts.png");press(H::Action::confirm);Check(!gm().bodyLines.empty(),"Thought full text unavailable");press(H::Action::back);Check(gm().selectedTab==2,"Thought Back lost tab");
         press(H::Action::nextOption);capture("12-guest-details.png");select(gm,"Spending...");press(H::Action::confirm);capture("13-guest-spending.png");press(H::Action::back);Check(gm().selectedTab==3,"Spending Back lost tab");
         select(gm,"Tracking: Off...");press(H::Action::confirm);Check(gm().confirmation&&gm().selected==1,"Tracking safety changed");W::HandheldMenuMove(-1);press(H::Action::confirm);GameActions::ProcessQueue(state);Check(G::Resolve(guest)->peepFlags.has(PeepFlag::tracking),"Native tracking failed");capture("14-guest-tracked.png");
         press(H::Action::nextOption);select(gm,"Follow guest");press(H::Action::confirm);Check(H::GuestFollow::Current()==guest,"Native follow failed");capture("15-guest-follow.png");press(H::Action::back);Check(gm().selectedTab==0,"Follow recovery lost tab");H::GuestFollow::Stop();
@@ -187,7 +190,8 @@ int main(int argc, char** argv)
         H::AreaTools::settings={};H::AreaTools::settings.width=2;H::AreaTools::settings.height=2;H::BeginAreaTools();H::UpdateExplorer(input);capture("22-landscape-build.png");press(H::Action::contextSecondary);capture("23-landscape-adjust.png");H::EndTerrain();
         W::HandheldDashboardOpen();capture("24-dashboard.png");
         std::cout<<"PASS staff native hire/duties/patrol/dismissal safety/tab and roster focus; guest needs/thoughts/spending/tracking/follow/pickup/map\n";
-        std::cout<<"PASS "<<roster.size()<<" guests, 50 full presentation snapshots "<<elapsed<<" ms under QEMU; native needs and money unchanged\n";
+        std::cout<<"PASS "<<roster.size()<<" guests, 50 full presentation snapshots "<<elapsed<<" ms in native runtime; native needs and money unchanged\n";
         return 0;
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }
+

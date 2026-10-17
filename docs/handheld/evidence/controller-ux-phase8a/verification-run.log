@@ -1,0 +1,16 @@
+PeopleUxTests {'exit': 0, 'stage': 'runtime'}
+ManagementUxTests {'exit': 0, 'stage': 'runtime'}
+RideFlowTests {'exit': 0, 'stage': 'runtime'}
+PathBatchTests {'exit': 0, 'stage': 'runtime'}
+UiRedesignTests {'exit': 0, 'stage': 'runtime'}
+ConstructionUxTests {'exit': 0, 'stage': 'runtime'}
+PathActionsTests {'exit': 0, 'stage': 'runtime'}
+RideAccessRelocationTests {'exit': 0, 'stage': 'runtime'}
+SceneryPathParityTests {'exit': 0, 'stage': 'runtime'}
+PauseResumeTests {'exit': 0, 'stage': 'runtime'}
+PresentationLifecycleTests {'exit': 0, 'stage': 'runtime'}
+ConstructionTests {'exit': 0, 'stage': 'runtime'}
+AccessShortcutTests {'exit': 0, 'stage': 'runtime'}
+GuestCompletionTests {'exit': 0, 'stage': 'runtime'}
+GuestInformationTests {'exit': 0, 'stage': 'runtime'}
+StaffCompletionTests {'exit': 0, 'stage': 'runtime'}

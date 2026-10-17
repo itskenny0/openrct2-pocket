@@ -520,12 +520,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
         DrawModernEllipsised(rt, kOrigin + ScreenCoordsXY{ 12, 116 }, 140, "{MUTED}" + (!lastError.empty()?"Review rejected / X":completed && placedOmitted?"Omitted "+std::to_string(placedOmitted)+" scenery":SceneryNotice()));
         DrawModernEllipsised(rt, kOrigin + ScreenCoordsXY{ 12, 142 }, 140, "{MUTED}" + HeightNotice());
         DrawModernEllipsised(rt, kOrigin + ScreenCoordsXY{ 12, 158 }, 140, "{MUTED}X Design options");
-        DrawActionStrip(rt, screen);
-        const auto y = screen.height - 21;
-        DrawCommand(rt, { 8, y }, 38, "D-pad", "Move");
-        DrawCommand(rt, { 115, y }, 17, "A", "Review");
-        DrawCommand(rt, { 219, y }, 17, "Y", "Designs");
-        DrawCommand(rt, { 329, y }, 30, "SEL", "Turn");
-        DrawCommand(rt, { 440, y }, 17, "B", "Back");
+        DrawFooter(
+            rt, screen, { { "D-pad", "Move" }, { "A", "Review" }, { "Y", "Designs" }, { "SEL", "Turn" }, { "B", "Back" } });
     }
 } // namespace OpenRCT2::Ui::Handheld::Designs

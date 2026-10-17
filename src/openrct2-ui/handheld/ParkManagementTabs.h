@@ -32,6 +32,12 @@ namespace OpenRCT2::Ui::Handheld::ParkManagementTabs
                 {"Month net",Money(income==kMoney64Undefined || expense==kMoney64Undefined ? kMoney64Undefined : income-expense)},
                 {"Park value",Money(park.value)}};
             m.metricColumns=2;
+            m.statInk = { "{WHITE}", "{WHITE}",
+                          income == kMoney64Undefined || expense == kMoney64Undefined ? "{WHITE}"
+                              : income < expense                                      ? "{DANGER}"
+                              : income > expense                                      ? "{POSITIVE}"
+                                                                                      : "{WHITE}",
+                          "{WHITE}" };
             m.bodyLines={Period(GetDate().GetMonthsElapsed())+" / month to date",
                 "Income "+Money(income)+"   Expenses "+Money(expense),
                 "Current weekly profit: "+Money(park.currentProfit)};
@@ -53,7 +59,9 @@ namespace OpenRCT2::Ui::Handheld::ParkManagementTabs
         else if(tab==2)
         {
             m=History(graph,sample,row);Workspace(m,{"Overview","Ledger","History","Controls"},tab,row);
-            m.summaryMetrics=false;m.reservedHeight=120;m.rows={"Next financial graph"};
+            m.metricColumns = 2;
+            m.reservedHeight = 112;
+            m.rows = { "Next financial graph" };
             m.primaryAction="Graph";m.navigationHint="Sample";
         }
         else
@@ -91,9 +99,14 @@ namespace OpenRCT2::Ui::Handheld::ParkManagementTabs
             const auto d=draft.value_or(ResearchManagement::Begin());
             const auto editor=ResearchManagement::Presentation(ResearchManagement::View::editor,0,d);
             const bool changed=d.funding!=d.baselineFunding||d.priorities!=d.baselinePriorities;
-            m.title="Research plan";m.headerStatus=changed?"Unsaved draft":"Current settings";
+            m.title = "Research plan";
+            m.headerStatus = changed ? "Unsaved draft" : "Current settings";
+            m.headerInk = changed ? "{CAUTION}" : "{WHITE}";
             m.stats={{"Funding",editor.rows[0].substr(editor.rows[0].find(':')==std::string::npos?0:9)},editor.stats[0]};
-            m.metricColumns=2;m.metricHeight=40;m.rowHeight=26;m.contextualAction="Funding";
+            m.metricColumns = 2;
+            m.metricHeight = 36;
+            m.rowHeight = 24;
+            m.contextualAction = "Funding";
             m.bodyLines={"X changes funding / A toggles / Review applies"};
             m.rows.clear();m.rowEnabled.clear();
             for(size_t i=0;i<7;++i)
@@ -129,12 +142,14 @@ namespace OpenRCT2::Ui::Handheld::ParkManagementTabs
         m.rows.clear();m.rowDetails.clear();m.rowEnabled.clear();
         if(tab==0)
         {
-            m.listLabel="CAMPAIGN / TARGET / REMAINING WEEKS";m.denseRoster=true;
+            m.listLabel = "CAMPAIGN / TARGET / REMAINING WEEKS";
+            m.denseRoster = true;
+            m.rowHeight = 44;
             for(auto type:ActiveTypes())
             {
                 const auto detail=Presentation(View::active,0,{},type);
-                m.rows.push_back(Name(type)+" / "+detail.stats[1].second+"w left");
-                m.rowDetails.push_back(detail.stats[0].second);
+                m.rows.push_back(Name(type));
+                m.rowDetails.push_back(detail.stats[0].second + " / " + detail.stats[1].second + " weeks left");
             }
             if(m.rows.empty())
             {
@@ -187,3 +202,4 @@ namespace OpenRCT2::Ui::Handheld::ParkManagementTabs
         return m;
     }
 }
+

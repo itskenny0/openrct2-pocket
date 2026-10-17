@@ -907,26 +907,25 @@ namespace OpenRCT2::Ui::Handheld::Paths
             return;
         }
         DrawActionStrip(rt,screen);
-        const auto y=screen.height-21;
+
         if (batch.review || batch.busy)
         {
-            DrawCommand(rt,{12,y},17,"A",batch.busy ? "Wait" : "Build selection");
-            DrawCommand(rt,{330,y},17,"B",batch.busy ? "Wait" : "Preview");
+            Handheld::DrawFooter(
+                rt, screen, { { "A", batch.busy ? "Wait" : "Build selection" }, { "B", batch.busy ? "Wait" : "Preview" } });
         }
         else if(IsAdjusting())
         {
-            DrawCommand(rt,{8,y},38,"D-pad","Height");
-            DrawCommand(rt,{160,y},30,"L/R","Mode");
-            DrawCommand(rt,{292,y},17,"X","More");
-            DrawCommand(rt,{408,y},17,"B","Build");
+            Handheld::DrawFooter(rt, screen, { { "D-pad", "Height" }, { "L/R", "Mode" }, { "X", "More" }, { "B", "Build" } });
         }
         else
         {
-            DrawCommand(rt,{8,y},38,"D-pad","Move");
-            DrawCommand(rt,{90,y},17,"A",batch.start ? "Review" : "Start");
-            DrawCommand(rt,{190,y},17,"Y","Adjust");
-            DrawCommand(rt,{290,y},28,"SEL","Surface");
-            DrawCommand(rt,{430,y},17,"B",batch.start ? "Cancel" : "Exit");
+            Handheld::DrawFooter(
+                rt, screen,
+                { { "D-pad", "Move" },
+                  { "A", batch.start ? "Review" : "Start" },
+                  { "Y", "Adjust" },
+                  { "SEL", "Surface" },
+                  { "B", batch.start ? "Cancel" : "Exit" } });
         }
     }
     void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position)
@@ -944,15 +943,17 @@ namespace OpenRCT2::Ui::Handheld::Paths
             DrawModernText(rt,p+ScreenCoordsXY{12,106},"{MUTED}Height "+std::to_string(fixedHeight.value_or(target ? target->z : 0)/kCoordsZStep));
             if (batch.review)
             {
-                DrawStrongText(rt,p+ScreenCoordsXY{12,128},"{CAUTION}Build sequentially?",180);
-                DrawModernText(rt,p+ScreenCoordsXY{12,150},"{WHITE}Stops on failure.");
-                DrawModernText(rt,p+ScreenCoordsXY{12,170},"{WHITE}Built tiles remain / charged.");
+                DrawStrongText(rt, p + ScreenCoordsXY{ 12, 128 }, "{CAUTION}Build these paths?", 180);
+                DrawModernText(rt, p + ScreenCoordsXY{ 12, 150 }, "{WHITE}Stops at the first problem.");
+                DrawModernText(rt, p + ScreenCoordsXY{ 12, 170 }, "{WHITE}Built paths stay. You pay.");
                 DrawModernText(rt,p+ScreenCoordsXY{12,190},"{MUTED}A Build / B Preview");
             }
             else
             {
-                const auto state = batch.busy ? "Building / please wait" : IsAdjusting() ? "L/R Single / Line / Fill"
-                    : batch.start ? "+ New   = Path   X Blocked" : "Y Adjust / L2/R2 Height";
+                const auto state = batch.busy ? "Building / please wait"
+                    : IsAdjusting()           ? "L1/R1 Single / Line / Fill"
+                    : batch.start             ? "+ New   = Path   X Blocked"
+                                              : "Y Adjust / L2/R2 Height";
                 DrawModernEllipsised(rt,p+ScreenCoordsXY{12,128},180,"{WHITE}"+std::string(state));
                 DrawModernEllipsised(rt,p+ScreenCoordsXY{12,150},180,"{MUTED}"+(batch.notice.empty()
                     ? batch.start ? "A Review / B Cancel selection" : "Select Surface / B Exit" : batch.notice));
@@ -964,7 +965,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
         {
             DrawPathOverlay(rt, position, SurfaceName(), IsQueue(), IsRemoving(), PlacementName(), false, IsAdjusting());
             if (IsAdjusting())
-                DrawModernText(rt,position+ScreenCoordsXY{12,170},"{WHITE}L/R Single / Line / Fill");
+                DrawModernText(rt, position + ScreenCoordsXY{ 12, 170 }, "{WHITE}L1/R1 Single / Line / Fill");
             return;
         }
         auto geometry = PlacementName();
@@ -985,3 +986,4 @@ namespace OpenRCT2::Ui::Handheld::Paths
         return object ? object->GetName() : "No surface loaded";
     }
 } // namespace OpenRCT2::Ui::Handheld::Paths
+

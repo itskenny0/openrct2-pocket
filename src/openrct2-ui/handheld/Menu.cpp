@@ -762,7 +762,7 @@ namespace OpenRCT2::Ui::Windows
                                                                 : View::dismissal;
             auto model = Handheld::StaffManagement::Presentation(
                 view, selected, _staffRoster, _staffTarget, _hireType, _ordersDraft, _status);
-            if(currentPage==Page::staffInspect && _staffTarget) {model=Handheld::PeopleTabs::Staff(*_staffTarget,_staffTabs,selected,_ordersDraft);model.status=_status;}
+            if(currentPage==Page::staffInspect && _staffTarget) {model=Handheld::PeopleTabs::Staff(*_staffTarget,_staffTabs,selected,_ordersDraft);if(!_status.empty())model.status=_status;}
             if (currentPage == Page::staffRoles)
                 model.rows.push_back(_hireManual ? "Placement: Manual" : "Placement: Automatic");
             if (currentPage == Page::staffHire)
@@ -5570,14 +5570,18 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::Dashboard::Draw(
                     rt, { ContextGetWidth(), ContextGetHeight() }, _dashboard, model, dashboardCanSwitch());
                 if(_page==Page::finances&&_financeTabs.tab==2)
-                    Handheld::FinanceInformation::DrawHistory(rt,_financeGraph,{{112,178},{ContextGetWidth()-28,258}},static_cast<int32_t>(_financeSample));
+                    Handheld::FinanceInformation::DrawHistory(
+                        rt, _financeGraph, { { 104, 158 }, { ContextGetWidth() - 24, 254 } },
+                        static_cast<int32_t>(_financeSample));
                 return;
             }
             if (_page==Page::shopAppearance || _page==Page::shopAppearanceEditor || _page==Page::shopAppearanceReview)
             {
                 Handheld::DrawManagementContent(rt,{8,8},{330,348},shopAppearancePresentation());
                 Handheld::DrawActionStrip(rt,{ContextGetWidth(),ContextGetHeight()});
-                Handheld::DrawModernText(rt,{12,369},"D-pad Choose   A Select / review   B Back",{},488);
+                Handheld::DrawFooter(
+                    rt, { ContextGetWidth(), ContextGetHeight() },
+                    { { "D-pad", "Choose" }, { "A", "Select / review" }, { "B", "Back" } });
                 return;
             }
             if (shopManagement())
@@ -5671,10 +5675,9 @@ namespace OpenRCT2::Ui::Windows
                     rt, Handheld::Concept::kMenuOrigin,
                     { 324, Handheld::Layout::ContentHeight({ ContextGetWidth(), ContextGetHeight() }) }, model);
                 Handheld::DrawActionStrip(rt, { ContextGetWidth(), ContextGetHeight() });
-                const int footerY = ContextGetHeight() - 21;
-                Handheld::DrawCommand(rt, { 12, footerY }, 38, "D-pad", "Choose");
-                Handheld::DrawCommand(rt, { 184, footerY }, 17, "A", "Select");
-                Handheld::DrawCommand(rt, { 356, footerY }, 17, "B", "Back");
+                Handheld::DrawFooter(
+                    rt, { ContextGetWidth(), ContextGetHeight() },
+                    { { "D-pad", "Choose" }, { "A", "Select" }, { "B", "Back" } });
                 return;
             }
             if (_page == Page::sceneryPicker)
@@ -6341,3 +6344,4 @@ namespace OpenRCT2::Ui::Windows
         return w&&static_cast<HandheldMenuWindow*>(w)->managementContext();
     }
 }
+

@@ -1,0 +1,62 @@
+[
+  [
+    "Dashboard",
+    "people/24-dashboard.png"
+  ],
+  [
+    "Ride Overview",
+    "ride/02-park-ride-overview.png"
+  ],
+  [
+    "Ride Operations",
+    "ride/03-ride-operations.png"
+  ],
+  [
+    "Coaster construction",
+    "ride/07-coaster-build.png"
+  ],
+  [
+    "Track piece selection",
+    "ride/09-track-pieces.png"
+  ],
+  [
+    "Path Line",
+    "path/01-line-preview.png"
+  ],
+  [
+    "Path Fill",
+    "path/05-fill-preview.png"
+  ],
+  [
+    "Scenery adjustment",
+    "people/21-scenery-adjust.png"
+  ],
+  [
+    "Landscaping",
+    "people/23-landscape-adjust.png"
+  ],
+  [
+    "Staff duties",
+    "people/04-employee-duties.png"
+  ],
+  [
+    "Guest needs",
+    "people/10-guest-needs.png"
+  ],
+  [
+    "Financial history",
+    "management/03-finance-history.png"
+  ],
+  [
+    "Research controls",
+    "management/14-research-settings.png"
+  ],
+  [
+    "Marketing",
+    "management/23-marketing-active.png"
+  ],
+  [
+    "Destructive confirmation",
+    "ride/06-demolition-review.png"
+  ]
+]

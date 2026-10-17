@@ -4,6 +4,7 @@
 #include "StaffManagement.h"
 #include "StaffPatrol.h"
 #include "GuestManagement.h"
+#include "ParkInformation.h"
 namespace OpenRCT2::Ui::Handheld::PeopleTabs
 {
     using State = TabFocus<4>;
@@ -42,7 +43,11 @@ namespace OpenRCT2::Ui::Handheld::PeopleTabs
         model.headerStatus=StaffManagement::RoleName(target.type);model.summaryMetrics=true;model.metricHeight=40;
         if(tabs.tab==1) {
             const auto orders=StaffManagement::Presentation(V::orders,selected,{},target,StaffType::handyman,draft);
-            model.stats.clear();model.rows=orders.rows;model.actionGrid=false;
+            model.stats.clear();model.rows=orders.rows;model.actionGrid=false;model.rowHeight=26;
+            const bool changed = draft != StaffManagement::Resolve(target)->staffOrders;
+            model.headerStatus = changed ? "Unsaved duties" : "Current duties";
+            model.headerInk = changed ? "{CAUTION}" : "{WHITE}";
+            model.status = changed ? "Unsaved / Apply orders saves / B discards" : "No duty changes pending";
             model.bodyLines={"A toggles duties. Apply orders saves changes."};
             if(StaffManagement::Orders(target.type).empty()) {model.rows={"Overview"};model.bodyLines={"This role has no configurable duties."};}
         } else {
@@ -68,6 +73,20 @@ namespace OpenRCT2::Ui::Handheld::PeopleTabs
         }
         return model;
     }
+    // Native thought formatting adds smart quotes. Normalize only punctuation
+    // supported by PocketSans so ordinary English thoughts use the readable UI
+    // face; other scripts retain the engine fallback and the full native text.
+    inline std::string ThoughtLabel(std::string text)
+    {
+        for(const auto& [from,to]:std::array<std::pair<std::string_view,std::string_view>,4>{
+            std::pair{"\xE2\x80\x98","'"}, {"\xE2\x80\x99","'"},
+            {"\xE2\x80\x9C","\""}, {"\xE2\x80\x9D","\""}})
+        {
+            size_t pos=0;
+            while((pos=text.find(from,pos))!=std::string::npos){text.replace(pos,from.size(),to);pos+=to.size();}
+        }
+        return text;
+    }
     inline ManagementPresentation Guest(const GuestManagement::Target& target,const State& tabs,size_t selected)
     {
         using V=GuestManagement::View;
@@ -79,10 +98,28 @@ namespace OpenRCT2::Ui::Handheld::PeopleTabs
         if(tabs.tab==1) {
             model.stats=GuestManagement::Presentation(V::needs,0,{},target).stats;
             model.metricHeight=60;model.rows={"Overview"};
-            for(const auto& stat:model.stats)model.meters.push_back(std::stoi(stat.second));
-            model.bodyLines={"Higher hunger, thirst and toilet bars indicate more need."};
+            for (size_t i = 0; i < model.stats.size(); ++i)
+            {
+                model.meters.push_back(std::stoi(model.stats[i].second));
+                model.meterDirections.push_back(i < 2 ? 1 : -1);
+            }
+            // Guest.cpp: native tired/hungry/thirsty/nausea/toilet thought predicates.
+            const bool attention[]{ false,
+                                    guest->energy <= 70 && guest->happiness < 128,
+                                    guest->hunger <= 10 && !guest->hasFoodOrDrink(),
+                                    guest->thirst <= 25 && !guest->hasFoodOrDrink(),
+                                    guest->nausea >= 140,
+                                    guest->toilet >= 160 };
+            for (size_t i = 0; i < model.stats.size(); ++i)
+                model.meterAttention.push_back(attention[i]);
+            model.bodyLines = { "+ More is better   ! Native need / thought trigger",
+                                "Hunger, thirst, nausea and toilet: less is better." };
         } else if(tabs.tab==2) {
-            model.rows=GuestManagement::Thoughts(*guest);model.actionGrid=false;model.listLabel="CURRENT THOUGHTS / A READ FULL TEXT";
+            model.rows = GuestManagement::Thoughts(*guest);
+            for(auto& thought:model.rows)thought=ThoughtLabel(ParkInformation::PlainText(thought,true));
+            model.actionGrid = false;
+            model.rowHeight = 44;
+            model.listLabel = "CURRENT THOUGHTS / A READ FULL TEXT";
             if(model.rows.empty()){model.bodyLines={"No current thoughts"};model.rows={"Overview"};}
         } else {
             Actions(model,native,GuestActions(tabs.tab));
@@ -98,3 +135,4 @@ namespace OpenRCT2::Ui::Handheld::PeopleTabs
         return model;
     }
 }
+

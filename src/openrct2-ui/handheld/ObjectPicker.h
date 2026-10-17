@@ -107,7 +107,7 @@ namespace OpenRCT2::Ui::Handheld
         const auto start = picker.page() * ObjectPicker::pageSize;
         const auto visible = std::min(ObjectPicker::pageSize, entries.size() - start);
         const int detailTop = 40 + static_cast<int>((visible + ObjectPicker::columns - 1) / ObjectPicker::columns) * 92;
-        Box(rt, p, { 244, detailTop + 62 });
+        Box(rt, p, { 320, detailTop + 78 });
         Heading(rt, p + ScreenCoordsXY{ 12, 12 }, title);
         DrawModernText(
             rt, p + ScreenCoordsXY{ 194, 12 },
@@ -140,18 +140,17 @@ namespace OpenRCT2::Ui::Handheld
             DrawModernEllipsised(
                 rt, cell + ScreenCoordsXY{ 4, 70 }, 60, (selected ? "{BLACK}" : "{WHITE}") + entries[index].name);
         }
-        Rule(rt, p + ScreenCoordsXY{ 12, detailTop }, 220);
+        Rule(rt, p + ScreenCoordsXY{ 12, detailTop }, 296);
         const auto* selected = picker.selected();
-        DrawStrongText(rt, p + ScreenCoordsXY{ 12, detailTop + 12 }, selected ? selected->name : emptyLabel, 220);
+        DrawWrappedLabel(rt, p + ScreenCoordsXY{ 12, detailTop + 12 }, 296, selected ? selected->name : emptyLabel, 2);
         DrawModernText(
-            rt, p + ScreenCoordsXY{ 12, detailTop + 36 },
-            "{MUTED}" + (status.empty() ? std::to_string(entries.size()) + " available" : status), {}, 220);
-        DrawActionStrip(rt, screen);
-        const auto y = screen.height - 21;
-        DrawCommand(rt, { 12, y }, 38, "D-pad", "Choose");
-        DrawCommand(rt, { 140, y }, 17, "A", "Select");
-        DrawCommand(rt, { 268, y }, 17, "B", "Back");
-        if (searchControl) DrawCommand(rt, {396,y},17,"X","Search");
-        else DrawCommand(rt, { 396, y }, 38, "START", startAction.c_str());
+            rt, p + ScreenCoordsXY{ 12, detailTop + 54 },
+            "{MUTED}" + (status.empty() ? std::to_string(entries.size()) + " available" : status), {}, 296);
+        DrawFooter(
+            rt, screen,
+            { { "D-pad", "Choose" },
+              { "A", "Select" },
+              { "B", "Back" },
+              { searchControl ? "X" : "START", searchControl ? "Search" : startAction } });
     }
 } // namespace OpenRCT2::Ui::Handheld

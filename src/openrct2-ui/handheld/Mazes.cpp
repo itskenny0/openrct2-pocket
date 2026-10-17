@@ -445,12 +445,24 @@ namespace OpenRCT2::Ui::Handheld::Mazes
                             : "{MUTED}L2/R2 Height");
         DrawModernText(rt, p + ScreenCoordsXY{ 10, 178 }, "{WHITE}SEL Camera | START Ride");
         DrawActionStrip(rt, screen);
-        DrawCommand(rt, { 8, screen.height - 21 }, 17, "A", review ? "Select" : Picking() ? "Pick" : "Build");
-        DrawCommand(rt, { 98, screen.height - 21 }, 17, "B", review ? "Cancel" : camera ? "Build" : "Ride");
-        DrawCommand(rt, { 188, screen.height - 21 }, 30, "L/R", review ? "Choice" : (camera ? "Zoom" : "Direction"));
+        std::vector<ControlHint> hints{ { "A",
+                                          review          ? "Select"
+                                              : Picking() ? "Pick"
+                                                          : "Build" },
+                                        { "B",
+                                          review       ? "Cancel"
+                                              : camera ? "Build"
+                                                       : "Ride" },
+                                        { "L1/R1",
+                                          review       ? "Choice"
+                                              : camera ? "Zoom"
+                                                       : "Direction" } };
         if (!review)
-            DrawCommand(rt, { 318, screen.height - 21 }, 17, "X", camera ? "Rotate" : "Move");
-        DrawCommand(rt,{420,screen.height-21},38,"START","Ride");
+        {
+            hints.push_back({ "X", camera ? "Rotate" : "Move" });
+            hints.push_back({ "START", "Ride" });
+        }
+        DrawFooter(rt, screen, hints);
         const auto q = review ? Apply(GA::MazeBuildMode::fill, false) : Picking() ? SelectCell(false) : Build(false);
         if (!feedback.empty())
             DrawContextMessage(rt, Layout::ContextAnchor(screen, kContextSize, true), feedback);
@@ -463,3 +475,4 @@ namespace OpenRCT2::Ui::Handheld::Mazes
                 rt, Layout::ContextAnchor(screen, kContextSize, true), feedback.empty() ? q.getErrorMessage() : feedback);
     }
 } // namespace OpenRCT2::Ui::Handheld::Mazes
+

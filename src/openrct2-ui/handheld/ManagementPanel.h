@@ -32,6 +32,9 @@ namespace OpenRCT2::Ui::Handheld
         std::string listLabel;
         bool destructive{};
         std::string headerInk = "{WHITE}";
+        std::vector<int> meterDirections; // +1 higher is better; -1 lower is better.
+        std::vector<bool> meterAttention; // Native thought/attention predicates only.
+        std::vector<std::string> statInk;
         std::vector<int> meters; // Native normalized values; -1 means no meter.
         std::vector<std::string> rowDetails;
         std::vector<bool> rowEnabled;
@@ -61,7 +64,7 @@ namespace OpenRCT2::Ui::Handheld
         const int rowStart = 64 + (model.tabs.empty() ? 0 : 34) + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16
             + model.reservedHeight + (model.graph.empty() ? 0 : 110) + (model.rows.empty() ? 0 : 11) + (model.toolbarCount ? 36 : 0);
         const int rowHeight = model.rowHeight ? model.rowHeight : model.denseRoster ? 38 : model.rosterCards ? 46 : model.actionGrid ? 30 : columns > 1 ? 24 : 30;
-        const size_t capacity = std::max(1, (size.height - rowStart - 30) / rowHeight) * columns;
+        const size_t capacity = std::max(1, (size.height - rowStart - 34) / rowHeight) * columns;
         return {columns, rowHeight, rowStart, statColumns, statHeight, capacity};
     }
     inline void DrawManagementContent(
@@ -80,8 +83,14 @@ namespace OpenRCT2::Ui::Handheld
         const size_t visible = std::min(capacity, model.rows.size() - std::min(first, model.rows.size()));
         DrawSurface(rt, p, size);
         DrawSectionLabel(rt, p + ScreenCoordsXY{12, 13}, width - 24 - (model.headerStatus.empty() ? 0 : 138), model.breadcrumb);
-        if (!model.headerStatus.empty() && (model.headerInk=="{POSITIVE}" || model.headerInk=="{CAUTION}"))
-            Fill(rt,p+ScreenCoordsXY{width-148,12},{4,12},static_cast<Drawing::PaletteIndex>(model.headerInk=="{POSITIVE}"?PocketPalette::positive:PocketPalette::caution));
+        if (!model.headerStatus.empty()
+            && (model.headerInk == "{POSITIVE}" || model.headerInk == "{CAUTION}" || model.headerInk == "{DANGER}"))
+            Fill(
+                rt, p + ScreenCoordsXY{ width - 148, 12 }, { 4, 12 },
+                static_cast<Drawing::PaletteIndex>(
+                    model.headerInk == "{POSITIVE}"     ? PocketPalette::positive
+                        : model.headerInk == "{DANGER}" ? PocketPalette::destructive
+                                                        : PocketPalette::caution));
         if (!model.headerStatus.empty()) DrawStrongText(rt,p+ScreenCoordsXY{width-138,13},model.headerInk+model.headerStatus,126);
         const int contentTop = model.tabs.empty() ? 64 : 98;
         if (!model.tabs.empty()) DrawTabs(rt,p+ScreenCoordsXY{10,62},width-20,model.tabs,model.selectedTab);
@@ -97,8 +106,10 @@ namespace OpenRCT2::Ui::Handheld
             if (model.summaryMetrics)
             {
                 const int cellWidth = (width - 24) / statColumns;
-                DrawMetric(rt, p + ScreenCoordsXY{12 + static_cast<int>(i % statColumns) * cellWidth, y},
-                    {cellWidth - 4, statHeight - 5}, model.stats[i].first, model.stats[i].second, highlight);
+                DrawMetric(
+                    rt, p + ScreenCoordsXY{ 12 + static_cast<int>(i % statColumns) * cellWidth, y },
+                    { cellWidth - 4, statHeight - 5 }, model.stats[i].first, model.stats[i].second, highlight,
+                    i < model.statInk.size() ? model.statInk[i] : "{WHITE}");
             }
             else
             {
@@ -116,7 +127,22 @@ namespace OpenRCT2::Ui::Handheld
             const int cellWidth=(width-24)/statColumns;
             const auto start=p+ScreenCoordsXY{12+static_cast<int>(i%statColumns)*cellWidth,contentTop+static_cast<int>(i/statColumns)*statHeight+statHeight-8};
             Fill(rt,start,{cellWidth-6,3},Theme::ink);
-            Fill(rt,start,{(cellWidth-6)*std::clamp(model.meters[i],0,100)/100,3},Theme::gold);
+            const bool directional = i < model.meterDirections.size();
+            const bool attention = i < model.meterAttention.size() && model.meterAttention[i];
+            const auto ink = attention                        ? PocketPalette::caution
+                : directional && model.meterDirections[i] > 0 ? PocketPalette::positive
+                                                              : PocketPalette::secondary;
+            Fill(
+                rt, start, { (cellWidth - 6) * std::clamp(model.meters[i], 0, 100) / 100, 3 },
+                static_cast<Drawing::PaletteIndex>(ink));
+            if (directional)
+                DrawModernText(
+                    rt, start + ScreenCoordsXY{ 0, -13 },
+                    std::string(
+                        attention                          ? "{CAUTION}! Needs attention"
+                            : model.meterDirections[i] > 0 ? "{MUTED}+ Higher is better"
+                                                           : "{MUTED}- Lower is better"),
+                    {}, cellWidth - 6);
         }
         for(size_t i=0;i<model.toolbarCount && i<model.rows.size();++i)
         {
@@ -168,9 +194,19 @@ namespace OpenRCT2::Ui::Handheld
                 DrawModernEllipsised(rt,p+ScreenCoordsXY{x+cellWidth-150,y+7},140,
                     std::string(selected?"{BLACK}":"{WHITE}")+model.rowValues[i]);
             }
+            else if (model.listLabel.starts_with("CURRENT THOUGHTS"))
+            {
+                const bool selected = focused && i == model.selected;
+                Fill(rt, p + ScreenCoordsXY{ x, y }, { cellWidth - 4, rowHeight - 2 }, selected ? Theme::gold : Theme::ink);
+                DrawWrappedLabel(
+                    rt, p + ScreenCoordsXY{ x + 8, y + 7 }, cellWidth - 20,
+                    std::string(selected ? "{BLACK}" : "{WHITE}") + model.rows[i], 2);
+            }
             else
-                DrawActionRow(rt, p + ScreenCoordsXY{x, y}, {cellWidth - 4, rowHeight - 2}, model.rows[i],
-                    i < model.rowDetails.size() ? model.rowDetails[i] : "", focused && i == model.selected, enabled);
+                DrawActionRow(
+                    rt, p + ScreenCoordsXY{ x, y }, { cellWidth - 4, rowHeight - 2 }, model.rows[i],
+                    i < model.rowDetails.size() ? model.rowDetails[i] : "", focused && i == model.selected, enabled,
+                    PanelIcon::none, model.destructive && i == 0);
         }
         // Feedback and overflow have independent lines, so failures never hide pagination.
         if (!model.status.empty())
@@ -190,10 +226,14 @@ namespace OpenRCT2::Ui::Handheld
     inline void DrawManagementPanel(Drawing::RenderTarget& rt, ScreenSize screen, const ManagementPresentation& model)
     {
         DrawManagementContent(rt, Concept::kMenuOrigin, { 244, Layout::ContentHeight(screen) }, model);
-        DrawActionStrip(rt, screen);
-        const int y = screen.height - 21;
-        DrawCommand(rt, { 12, y }, 38, "D-pad", model.editing ? "Adjust" : "Choose");
-        DrawCommand(rt, { 190, y }, 17, "A", model.editing ? "Review" : model.confirmation ? "Confirm" : "Select");
-        DrawCommand(rt, { 370, y }, 17, "B", "Back");
+        DrawFooter(
+            rt, screen,
+            { { "D-pad", model.editing ? "Adjust" : "Choose" },
+              { "A",
+                model.editing            ? "Review"
+                    : model.confirmation ? "Confirm"
+                                         : "Select" },
+              { "B", "Back" } });
     }
 } // namespace OpenRCT2::Ui::Handheld
+

@@ -147,15 +147,20 @@ namespace OpenRCT2::Ui::Handheld::FinanceInformation
         props.hoverIdx = -1; // Controller-selected value is displayed above the native plot.
         // Same magnitude/leading-digit range as desktop Finances, within ordinary native monetary bounds.
         money64 magnitude = 0;
+        bool negative = false, positive = false;
         for (size_t i = 0; i < 64; ++i)
             if (props.series[i] != kMoney64Undefined)
+            {
                 magnitude = std::max(magnitude, std::abs(props.series[i]));
+                negative |= props.series[i] < 0;
+                positive |= props.series[i] > 0;
+            }
         money64 oom = 10;
         while (magnitude / oom >= 10)
             oom *= 10;
         const auto limit = std::max(10.00_GBP, ((magnitude + oom - 1) / oom) * oom);
-        props.min = graph == 2 ? 0 : -limit;
-        props.max = limit;
+        props.min = graph == 2 || !negative ? 0 : -limit;
+        props.max = positive || !negative ? limit : 0;
         props.darkBackground = true;
         props.breakOnMissing = true;
         props.lineCol = ColourWithFlags{ Drawing::Colour::grey };
@@ -168,3 +173,4 @@ namespace OpenRCT2::Ui::Handheld::FinanceInformation
         }
     }
 } // namespace OpenRCT2::Ui::Handheld::FinanceInformation
+

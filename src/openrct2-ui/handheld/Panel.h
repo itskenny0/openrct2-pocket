@@ -165,34 +165,77 @@ namespace OpenRCT2::Ui::Handheld
         DrawIconRow(rt, { window.windowPos.x + 10, y - 8 }, window.width - 20, label, selected, PanelIcon::play);
     }
 
-    inline void DrawCommand(Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t keyWidth, const char* key, const char* label)
+    struct ControlHint
     {
-        const std::string_view original(key);
-        const bool dpad = original == "D-pad";
-        const bool face = original.size() == 1 && std::string_view("ABXY").find(original.front()) != std::string_view::npos;
-        const auto top = pos.y - 1;
-        int width = 16;
-        if (dpad)
+        std::string key, label;
+    };
+    struct ControlPlacement
+    {
+        ControlHint hint;
+        int x, y, width;
+    };
+    inline std::string ControlKey(std::string key)
+    {
+        if (key == "L/R")
+            return "L1/R1";
+        if (key == "SEL")
+            return "SELECT";
+        return key;
+    }
+    inline int ControlKeyWidth(const std::string& key)
+    {
+        return key == "D-pad" || key.size() == 1 ? 16 : TextWidth(key) + 8;
+    }
+    inline int ControlHintWidth(const ControlHint& hint)
+    {
+        return ControlKeyWidth(ControlKey(hint.key)) + 5 + TextWidth(hint.label) + 12;
+    }
+    inline void DrawCommand(Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t, const char* key, const char* label)
+    {
+        const auto name = ControlKey(key);
+        const int width = ControlKeyWidth(name);
+        const int top = pos.y - 3;
+        const auto face = static_cast<Drawing::PaletteIndex>(name == "A" ? PocketPalette::positive : PocketPalette::selection);
+        if (name == "D-pad")
         {
-            // Small, crisp cross; no oversized faux hardware silhouette.
-            Fill(rt, {pos.x + 5, top}, {4, 14}, Theme::text);
-            Fill(rt, {pos.x, top + 5}, {14, 4}, Theme::text);
-            Fill(rt, {pos.x + 5, top + 5}, {4, 4}, Theme::edge);
-        }
-        else if (face)
-        {
-            // Compact rounded tiles replace the large antialiased discs.
-            Fill(rt, {pos.x + 2, top}, {12, 16}, Theme::text);
-            Fill(rt, {pos.x, top + 2}, {16, 12}, Theme::text);
-            DrawButtonLabel(rt, {pos.x, top}, {16, 16}, std::string(original));
+            Fill(rt, { pos.x + 5, top + 1 }, { 5, 15 }, Theme::text);
+            Fill(rt, { pos.x, top + 6 }, { 15, 5 }, Theme::text);
+            Fill(rt, { pos.x + 6, top + 7 }, { 3, 3 }, Theme::edge);
         }
         else
         {
-            const std::string name = original == "SEL" ? "SELECT" : std::string(original);
-            width = TextWidth(name);
-            DrawModernText(rt, pos, "{MUTED}" + name);
+            Fill(rt, { pos.x + 2, top }, { width - 4, 17 }, face);
+            Fill(rt, { pos.x, top + 2 }, { width, 13 }, face);
+            DrawButtonLabel(rt, { pos.x, top }, { width, 17 }, name);
         }
-        DrawModernText(rt, {pos.x + width + 5, pos.y}, label, {Drawing::Colour::white});
+        DrawModernText(rt, { pos.x + width + 5, pos.y }, std::string(name == "A" ? "{WHITE}" : "{MUTED}") + label);
+    }
+    inline void DrawFooter(Drawing::RenderTarget&, ScreenSize, const std::vector<ControlHint>&);
+    // Word wrapping preserves the color on every line and never splits UTF-8.
+    inline void DrawWrappedLabel(Drawing::RenderTarget& rt, ScreenCoordsXY p, int width, std::string text, int lines = 2)
+    {
+        std::string ink = "{WHITE}";
+        if (text.starts_with("{") && text.find('}') != std::string::npos)
+        {
+            const auto end = text.find('}') + 1;
+            ink = text.substr(0, end);
+            text.erase(0, end);
+        }
+        std::istringstream words(text);
+        std::string word, line;
+        int row = 0;
+        while (words >> word)
+        {
+            const auto next = line.empty() ? word : line + " " + word;
+            if (!line.empty() && TextWidth(next, true) > width && row + 1 < lines)
+            {
+                DrawStrongText(rt, p + ScreenCoordsXY{ 0, row++ * 16 }, ink + line, width);
+                line = word;
+            }
+            else
+                line = next;
+        }
+        DrawStrongText(rt, p + ScreenCoordsXY{ 0, row * 16 }, ink + line, width);
     }
 
     // Shared hierarchy for summaries, construction and management. These surfaces
@@ -203,32 +246,37 @@ namespace OpenRCT2::Ui::Handheld
     }
 
     inline void DrawMetric(
-        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& label,
-        const std::string& value, bool selected = false)
+        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& label, const std::string& value,
+        bool selected = false, const std::string& valueInk = "{WHITE}")
     {
         Fill(rt, p, size, selected ? Theme::gold : Theme::raised);
         DrawModernEllipsised(rt, p + ScreenCoordsXY{8, 9}, size.width - 16,
             std::string(selected ? "{BLACK}" : "{MUTED}") + label);
-        DrawStrongText(rt, p + ScreenCoordsXY{8, size.height >= 40 ? 27 : 23},
-            std::string(selected ? "{BLACK}" : "{WHITE}") + value, size.width - 16);
+        DrawStrongText(
+            rt, p + ScreenCoordsXY{ 8, size.height >= 40 ? 27 : 23 }, std::string(selected ? "{BLACK}" : valueInk) + value,
+            size.width - 16);
     }
 
     inline void DrawActionRow(
-        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& title,
-        const std::string& subtitle, bool focused, bool enabled = true, PanelIcon icon = PanelIcon::none)
+        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& title, const std::string& subtitle,
+        bool focused, bool enabled = true, PanelIcon icon = PanelIcon::none, bool destructive = false)
     {
         Fill(rt, p, size, focused ? Theme::gold : Theme::ink);
         if (focused)
             Fill(rt, p, {3, size.height}, Theme::text);
         else
             Fill(rt, p + ScreenCoordsXY{0, size.height - 1}, {size.width, 1}, Theme::raised);
-        const auto colour = focused ? "{BLACK}" : enabled ? "{WHITE}" : "{DISABLED}";
+        const auto colour = focused ? "{BLACK}" : enabled ? destructive ? "{DANGER}" : "{WHITE}" : "{DISABLED}";
+        if (destructive)
+            Fill(rt, p, { 3, size.height }, static_cast<Drawing::PaletteIndex>(PocketPalette::destructive));
         const int inset = icon == PanelIcon::none ? 10 : 36;
         DrawIcon(rt, p + ScreenCoordsXY{9, 8}, icon, focused);
-        DrawStrongText(rt, p + ScreenCoordsXY{inset, subtitle.empty() ? (size.height - 12) / 2 + 3 : 10},
+        DrawStrongText(
+            rt, p + ScreenCoordsXY{ inset, subtitle.empty() || size.height < 34 ? (size.height - 12) / 2 + 3 : 8 },
             std::string(colour) + title, size.width - inset - 22);
-        if (!subtitle.empty())
-            DrawModernEllipsised(rt, p + ScreenCoordsXY{inset, 27}, size.width - inset - 22,
+        if (!subtitle.empty() && size.height >= 34)
+            DrawModernEllipsised(
+                rt, p + ScreenCoordsXY{ inset, size.height - 13 }, size.width - inset - 22,
                 std::string(focused ? "{BLACK}" : "{MUTED}") + subtitle);
         DrawModernText(rt, p + ScreenCoordsXY{size.width - 15, (size.height - 12) / 2 + 3},
             std::string(colour) + (enabled ? ">" : "-"));
@@ -249,10 +297,7 @@ namespace OpenRCT2::Ui::Handheld
         const auto pos = window.windowPos + ScreenCoordsXY{ 1, window.height - 29 };
         Fill(rt, pos, { window.width - 2, 28 }, Theme::raised);
         Fill(rt, pos, { window.width - 2, 1 }, Theme::edge);
-        const auto y = pos.y + 8;
-        DrawCommand(rt, { pos.x + 12, y }, 38, "D-pad", "Choose");
-        DrawCommand(rt, { pos.x + 139, y }, 17, "A", "Select");
-        DrawCommand(rt, { pos.x + 238, y }, 17, "B", backLabel);
+        DrawFooter(rt, { rt.width, rt.height }, { { "D-pad", "Choose" }, { "A", "Select" }, { "B", backLabel } });
     }
 
     inline void DrawTabs(
@@ -419,63 +464,79 @@ namespace OpenRCT2::Ui::Handheld
         Concept::Rule(rt, p, screen.width);
     }
 
-    inline void DrawShopFooter(Drawing::RenderTarget& rt, ScreenSize screen)
+    // Primary lane: movement, action, Back. Secondary lane: all other supplied
+    // controls. Use actual font advances; callers never position hints by hand.
+    inline std::vector<ControlPlacement> MeasureFooter(ScreenSize screen, const std::vector<ControlHint>& hints)
+    {
+        std::array<std::vector<ControlHint>, 2> lanes;
+        for (const auto& hint : hints)
+            if (!hint.label.empty())
+                lanes[hint.key == "D-pad" || hint.key == "A" || hint.key == "B" ? 0 : 1].push_back(hint);
+        std::stable_sort(lanes[0].begin(), lanes[0].end(), [](const auto& a, const auto& b) {
+            const auto rank = [](const auto& h) { return h.key == "D-pad" ? 0 : h.key == "A" ? 1 : 2; };
+            return rank(a) < rank(b);
+        });
+        std::vector<ControlPlacement> result;
+        for (size_t row = 0; row < lanes.size(); ++row)
+        {
+            const auto& lane = lanes[row];
+            int total = 0;
+            for (const auto& h : lane)
+                total += ControlHintWidth(h);
+            const int gap = lane.size() > 1 ? std::max(0, (screen.width - 16 - total) / static_cast<int>(lane.size() - 1)) : 0;
+            int x = 8;
+            for (const auto& hint : lane)
+            {
+                const int width = ControlHintWidth(hint);
+                result.push_back({ hint, x, screen.height - Layout::actionHeight + 7 + static_cast<int>(row) * 20, width });
+                x += width + gap;
+            }
+        }
+        return result;
+    }
+    inline void DrawFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::vector<ControlHint>& hints)
     {
         DrawActionStrip(rt, screen);
-        const auto y = screen.height - 21;
-        DrawCommand(rt, { 8, y }, 38, "D-pad", "Move");
-        DrawCommand(rt, { 115, y }, 17, "A", "Place");
-        DrawCommand(rt, { 207, y }, 17, "Y", "Shops");
-        DrawCommand(rt, { 299, y }, 30, "SEL", "Turn");
-        DrawCommand(rt, { 420, y }, 17, "B", "Back");
+        for (const auto& placement : MeasureFooter(screen, hints))
+            DrawCommand(rt, { placement.x, placement.y }, 0, placement.hint.key.c_str(), placement.hint.label.c_str());
+    }
+
+    inline void DrawShopFooter(Drawing::RenderTarget& rt, ScreenSize screen)
+    {
+        DrawFooter(rt, screen, { { "D-pad", "Move" }, { "A", "Place" }, { "Y", "Shops" }, { "SEL", "Turn" }, { "B", "Back" } });
     }
 
     inline void DrawTreeFooter(Drawing::RenderTarget& rt, ScreenSize screen)
     {
-        DrawActionStrip(rt, screen);
-        const auto y = screen.height - 21;
-        DrawCommand(rt, { 12, y }, 38, "D-pad", "Move");
-        DrawCommand(rt, { 140, y }, 17, "A", "Place");
-        DrawCommand(rt, { 268, y }, 17, "Y", "Trees");
-        DrawCommand(rt, { 396, y }, 17, "B", "Back");
+        DrawFooter(rt, screen, { { "D-pad", "Move" }, { "A", "Place" }, { "Y", "Trees" }, { "B", "Back" } });
     }
 
     inline void DrawSceneryRemovalFooter(Drawing::RenderTarget& rt, ScreenSize screen)
     {
-        DrawActionStrip(rt, screen);
-        const auto y = screen.height - 21;
-        DrawCommand(rt, { 12, y }, 38, "D-pad", "Move");
-        DrawCommand(rt, { 184, y }, 17, "A", "Remove");
-        DrawCommand(rt, { 396, y }, 17, "B", "Back");
+        DrawFooter(rt, screen, { { "D-pad", "Move" }, { "A", "Remove" }, { "B", "Back" } });
     }
 
     inline void DrawTrackColourFooter(Drawing::RenderTarget& rt, ScreenSize screen)
     {
-        DrawActionStrip(rt, screen);
-        const auto y = screen.height - 21;
-        DrawCommand(rt, { 12, y }, 38, "D-pad", "Move");
-        DrawCommand(rt, { 140, y }, 17, "A", "Paint");
-        DrawCommand(rt, { 268, y }, 17, "Y", "Scheme");
-        DrawCommand(rt, { 396, y }, 17, "B", "Back");
+        DrawFooter(rt, screen, { { "D-pad", "Move" }, { "A", "Paint" }, { "Y", "Scheme" }, { "B", "Back" } });
     }
     inline void DrawGameplayFooter(
         Drawing::RenderTarget& rt, ScreenSize screen, const std::string&, bool terrain, bool surface = false)
     {
         DrawActionStrip(rt, screen);
-        const auto y = screen.height - 21;
+
         if (terrain)
         {
-            DrawCommand(rt, { 12, y }, 38, "D-pad", "Move");
-            DrawCommand(rt, { 140, y }, 17, "A", surface ? "Paint" : "Edit");
-            DrawCommand(rt, { 268, y }, 17, "Y", surface ? "Surface" : "Tool");
-            DrawCommand(rt, { 396, y }, 17, "B", "Back");
+            DrawFooter(
+                rt, screen,
+                { { "D-pad", "Move" },
+                  { "A", surface ? "Paint" : "Edit" },
+                  { "Y", surface ? "Surface" : "Tool" },
+                  { "B", "Back" } });
         }
         else
         {
-            DrawCommand(rt, { 12, y }, 17, "A", "Inspect");
-            DrawCommand(rt, { 140, y }, 17, "B", "Back");
-            DrawCommand(rt, { 268, y }, 28, "SEL", "Build");
-            DrawCommand(rt, { 396, y }, 38, "START", "Park");
+            DrawFooter(rt, screen, { { "A", "Inspect" }, { "B", "Back" }, { "SEL", "Build" }, { "START", "Park" } });
         }
     }
 
@@ -508,22 +569,29 @@ namespace OpenRCT2::Ui::Handheld
         bool connected = false, bool adjusting = false, bool ready = false)
     {
         DrawActionStrip(rt, screen);
-        const auto y = screen.height - 21;
+
         if (adjusting)
         {
-            DrawCommand(rt,{12,y},38,"D-pad","Adjust");
-            DrawCommand(rt,{140,y},17,"A",connected ? "Flat" : "Flat/slope");
-            DrawCommand(rt,{268,y},17,"X","More");
-            DrawCommand(rt,{396,y},17,"B","Build");
+            DrawFooter(
+                rt, screen,
+                { { "D-pad", "Adjust" }, { "A", connected ? "Flat" : "Flat/slope" }, { "X", "More" }, { "B", "Build" } });
         }
         else
         {
-            DrawCommand(rt,{8,y},38,"D-pad","Move");
-            DrawCommand(rt,{80,y},17,"A",connected ? ready ? "Extend" : "Start" : remove ? "Remove" : "Place");
-            DrawCommand(rt,{154,y},17,"X",connected ? "View" : remove ? "Place" : "Remove");
-            DrawCommand(rt,{230,y},17,"Y","Adjust");
-            DrawCommand(rt,{312,y},28,"SEL","Surface");
-            DrawCommand(rt,{450,y},17,"B","Back");
+            DrawFooter(
+                rt, screen,
+                { { "D-pad", "Move" },
+                  { "A",
+                    connected    ? ready ? "Extend" : "Start"
+                        : remove ? "Remove"
+                                 : "Place" },
+                  { "X",
+                    connected    ? "View"
+                        : remove ? "Place"
+                                 : "Remove" },
+                  { "Y", "Adjust" },
+                  { "SEL", "Surface" },
+                  { "B", "Back" } });
         }
     }
 
@@ -532,7 +600,7 @@ namespace OpenRCT2::Ui::Handheld
         Concept::Box(rt, pos, { 160, 26 });
         DrawModernText(rt, pos + ScreenCoordsXY{ 8, 8 }, quote ? "{MUTED}Quote:" : "{MUTED}Cost:");
         const int valueX = quote ? 50 : 43;
-        DrawStrongText(rt, pos + ScreenCoordsXY{ valueX, 8 }, "{POSITIVE}" + amount, 152 - valueX);
+        DrawStrongText(rt, pos + ScreenCoordsXY{ valueX, 8 }, "{WHITE}" + amount, 152 - valueX);
     }
 
     inline void DrawContextMessage(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& text)
@@ -596,11 +664,7 @@ namespace OpenRCT2::Ui::Handheld
         for (size_t i = 0; i < rows.size() && i < 8; ++i)
             DrawActionRow(rt, p + ScreenCoordsXY{8, positions[i]}, {width - 16, i == 0 ? 30 : 27},
                 i == 0 ? "Return to building" : rows[i], "", selected == i);
-        DrawActionStrip(rt, screen);
-        const auto y = screen.height - 21;
-        DrawCommand(rt, {12, y}, 38, "D-pad", "Choose");
-        DrawCommand(rt, {184, y}, 17, "A", "Apply");
-        DrawCommand(rt, {356, y}, 17, "B", "Tool");
+        DrawFooter(rt, screen, { { "D-pad", "Choose" }, { "A", "Apply" }, { "B", "Tool" } });
     }
 
     inline void DrawMapFocus(Drawing::RenderTarget& rt, ScreenCoordsXY centre)
@@ -654,3 +718,4 @@ namespace OpenRCT2::Ui::Handheld
         DrawPanelCommands(rt, window);
     }
 } // namespace OpenRCT2::Ui::Handheld
+

@@ -991,7 +991,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             DrawActionStrip(rt, screen);
             return;
         }
-        Box(rt, p, { 200, 238 });
+        Box(rt, p, { 216, 254 });
         Heading(
             rt, p + ScreenCoordsXY{ 10, 12 },
             replacement ? "Rebuild removed"
@@ -999,13 +999,13 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                 : backward     ? "Build backward"
                                : "Build track");
         Rule(rt, p + ScreenCoordsXY{ 8, 38 }, 184);
-        Box(rt, p + ScreenCoordsXY{ 8, 48 }, { 184, 28 }, true);
-        DrawStrongText(rt, p + ScreenCoordsXY{ 14, 57 }, "{BLACK}" + PieceName(selected), 172);
+        Box(rt, p + ScreenCoordsXY{ 8, 48 }, { 200, 40 }, true);
+        DrawWrappedLabel(rt, p + ScreenCoordsXY{ 14, 54 }, 188, "{BLACK}" + PieceName(selected), 2);
         const auto& d = GetTrackElementDescriptor(selected).definition;
         const auto displayPitch = backward ? d.pitchStart : d.pitchEnd;
         const auto displayRoll = backward ? d.rollStart : d.rollEnd;
         DrawModernText(
-            rt, p + ScreenCoordsXY{ 10, 86 },
+            rt, p + ScreenCoordsXY{ 10, 98 },
             "{WHITE}Slope "
                 + std::string(
                     displayPitch == TrackPitch::none         ? "Level"
@@ -1015,7 +1015,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                         : displayPitch == TrackPitch::down60 ? "Down 60"
                                                              : "Special"));
         DrawModernText(
-            rt, p + ScreenCoordsXY{ 10, 108 },
+            rt, p + ScreenCoordsXY{ 10, 120 },
             trackTypeHasSpeedSetting(selected) ? "{MUTED}Speed "
                     + FormatStringID(STR_VELOCITY, static_cast<uint16_t>((placementSpeed * 9) >> 2))
                                                : "{WHITE}Bank "
@@ -1024,33 +1024,42 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                                       : displayRoll == TrackRoll::right ? "Right"
                                                                         : "Inverted"));
         DrawModernText(
-            rt, p + ScreenCoordsXY{ 10, 130 },
+            rt, p + ScreenCoordsXY{ 10, 142 },
             std::string("{MUTED}Chain ") + (ChainAllowed() ? (chain ? "On" : "Off") : "Unavailable"));
         DrawModernText(
-            rt, p + ScreenCoordsXY{ 10, 152 }, "{WHITE}Height " + (endpoint ? std::to_string(endpoint->z / 8) : "Unavailable"));
+            rt, p + ScreenCoordsXY{ 10, 164 }, "{WHITE}Height " + (endpoint ? std::to_string(endpoint->z / 8) : "Unavailable"));
         DrawModernText(
-            rt, p + ScreenCoordsXY{ 10, 194 },
+            rt, p + ScreenCoordsXY{ 10, 206 },
             camera ? "{GOLD}CAMERA / B Build"
                 : SeatSupported()
                 ? "{MUTED}Seat " + std::to_string(placementSeat) + (placementInverted ? " / Inv" : " / SEL options")
                 : placementInverted ? "{WHITE}Inverted / START Ride"
                                     : "{WHITE}START Ride / SEL Pieces");
-        DrawModernText(rt, p + ScreenCoordsXY{ 10, 218 }, "{WHITE}L2/R2 Slope | SEL Pieces");
+        DrawModernText(rt, p + ScreenCoordsXY{ 10, 230 }, "{WHITE}L2/R2 Slope | SEL Pieces");
         static const char* directions[]{"West","South","East","North"};
-        DrawModernText(rt,p+ScreenCoordsXY{10,174},endpoint ? "{WHITE}"+std::string(directions[endpoint->direction&3]) : "{WHITE}Choose origin");
+        DrawModernText(
+            rt, p + ScreenCoordsXY{ 10, 186 },
+            endpoint ? "{WHITE}" + std::string(directions[endpoint->direction & 3]) : "{WHITE}Choose origin");
         Drawing::RenderTarget preview;
-        if(ClipRenderTarget(preview,rt,p+ScreenCoordsXY{130,123},60,62)) DrawPiecePreview(preview,selected);
-        DrawActionStrip(rt, screen);
-        const auto y = screen.height - 21;
-        DrawCommand(rt, { 8, y }, 17, "A", "Build");
-        DrawCommand(rt, { 100, y }, 17, "B", camera ? "Build" : replacement ? "Cancel" : StationPlacement() ? "Cancel" : "Undo");
-        DrawCommand(rt, { 192, y }, 30, "L/R", camera ? "Zoom" : "Piece");
-        DrawCommand(rt, { 306, y }, 17, "X", camera ? "Rotate" : trackTypeHasSpeedSetting(selected) ? "Speed +" : "Bank");
-        DrawCommand(
-            rt, { 411, y }, 17, "Y",
-            StationPlacement()                       ? "Turn"
-                : trackTypeHasSpeedSetting(selected) ? "Speed -"
-                                                     : "Chain");
+        if (ClipRenderTarget(preview, rt, p + ScreenCoordsXY{ 146, 135 }, 60, 62))
+            DrawPiecePreview(preview, selected);
+        DrawFooter(
+            rt, screen,
+            { { "A", "Build" },
+              { "B",
+                camera                   ? "Build"
+                    : replacement        ? "Cancel"
+                    : StationPlacement() ? "Cancel"
+                                         : "Undo" },
+              { "L/R", camera ? "Zoom" : "Piece" },
+              { "X",
+                camera                                   ? "Rotate"
+                    : trackTypeHasSpeedSetting(selected) ? "Speed +"
+                                                         : "Bank" },
+              { "Y",
+                StationPlacement()                       ? "Turn"
+                    : trackTypeHasSpeedSetting(selected) ? "Speed -"
+                                                         : "Chain" } });
         const auto q = Action(false);
         if (q.error == GA::Status::ok)
             DrawCostBadge(rt, Layout::ContextAnchor(screen, kContextSize, true), FormatMoney(q.cost));
@@ -1059,3 +1068,4 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                 rt, Layout::ContextAnchor(screen, kContextSize, true), feedback.empty() ? q.getErrorMessage() : feedback);
     }
 } // namespace OpenRCT2::Ui::Handheld::CustomTracks
+

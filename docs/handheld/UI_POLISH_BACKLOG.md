@@ -34,11 +34,13 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 
 - Description: Some secondary/contextual labels may remain too muted.
 - Severity: Minor
-- Status: Unverified
+- Status: Fixed
 - Source: Previous screenshot review; Phase 5 contrast improvements accepted
 - Reproduction: Compare dashboard and every active construction tool on dark/bright native scenes.
 - Suggested solution: Measure contrast/readability without flattening hierarchy.
 - Relevant files/components: PocketPalette.h / ConceptStyle.h; ManagementPanel.h; construction presenters
+
+- Phase 8A verification: Shared secondary ink 19→20 and disabled ink 17→19. Verified representative 512×384 native captures across management and construction; physical readability remains S-02.
 
 ## S-02 — Shared
 
@@ -60,6 +62,8 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 - Suggested solution: Retain text/icons with semantic colors; closed does not imply failure.
 - Relevant files/components: ManagementPanel.h; PocketPalette.h / ConceptStyle.h
 
+- Phase 8A progress: Phase 8A uses neutral Closed, mint Open, amber Testing, coral crashed/broken/down and destructive review accents, signed month-net ink, and draft markers. Representative native captures pass; a full-system/device state matrix remains unverified.
+
 ## S-04 — Shared
 
 - Description: Focus visibility over bright park graphics needs device verification.
@@ -74,31 +78,37 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 
 - Description: Contextual controller hints need a complete journey audit.
 - Severity: Minor
-- Status: Unverified
+- Status: Deferred
 - Source: Previous review; Phase 6 hints inspected in captures
 - Reproduction: Exercise every Build/Adjust, tab, modifier, map and placement state.
 - Suggested solution: Correct hints against actual dispatch; avoid hidden actions.
 - Relevant files/components: Explorer.cpp; Menu.cpp; Dashboard.h
 
+- Phase 8A verification: Phase 8A replaces fixed footer coordinates with shared measured two-lane glyphs; representative bounds and runtime captures pass. Full input-journey accuracy, camera access and mode transitions remain Phase 8B.
+
 ## S-06 — Shared
 
 - Description: Back and focus restoration require remaining-system coverage.
 - Severity: Major
-- Status: Unverified
+- Status: Deferred
 - Source: Previous review; representative Phase 6 automated returns pass
 - Reproduction: Traverse submenus, cancellation, tool return and section/park return.
 - Suggested solution: Preserve caller/tab/selection; document intentional draft discard.
 - Relevant files/components: Menu.cpp; TabbedActions.h
 
+- Phase 8A verification: Phase 8B: comprehensive Back, draft-loss prevention, caller/tab selection and focus restoration. Phase 8A retains native behavior; passing representative journey tests do not establish full-system/device coverage.
+
 ## R-01 — Ride management
 
 - Description: Some Overview states leave considerable unused space.
 - Severity: Cosmetic
-- Status: Unverified
+- Status: Fixed
 - Source: Historical screenshot observation
 - Reproduction: Inspect real rides with sparse and complete native statistics.
 - Suggested solution: Consider useful existing native data without clutter.
 - Relevant files/components: RideTabs.h; ManagementPanel.h
+
+- Phase 8A verification: Overview now includes native reliability, customers and profit/hour from the existing statistics adapter. RideFlowTests and ride/02-park-ride-overview.png verify the populated layout.
 
 ## R-02 — Ride construction
 
@@ -114,11 +124,13 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 
 - Description: Selected-piece labels may truncate.
 - Severity: Minor
-- Status: Unverified
+- Status: Fixed
 - Source: Historical screenshot observation
 - Reproduction: Select long track names and translated labels.
 - Suggested solution: Improve wrapping/selected detail if reproduced.
 - Relevant files/components: CustomTracks.h; Menu.cpp
+
+- Phase 8A verification: Selected track names wrap into two lines in a 216-pixel construction panel; picker details wrap across 296 pixels. Native previews/eligibility preserved. RideFlowTests and ride/07-coaster-build.png / 09-track-pieces.png pass. Long translated names remain I-04.
 
 ## R-04 — Ride construction
 
@@ -139,6 +151,8 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 - Reproduction: Inspect all object/brush shape/paint adjustments at logical resolution.
 - Suggested solution: Prioritize current operation; preserve advanced settings.
 - Relevant files/components: SceneryTools.cpp; AreaTools.h / TerrainMaterials.h
+
+- Phase 8A progress: Phase 8A shortens adjustment instructions, keeps explicit Adjust headings, and improves shared label contrast. Representative scenery/terrain panels verified; broader catalogs/settings/device coverage stays open.
 
 ## C-02 — Scenery / landscaping
 
@@ -170,15 +184,19 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 - Suggested solution: Retain dense informative rows; verify focus and viewport.
 - Relevant files/components: PeopleNavigation.h / Menu.cpp; ManagementPanel.h
 
+- Phase 8A progress: Phase 8A fixes subtitle placement within compact roster rows and verifies populated native fixture paging. Hardware/long-name coverage remains open.
+
 ## P-02 — Staff
 
 - Description: Duties tab lacks an explicit pending/unsaved summary.
 - Severity: Minor
-- Status: Confirmed
+- Status: Fixed
 - Source: Phase 6 source inspection: PeopleTabs::Staff sets role header and static duty instructions
 - Reproduction: Toggle a duty without applying; compare header before/after.
 - Suggested solution: Show draft/current state based on native baseline, without changing save semantics.
 - Relevant files/components: PeopleTabs.h; StaffManagement.cpp
+
+- Phase 8A verification: Duties compares the draft with native staffOrders, shows amber Unsaved duties, and retains the pending summary when no transient message exists. PeopleUxTests checks no native mutation before Apply and cancellation; people/04-employee-duties.png verifies the display.
 
 ## P-03 — Staff
 
@@ -194,11 +212,13 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 
 - Description: Needs could communicate direction and importance more clearly.
 - Severity: Minor
-- Status: Unverified
+- Status: Fixed
 - Source: Previous review; current source explicitly states high hunger/thirst/toilet means more need
 - Reproduction: Compare extreme native values and happiness in Needs tab.
 - Suggested solution: Validate native meaning/thresholds before any severity treatment; optional enhancement tracked separately.
 - Relevant files/components: PeopleTabs.h; GuestManagement.cpp
+
+- Phase 8A verification: Needs preserve all six native normalized values, add higher/lower-is-better labels, and use native Guest.cpp thought/attention predicates for amber ! markers. Boundary tests cover toilet 159/160 and nausea 139/140; low/high runtime captures are included. No percentage severity bands or recommendations were invented.
 
 ## G-02 — Guests
 
@@ -210,6 +230,8 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 - Suggested solution: Prioritize readable native thoughts/full-text access.
 - Relevant files/components: PeopleTabs.h; GuestManagement.cpp
 
+- Phase 8A progress: Phase 8A uses 44-pixel thought rows with two-line wrapping and retains A full text. Representative English fixture verified; long/translated content remains open.
+
 ## G-03 — Guests
 
 - Description: Guest roster selected-row visibility and activity clipping need scale testing.
@@ -219,6 +241,8 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 - Reproduction: Browse large populations and long activity/name strings.
 - Suggested solution: Keep dense rows; check visible focus and rendering cost.
 - Relevant files/components: PeopleNavigation.h / Menu.cpp; GuestManagement.cpp
+
+- Phase 8A progress: Phase 8A verifies focus and complete compact rows in a 1,024-guest native fixture, restoring the activity/happiness subtitle. Device and broader long-name performance stay open.
 
 ## I-01 — Integration
 
@@ -330,4 +354,54 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 - Suggested solution: Show Left/Right and full-list controls under relevant actions.
 - Relevant files/components: MarketingManagement.cpp
 
-Inventory: **32 entries**; 3 Confirmed, 22 Unverified, 7 Fixed, 0 Deferred.
+## P8-F1 — Shared roster
+
+- Description: Compact row subtitles could fall below their row or disappear after footer resizing.
+- Severity: Minor
+- Status: Fixed
+- Source: Phase 8A source, native fixture tests and capture review
+- Reproduction: Use the corresponding Phase 8A runtime fixture.
+- Implementation / next step: DrawActionRow now fits title/detail baselines within a 36-pixel visible row; staff/guest populated roster captures and native scrolling tests pass.
+- Evidence: `CONTROLLER-UX-PHASE8A.md`; `captures/controller-ux-phase8a/`; `evidence/controller-ux-phase8a/`.
+
+## P8-F2 — Staff
+
+- Description: The transient Menu status overwrote the shared pending-duty summary with an empty string.
+- Severity: Minor
+- Status: Fixed
+- Source: Phase 8A source, native fixture tests and capture review
+- Reproduction: Use the corresponding Phase 8A runtime fixture.
+- Implementation / next step: Preserve the shared summary unless a transient message exists; PeopleUxTests verifies pending native duty drafts and cancellation.
+- Evidence: `CONTROLLER-UX-PHASE8A.md`; `captures/controller-ux-phase8a/`; `evidence/controller-ux-phase8a/`.
+
+## P8-F3 — Paths
+
+- Description: The first revision of the partial-build warning extended beyond the compact panel.
+- Severity: Minor
+- Status: Fixed
+- Source: Phase 8A source, native fixture tests and capture review
+- Reproduction: Use the corresponding Phase 8A runtime fixture.
+- Implementation / next step: Shortened to Built paths stay. You pay. Native Line/Fill review/cost/partial-failure tests and runtime review capture verify the result.
+- Evidence: `CONTROLLER-UX-PHASE8A.md`; `captures/controller-ux-phase8a/`; `evidence/controller-ux-phase8a/`.
+
+## P8-F4 — Staff
+
+- Description: The taller control bar initially moved the explicit Cancel duty row onto a second page.
+- Severity: Minor
+- Status: Fixed
+- Source: Phase 8A source, native fixture tests and capture review
+- Reproduction: Use the corresponding Phase 8A runtime fixture.
+- Implementation / next step: Use 26-pixel duty actions, keeping all four handyman duties plus Apply and Cancel visible. Save/cancel dispatch is unchanged.
+- Evidence: `CONTROLLER-UX-PHASE8A.md`; `captures/controller-ux-phase8a/`; `evidence/controller-ux-phase8a/`.
+
+## P8-B1 — Research
+
+- Description: B or changing a tab discards an unapplied research plan.
+- Severity: Minor
+- Status: Deferred
+- Source: Phase 8A source, native fixture tests and capture review
+- Reproduction: Use the corresponding Phase 8A runtime fixture.
+- Implementation / next step: Phase 8B must evaluate a discard review / draft preservation with consistent Back behavior. Phase 8A keeps the existing behavior and clearly labels the unsaved draft and consequence.
+- Evidence: `CONTROLLER-UX-PHASE8A.md`; `captures/controller-ux-phase8a/`; `evidence/controller-ux-phase8a/`.
+
+Inventory: **37 entries**; 2 Confirmed, 16 Unverified, 16 Fixed, 3 Deferred.

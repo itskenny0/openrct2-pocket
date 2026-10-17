@@ -1,0 +1,31 @@
+/workspace/scratch/3dd26b9bb351/repo/src/openrct2-ui/handheld/SceneryTools.cpp: In function ‘Configure’:
+/workspace/scratch/3dd26b9bb351/repo/src/openrct2-ui/handheld/SceneryTools.cpp:370:32: warning: ‘MEM[(union _Storage *)&previewHeight]._M_value’ may be used uninitialized [-Wmaybe-uninitialized]
+  370 |                 current.height = *previewHeight;
+      |                                ^
+/workspace/scratch/3dd26b9bb351/repo/src/openrct2-ui/handheld/SceneryTools.cpp:363:20: note: ‘MEM[(union _Storage *)&previewHeight]._M_value’ was declared here
+  363 |         const auto previewHeight = ghost && requested && requested->settings == current
+      |                    ^
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+Building object index (2504 items)
+Finished building object index in 0.07 seconds.
+Building track design index (0 items)
+Finished building track design index in 0.00 seconds.
+Building scenario index (0 items)
+Finished building scenario index in 0.00 seconds.
+INFO: Handheld controller: Virtual Controller (instance 0)
+INFO: Handheld controller: Virtual Controller (instance 1)
+INFO: Handheld controller: Virtual Controller (instance 2)
+INFO: Handheld controller: Virtual Controller (instance 3)
+INFO: Handheld controller: Virtual Controller (instance 4)
+INFO: Handheld controller: Virtual Controller (instance 5)
+PASS family 33 entrance inspection/ghost/nested autosave/cancel/serialized stale descriptor/quote/one Apply/native move/remove/accounting/gap recovery
+PASS family 33 exit inspection/ghost/nested autosave/cancel/serialized stale descriptor/quote/one Apply/native move/remove/accounting/gap recovery
+PASS family 20 entrance inspection/ghost/nested autosave/cancel/serialized stale descriptor/quote/one Apply/native move/remove/accounting/gap recovery
+PASS family 20 exit inspection/ghost/nested autosave/cancel/serialized stale descriptor/quote/one Apply/native move/remove/accounting/gap recovery
+PASS family 6 entrance inspection/ghost/nested autosave/cancel/serialized stale descriptor/quote/one Apply/native move/remove/accounting/gap recovery
+PASS family 6 exit inspection/ghost/nested autosave/cancel/serialized stale descriptor/quote/one Apply/native move/remove/accounting/gap recovery
+PASS changed target preserves source through guarded action; direct native Execute demonstrates sequential gap and native recovery
+Unable to open '/workspace/scratch/3dd26b9bb351/profiles/final-RideAccessRelocationTests/absent.park'
+PASS native Open eligibility, final .park map/cash/access round-trip and stale-load identity
+PASS old-window completion isolation, early load preservation, successful-load pending queue cleanup and pre-unload

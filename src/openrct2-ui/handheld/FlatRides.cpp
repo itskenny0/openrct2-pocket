@@ -329,15 +329,16 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
             placing ? "{MUTED}Ground placement" : "{MUTED}Station " + std::to_string(stationIndex.ToUnderlying() + 1));
         DrawModernEllipsised(rt,p+ScreenCoordsXY{12,140},140,placing ? "{WHITE}Direction "+std::to_string(direction+1) : "{WHITE}START/B Return to ride");
         DrawActionStrip(rt, screen);
-        const auto y = screen.height - 21;
-        DrawCommand(rt, { 8, y }, 38, "D-pad", "Move");
-        DrawCommand(rt, { 110, y }, 17, "A", editing ? "Review" : "Place");
-        if (placing)
+
+        std::vector<ControlHint> hints{ { "D-pad", "Move" },
+                                        { "A", editing ? "Review" : "Place" },
+                                        { "B", target ? "Ride" : "Cancel" },
+                                        { "START", target ? "Ride" : "Park" } };
+        if (!editing)
         {
-            DrawCommand(rt, { 190, y }, 17, "Y", "Rides");
-            DrawCommand(rt, { 262, y }, 30, "SEL", "Turn");
+            hints.push_back({ "Y", "Rides" });
+            hints.push_back({ "SELECT", "Turn" });
         }
-        DrawCommand(rt,{350,y},38,"START",target ? "Ride" : "Park");
-        DrawCommand(rt, { 450, y }, 17, "B", target ? "Ride" : "Cancel");
-    }
+        DrawFooter(rt, screen, hints);
+        }
 } // namespace OpenRCT2::Ui::Handheld::FlatRides

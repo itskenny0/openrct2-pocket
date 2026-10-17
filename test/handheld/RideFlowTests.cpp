@@ -126,7 +126,7 @@ int main(int argc, char** argv)
             const auto info=GetMapCoordinatesFromPos({256,192},{ViewportInteractionItem::ride});
             hit=info.Element&&info.Element->getRideIndex()==target.id;}
         Check(hit,"Native park-centre ride hit testing failed");const auto camera=WindowGetMain()->viewport->viewPos;
-        press(H::Action::confirm);Check(W::HandheldRidesPresentation().tabs.size()==4,"Park A did not open Ride Overview");capture("02-park-ride-overview.png");
+        press(H::Action::confirm);Check(W::HandheldRidesPresentation().tabs.size()==4,"Park A did not open Ride Overview");{const auto m=W::HandheldRidesPresentation();Check(H::MeasureManagement({496,H::Layout::ContentHeight({512,384})},m).capacity>=m.rows.size(),"Overview unnecessarily splits ordinary actions");}capture("02-park-ride-overview.png");
         press(H::Action::nextOption);capture("03-ride-operations.png");
         FocusRideTabAction("Operations...");press(H::Action::confirm);press(H::Action::back);
         Check(W::HandheldRidesPresentation().selectedTab==1,"Operations Back lost tab");
@@ -175,3 +175,4 @@ int main(int argc, char** argv)
         return 0;
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }
+

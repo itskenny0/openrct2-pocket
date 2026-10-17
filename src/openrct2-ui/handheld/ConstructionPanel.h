@@ -19,11 +19,6 @@ namespace OpenRCT2::Ui::Handheld
     inline void DrawConstructionFooter(
         Drawing::RenderTarget& rt, ScreenSize screen, const std::string& apply, const std::string& options)
     {
-        DrawActionStrip(rt, screen);
-        const int y = screen.height - 21;
-        DrawCommand(rt, { 12, y }, 38, "D-pad", "Move");
-        DrawCommand(rt, { 140, y }, 17, "A", apply.c_str());
-        DrawCommand(rt, { 268, y }, 17, "Y", options.c_str());
-        DrawCommand(rt, { 396, y }, 17, "B", "Back");
+        DrawFooter(rt, screen, { { "D-pad", "Move" }, { "A", apply }, { "Y", options }, { "B", "Back" } });
     }
 } // namespace OpenRCT2::Ui::Handheld
