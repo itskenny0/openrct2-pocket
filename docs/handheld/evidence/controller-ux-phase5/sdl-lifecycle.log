@@ -1,0 +1,24 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+WARNING[/workspace/scratch/d2d0a4acf14b/openrct2-pocket/src/openrct2-ui/drawing/engines/HardwareDisplayDrawingEngine.cpp:115 (Resize)]: HWDisplayDrawingEngine::Resize error: Parameter 'renderer' is invalid
+WARNING[/workspace/scratch/d2d0a4acf14b/openrct2-pocket/src/openrct2-ui/drawing/engines/HardwareDisplayDrawingEngine.cpp:115 (Resize)]: HWDisplayDrawingEngine::Resize error: Parameter 'renderer' is invalid
+ERROR[/workspace/scratch/486484e47585/openrct2-pocket-hud/src/openrct2/object/ObjectFactory.cpp:315 (CreateObjectFromLegacyFile)]: Error: Unable to open 'ObjData/PTCT1.POB' when processing object ObjData/PTCT1.POB
+[rct2.ride.ptct1] Warning (3): Unable to open 'PTCT1.DAT'
+Native wooden mode / lift bounds / coupled waiting / no-money passed
+INFO: Handheld controller: Virtual Controller (instance 0)
+INFO: Handheld controller: Virtual Controller (instance 1)
+SDL mode-specific Operations / held select / Cancel-first / one native confirm / parent return passed
+SDL operations / resume / draft guards / Cancel-first demolition passed
+Native stale ride / cleanup passed
+ERROR[/workspace/scratch/486484e47585/openrct2-pocket-hud/src/openrct2/object/ObjectFactory.cpp:315 (CreateObjectFromLegacyFile)]: Error: Unable to open 'ObjData/BURGB.POB' when processing object ObjData/BURGB.POB
+[rct2.ride.burgb] Warning (3): Unable to open 'BURGB.DAT'
+SDL shop keyboard / rail handoff / typing-cancel passed
+ERROR[/workspace/scratch/486484e47585/openrct2-pocket-hud/src/openrct2/object/ObjectFactory.cpp:315 (CreateObjectFromLegacyFile)]: Error: Unable to open 'ObjData/WBRG.POB' when processing object ObjData/WBRG.POB
+[rct2.scenery_wall.wbrg] Warning (3): Unable to open 'WBRG.DAT'
+SDL scenery category / picker / duplicate A / options-return passed
+SDL area brush / duplicate A / bounded adjustment / return passed
+SDL land review / owned-pause handoff / Cancel-first / single native confirmation passed
+SDL connected picker / held-A handoff / options-return / cleanup passed
+SDL patrol inspector / width-held-A / Cancel-first clear / options recovery passed
+SDL staff roles / held-A handoff / Cancel-first hire / costume native action passed
+Pocket SDL HUD windows / construction inset / Dashboard-Build yield-return / native save-reload / shutdown passed

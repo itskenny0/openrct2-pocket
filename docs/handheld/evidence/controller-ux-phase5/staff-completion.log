@@ -1,0 +1,3 @@
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+ERROR[/workspace/scratch/486484e47585/openrct2-pocket-hud/src/openrct2/actions/peep/StaffSetCostumeAction.cpp:70 (Query)]: Invalid entertainer costume 65535
+Native all staff roles / loaded costumes / invalid-role-object / query-stale-repeat / wages-no-money / patrol-name-uniform-filter-dismissal-save passed

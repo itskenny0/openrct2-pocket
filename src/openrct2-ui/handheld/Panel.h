@@ -221,7 +221,7 @@ namespace OpenRCT2::Ui::Handheld
             Fill(rt, p, {3, size.height}, Theme::text);
         else
             Fill(rt, p + ScreenCoordsXY{0, size.height - 1}, {size.width, 1}, Theme::raised);
-        const auto colour = focused ? "{BLACK}" : enabled ? "{WHITE}" : "{MUTED}";
+        const auto colour = focused ? "{BLACK}" : enabled ? "{WHITE}" : "{DISABLED}";
         const int inset = icon == PanelIcon::none ? 10 : 36;
         DrawIcon(rt, p + ScreenCoordsXY{9, 8}, icon, focused);
         DrawStrongText(rt, p + ScreenCoordsXY{inset, subtitle.empty() ? (size.height - 12) / 2 + 3 : 10},

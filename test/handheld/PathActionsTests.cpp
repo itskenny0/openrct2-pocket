@@ -1904,7 +1904,7 @@ static void TestStaff(IContext& context, const std::string& profile, bool realUi
     }
     roster = S::Roster();
     Require(
-        roster.size() >= 11 && S::Presentation(S::View::roster, roster.size() + 1, roster).rows.size() == roster.size() + 6,
+        roster.size() >= 11 && S::Presentation(S::View::roster, roster.size() + 1, roster).rows.size() == roster.size() + 4,
         "Full staff roster truncated");
     const auto stableRoster = roster;
     const auto afterHireCash = park.cash;
@@ -2633,7 +2633,7 @@ static void TestGuests(IContext& context, const std::string& profile, bool realU
     Require(outside && !G::Identify(outside->id), "Outside guest included");
     const auto roster = G::Roster();
     Require(
-        roster.size() == 20 && G::Presentation(G::View::roster, 19, roster).rows.size() == 21, "Full guest roster truncated");
+        roster.size() == 20 && G::Presentation(G::View::roster, 22, roster).rows.size() == 24, "Full guest roster truncated");
     const auto target = roster.back();
     auto* guest = state.entities.tryGetEntity<Guest>(target.id);
     guest->happiness = 204;

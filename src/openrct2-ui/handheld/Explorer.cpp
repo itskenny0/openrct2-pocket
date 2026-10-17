@@ -1491,7 +1491,8 @@ namespace OpenRCT2::Ui::Handheld
         std::string costAmount;
         if (_terrainActive)
         {
-            status = PeepPlacement::Active()                              ? "PLACE PERSON"
+            status = StaffPatrol::Active() ? "PATROL / Select Brush"
+                : PeepPlacement::Active()                              ? "PLACE PERSON"
                 : Designs::Active()                                       ? "PLACE DESIGN"
                 : FlatRides::CurrentStage() != FlatRides::Stage::inactive ? "PLACE RIDE"
                 : _shopTool                                               ? "PLACE SHOP"

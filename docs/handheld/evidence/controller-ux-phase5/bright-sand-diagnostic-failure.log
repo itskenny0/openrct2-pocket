@@ -1,0 +1,15 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+WARNING[/workspace/scratch/d2d0a4acf14b/openrct2-pocket/src/openrct2-ui/drawing/engines/HardwareDisplayDrawingEngine.cpp:115 (Resize)]: HWDisplayDrawingEngine::Resize error: Parameter 'renderer' is invalid
+WARNING[/workspace/scratch/d2d0a4acf14b/openrct2-pocket/src/openrct2-ui/drawing/engines/HardwareDisplayDrawingEngine.cpp:115 (Resize)]: HWDisplayDrawingEngine::Resize error: Parameter 'renderer' is invalid
+bright: load
+bright: construct
+bright: execute
+bright: render
+qemu: uncaught target signal 11 (Segmentation fault) - core dumped
+Traceback (most recent call last):
+  File "/workspace/scratch/d2d0a4acf14b/openrct2-pocket/../phase4-link-driver.py", line 14, in <module>
+    subprocess.run(cmd,env=env,check=True)
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/workspace/scratch/d2d0a4acf14b/phase4-sdk/qemu-aarch64-static', '-B', '0x100000000', '/workspace/scratch/d2d0a4acf14b/phase4-runtime/lib/ld-linux-aarch64.so.1', '--library-path', '/workspace/scratch/d2d0a4acf14b/phase4-runtime/lib', '/workspace/scratch/d2d0a4acf14b/PeopleUxTests', '/workspace/scratch/d2d0a4acf14b/phase4-runtime/data', '/workspace/scratch/d2d0a4acf14b/profile-PeopleUxTests', '/workspace/scratch/d2d0a4acf14b/phase4-private-assets']' died with <Signals.SIGSEGV: 11>.

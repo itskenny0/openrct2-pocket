@@ -219,15 +219,24 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         };
         if (view == View::roster)
         {
-            model.rows = { "Hire handyman...", "Hire mechanic..." };
+            model.rows = { "Hire employee...", "Filter role...", "Counts / wages..." };
+            model.rowDetails.resize(3);
+            model.toolbarCount=3;model.denseRoster=true;model.listLabel="EMPLOYEES / ROLE / CURRENT ACTIVITY";
+            const auto capacity=MeasureManagement({ContextGetWidth()-16,Layout::ContentHeight({ContextGetWidth(),ContextGetHeight()})},model).capacity;
             for (const auto& entry : roster)
             {
                 const auto* staff = Resolve(entry);
                 model.rows.push_back(staff ? staff->getName() : "Employee unavailable");
+                const auto index=model.rows.size()-1;
+                const auto first=3+(std::max<size_t>(selected,3)-3)/capacity*capacity;
+                std::string detail;
+                if(staff && index>=first && index<first+capacity) {
+                    Formatter ft;formatPeepActionTo(*staff,ft);
+                    detail=RoleName(entry.type)+" / "+FormatStringIDLegacy(STR_STRINGID,ft.Data());
+                }
+                model.rowDetails.push_back(detail);
             }
-            model.rows.push_back("Hire other role...");
-            model.rows.push_back("Filter role...");
-            model.rows.push_back("Role counts / wages...");
+
             model.rows.push_back("Back to dashboard");
             if (roster.empty())
                 model.status = "No staff employed";
@@ -346,6 +355,8 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
                               getGameState().park.flags.has(ParkFlag::noMoney) ? "Not applicable" : FormatMoney(0) } };
             model.rows = { "Dismiss employee", "Cancel" };
             model.confirmation = true;
+            model.destructive = true;
+            model.bodyLines = {"Removes this employee and their patrol assignment."};
             const auto result = Dismiss(*target, false);
             if (result.error != GameActions::Status::ok && model.status.empty())
                 model.status = result.getErrorMessage().empty() ? result.getErrorTitle() : result.getErrorMessage();

@@ -1,0 +1,72 @@
+{
+  "primary": {
+    "index": 21,
+    "rgb": [
+      239,
+      243,
+      243
+    ],
+    "contrast_on_panel": 9.37,
+    "contrast_on_raised": 7.299
+  },
+  "secondary": {
+    "index": 19,
+    "rgb": [
+      183,
+      195,
+      195
+    ],
+    "contrast_on_panel": 5.79,
+    "contrast_on_raised": 4.51
+  },
+  "focus": {
+    "index": 19,
+    "rgb": [
+      183,
+      195,
+      195
+    ],
+    "contrast_on_panel": 5.79,
+    "contrast_on_raised": 4.51
+  },
+  "positive": {
+    "index": 151,
+    "rgb": [
+      147,
+      199,
+      167
+    ],
+    "contrast_on_panel": 5.471,
+    "contrast_on_raised": 4.262
+  },
+  "caution": {
+    "index": 43,
+    "rgb": [
+      219,
+      199,
+      135
+    ],
+    "contrast_on_panel": 6.251,
+    "contrast_on_raised": 4.869
+  },
+  "destructive": {
+    "index": 68,
+    "rgb": [
+      235,
+      159,
+      159
+    ],
+    "contrast_on_panel": 4.984,
+    "contrast_on_raised": 3.883
+  },
+  "disabled": {
+    "index": 17,
+    "rgb": [
+      131,
+      151,
+      151
+    ],
+    "contrast_on_panel": 3.411,
+    "contrast_on_raised": 2.657
+  }
+}

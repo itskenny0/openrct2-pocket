@@ -27,6 +27,12 @@ namespace OpenRCT2::Ui::Handheld
         bool summaryMetrics{};
         bool actionGrid{};
         bool rosterCards{};
+        bool denseRoster{};
+        size_t toolbarCount{};
+        std::string listLabel;
+        bool destructive{};
+        std::string headerInk = "{WHITE}";
+        std::vector<int> meters; // Native normalized values; -1 means no meter.
         std::vector<std::string> rowDetails;
         std::vector<bool> rowEnabled;
         std::vector<std::string> tabs;
@@ -48,8 +54,8 @@ namespace OpenRCT2::Ui::Handheld
         const int statHeight = model.summaryMetrics ? model.metricHeight : 24;
         const int statRows = (static_cast<int>(model.stats.size()) + statColumns - 1) / statColumns;
         const int rowStart = 64 + (model.tabs.empty() ? 0 : 34) + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16
-            + (model.graph.empty() ? 0 : 110) + (model.rows.empty() ? 0 : 11);
-        const int rowHeight = model.rosterCards ? 46 : model.actionGrid ? 30 : columns > 1 ? 24 : 30;
+            + (model.graph.empty() ? 0 : 110) + (model.rows.empty() ? 0 : 11) + (model.toolbarCount ? 36 : 0);
+        const int rowHeight = model.denseRoster ? 38 : model.rosterCards ? 46 : model.actionGrid ? 30 : columns > 1 ? 24 : 30;
         const size_t capacity = std::max(1, (size.height - rowStart - 30) / rowHeight) * columns;
         return {columns, rowHeight, rowStart, statColumns, statHeight, capacity};
     }
@@ -65,16 +71,19 @@ namespace OpenRCT2::Ui::Handheld
         const int width = size.width;
         const auto layout = MeasureManagement(size, model);
         const auto [columns, rowHeight, rowStart, statColumns, statHeight, capacity] = layout;
-        const size_t first = model.selected / capacity * capacity;
+        const size_t first = model.toolbarCount + (std::max(model.selected, model.toolbarCount) - model.toolbarCount) / capacity * capacity;
         const size_t visible = std::min(capacity, model.rows.size() - std::min(first, model.rows.size()));
         DrawSurface(rt, p, size);
         DrawSectionLabel(rt, p + ScreenCoordsXY{12, 13}, width - 24 - (model.headerStatus.empty() ? 0 : 138), model.breadcrumb);
-        if (!model.headerStatus.empty()) DrawStrongText(rt,p+ScreenCoordsXY{width-138,13},"{WHITE}"+model.headerStatus,126);
+        if (!model.headerStatus.empty() && (model.headerInk=="{POSITIVE}" || model.headerInk=="{CAUTION}"))
+            Fill(rt,p+ScreenCoordsXY{width-148,12},{4,12},static_cast<Drawing::PaletteIndex>(model.headerInk=="{POSITIVE}"?PocketPalette::positive:PocketPalette::caution));
+        if (!model.headerStatus.empty()) DrawStrongText(rt,p+ScreenCoordsXY{width-138,13},model.headerInk+model.headerStatus,126);
         const int contentTop = model.tabs.empty() ? 64 : 98;
         if (!model.tabs.empty()) DrawTabs(rt,p+ScreenCoordsXY{10,62},width-20,model.tabs,model.selectedTab);
         DrawHeadingText(rt, p + ScreenCoordsXY{12, 29},
-            std::string(model.confirmation ? "{GOLD}" : "{WHITE}") + model.title, width - 24);
+            std::string(model.destructive ? "{DANGER}" : model.confirmation ? "{GOLD}" : "{WHITE}") + model.title, width - 24);
         Fill(rt, p + ScreenCoordsXY{12, 55}, {width - 24, 1}, Theme::edge);
+        if (model.destructive) Fill(rt,p+ScreenCoordsXY{12,55},{width-24,2},static_cast<Drawing::PaletteIndex>(PocketPalette::destructive));
         const int valueX = 14 + (width - 30) * 45 / 100;
         for (size_t i = 0; i < model.stats.size(); ++i)
         {
@@ -96,6 +105,19 @@ namespace OpenRCT2::Ui::Handheld
             }
         }
         const int statRows = (static_cast<int>(model.stats.size()) + statColumns - 1) / statColumns;
+        for (size_t i=0;i<model.meters.size() && i<model.stats.size();++i)
+        {
+            if(model.meters[i]<0) continue;
+            const int cellWidth=(width-24)/statColumns;
+            const auto start=p+ScreenCoordsXY{12+static_cast<int>(i%statColumns)*cellWidth,contentTop+static_cast<int>(i/statColumns)*statHeight+statHeight-8};
+            Fill(rt,start,{cellWidth-6,3},Theme::ink);
+            Fill(rt,start,{(cellWidth-6)*std::clamp(model.meters[i],0,100)/100,3},Theme::gold);
+        }
+        for(size_t i=0;i<model.toolbarCount && i<model.rows.size();++i)
+        {
+            const int cellWidth=(width-20)/static_cast<int>(model.toolbarCount);
+            DrawActionRow(rt,p+ScreenCoordsXY{10+static_cast<int>(i)*cellWidth,rowStart-47},{cellWidth-4,28},model.rows[i],"",focused&&model.selected==i);
+        }
         for (size_t i = 0; i < model.bodyLines.size(); ++i)
             DrawModernEllipsised(rt, p + ScreenCoordsXY{12, contentTop + 4 + statRows * statHeight + static_cast<int>(i) * 16},
                 width - 24, "{WHITE}" + model.bodyLines[i]);
@@ -118,7 +140,7 @@ namespace OpenRCT2::Ui::Handheld
         }
         if (!model.rows.empty() && model.bodyLines.empty())
             DrawSectionLabel(rt, p + ScreenCoordsXY{12, rowStart - 12}, width - 24,
-                model.confirmation ? "REVIEW & DECIDE" : model.rosterCards ? "CHOOSE A RIDE" : "ACTIONS");
+                !model.listLabel.empty() ? model.listLabel : model.confirmation ? "REVIEW & DECIDE" : model.rosterCards ? "CHOOSE A RIDE" : "ACTIONS");
         for (size_t i = first; i < first + visible; ++i)
         {
             const int y = rowStart + static_cast<int>((i - first) / columns) * rowHeight;
@@ -139,14 +161,14 @@ namespace OpenRCT2::Ui::Handheld
         // Feedback and overflow have independent lines, so failures never hide pagination.
         if (!model.status.empty())
             DrawModernEllipsised(rt, p + ScreenCoordsXY{12, size.height - 29}, width - 24, "{WHITE}" + model.status);
-        DrawPagePosition(rt, p + ScreenCoordsXY{12, size.height - 13}, width - 24, model.selected, model.rows.size(), capacity);
-        if (model.rows.size() > capacity)
+        DrawPagePosition(rt, p + ScreenCoordsXY{12, size.height - 13}, width - 24, std::max(model.selected,model.toolbarCount)-model.toolbarCount, model.rows.size()-model.toolbarCount, capacity);
+        if (model.rows.size()-model.toolbarCount > capacity)
         {
             const int trackHeight = std::max(8, size.height - rowStart - 40);
             Fill(rt, p + ScreenCoordsXY{width - 6, rowStart}, {2, trackHeight}, Theme::raised);
-            const auto pages = (model.rows.size() + capacity - 1) / capacity;
+            const auto pages = (model.rows.size()-model.toolbarCount + capacity - 1) / capacity;
             const int thumb = std::max(3, trackHeight / static_cast<int>(pages));
-            Fill(rt, p + ScreenCoordsXY{width - 6, rowStart + static_cast<int>(model.selected / capacity) * (trackHeight - thumb) / static_cast<int>(pages - 1)},
+            Fill(rt, p + ScreenCoordsXY{width - 6, rowStart + static_cast<int>((std::max(model.selected,model.toolbarCount)-model.toolbarCount) / capacity) * (trackHeight - thumb) / static_cast<int>(pages - 1)},
                 {2, thumb}, Theme::gold);
         }
     }

@@ -23,7 +23,10 @@ namespace OpenRCT2::Ui::Handheld
         dark,
         gold,
         muted,
-        positive
+        positive,
+        caution,
+        destructive,
+        disabled
     };
 
     inline Drawing::PaletteIndex BlendGlyph(Ink ink, Drawing::PaletteIndex background, uint8_t coverage)
@@ -33,7 +36,7 @@ namespace OpenRCT2::Ui::Handheld
             bool ready{};
             std::array<Drawing::PaletteIndex, 16> colours{};
         };
-        static std::array<std::array<Ramp, 256>, 5> ramps;
+        static std::array<std::array<Ramp, 256>, 8> ramps;
         auto& ramp = ramps[static_cast<size_t>(ink)][static_cast<uint8_t>(background)];
         if (!ramp.ready)
         {
@@ -42,7 +45,10 @@ namespace OpenRCT2::Ui::Handheld
                 || static_cast<uint8_t>(background) >= palette->startIndex + palette->numColours)
                 return background;
             const auto bg = palette->palette[static_cast<uint8_t>(background) - palette->startIndex];
-            const auto foreground = ink == Ink::positive ? PocketPalette::positive
+            const auto foreground = ink == Ink::caution ? PocketPalette::caution
+                : ink == Ink::destructive ? PocketPalette::destructive
+                : ink == Ink::disabled ? PocketPalette::disabled
+                : ink == Ink::positive ? PocketPalette::positive
                 : ink == Ink::muted                      ? PocketPalette::secondary
                 : ink == Ink::dark                       ? PocketPalette::dark
                 : ink == Ink::gold                       ? PocketPalette::selection
@@ -90,10 +96,14 @@ namespace OpenRCT2::Ui::Handheld
     {
         Ink ink = paint.colour.colour == Drawing::Colour::yellow ? Ink::gold : Ink::light;
         for (const auto& prefix : { std::string("{BLACK}"), std::string("{WHITE}"), std::string("{YELLOW}"),
+                                    std::string("{CAUTION}"), std::string("{DANGER}"), std::string("{DISABLED}"),
                                     std::string("{MUTED}"), std::string("{POSITIVE}"), std::string("{GOLD}") })
             if (text.starts_with(prefix))
             {
-                ink = prefix == "{POSITIVE}"                     ? Ink::positive
+                ink = prefix == "{CAUTION}" ? Ink::caution
+                    : prefix == "{DANGER}" ? Ink::destructive
+                    : prefix == "{DISABLED}" ? Ink::disabled
+                    : prefix == "{POSITIVE}"                     ? Ink::positive
                     : prefix == "{BLACK}"                        ? Ink::dark
                     : prefix == "{YELLOW}" || prefix == "{GOLD}" ? Ink::gold
                     : prefix == "{MUTED}"                        ? Ink::muted

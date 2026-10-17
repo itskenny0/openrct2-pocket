@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "GuestManagement.h"
+#include <openrct2/Context.h>
 #include "GuestFollow.h"
 
 #include "TextEntry.h"
@@ -373,8 +374,16 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
         }
         if (view == View::roster)
         {
-            for (const auto& entry : roster)
-                model.rows.push_back(Resolve(entry) ? Resolve(entry)->getName() : "Guest unavailable");
+            model.rows={"Map roster", "Name filter...", "Tracked only"};model.rowDetails.resize(3);
+            model.toolbarCount=3;model.denseRoster=true;model.listLabel="GUESTS / CURRENT ACTIVITY / HAPPINESS";
+            const auto capacity=MeasureManagement({ContextGetWidth()-16,Layout::ContentHeight({ContextGetWidth(),ContextGetHeight()})},model).capacity;
+            const auto first=3+(std::max<size_t>(selected,3)-3)/capacity*capacity;
+            for (const auto& entry : roster) {
+                const auto index=model.rows.size();
+                const auto* guest=index>=first && index<first+capacity ? Resolve(entry) : nullptr;
+                model.rows.push_back(guest ? guest->getName() : "");
+                model.rowDetails.push_back(guest && index>=first && index<first+capacity ? Status(*guest)+" / Happy "+std::to_string(guest->happiness*100/255)+"%"+(guest->peepFlags.has(PeepFlag::tracking)?" / Tracked":"") : "");
+            }
             model.rows.push_back("Back to Guests");
             if (roster.empty())
                 model.status = "No guests inside the park";

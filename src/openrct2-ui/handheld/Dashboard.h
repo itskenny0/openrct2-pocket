@@ -102,7 +102,7 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         const auto rail = Layout::menuOrigin;
         const auto content = rail + ScreenCoordsXY{ railWidth + Layout::gutter, 0 };
         const int height = Layout::ContentHeight(screen);
-        const bool expanded = state.section == Section::rides && state.focus == Focus::content;
+        const bool expanded = (state.section == Section::rides || state.section == Section::staff || state.section == Section::guests) && state.focus == Focus::content;
         if (!expanded)
         {
         DrawSurface(rt, rail, { railWidth, height });
@@ -160,6 +160,11 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
             if (!model.contextualAction.empty()) DrawCommand(rt,{318,y},17,"X",model.contextualAction.c_str());
             DrawCommand(rt,{402,y},28,"SEL","Sections");
             return;
+        }
+        if(model.denseRoster && state.focus==Focus::content) {
+            DrawCommand(rt,{8,y},38,"D-pad","Choose");DrawCommand(rt,{126,y},17,"A","Select");
+            DrawCommand(rt,{225,y},17,"B","Back");DrawCommand(rt,{316,y},28,"L/R","Page");
+            DrawCommand(rt,{402,y},28,"SEL","Sections");return;
         }
         const bool ridePaging = state.section == Section::rides && state.focus == Focus::content && sectionRoot;
         DrawCommand(rt, {10, y}, 38, "D-pad", model.editing ? "Adjust" : model.actionGrid ? "Move" : "Choose");

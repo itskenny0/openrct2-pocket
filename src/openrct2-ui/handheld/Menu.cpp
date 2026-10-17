@@ -31,6 +31,7 @@
 #include "RideManagement.h"
 #include "RideTabs.h"
 #include "RideNavigation.h"
+#include "PeopleNavigation.h"
 #include "RightsTools.h"
 #include "SaveSlots.h"
 #include "FileBrowsing.h"
@@ -407,10 +408,12 @@ namespace OpenRCT2::Ui::Windows
         std::shared_ptr<int> _marketingLifetime = std::make_shared<int>(0);
         std::vector<Handheld::GuestManagement::Target> _guestRoster;
         std::optional<Handheld::GuestManagement::Target> _guestTarget;
-        size_t _guestRosterFocus{}, _guestGroupFocus{};
+        size_t _guestRosterFocus=3, _guestGroupFocus{};
         std::vector<Handheld::RideManagement::Target> _guestRides;
         size_t _guestRideFocus{};
         bool _guestRideInspection{};
+        Handheld::PeopleTabs::State _staffTabs, _guestTabs;
+        bool _staffFromPark{}, _guestFromPark{};
         Handheld::GuestManagement::GroupMode _guestGroupMode{};
         std::vector<Handheld::GuestManagement::Group> _guestGroups;
         Handheld::GuestManagement::Filter _guestFilter;
@@ -677,7 +680,10 @@ namespace OpenRCT2::Ui::Windows
                 const auto stats = Handheld::RideManagement::Presentation(View::statistics,0,{},_ridesTarget);
                 model = Handheld::RideTabs::Compose(model,stats,_rideTabs,selected);
                 if (_ridesTarget && Handheld::RideAccess::Supported(*_ridesTarget)) model.contextualAction = "Access";
+                if(const auto* ride=_ridesTarget?Handheld::RideManagement::Resolve(*_ridesTarget):nullptr)
+                    model.headerInk=ride->status==RideStatus::open?"{POSITIVE}":ride->status==RideStatus::testing?"{CAUTION}":"{MUTED}";
             }
+            if (current == Page::ridesConfirm && _ridesDraft && _ridesDraft->demolition) model.destructive=true;
             if (current == Page::ridesRoster) model.contentSized = true;
             if (current == Page::ridesCustomers && _ridesTarget && Handheld::RideManagement::Resolve(*_ridesTarget))
                 model.rows.insert(model.rows.end(), { "Guests riding...", "Guests queuing...", "Guests thinking about ride..." });
@@ -723,6 +729,7 @@ namespace OpenRCT2::Ui::Windows
                                                                 : View::dismissal;
             auto model = Handheld::StaffManagement::Presentation(
                 view, selected, _staffRoster, _staffTarget, _hireType, _ordersDraft, _status);
+            if(currentPage==Page::staffInspect && _staffTarget) {model=Handheld::PeopleTabs::Staff(*_staffTarget,_staffTabs,selected,_ordersDraft);model.status=_status;}
             if (currentPage == Page::staffRoles)
                 model.rows.push_back(_hireManual ? "Placement: Manual" : "Placement: Automatic");
             if (currentPage == Page::staffHire)
@@ -733,7 +740,7 @@ namespace OpenRCT2::Ui::Windows
             }
             if (currentPage == Page::staff)
             {
-                model.rows[_staffRoster.size() + 3] = "Filter: "
+                model.rows[1] = "Filter: "
                     + (_staffFilter ? Handheld::StaffManagement::RoleName(*_staffFilter) : "All staff");
                 if (_staffFilter && _staffRoster.empty() && _status.empty())
                     model.status = "No employees in this role";
@@ -822,14 +829,14 @@ namespace OpenRCT2::Ui::Windows
                                                       : View::text;
             auto model = Handheld::GuestManagement::Presentation(
                 view, selected, _guestRoster, _guestTarget, _status, _guestText, _guestTextPage);
+            if(current==Page::guestInspect && _guestTarget){model=Handheld::PeopleTabs::Guest(*_guestTarget,_guestTabs,selected);model.status=_status;}
             if (current == Page::guestRoster)
             {
                 model.title = Handheld::GuestManagement::FilterName(_guestFilter);
                 model.rows.back() = _guestRosterParent == Page::guestGroups ? "Back to groups"
                     : _guestRosterParent == Page::ridesCustomers ? "Back to ride customers" : "Back to Guests";
-                model.rows.insert(model.rows.end() - 1, { "Show roster on map", "Filter by name...",
-                    _guestFilter.tracked ? "Show tracked and untracked" : "Show tracked only" });
-                model.status = std::to_string(_guestRoster.size()) + " native guests / A Inspect or map";
+                model.rows[2]=_guestFilter.tracked ? "All tracking" : "Tracked only";
+                model.status = std::to_string(_guestRoster.size()) + " guests / A Inspect or map";
             }
             return model;
         }
@@ -1049,6 +1056,8 @@ namespace OpenRCT2::Ui::Windows
                 _overviewDraft.reset();
             _overviewBusy = false;
             ++_overviewRequest;
+            if (_page == Page::staffInspect) _staffTabs.save(_focus.index());
+            if (_page == Page::guestInspect) _guestTabs.save(_focus.index());
             if (_page == Page::ridesInspect)
             {
                 _ridesInspectFocus = _focus.index();
@@ -1116,6 +1125,8 @@ namespace OpenRCT2::Ui::Windows
             if (next != Page::financeEditor && next != Page::financeConfirm)
                 _financeDraft.reset();
             _focus = {};
+            if (next == Page::staffInspect) _focus.move(static_cast<int>(std::min(_staffTabs.rows[_staffTabs.tab],rows().size()-1)),rows().size());
+            if (next == Page::guestInspect) _focus.move(static_cast<int>(std::min(_guestTabs.rows[_guestTabs.tab],rows().size()-1)),rows().size());
             if (next == Page::ridesInspect)
                 _focus.move(static_cast<int>(std::min(_rideTabs.rows[_rideTabs.tab], rows().size() - 1)), rows().size());
             if (next == Page::build) _focus.move(static_cast<int>(_buildFocus), rows().size());
@@ -1898,14 +1909,13 @@ namespace OpenRCT2::Ui::Windows
                 const auto updated = Handheld::GuestManagement::Roster(_guestFilter);
                 if (updated != _guestRoster)
                 {
-                    const auto selected = _focus.index() < _guestRoster.size()
-                        ? std::optional<Handheld::GuestManagement::Target>{ _guestRoster[_focus.index()] }
+                    const auto selected = _focus.index() >= 3 && _focus.index()-3 < _guestRoster.size()
+                        ? std::optional<Handheld::GuestManagement::Target>{ _guestRoster[_focus.index()-3] }
                         : std::nullopt;
-                    size_t row = selected ? std::min(_focus.index(), updated.size())
-                        : updated.size() + std::min<size_t>(_focus.index() - _guestRoster.size(), 3);
+                    size_t row = std::min(_focus.index(), updated.size()+3);
                     if (selected)
                         if (const auto found = std::find(updated.begin(), updated.end(), *selected); found != updated.end())
-                            row = std::distance(updated.begin(), found);
+                            row = 3+std::distance(updated.begin(), found);
                     _guestRoster = updated;
                     _guestRosterFocus = row;
                     _focus = {};
@@ -1913,7 +1923,7 @@ namespace OpenRCT2::Ui::Windows
                     invalidate();
                 }
             }
-            if (guestManagement())
+            if (guestManagement() || staffManagement())
                 invalidate(); // read native state without clearing native guest invalidation flags
             if (_page == Page::staff)
             {
@@ -1921,14 +1931,14 @@ namespace OpenRCT2::Ui::Windows
                 if (updated != _staffRoster)
                 {
                     std::optional<Handheld::StaffManagement::Target> selected;
-                    if (_focus.index() >= 2 && _focus.index() - 2 < _staffRoster.size())
-                        selected = _staffRoster[_focus.index() - 2];
-                    size_t newFocus = std::min(_focus.index(), updated.size() + 5);
+                    if (_focus.index() >= 3 && _focus.index() - 3 < _staffRoster.size())
+                        selected = _staffRoster[_focus.index() - 3];
+                    size_t newFocus = std::min(_focus.index(), updated.size() + 3);
                     if (selected)
                     {
                         const auto found = std::find(updated.begin(), updated.end(), *selected);
                         if (found != updated.end())
-                            newFocus = 2 + std::distance(updated.begin(), found);
+                            newFocus = 3 + std::distance(updated.begin(), found);
                     }
                     _staffRoster = updated;
                     _focus = {};
@@ -2106,7 +2116,14 @@ namespace OpenRCT2::Ui::Windows
                 else if (x > 0)
                     enterDashboardContent();
             }
-            else if (_page == Page::ridesInspect || _page == Page::overview)
+            else if((_page==Page::staff || _page==Page::guestRoster) && _focus.index()<3)
+            {
+                if(x) _focus.move(std::clamp<int>(static_cast<int>(_focus.index())+x,0,2)-static_cast<int>(_focus.index()),rows().size());
+                if(y>0) move(static_cast<int>(3-_focus.index()));
+                invalidate();
+            }
+            else if (_page == Page::ridesInspect || _page == Page::overview
+                || (_page==Page::staffInspect && _staffTabs.tab!=1) || (_page==Page::guestInspect && _guestTabs.tab!=1 && _guestTabs.tab!=2))
             {
                 const auto count = rows().size();
                 const auto current = _focus.index();
@@ -2204,6 +2221,13 @@ namespace OpenRCT2::Ui::Windows
                 invalidate();
                 return;
             }
+            if(_page==Page::staffInspect || _page==Page::guestInspect)
+            {
+                auto& tabs=_page==Page::staffInspect?_staffTabs:_guestTabs;
+                tabs.save(_focus.index());const auto remembered=tabs.move(direction);
+                if(_page==Page::staffInspect && _staffTarget) if(const auto* staff=Handheld::StaffManagement::Resolve(*_staffTarget)) _ordersBaseline=_ordersDraft=staff->staffOrders;
+                _focus={};_focus.move(static_cast<int>(std::min(remembered,rows().size()-1)),rows().size());_status.clear();invalidate();return;
+            }
             if (_page == Page::ridesInspect)
             {
                 _rideTabs.save(_focus.index());
@@ -2218,16 +2242,29 @@ namespace OpenRCT2::Ui::Windows
                 return;
             Handheld::ManagementPresentation model;
             if (ridesManagement()) model = ridesPresentationFor(_page, _focus.index());
-            else return; // Remaining adapters migrate with their own navigation tests.
+            else if(_page==Page::staff)model=staffPresentation();
+            else if(_page==Page::guestRoster)model=guestsPresentation();
+            else return;
             const auto workspaceWidth = ContextGetWidth() - 2 * Handheld::Layout::margin;
             const auto capacity = Handheld::MeasureManagement(
                 {workspaceWidth, Handheld::Layout::ContentHeight({ContextGetWidth(), ContextGetHeight()})}, model).capacity;
             const auto current = _focus.index();
-            const auto next = std::clamp<int>(static_cast<int>(current) + direction * static_cast<int>(capacity),
-                0, static_cast<int>(rows().size()) - 1);
+            const auto listStart=model.denseRoster?3:0;
+            const auto next = std::clamp<int>(std::max(static_cast<int>(current),listStart) + direction * static_cast<int>(capacity),
+                listStart, static_cast<int>(rows().size()) - 1);
             _focus.move(next - static_cast<int>(current), rows().size());
             _status.clear();
             invalidate();
+        }
+        void saveStaffReturn()
+        {
+            _staffTabs.save(_focus.index());
+            Handheld::PeopleNavigation::staff=Handheld::PeopleNavigation::StaffContext{*_staffTarget,_staffTabs,_staffRosterFocus,_staffFilter,_staffFromPark};
+        }
+        void saveGuestReturn()
+        {
+            _guestTabs.save(_focus.index());
+            Handheld::PeopleNavigation::guest=Handheld::PeopleNavigation::GuestContext{*_guestTarget,_guestTabs,_guestRosterFocus,_guestFilter,_guestFromPark,static_cast<int>(_guestRosterParent),_guestRosterRideParent};
         }
         void openStaffPatrolOptions()
         {
@@ -2236,6 +2273,11 @@ namespace OpenRCT2::Ui::Windows
         void openGuest(const Handheld::GuestManagement::Target& person)
         {
             _guestRideInspection = false;
+            _guestTabs={};_guestFromPark=true;
+            if(const auto context=Handheld::PeopleNavigation::guest;context && context->target==person) {
+                _guestTabs=context->tabs;_guestRosterFocus=context->rosterFocus;_guestFilter=context->filter;_guestFromPark=context->fromPark;_guestRosterParent=static_cast<Page>(context->rosterParent);_guestRosterRideParent=context->rideParent;
+            }
+            Handheld::PeopleNavigation::guest.reset();
             _guestTarget = person;
             _dashboard.section = Handheld::Dashboard::Section::guests;
             _dashboard.focus = Handheld::Dashboard::Focus::content;
@@ -2247,9 +2289,16 @@ namespace OpenRCT2::Ui::Windows
         }
         void openStaff(std::optional<Handheld::StaffManagement::Target> target)
         {
+            _staffTabs={};_staffFromPark=target.has_value();
+            if(const auto context=Handheld::PeopleNavigation::staff;target && context && context->target==*target) {
+                _staffTabs=context->tabs;_staffRosterFocus=context->rosterFocus;_staffFilter=context->filter;_staffFromPark=context->fromPark;
+            }
+            Handheld::PeopleNavigation::staff.reset();
             _staffTarget = target;
+            if(target)if(const auto* staff=Handheld::StaffManagement::Resolve(*target))_ordersBaseline=_ordersDraft=staff->staffOrders;
             if (!target)
                 _staffRosterFocus = 0;
+            _dashboard.section = Handheld::Dashboard::Section::staff;
             _dashboard.focus = Handheld::Dashboard::Focus::content;
             page(target ? Page::staffInspect : Page::staff);
         }
@@ -2275,13 +2324,14 @@ namespace OpenRCT2::Ui::Windows
                 _status = Handheld::Finances::Feedback(result);
             else
             {
+                _staffTabs={};_staffFromPark=false;
                 _staffTarget = Handheld::StaffManagement::Identify(
                     result.getData<GameActions::StaffHireNewActionResult>().StaffEntityId);
                 if (_hireManual && _staffTarget)
                 {
                     const auto employee = *_staffTarget;
-                    close();
-                    Handheld::BeginPeepPlacement({ {}, employee });
+                    saveStaffReturn();close();
+                    if(!Handheld::BeginPeepPlacement({ {}, employee }))HandheldStaffOpen(employee);
                     return;
                 }
                 page(_staffTarget ? Page::staffInspect : Page::staff);
@@ -2608,7 +2658,7 @@ namespace OpenRCT2::Ui::Windows
                     page(_guestRosterParent);
                     break;
                 case Page::guestInspect:
-                    page(Page::guestRoster);
+                    if(_guestFromPark)close();else page(Page::guestRoster);
                     break;
                 case Page::guestText:
                     page(
@@ -2635,8 +2685,9 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::staffRoles:
                 case Page::staffHire:
+                    page(Page::staff);break;
                 case Page::staffInspect:
-                    page(Page::staff);
+                    if(_staffFromPark)close();else page(Page::staff);
                     break;
                 case Page::staffNameConfirm:
                     page(Page::staffName);
@@ -2738,7 +2789,29 @@ namespace OpenRCT2::Ui::Windows
                 return;
             }
             auto choice = _focus.index();
-            switch (_page)
+            if(_page==Page::guestRoster) choice=choice<3 ? _guestRoster.size()+choice : choice==_guestRoster.size()+3 ? _guestRoster.size()+3 : choice-3;
+            auto actionPage=_page;
+            if(_page==Page::staffInspect) {
+                const auto model=staffPresentation();
+                if(choice<model.rowEnabled.size() && !model.rowEnabled[choice]){_status="Unavailable for this role or current state";invalidate();return;}
+                _staffTabs.save(choice);
+                if(_staffTabs.tab==1) {
+                    if(!_staffTarget || Handheld::StaffManagement::Orders(_staffTarget->type).empty()){_staffTabs.tab=0;page(Page::staffInspect);return;}
+                    actionPage=Page::staffOrders;
+                } else {const auto indices=Handheld::PeopleTabs::StaffActions(_staffTabs.tab);if(choice>=indices.size())return;choice=indices[choice];}
+            }
+            if(_page==Page::guestInspect) {
+                _guestTabs.save(choice);
+                if(_guestTabs.tab==1){_guestTabs.tab=0;page(Page::guestInspect);return;}
+                if(_guestTabs.tab==2) {
+                    const auto* guest=_guestTarget?Handheld::GuestManagement::Resolve(*_guestTarget):nullptr;
+                    const auto thoughts=guest?Handheld::GuestManagement::Thoughts(*guest):std::vector<std::string>{};
+                    if(choice>=thoughts.size()){_guestTabs.tab=0;page(Page::guestInspect);return;}
+                    _guestText=thoughts[choice];_guestTextParent=Page::guestInspect;_guestTextPage=0;page(Page::guestText);return;
+                }
+                const auto indices=Handheld::PeopleTabs::GuestActions(_guestTabs.tab);if(choice>=indices.size())return;choice=indices[choice];
+            }
+            switch (actionPage)
             {
                 case Page::designOptions:
                     if (choice < 2)
@@ -3338,19 +3411,14 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::staff:
                     _staffRosterFocus = choice;
-                    if (choice < 2)
+                    if(choice==0)page(Page::staffRoles);
+                    else if(choice>=3 && choice-3<_staffRoster.size())
                     {
-                        _hireType = choice == 0 ? StaffType::handyman : StaffType::mechanic;
-                        page(Page::staffHire);
-                    }
-                    else if (choice - 2 < _staffRoster.size())
-                    {
-                        _staffTarget = _staffRoster[choice - 2];
+                        _staffTarget=_staffRoster[choice-3];_staffTabs={};_staffFromPark=false;
+                        _ordersBaseline=_ordersDraft=Handheld::StaffManagement::Resolve(*_staffTarget)->staffOrders;
                         page(Page::staffInspect);
                     }
-                    else if (choice == _staffRoster.size() + 2)
-                        page(Page::staffRoles);
-                    else if (choice == _staffRoster.size() + 3)
+                    else if (choice == 1)
                     {
                         _staffFilter = !_staffFilter ? std::optional<StaffType>(StaffType::handyman)
                             : *_staffFilter == StaffType::entertainer
@@ -3359,7 +3427,7 @@ namespace OpenRCT2::Ui::Windows
                         _staffRosterFocus = 0;
                         page(Page::staff);
                     }
-                    else if (choice == _staffRoster.size() + 4)
+                    else if (choice == 2)
                         page(Page::staffSummary);
                     else
                         page(Page::dashboard);
@@ -3440,8 +3508,8 @@ namespace OpenRCT2::Ui::Windows
                             _status = "Person cannot be picked up now";
                             break;
                         }
-                        close();
-                        Handheld::BeginPeepPlacement({ {}, person });
+                        saveStaffReturn();close();
+                        if(!Handheld::BeginPeepPlacement({ {}, person }))HandheldStaffOpen(person);
                         return;
                     }
                     else if (choice == 8)
@@ -3463,8 +3531,8 @@ namespace OpenRCT2::Ui::Windows
                     else if (choice == 6)
                     {
                         const auto employee = *_staffTarget;
-                        close();
-                        Handheld::BeginStaffPatrol(employee);
+                        saveStaffReturn();close();
+                        if(!Handheld::BeginStaffPatrol(employee))HandheldStaffOpen(employee);
                         return;
                     }
                     else if (choice == 4)
@@ -3548,13 +3616,17 @@ namespace OpenRCT2::Ui::Windows
                         {
                             const auto result = Handheld::StaffManagement::SetOrders(
                                 *_staffTarget, _ordersBaseline, _ordersDraft, true);
-                            if (result.error == GameActions::Status::ok)
-                                page(Page::staffInspect);
+                            if (result.error == GameActions::Status::ok) {
+                                _ordersBaseline=_ordersDraft;
+                                page(Page::staffInspect);_status="Orders submitted";
+                            }
                             else
                                 _status = Handheld::Finances::Feedback(result);
                         }
-                        else
+                        else {
+                            _ordersBaseline=_ordersDraft=Handheld::StaffManagement::Resolve(*_staffTarget)->staffOrders;
                             page(Page::staffInspect);
+                        }
                     }
                     break;
                 case Page::staffDismiss:
@@ -4315,7 +4387,7 @@ namespace OpenRCT2::Ui::Windows
                             *_ridesTarget, static_cast<Handheld::GuestManagement::RideFilterKind>(choice - 2) };
                         _guestRosterParent = Page::ridesCustomers;
                         _guestRosterRideParent = _ridesTarget;
-                        _guestRosterFocus = 0;
+                        _guestRosterFocus = 3;
                         _dashboard.section = Handheld::Dashboard::Section::guests;
                         page(Page::guestRoster);
                     }
@@ -4468,7 +4540,7 @@ namespace OpenRCT2::Ui::Windows
                     {
                         _guestFilter = { {}, choice == 4 };
                         _guestRosterParent = Page::guests;
-                        _guestRosterFocus = 0;
+                        _guestRosterFocus = 3;
                         page(Page::guestRoster);
                     }
                     else
@@ -4482,12 +4554,12 @@ namespace OpenRCT2::Ui::Windows
                     {
                         _guestFilter = { _guestGroups[choice], false };
                         _guestRosterParent = Page::guestGroups;
-                        _guestRosterFocus = 0;
+                        _guestRosterFocus = 3;
                         page(Page::guestRoster);
                     }
                     break;
                 case Page::guestRoster:
-                    _guestRosterFocus = choice;
+                    _guestRosterFocus = _focus.index();
                     if (choice == _guestRoster.size())
                     {
                         _parkMap.Begin();
@@ -4517,7 +4589,7 @@ namespace OpenRCT2::Ui::Windows
                     }
                     else if (Handheld::GuestManagement::Resolve(_guestRoster[choice]))
                     {
-                        _guestTarget = _guestRoster[choice];
+                        _guestTarget = _guestRoster[choice];_guestTabs={};_guestFromPark=false;
                         page(Page::guestInspect);
                     }
                     else
@@ -4574,8 +4646,8 @@ namespace OpenRCT2::Ui::Windows
                             _status = "Person cannot be picked up now";
                             break;
                         }
-                        close();
-                        Handheld::BeginPeepPlacement({ person, {} });
+                        saveGuestReturn();close();
+                        if(!Handheld::BeginPeepPlacement({ person, {} }))HandheldGuestOpen(person);
                         return;
                     }
                     else if (choice == 11)
@@ -4583,7 +4655,7 @@ namespace OpenRCT2::Ui::Windows
                         if (Handheld::GuestFollow::Current() == _guestTarget)
                         { Handheld::GuestFollow::Stop(); _status = "Follow stopped"; invalidate(); }
                         else if (Handheld::GuestFollow::Start(*_guestTarget))
-                        { close(); return; }
+                        { saveGuestReturn();close(); return; }
                         else { _status = "Guest cannot be followed now"; invalidate(); }
                     }
                     else if (choice == 10) { _guestRideFocus = 0; page(Page::guestRideHistory); }
@@ -4602,7 +4674,7 @@ namespace OpenRCT2::Ui::Windows
                     else if (choice == 46)
                     {
                         _guestFilter.name = _nameEntry.text;
-                        _guestRosterFocus = 0;
+                        _guestRosterFocus = 3;
                         page(Page::guestRoster);
                     }
                     else { _nameEntry.Press(choice); invalidate(); }

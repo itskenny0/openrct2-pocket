@@ -9,9 +9,12 @@ namespace OpenRCT2::Ui::Handheld::PocketPalette
     inline constexpr uint8_t panel = 12;
     inline constexpr uint8_t border = 15;
     inline constexpr uint8_t separator = 14;
-    inline constexpr uint8_t selection = 18;
+    inline constexpr uint8_t selection = 19;
     inline constexpr uint8_t primary = 21;
-    inline constexpr uint8_t secondary = 17;
+    inline constexpr uint8_t secondary = 19;
     inline constexpr uint8_t dark = 10;
-    inline constexpr uint8_t positive = 103;
+    inline constexpr uint8_t positive = 151;
+    inline constexpr uint8_t caution = 43;
+    inline constexpr uint8_t destructive = 68;
+    inline constexpr uint8_t disabled = 17;
 } // namespace OpenRCT2::Ui::Handheld::PocketPalette

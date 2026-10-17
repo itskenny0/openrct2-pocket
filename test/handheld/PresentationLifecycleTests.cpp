@@ -1,3 +1,4 @@
+#include "PeopleTabNavigation.h"
 // SPDX-License-Identifier: GPL-3.0-only
 // Real SDL/window lifecycle with public engine data; graphics-disabled native park fixture.
 #include <SDL.h>
@@ -620,7 +621,7 @@ int main(int argc, char** argv)
         state.park.entrances.push_back({ 64, 64, 16, 0 });
         const auto employeeCount = S::Roster().size();
         W::HandheldStaffOpen();
-        W::HandheldMenuMove(2 + employeeCount);
+        // Hire is the persistent first toolbar action.
         press(H::Action::confirm);
         Require(W::HandheldStaffPresentation().title == "Choose staff role", "Duplicate A skipped role picker");
         W::HandheldMenuMove(3);
@@ -629,7 +630,7 @@ int main(int argc, char** argv)
         press(H::Action::confirm);
         Require(S::Roster().size() == employeeCount, "Cancel hired entertainer");
         W::HandheldStaffOpen();
-        W::HandheldMenuMove(2 + employeeCount);
+        // Hire is the persistent first toolbar action.
         press(H::Action::confirm);
         W::HandheldMenuMove(3);
         press(H::Action::confirm);
@@ -639,7 +640,7 @@ int main(int argc, char** argv)
         auto employee = S::Roster().back();
         Require(employee.type == StaffType::entertainer, "SDL entertainer hire failed");
         const auto oldCostume = S::Resolve(employee)->animationObjectIndex;
-        W::HandheldMenuMove(4);
+        FocusPersonAction(true,"Costume...");
         press(H::Action::confirm);
         Require(W::HandheldStaffPresentation().breadcrumb == "Staff / Entertainer costume", "Costume picker route failed");
         const auto costumes = S::Costumes();
@@ -650,7 +651,7 @@ int main(int argc, char** argv)
         Require(
             S::Resolve(employee)->animationObjectIndex == costumes[chosen].first && state.park.cash == cash,
             "Costume action/held A accounting failed");
-        W::HandheldMenuMove(6);
+        FocusPersonAction(true,"Patrol area...");
         press(H::Action::confirm);
         Require(H::StaffPatrol::Active() && !W::HandheldStaffIsOpen(), "Patrol inspector route failed");
         Require(
@@ -678,7 +679,7 @@ int main(int argc, char** argv)
         std::cout << "SDL patrol inspector / width-held-A / Cancel-first clear / options recovery passed" << std::endl;
         wm->CloseByClass(WindowClass::handheldMenu);
         W::HandheldStaffOpen(employee);
-        W::HandheldMenuMove(7);
+        FocusPersonAction(true,"Name...");
         press(H::Action::confirm);
         Require(W::HandheldStaffPresentation().columns == 8, "Staff keyboard route failed");
         const auto oldName = S::Resolve(employee)->getName();
@@ -715,7 +716,7 @@ int main(int argc, char** argv)
         GameActions::ProcessQueue(state);
         Require(handyman.has_value(), "SDL uniform target absent");
         W::HandheldStaffOpen(*handyman);
-        W::HandheldMenuMove(8);
+        FocusPersonAction(true,"Uniform colour...");
         press(H::Action::confirm);
         const auto oldColour = StaffGetColour(StaffType::handyman);
         press(H::Action::confirm);
@@ -727,12 +728,12 @@ int main(int argc, char** argv)
             EnumValue(StaffGetColour(StaffType::handyman)) == (EnumValue(oldColour) + 1) % 72,
             "SDL uniform held-A/native apply failed");
         W::HandheldStaffOpen();
-        W::HandheldMenuMove(S::Roster().size() + 3);
+        W::HandheldMenuMove(1);
         press(H::Action::confirm);
         Require(
-            W::HandheldStaffPresentation().rows[S::Roster(StaffType::handyman).size() + 3] == "Filter: Handyman",
+            W::HandheldStaffPresentation().rows[1] == "Filter: Handyman",
             "SDL role filtering failed");
-        W::HandheldMenuMove(S::Roster(StaffType::handyman).size() + 4);
+        W::HandheldMenuMove(2);
         press(H::Action::confirm);
         Require(W::HandheldStaffPresentation().stats.size() == 5, "SDL role wages/counts absent");
         wm->CloseByClass(WindowClass::handheldMenu);

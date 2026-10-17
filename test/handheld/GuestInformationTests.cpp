@@ -1,3 +1,4 @@
+#include "PeopleTabNavigation.h"
 // SPDX-License-Identifier: GPL-3.0-only
 // Native map fixture, real SDL controller routing and production map rendering.
 #include <SDL.h>
@@ -107,7 +108,7 @@ int main(int argc, char** argv)
         const auto cash=state.park.cash;const auto accounting=state.park.expenditureTable;const auto history=G::RideHistory(target);
         Check(history.size()==2 && history[0]==rides[0] && history[1]==rides[2],"Native history membership/order differs");
         H::ControllerInput input;H::Frame confirm;confirm.actions={H::Action::confirm};H::Frame cancel;cancel.actions={H::Action::back};
-        W::HandheldGuestOpen(target);W::HandheldMenuMove(10);H::HandleMenuInput(input,confirm);Check(W::HandheldGuestsPresentation().breadcrumb=="Guests / Native ride history","Controller history entry failed");
+        W::HandheldGuestOpen(target);FocusPersonAction(false,"Ride history...");H::HandleMenuInput(input,confirm);Check(W::HandheldGuestsPresentation().breadcrumb=="Guests / Native ride history","Controller history entry failed");
         H::HandleMenuInput(input,confirm);Check(W::HandheldRidesIsOpen(),"History inspection failed");H::HandleMenuInput(input,cancel);Check(W::HandheldGuestsPresentation().breadcrumb=="Guests / Native ride history","History return failed");H::HandleMenuInput(input,cancel);
         // Native GuestList fixture: each state uses the desktop action/thought formatter contract.
         const auto savedState=person->state;
@@ -144,31 +145,31 @@ int main(int argc, char** argv)
             const auto it=std::find(model.rows.begin(),model.rows.end(),row);Check(it!=model.rows.end(),"Controller row missing");
             W::HandheldMenuMove(static_cast<int>(it-model.rows.begin())-static_cast<int>(model.selected));H::HandleMenuInput(input,confirm);
         };
-        W::HandheldGuestOpen(target);W::HandheldMenuMove(10);H::HandleMenuInput(input,confirm);H::HandleMenuInput(input,confirm);choose(W::HandheldRidesPresentation(),"Statistics...");choose(W::HandheldRidesPresentation(),"Customers...");
+        W::HandheldGuestOpen(target);FocusPersonAction(false,"Ride history...");H::HandleMenuInput(input,confirm);H::HandleMenuInput(input,confirm);W::HandheldDashboardPage(2);choose(W::HandheldRidesPresentation(),"Customers...");
         choose(W::HandheldRidesPresentation(),"Guests thinking about ride...");
-        Check(W::HandheldGuestsPresentation().rows.front()==person->getName(),"Ride filter controller roster failed");
-        choose(W::HandheldGuestsPresentation(),"Filter by name...");choose(W::HandheldGuestsPresentation(),"G");choose(W::HandheldGuestsPresentation(),"OK");
-        Check(W::HandheldGuestsPresentation().rows.front()==person->getName(),"Controller name filter apply failed");
-        choose(W::HandheldGuestsPresentation(),"Filter by name...");choose(W::HandheldGuestsPresentation(),"Z");H::HandleMenuInput(input,cancel);
-        Check(W::HandheldGuestsPresentation().rows.front()==person->getName(),"Cancelled name draft changed membership");
-        choose(W::HandheldGuestsPresentation(),"Show tracked only");Check(W::HandheldGuestsPresentation().rows.front()==person->getName(),"Controller tracked intersection failed");
-        choose(W::HandheldGuestsPresentation(),"Show roster on map");Check(W::HandheldParkMapIsOpen(),"Filtered roster map entry failed");
+        Check(W::HandheldGuestsPresentation().rows[3]==person->getName(),"Ride filter controller roster failed");
+        choose(W::HandheldGuestsPresentation(),"Name filter...");choose(W::HandheldGuestsPresentation(),"G");choose(W::HandheldGuestsPresentation(),"OK");
+        Check(W::HandheldGuestsPresentation().rows[3]==person->getName(),"Controller name filter apply failed");
+        choose(W::HandheldGuestsPresentation(),"Name filter...");choose(W::HandheldGuestsPresentation(),"Z");H::HandleMenuInput(input,cancel);
+        Check(W::HandheldGuestsPresentation().rows[3]==person->getName(),"Cancelled name draft changed membership");
+        choose(W::HandheldGuestsPresentation(),"Tracked only");Check(W::HandheldGuestsPresentation().rows[3]==person->getName(),"Controller tracked intersection failed");
+        choose(W::HandheldGuestsPresentation(),"Map roster");Check(W::HandheldParkMapIsOpen(),"Filtered roster map entry failed");
         W::HandheldParkMapSubjects();Check(W::HandheldParkMapSubjectsPresentation().rows.front()==person->getName(),"Map subject filter lost");
         H::HandleMenuInput(input,confirm);choose(W::HandheldParkMapSubjectsPresentation(),"Inspect subject");
         Check(W::HandheldGuestsIsOpen(),"Filtered map inspection failed");H::HandleMenuInput(input,cancel);
         Check(W::HandheldParkMapSubjectsPresentation().title==person->getName(),"Map inspection return context lost");
         H::HandleMenuInput(input,cancel);H::HandleMenuInput(input,cancel);Check(W::HandheldParkMapIsOpen(),"Map subject return failed");
         H::HandleMenuInput(input,cancel);Check(W::HandheldGuestsPresentation().title.find("Thinking / ")==0,"Map return lost roster filter");
-        choose(W::HandheldGuestsPresentation(),"Filter by name...");choose(W::HandheldGuestsPresentation(),"Clr");choose(W::HandheldGuestsPresentation(),"OK");
+        choose(W::HandheldGuestsPresentation(),"Name filter...");choose(W::HandheldGuestsPresentation(),"Clr");choose(W::HandheldGuestsPresentation(),"OK");
         H::HandleMenuInput(input,cancel);Check(W::HandheldRidesPresentation().breadcrumb=="Rides / Customers","Filtered roster return lost ride context");
         person->thoughts[0]=savedThought;person->peepFlags=originalFlags;
         W::HandheldGuestOpen(target);
         namespace F=H::GuestFollow;
         const auto personPosition=G::Resolve(target)->getLocation();
-        W::HandheldMenuMove(11);H::HandleMenuInput(input,confirm);
+        FocusPersonAction(false,"Follow guest");H::HandleMenuInput(input,confirm);
         Check(F::Current()==target && WindowGetMain()->viewportSmartFollowSprite==target.id,"Controller follow start failed");
         H::HandleExplorerInput(input,cancel);Check(W::HandheldGuestsIsOpen() && F::Current()==target,"Follow inspector recovery failed");
-        W::HandheldMenuMove(11);H::HandleMenuInput(input,confirm);Check(!F::Current() && WindowGetMain()->viewportSmartFollowSprite.IsNull(),"Explicit follow stop failed");
+        FocusPersonAction(false,"Stop following");H::HandleMenuInput(input,confirm);Check(!F::Current() && WindowGetMain()->viewportSmartFollowSprite.IsNull(),"Explicit follow stop failed");
         Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
         Check(F::Start(target),"Native follow restart failed");
         if(argc==4) {
