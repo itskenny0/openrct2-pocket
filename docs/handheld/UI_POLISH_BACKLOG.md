@@ -561,4 +561,33 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 
 - Device evidence update: User reports RC1 launches and plays well after replacing the complete runtime folder. That confirms ordinary startup/gameplay on one Brick installation; audio, every button, suspend, performance and save-round-trip matrices remain unverified. The cause of the earlier invalid installed library files is unknown.
 
-Inventory: **52 entries**; 2 Confirmed, 19 Unverified, 31 Fixed, 0 Deferred.
+## RC4-01 — Line/Fill real-device construction failure
+
+- Severity: Critical
+- Status: Confirmed (user device report); root cause unresolved.
+- Report: On flat ground, Line and Fill consume money without visible paths on Brick/NextUI RC3.
+- Investigation: Existing native batch tests, full-live-tick variant and actual cursor-targeting probe pass against unchanged RC3. Native map elements, exact cash, rendering and persistence were checked. This does not close the reported hardware failure.
+- Next step: Reproduce with the affected Brick park save; correct the demonstrated cause before RC4 acceptance.
+- Evidence: RC4-PATH-INVESTIGATION.md; captures/rc4-investigation/; evidence/rc4-investigation/.
+
+## RC4-02 — Park guest selection opens legacy inspection
+
+- Severity: Major
+- Status: Confirmed
+- Report/source trace: Park input falls through ViewportInteractionLeftClick/GuestOpen, whereas the dashboard uses the tabbed guest workspace.
+- Next step: Unify entry while retaining guest identity, caller return, follow and pickup. Not implemented in this checkpoint.
+
+## RC4-03 — Coaster construction preview/selection friction
+
+- Severity: Major
+- Status: Confirmed (device usability report)
+- Next step: Improve actual native ghost visibility and continuous piece selection. Preserve eligibility, geometry, undo and advanced pieces. Not implemented in this checkpoint.
+
+## RC4-04 — Park events disconnected from ordinary play
+
+- Severity: Major
+- Status: Confirmed (device usability report)
+- Source finding: Native news history and target-aware management routes already exist; ordinary-play discoverability and handoff still need improvement.
+- Next step: Integrate existing native events without text-based subject guessing or duplicate event simulation. Not implemented in this checkpoint.
+
+Inventory: **56 entries**; 6 Confirmed, 19 Unverified, 31 Fixed, 0 Deferred.

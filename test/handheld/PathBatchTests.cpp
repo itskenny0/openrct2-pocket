@@ -86,9 +86,14 @@ int main(int argc, char** argv)
             Image image;image.Width=512;image.Height=384;image.Depth=8;image.Stride=rt.LineStride();image.Palette=Drawing::gPalette;
             const auto* bytes=reinterpret_cast<uint8_t*>(rt.bits);image.Pixels.assign(bytes,bytes+rt.LineStride()*rt.height);
             Imaging::WriteToFile((std::filesystem::path(folder)/name).string(),image,ImageFormat::png);engine.EndDraw();};
+        auto flush = [&]() {
+            if (std::getenv("POCKET_PATH_LIVE_TICKS")) gameStateUpdateLogic();
+            else GameActions::ProcessQueue(state);
+        };
+        // Run with POCKET_PATH_LIVE_TICKS=1 to include the real simulation lifecycle.
         // Single placement, query, ghost suspension and accounting remain native.
         begin(P::BuildMode::single);target(512,512);const auto single=P::Action(false);const auto initialCash=state.park.cash;
-        Check(single.error==GameActions::Status::ok,"Single query failed");press(H::Action::confirm);GameActions::ProcessQueue(state);
+        Check(single.error==GameActions::Status::ok,"Single query failed");press(H::Action::confirm);flush();
         Check(path(512,512)&&state.park.cash==initialCash-single.cost,"Single construction/accounting regressed");
         P::ClearPreview();
         // Horizontal line includes both ends and joins an existing path through native connection logic.
@@ -98,18 +103,18 @@ int main(int argc, char** argv)
         press(H::Action::confirm);Check(P::SelectionOwnsInput()&&!path(544,512),"Review purchased a tile");
         capture("02-line-review.png");press(H::Action::back);Check(!P::SelectionOwnsInput()&&P::IsActive(),"Review Back left construction");
         press(H::Action::confirm);press(H::Action::confirm);Check(!path(544,512),"Batch bypassed action queue");
-        GameActions::ProcessQueue(state);Check(state.park.cash==lineCash-lineQuote.cost,"Line accounting differs from native quote");
+        flush();Check(state.park.cash==lineCash-lineQuote.cost,"Line accounting differs from native quote");
         for(int x=512;x<=672;x+=32)Check(path(x,512),"Line tile missing");
         Check(path(544,512)->getEdges()!=0,"Native line connectivity missing");capture("03-line-built.png");
         begin(P::BuildMode::line);target(512,512);press(H::Action::confirm);target(672,512);focus({});capture("12-existing-path-preview.png");press(H::Action::back);
         // Repeated operation returns to start-selection, with no stale endpoint or automatic purchase.
         target(672,544);press(H::Action::confirm);target(672,640);const auto vertical=P::Action(false);
-        Check(vertical.error==GameActions::Status::ok,"Vertical line quote failed");press(H::Action::confirm);press(H::Action::confirm);GameActions::ProcessQueue(state);
+        Check(vertical.error==GameActions::Status::ok,"Vertical line quote failed");press(H::Action::confirm);press(H::Action::confirm);flush();
         for(int y=544;y<=640;y+=32)Check(path(672,y),"Vertical line missing");
         for(const auto& ends:std::array<std::pair<CoordsXY,CoordsXY>,4>{{{{1280,512},{1376,512}},{{1376,576},{1280,576}},{{1440,512},{1440,608}},{{1504,608},{1504,512}}}})
         {
             begin(P::BuildMode::line);target(ends.first.x,ends.first.y);press(H::Action::confirm);target(ends.second.x,ends.second.y);
-            Check(P::Action(false).error==GameActions::Status::ok,"Cardinal line quote failed");press(H::Action::confirm);press(H::Action::confirm);GameActions::ProcessQueue(state);
+            Check(P::Action(false).error==GameActions::Status::ok,"Cardinal line quote failed");press(H::Action::confirm);press(H::Action::confirm);flush();
             Check(path(ends.first.x,ends.first.y)&&path(ends.second.x,ends.second.y),"Cardinal line endpoint missing");
         }
         // Diagonal is rejected rather than routed. Cancel never changes map/cash.
@@ -120,41 +125,41 @@ int main(int argc, char** argv)
         // Rectangle, all corners included; native flat paths at the start height.
         begin(P::BuildMode::fill);target(960,640);press(H::Action::confirm);target(1056,736);
         const auto fill=P::Action(false);Check(fill.error==GameActions::Status::ok,"Fill query failed");focus({1008,704,16});capture("05-fill-preview.png");
-        const auto fillCash=state.park.cash;press(H::Action::confirm);press(H::Action::confirm);GameActions::ProcessQueue(state);
+        const auto fillCash=state.park.cash;press(H::Action::confirm);press(H::Action::confirm);flush();
         Check(state.park.cash==fillCash-fill.cost,"Fill accounting wrong");
         for(int y=640;y<=736;y+=32)for(int x=960;x<=1056;x+=32)Check(path(x,y)&&!path(x,y)->isSloped(),"Rectangle tile/height wrong");
         capture("06-fill-built.png");
-        target(1088,640);press(H::Action::confirm);target(1120,672);press(H::Action::confirm);press(H::Action::confirm);GameActions::ProcessQueue(state);
+        target(1088,640);press(H::Action::confirm);target(1120,672);press(H::Action::confirm);press(H::Action::confirm);flush();
         Check(path(1088,640)&&path(1120,672),"Repeated fill lost state");
         // A fresh quote that changes while review is open cannot purchase at an unreviewed price.
         begin(P::BuildMode::line);target(1184,640);press(H::Action::confirm);target(1216,640);press(H::Action::confirm);
         const auto reviewCash=state.park.cash;
         GameActions::FootpathPlaceAction external({1184,640,MapGetSurfaceElementAt(CoordsXY{1184,640})->getBaseZ()},
             {FootpathSlopeType::flat,0},gFootpathSelection.normalSurface,gFootpathSelection.railings,kInvalidDirection,0);
-        Check(GameActions::Execute(&external,state).error==GameActions::Status::ok,"External native placement failed");GameActions::ProcessQueue(state);
-        press(H::Action::confirm);GameActions::ProcessQueue(state);
+        Check(GameActions::Execute(&external,state).error==GameActions::Status::ok,"External native placement failed");flush();
+        press(H::Action::confirm);flush();
         Check(!path(1216,640)&&P::SelectionOwnsInput(),"Changed review quote purchased without renewed consent");
         Check(state.park.cash<reviewCash,"External action accounting missing");press(H::Action::back);press(H::Action::back);
         // Queue surface/type is preserved; the native engine decides queue connections, not this selection tool.
         begin(P::BuildMode::line,true);target(800,896);press(H::Action::confirm);target(896,896);
         Check(P::Action(false).error==GameActions::Status::ok,"Queue quote failed");focus({864,912,16});capture("07-queue-preview.png");
         const auto queueSurface=gFootpathSelection.queueSurface;
-        press(H::Action::confirm);press(H::Action::confirm);GameActions::ProcessQueue(state);
+        press(H::Action::confirm);press(H::Action::confirm);flush();
         for(int x=800;x<=896;x+=32)Check(path(x,896)&&path(x,896)->isQueue()&&path(x,896)->getSurfaceEntryIndex()==queueSurface,"Queue selection changed");
         begin(P::BuildMode::fill,true);target(960,896);press(H::Action::confirm);target(992,928);Check(P::Action(false).error==GameActions::Status::ok,"Queue fill unavailable");
-        press(H::Action::confirm);press(H::Action::confirm);GameActions::ProcessQueue(state);Check(path(992,928)->isQueue(),"Queue fill lost queue type");
+        press(H::Action::confirm);press(H::Action::confirm);flush();Check(path(992,928)->isQueue(),"Queue fill lost queue type");
         // Invalid ownership blocks the whole selection before review, even with valid tiles either side.
         begin(P::BuildMode::line);target(640,1088);press(H::Action::confirm);target(768,1088);
         MapGetSurfaceElementAt(CoordsXY{704,1088})->setOwnership({});state.currentTicks+=8;P::UpdatePreview();
         const auto blockedCash=state.park.cash;Check(P::Action(false).error!=GameActions::Status::ok,"Blocked selection accepted");
-        focus({736,1104,16});capture("08-blocked-preview.png");press(H::Action::confirm);GameActions::ProcessQueue(state);
+        focus({736,1104,16});capture("08-blocked-preview.png");press(H::Action::confirm);flush();
         Check(!path(640,1088)&&!path(768,1088)&&state.park.cash==blockedCash,"Known invalid selection partially built");
         MapGetSurfaceElementAt(CoordsXY{704,1088})->setOwnership({OwnershipFlag::landOwned});
         // Full-selection affordability, not affordability of just the first tile.
         begin(P::BuildMode::fill);target(960,1088);press(H::Action::confirm);target(1056,1184);
         const auto fullQuote=P::Action(false);state.park.cash=fullQuote.cost/2;state.currentTicks+=8;
         Check(P::Action(false).error==GameActions::Status::insufficientFunds,"Whole-selection affordability missing");
-        press(H::Action::confirm);GameActions::ProcessQueue(state);Check(!path(960,1088),"Unaffordable fill partially built");state.park.cash=blockedCash;
+        press(H::Action::confirm);flush();Check(!path(960,1088),"Unaffordable fill partially built");state.park.cash=blockedCash;
         // Incompatible terrain is rejected by native clearance; flat elevated spans remain native eligible.
         begin(P::BuildMode::line);target(640,1248);press(H::Action::confirm);target(768,1248);
         auto* ridge=MapGetSurfaceElementAt(CoordsXY{704,1248});const auto oldBase=ridge->getBaseZ();
@@ -169,7 +174,7 @@ int main(int argc, char** argv)
         // Native runtime change AFTER explicit sequential confirmation: stop and report exact retained count.
         begin(P::BuildMode::line);target(640,1408);press(H::Action::confirm);const auto failureTileCost=P::Action(false).cost;target(736,1408);
         press(H::Action::confirm);const auto failureCash=state.park.cash;press(H::Action::confirm);
-        MapGetSurfaceElementAt(CoordsXY{672,1408})->setOwnership({});GameActions::ProcessQueue(state);
+        MapGetSurfaceElementAt(CoordsXY{672,1408})->setOwnership({});flush();
         Check(path(640,1408)&&!path(672,1408)&&!path(704,1408),"Sequential failure did not stop");
         Check(P::BatchMessage().find("Stopped: 1/4")!=std::string::npos&&state.park.cash==failureCash-failureTileCost,"Partial result not explicitly reported/accounted");
         focus({704,1424,16});capture("09-stopped-result.png");
@@ -214,7 +219,7 @@ int main(int argc, char** argv)
         begin(P::BuildMode::fill);target(1280,1280);press(H::Action::confirm);target(1536,1504);focus({});capture("15-selection-limit.png");target(1504,1504);
         const auto largeQuote=P::Action(false);Check(largeQuote.error==GameActions::Status::ok,"64-tile quote failed");
         const auto largeCash=state.park.cash;press(H::Action::confirm);press(H::Action::confirm);
-        timer=std::chrono::steady_clock::now();GameActions::ProcessQueue(state);
+        timer=std::chrono::steady_clock::now();flush();
         std::cout<<"64 tile native queued build us="<<std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-timer).count()<<"\n";
         Check(state.park.cash==largeCash-largeQuote.cost&&path(1504,1504),"64-tile execution/accounting failed");
         P::End();const auto savedCash=state.park.cash;SaveFlags flags{};flags.set(SaveFlag::exportObjects);
