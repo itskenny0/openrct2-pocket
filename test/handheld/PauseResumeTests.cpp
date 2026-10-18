@@ -38,6 +38,22 @@ int main(int argc,char** argv)
    Check(gGamePaused==(initial&~GAME_PAUSED_NORMAL),"Resume left the normal pause set or cleared an engine pause reason");
    WindowCullDead();
   }
+  for (bool back : { false, true })
+  {
+      gGamePaused = 0;
+      W::HandheldMenuOpen();
+      W::HandheldMenuMove(7);
+      W::HandheldMenuConfirm();
+      if (back)
+          W::HandheldMenuBack();
+      else
+          W::HandheldMenuConfirm();
+      W::HandheldMenuConfirm(); // restored Controls focus reopens the guide
+      W::HandheldMenuBack();
+      W::HandheldMenuBack();
+      WindowCullDead();
+      Check(!(gGamePaused & GAME_PAUSED_NORMAL), "Controller guide trapped pause or failed Back return");
+  }
   gGamePaused=0;W::HandheldMenuOpen();Check(gGamePaused&GAME_PAUSED_NORMAL,"Menu did not acquire normal pause");
   gGamePaused=GAME_PAUSED_MODAL;wm->CloseByClass(WindowClass::handheldMenu);
   Check(gGamePaused==GAME_PAUSED_MODAL,"Owned-menu cleanup reintroduced normal pause");WindowCullDead();

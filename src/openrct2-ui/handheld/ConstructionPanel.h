@@ -19,6 +19,12 @@ namespace OpenRCT2::Ui::Handheld
     inline void DrawConstructionFooter(
         Drawing::RenderTarget& rt, ScreenSize screen, const std::string& apply, const std::string& options)
     {
-        DrawFooter(rt, screen, { { "D-pad", "Move" }, { "A", apply }, { "Y", options }, { "L1/R1", "Zoom" }, { "B", "Back" } });
+        DrawFooter(
+            rt, screen,
+            { { "D-pad", "Move" },
+              { "A", apply },
+              { "Y", options },
+              { "L1/R1", "Zoom", HintPriority::guide },
+              { "B", "Back" } });
     }
 } // namespace OpenRCT2::Ui::Handheld

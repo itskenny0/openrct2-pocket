@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 import argparse,hashlib,json,os,re,shutil,subprocess,zipfile
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--build',type=Path,required=True);p.add_argument('--sysroot',type=Path,required=True);p.add_argument('--assets',type=Path,required=True);p.add_argument('--stage',type=Path,required=True);p.add_argument('--strip',required=True);a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--build',type=Path,required=True);p.add_argument('--sysroot',type=Path,required=True);p.add_argument('--assets',type=Path,required=True);p.add_argument('--stage',type=Path,required=True);p.add_argument('--strip',required=True);p.add_argument('--canonical-commit');p.add_argument('--canonical-tree');a=p.parse_args()
 repo=Path(__file__).resolve().parents[3];pak=a.stage/'Tools/tg5040/OpenRCT2 Pocket.pak';game=pak/'game';lib=game/'lib';data=game/'data';lib.mkdir(parents=True,exist_ok=True);data.mkdir(parents=True,exist_ok=True)
 for name in ['launch.sh','config.ini','INSTALL.md','FIRST-PLAYTEST.md','BUILD.md']:shutil.copy2(Path(__file__).parent/name,pak/name)
 (pak/'launch.sh').chmod(0o755)
@@ -54,4 +54,6 @@ def digest(f):return hashlib.sha256(f.read_bytes()).hexdigest()
 manifest={'architecture':'AArch64 / ARMv8 Cortex-A53 / Linux LP64','minimum_kernel_from_ELF':'3.10.108','runtime':'private glibc 2.26 loader; target SDK SDL 2.26.1; dependency closure verified via readelf','source_local_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip(),'source_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],cwd=repo,text=True).strip(),'physical_validation':False,'logical_resolution':[512,384],'physical_resolution':[1024,768],'dependencies':copied,'files':{str(f.relative_to(pak)):digest(f) for f in sorted(pak.rglob('*')) if f.is_file()}}
 # Do not expose private build filesystem paths in distributable provenance.
 manifest['dependencies']={n:Path(v).name for n,v in copied.items()}
+if a.canonical_commit:manifest['source_canonical_commit']=a.canonical_commit
+if a.canonical_tree:manifest['source_canonical_tree']=a.canonical_tree
 (pak/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n');print(pak)

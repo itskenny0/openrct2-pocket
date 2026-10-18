@@ -88,6 +88,8 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 
 - Phase 8B verification: Desktop journey audit completed: shared stable footer zones, correct catalog Page/Camera and placement Zoom hints, existing tool-specific bindings retained. Sixteen native runtime drivers and logical-resolution captures cover representative journeys. Full translated/controller hardware matrix remains unverified. See `CONTROLLER-UX-PHASE8B.md`.
 
+- RC1 verification: RC1 keeps one readable footer row in all captured ordinary cases, with secondary shortcuts in the park Controls guide. Bindings are unchanged; hardware/locale coverage remains open. See `CONTROLLER-FOOTER-BRICK-RC1.md`.
+
 ## S-06 — Shared
 
 - Description: Back and focus restoration require remaining-system coverage.
@@ -427,6 +429,8 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 - Implementation / verification: The rail preview uses compact metrics/actions; the footer reserves its measured 28/44-pixel height. Native 00-dashboard.png shows all six actions with no page indicator. No actions removed.
 - Evidence: `CONTROLLER-UX-PHASE8B.md`; `captures/controller-ux-phase8b/`; `evidence/controller-ux-phase8b/`.
 
+- RC1 verification: RC1 retains all six dashboard Park actions with the shared 28-pixel strip; native 24-dashboard.png verifies no pagination. See `CONTROLLER-FOOTER-BRICK-RC1.md`.
+
 ## P8B-F2 — Shared footer
 
 - Description: A/B prompt placement and two-row distribution varied between contexts.
@@ -435,6 +439,8 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 - Source: Phase 8B source audit and native regression fixtures
 - Implementation / verification: MeasureFooter anchors navigation left, A center and B right; secondary controls pack contiguously. Bounds tests verify no lost hints or overlaps at 512x384; native management, construction and confirmation captures reviewed.
 - Evidence: `CONTROLLER-UX-PHASE8B.md`; `captures/controller-ux-phase8b/`; `evidence/controller-ux-phase8b/`.
+
+- RC1 verification: RC1 supersedes the two-row distribution with grouped navigation/action/Back prompts and 28-pixel ordinary footers. Native capture assertions and shared bounds tests pass; long-label fallback is documented. See `CONTROLLER-FOOTER-BRICK-RC1.md`.
 
 ## P8B-F3 — Staff
 
@@ -472,4 +478,24 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 - Implementation / verification: L1/R1 moves one six-item page, clamps at boundaries and preserves selected identity during refresh. Shared picker tests and native track catalog capture verify controls.
 - Evidence: `CONTROLLER-UX-PHASE8B.md`; `captures/controller-ux-phase8b/`; `evidence/controller-ux-phase8b/`.
 
-Inventory: **43 entries**; 2 Confirmed, 18 Unverified, 23 Fixed, 0 Deferred.
+
+
+## RC1-F1 — Controller footer
+
+- Description: Ordinary screens still used an awkward two-row prompt layout.
+- Severity: Minor
+- Status: Fixed
+- Implementation: Shared 28-pixel strip, stable navigation/action/Back grouping, explicit secondary/guide priority, full menu-entry hints in Start -> Controls. No remapping or font shrinking.
+- Verification: Six standalone tests, 16 native drivers, per-capture single-row assertions, logical-resolution native screenshots and focused guide Back/return checks.
+- Evidence: `CONTROLLER-FOOTER-BRICK-RC1.md`; `captures/footer-brick-rc1/`; `evidence/footer-brick-rc1/`.
+
+## RC1-F2 — Build infrastructure
+
+- Description: Vendor libpng12.pc referenced an include directory absent after setup.sh.
+- Severity: Major
+- Status: Fixed
+- Implementation: Private SDK setup now creates libpng12/ with the matching vendor headers.
+- Verification: Clean AArch64 configure/build, ELF architecture inspection and QEMU GUI/CLI version checks pass. Package CRC/modes/hashes/runtime closure have their own verification script.
+- Physical status: Device graphics, controls, audio, sleep and SD-card saves remain unverified; this build fix does not close device QA.
+
+Inventory: **45 entries**; 2 Confirmed, 18 Unverified, 25 Fixed, 0 Deferred.

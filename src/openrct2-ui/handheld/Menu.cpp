@@ -86,6 +86,7 @@ namespace OpenRCT2::Ui::Windows
     enum class Page
     {
         park,
+        controls,
         build,
         paths,
         pathOptions,
@@ -1060,6 +1061,7 @@ namespace OpenRCT2::Ui::Windows
                     : ScreenCoordsXY{ 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
         }
 
+        std::vector<Handheld::ControlHint> _guideHints = Handheld::LastControlHints;
         std::function<void()> _leaveAction;
         size_t _leaveFocus{};
         bool _leaveStaff{};
@@ -1348,8 +1350,10 @@ namespace OpenRCT2::Ui::Windows
             switch (_page)
             {
                 case Page::park:
-                    return { "Resume park",   "Build",     "Park dashboard",     "Save park",
-                             "Save and exit", "Load park", "Exit without saving" };
+                    return { "Resume park",   "Build",     "Park dashboard",      "Save park",
+                             "Save and exit", "Load park", "Exit without saving", "Controls..." };
+                case Page::controls:
+                    return { "Back" };
                 case Page::dashboard:
                     return HandheldDashboardPresentation(0).rows;
                 case Page::staff:
@@ -2697,6 +2701,10 @@ namespace OpenRCT2::Ui::Windows
             }
             switch (_page)
             {
+                case Page::controls:
+                    page(Page::park);
+                    _focus.move(7, rows().size());
+                    break;
                 case Page::researchCatalog:
                     page(Page::research); break;
                 case Page::researchItem:
@@ -3256,6 +3264,10 @@ namespace OpenRCT2::Ui::Windows
                         invalidate();
                     }
                     break;
+                case Page::controls:
+                    page(Page::park);
+                    _focus.move(7, rows().size());
+                    break;
                 case Page::park:
                     switch (choice)
                     {
@@ -3281,6 +3293,9 @@ namespace OpenRCT2::Ui::Windows
                             break;
                         case 6:
                             page(Page::exit);
+                            break;
+                        case 7:
+                            page(Page::controls);
                             break;
                     }
                     break;
@@ -5558,6 +5573,22 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
+            if (_page == Page::controls)
+            {
+                Handheld::ManagementPresentation model;
+                model.breadcrumb = "Park / Controller guide";
+                model.title = "Controls";
+                model.bodyLines = { "Controls from menu entry:" };
+                for (const auto& h : _guideHints)
+                    if (!h.label.empty())
+                        model.bodyLines.push_back(Handheld::ControlKey(h.key) + ": " + h.label);
+                model.bodyLines.push_back("Start: Park menu / B: Back or cancel");
+                model.bodyLines.push_back("Build panels show tool-specific options.");
+                model.rows = { "Back" };
+                Handheld::DrawManagementContent(rt, { 8, 8 }, { 496, 340 }, model);
+                Handheld::DrawFooter(rt, { ContextGetWidth(), ContextGetHeight() }, { { "A", "Back" }, { "B", "Back" } });
+                return;
+            }
             if (_leaveAction)
             {
                 Handheld::DrawManagementContent(rt, { 80, 32 }, { 352, 292 }, leavePresentation());

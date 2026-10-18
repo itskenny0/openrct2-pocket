@@ -8,24 +8,43 @@
 static void CheckVisualPolishLayout()
 {
     const std::vector<std::vector<H::ControlHint>> cases{
-        {{"D-pad","Section"},{"A","Enter"},{"B","Park"},{"L1/R1","Section"},{"SELECT","Enter"}},
-        {{"D-pad","Choose"},{"A","Select"},{"B","Back"},{"L1/R1","Tab"},{"X","Access"},{"SELECT","Sections"}},
-        {{"A","Build"},{"B","Undo"},{"L1/R1","Piece"},{"X","Speed +"},{"Y","Speed -"}},
-        {{"D-pad","Move"},{"A","Review"},{"B","Cancel"},{"Y","Adjust"},{"SELECT","Surface"}},
-        {{"D-pad","Move"},{"A","Place"},{"B","Back"},{"X","Remove"},{"Y","Adjust"},{"SELECT","Surface"}},
-        {{"D-pad","Adjust"},{"A","Build"},{"B","Build"},{"L1/R1","Group"}},
-        {{"D-pad","Move"},{"A","Apply"},{"B","Back"},{"Y","Add/Remove"}},
-        {{"D-pad","Choose"},{"A","Confirm"},{"B","Cancel"}},
-        {{"D-pad","Sample"},{"A","Graph"},{"B","Back"},{"L1/R1","Tab"},{"SELECT","Sections"}}
+        { { "D-pad", "Section" },
+          { "A", "Enter" },
+          { "B", "Park" },
+          { "L1/R1", "Section" },
+          { "SELECT", "Enter", H::HintPriority::guide } },
+        { { "D-pad", "Choose" },
+          { "A", "Select" },
+          { "B", "Back" },
+          { "L1/R1", "Tab" },
+          { "X", "Access" },
+          { "SELECT", "Sections", H::HintPriority::guide } },
+        { { "A", "Build" }, { "B", "Undo" }, { "L1/R1", "Piece" }, { "X", "Speed +" }, { "Y", "Speed -" } },
+        { { "D-pad", "Move" },
+          { "A", "Review" },
+          { "B", "Cancel" },
+          { "Y", "Adjust" },
+          { "SELECT", "Surface", H::HintPriority::guide } },
+        { { "D-pad", "Move" },
+          { "A", "Place" },
+          { "B", "Back" },
+          { "X", "Remove" },
+          { "Y", "Adjust" },
+          { "SELECT", "Surface", H::HintPriority::guide } },
+        { { "D-pad", "Adjust" }, { "A", "Build" }, { "B", "Build" }, { "L1/R1", "Group" } },
+        { { "D-pad", "Move" }, { "A", "Apply" }, { "B", "Back" }, { "Y", "Add/Remove" } },
+        { { "D-pad", "Choose" }, { "A", "Confirm" }, { "B", "Cancel" } },
+        { { "D-pad", "Sample" },
+          { "A", "Graph" },
+          { "B", "Back" },
+          { "L1/R1", "Tab" },
+          { "SELECT", "Sections", H::HintPriority::guide } }
     };
     for(const auto& hints:cases)
     {
         auto layout = H::MeasureFooter({ 512, 384 }, hints);
-        Check(layout.size()==hints.size(),"Footer hid an essential action");
-        for(const auto& item:layout) {
-            if(item.hint.key=="A")Check(item.x==199,"Primary A position drifted between modes");
-            if(item.hint.key=="B")Check(item.x==408,"Back B position drifted between modes");
-        }
+        Check(layout.size() == H::FooterHints(hints, 496).size(), "Footer lost a visible action");
+        Check(H::FooterHeight({ 512, 384 }, hints) == 28, "Ordinary footer expanded beyond one row");
         std::sort(
             layout.begin(), layout.end(), [](const auto& a, const auto& b) { return a.y == b.y ? a.x < b.x : a.y < b.y; });
         std::array<int,2> right{0,0};

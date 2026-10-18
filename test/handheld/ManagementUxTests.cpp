@@ -92,6 +92,7 @@ int main(int argc,char** argv)
         auto capture=[&](const char* name){const char* dir=std::getenv("POCKET_MANAGEMENT_UX_CAPTURES");if(!dir)return;std::filesystem::create_directories(dir);
             Drawing::X8DrawingEngine engine(context->GetUiContext());engine.Resize(512,384);engine.BeginDraw();auto& rt=*engine.getRT();ResetAllSpriteQuadrantPlacements();Drawing::UpdatePaletteEffects();ViewportRender(rt,WindowGetMain()->viewport);
             auto* window=wm->FindByClass(WindowClass::handheldMenu);Check(window,"Capture menu missing");window->onDraw(rt);
+            Check(H::FooterHeight({ 512, 384 }, H::LastControlHints) == 28, "Runtime footer expanded beyond one row");
             Image image;image.Width=512;image.Height=384;image.Depth=8;image.Stride=rt.LineStride();image.Palette=Drawing::gPalette;const auto* bytes=reinterpret_cast<uint8_t*>(rt.bits);image.Pixels.assign(bytes,bytes+rt.LineStride()*rt.height);
             Imaging::WriteToFile((std::filesystem::path(dir)/name).string(),image,ImageFormat::png);engine.EndDraw();};
         W::HandheldDashboardOpen();

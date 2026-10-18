@@ -97,11 +97,11 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
     inline std::vector<ControlHint> Hints(const State& state, const ManagementPresentation& model, bool sectionRoot)
     {
         std::vector<ControlHint> hints{ { "D-pad",
-                                          state.focus == Focus::rail         ? "Section"
+                                          state.focus == Focus::rail         ? "Navigate"
                                               : model.navigationHint.empty() ? model.editing ? "Adjust" : "Choose"
                                                                              : model.navigationHint },
                                         { "A",
-                                          state.focus == Focus::rail         ? "Enter"
+                                          state.focus == Focus::rail         ? "Select"
                                               : !model.primaryAction.empty() ? model.primaryAction
                                               : model.editing                ? "Review"
                                               : model.confirmation           ? "Confirm"
@@ -122,7 +122,8 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
             { state.focus == Focus::rail || sectionRoot || !model.tabs.empty() || model.denseRoster ? "SELECT" : "START",
               state.focus == Focus::rail                                    ? "Enter"
                   : sectionRoot || !model.tabs.empty() || model.denseRoster ? "Sections"
-                                                                            : "Park" });
+                                                                            : "Park",
+              HintPriority::guide });
         return hints;
     }
     inline int ContentHeight(ScreenSize screen, const State& state, const ManagementPresentation& model, bool sectionRoot)

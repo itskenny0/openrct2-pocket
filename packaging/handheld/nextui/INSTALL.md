@@ -1,4 +1,4 @@
-# OpenRCT2 Pocket: first NextUI Brick playtest
+# OpenRCT2 Pocket: NextUI Brick release candidate
 
 1. Extract the ZIP onto the SD card root. The result must be:
    `Tools/tg5040/OpenRCT2 Pocket.pak/launch.sh`.
@@ -32,3 +32,6 @@ mapping. `OPENRCT2_RCT2_PATH` can select another original installation directory
 This is a real AArch64 native-engine testing build, not a physical-device-verified
 release. GPU/display/audio, every physical button, save/resume on your SD card,
 sleep behavior and performance still need your first Brick test. Back up saves.
+
+The final footer is single-row. Start opens the park menu; its Controls entry
+shows the shortcuts from menu entry. See `manifest.json` for source/build identity.

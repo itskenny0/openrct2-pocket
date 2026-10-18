@@ -165,10 +165,18 @@ namespace OpenRCT2::Ui::Handheld
         DrawIconRow(rt, { window.windowPos.x + 10, y - 8 }, window.width - 20, label, selected, PanelIcon::play);
     }
 
+    enum class HintPriority
+    {
+        normal,
+        secondary,
+        guide
+    };
     struct ControlHint
     {
         std::string key, label;
+        HintPriority priority = HintPriority::normal;
     };
+    inline std::vector<ControlHint> LastControlHints;
     struct ControlPlacement
     {
         ControlHint hint;
@@ -188,7 +196,7 @@ namespace OpenRCT2::Ui::Handheld
     }
     inline int ControlHintWidth(const ControlHint& hint)
     {
-        return ControlKeyWidth(ControlKey(hint.key)) + 5 + TextWidth(hint.label) + 12;
+        return ControlKeyWidth(ControlKey(hint.key)) + 5 + TextWidth(hint.label) + 6;
     }
     inline void DrawCommand(Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t, const char* key, const char* label)
     {
@@ -464,73 +472,118 @@ namespace OpenRCT2::Ui::Handheld
         Concept::Rule(rt, p, screen.width);
     }
 
+    // Full bindings remain available in Park -> Controls. Only declared secondary
+    // shortcuts may leave the strip; primary actions never disappear to make room.
+    inline std::vector<ControlHint> FooterHints(const std::vector<ControlHint>& hints, int available)
+    {
+        std::vector<ControlHint> result;
+        for (auto h : hints)
+        {
+            if (h.label.empty() || h.priority == HintPriority::guide)
+                continue;
+            if (h.label == "Build selection" || h.label == "Build mode")
+                h.label = "Build";
+            if (h.label == "Select / review")
+                h.label = "Select";
+            if (h.label == "Add/Remove")
+                h.label = "Paint mode";
+            const auto duplicate = std::find_if(result.begin(), result.end(), [&](const auto& old) {
+                return ControlKey(old.key) == ControlKey(h.key) && old.label == h.label;
+            });
+            if (duplicate == result.end())
+                result.push_back(h);
+        }
+        const auto width = [&] {
+            int total = 0;
+            for (const auto& h : result)
+                total += ControlHintWidth(h) + 6;
+            return total ? total - 6 : 0;
+        };
+        for (auto it = result.end(); width() > available && it != result.begin();)
+        {
+            --it;
+            if (it->priority == HintPriority::secondary)
+                it = result.erase(it);
+        }
+        return result;
+    }
     inline std::vector<ControlPlacement> MeasureFooter(ScreenSize screen, const std::vector<ControlHint>& hints)
     {
-        std::vector<ControlPlacement> primary;
-        std::vector<ControlHint> extras;
-        int leftEnd = 8, actionEnd = screen.width * 39 / 100, backStart = screen.width - 8;
-        for (const auto& h : hints)
+        const auto visible = FooterHints(hints, screen.width - 16);
+        std::vector<ControlHint> left, actions, back;
+        for (const auto& h : visible)
         {
-            if (h.label.empty())
-                continue;
-            const int width = ControlHintWidth(h);
-            if (h.key == "D-pad")
-            {
-                primary.push_back({ h, 8, 0, width });
-                leftEnd = 8 + width;
-            }
-            else if (h.key == "A")
-            {
-                primary.push_back({ h, screen.width * 39 / 100, 0, width });
-                actionEnd = screen.width * 39 / 100 + width;
-            }
+            if (h.key == "D-pad" || ControlKey(h.key) == "L1/R1")
+                left.push_back(h);
             else if (h.key == "B")
-            {
-                backStart = std::min(screen.width - 104, screen.width - 8 - width);
-                primary.push_back({ h, backStart, 0, width });
-            }
+                back.push_back(h);
+            else if (h.key == "A")
+                actions.insert(actions.begin(), h);
             else
-                extras.push_back(h);
+                actions.push_back(h);
         }
-        const auto fixed = primary;
-        int x = leftEnd + 8;
-        bool second = false;
-        for (const auto& h : extras)
+        std::vector<ControlPlacement> result;
+        int total = 0;
+        for (const auto& h : visible)
+            total += ControlHintWidth(h) + 6;
+        // Exceptional long labels wrap as complete prompts; text and glyphs never shrink.
+        if (total > screen.width - 10)
         {
-            const int width = ControlHintWidth(h);
-            if (x + width > screen.width * 39 / 100 - 8)
-                x = std::max(x, actionEnd + 8);
-            if (x + width > backStart - 8)
+            std::vector<ControlHint> ordered = left;
+            ordered.insert(ordered.end(), actions.begin(), actions.end());
+            ordered.insert(ordered.end(), back.begin(), back.end());
+            int x = 8, row = 0;
+            for (const auto& h : ordered)
             {
-                second = true;
-                break;
+                const int w = ControlHintWidth(h);
+                if (x > 8 && x + w > screen.width - 8)
+                {
+                    x = 8;
+                    ++row;
+                }
+                result.push_back({ h, x, row, w });
+                x += w + 6;
             }
-            primary.push_back({ h, x, 0, width });
-            x += width + 8;
+            const int height = 28 + row * 20;
+            for (auto& p : result)
+                p.y = screen.height - height + 7 + p.y * 20;
+            return result;
         }
-        if (second)
+        const int y = screen.height - 28 + 7;
+        int x = 8;
+        for (const auto& h : left)
         {
-            primary = fixed;
-            x = 8;
-            for (const auto& h : extras)
-            {
-                const int width = ControlHintWidth(h);
-                primary.push_back({ h, x, 1, width });
-                x += width + 8;
-            }
+            const int w = ControlHintWidth(h);
+            result.push_back({ h, x, y, w });
+            x += w + 6;
         }
-        const int height = second ? 44 : 28;
-        for (auto& item : primary)
-            item.y = screen.height - height + 7 + item.y * 20;
-        return primary;
+        const int backWidth = back.empty() ? 0 : ControlHintWidth(back.front());
+        int actionWidth = 0;
+        for (const auto& h : actions)
+            actionWidth += ControlHintWidth(h) + 6;
+        const int maxAction = screen.width - 8 - backWidth - (back.empty() ? 0 : 6) - actionWidth + 6;
+        x = std::max(x, std::min(screen.width * 39 / 100, maxAction));
+        for (const auto& h : actions)
+        {
+            const int w = ControlHintWidth(h);
+            result.push_back({ h, x, y, w });
+            x += w + 6;
+        }
+        if (!back.empty())
+            result.push_back({ back.front(), screen.width - 8 - backWidth, y, backWidth });
+        return result;
     }
     inline int FooterHeight(ScreenSize screen, const std::vector<ControlHint>& hints)
     {
-        const auto items = MeasureFooter(screen, hints);
-        return std::any_of(items.begin(), items.end(), [&](const auto& p) { return p.y < screen.height - 21; }) ? 44 : 28;
+        const auto layout = MeasureFooter(screen, hints);
+        int height = 28;
+        for (const auto& p : layout)
+            height = std::max(height, screen.height - p.y + 7);
+        return height;
     }
     inline void DrawFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::vector<ControlHint>& hints)
     {
+        LastControlHints = hints;
         const int height = FooterHeight(screen, hints);
         Fill(rt, { 0, screen.height - height }, { screen.width, height }, Theme::ink);
         Concept::Rule(rt, { 0, screen.height - height }, screen.width);
@@ -586,8 +639,8 @@ namespace OpenRCT2::Ui::Handheld
                   { "B", "Back" },
                   { "SEL", "Build" },
                   { "START", "Park" },
-                  { "L1/R1", "Zoom" },
-                  { "X", "Rotate" } });
+                  { "L1/R1", "Zoom", HintPriority::secondary },
+                  { "X", "Rotate", HintPriority::guide } });
         }
     }
 
@@ -641,8 +694,8 @@ namespace OpenRCT2::Ui::Handheld
                         : remove ? "Place"
                                  : "Remove" },
                   { "Y", "Adjust" },
-                  { "SEL", "Surface" },
-                  { "L1/R1", "Zoom" },
+                  { "SEL", "Surface", HintPriority::guide },
+                  { "L1/R1", "Zoom", HintPriority::secondary },
                   { "B", "Back" } });
         }
     }

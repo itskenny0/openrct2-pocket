@@ -4,7 +4,7 @@ Use a private SDK directory; do not install the bundled libc into your host or d
 
 Download into `$BRICK_SDK`:
 - `gcc.tar.gz`: https://github.com/prepkg/gcc-toolchain/releases/download/1.0.0-beta/gcc-aarch64-linux-gnu.tar.gz (SHA256 da5113921eaeba7c9e9e7be104c610790a449ee13e98f09a5a7153ebb5dc739e).
-- `trimui-sdk.tgz`: https://github.com/trimui/toolchain_sdk_smartpro/releases/download/20231018/SDK_usr_tg5040_a133p.tgz.
+- `trimui-sdk.tgz`: https://github.com/trimui/toolchain_sdk_smartpro/releases/download/20231018/SDK_usr_tg5040_a133p.tgz (SHA256 b6b615d03204e9d9bb1a91c31de0c3402434f6b8fc780743fa88a5f1da6f3c79).
 
 From the repository root, with `BRICK_SDK` an absolute private directory:
 
@@ -37,3 +37,14 @@ Zip the stage's Tools directory preserving Unix executable modes. The package he
 The packaged GUI and CLI version checks pass QEMU 7.2 using the private loader with `-B 0x100000000`. Without that guest address offset, explicit-loader QEMU execution crashes at MAP_FIXED of the non-PIE executable at 0x400000. QEMU's ordinary interpreter mode with the package as `-L` and its lib directory as LD_LIBRARY_PATH also passes. This establishes ELF/runtime closure, not gameplay or physical-device validation.
 
 Vendor SDL 2.26.1 includes the native Mali backend but no dummy video driver. Target GUI fixtures therefore cannot initialize headlessly here. Actual device GPU/audio/display/controller compatibility, sleep/resume and performance remain unverified. Network, HTTP, OpenGL, TTF, Vorbis and FLAC are disabled; native software rendering, simulation, save formats and Pocket UI remain. Device GPU libraries are not redistributed or replaced.
+
+## Release-candidate package checks
+
+`setup.sh` creates both root and `libpng12/` include locations required by the
+vendor pkg-config file. Keep its private sysroot separate from host headers.
+
+Run `python3 packaging/handheld/nextui/verify-package.py PACKAGE.zip` after
+creating the transfer archive. Optionally add `--qemu /path/to/qemu-aarch64`
+for packaged GUI/CLI version checks with the private loader. CRC, modes,
+AArch64 dependency closure, resource paths, file hashes and isolated save paths
+are checked. These checks do not validate physical GPU/audio/input/suspend.

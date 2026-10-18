@@ -924,8 +924,8 @@ namespace OpenRCT2::Ui::Handheld::Paths
                 { { "D-pad", "Move" },
                   { "A", batch.start ? "Review" : "Start" },
                   { "Y", "Adjust" },
-                  { "SEL", "Surface" },
-                  { "L1/R1", "Zoom" },
+                  { "SEL", "Surface", HintPriority::guide },
+                  { "L1/R1", "Zoom", HintPriority::guide },
                   { "B", batch.start ? "Cancel" : "Exit" } });
         }
     }

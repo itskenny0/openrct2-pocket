@@ -1045,7 +1045,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         if (ClipRenderTarget(preview, rt, p + ScreenCoordsXY{ 146, 135 }, 60, 62))
             DrawPiecePreview(preview, selected);
         DrawModeBadge(rt, p + ScreenCoordsXY{ 144, 8 }, camera ? "CAMERA" : "BUILD");
-        std::vector<ControlHint> hints{ { "D-pad", "Move" },
+        std::vector<ControlHint> hints{ { "D-pad", "Move", camera ? HintPriority::normal : HintPriority::guide },
                                         { "A", camera ? "Build mode" : "Build" },
                                         { "B",
                                           camera                                  ? "Build"
@@ -1056,7 +1056,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                                           camera                                   ? "Rotate"
                                               : trackTypeHasSpeedSetting(selected) ? "Speed +"
                                                                                    : "Bank" },
-                                        { "SELECT", camera ? "Build" : "Pieces" } };
+                                        { "SELECT", camera ? "Build" : "Pieces", HintPriority::guide } };
         if (!camera)
             hints.push_back({ "Y", StationPlacement() ? "Turn" : trackTypeHasSpeedSetting(selected) ? "Speed -" : "Chain" });
         DrawFooter(rt, screen, hints);

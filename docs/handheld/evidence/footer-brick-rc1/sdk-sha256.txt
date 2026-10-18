@@ -1,0 +1,2 @@
+da5113921eaeba7c9e9e7be104c610790a449ee13e98f09a5a7153ebb5dc739e  brick-sdk/gcc.tar.gz
+b6b615d03204e9d9bb1a91c31de0c3402434f6b8fc780743fa88a5f1da6f3c79  brick-sdk/trimui-sdk.tgz

@@ -108,6 +108,7 @@ int main(int argc, char** argv)
             std::filesystem::create_directories(folder);Drawing::X8DrawingEngine engine(context->GetUiContext());engine.Resize(512,384);engine.BeginDraw();
             auto& rt=*engine.getRT();ResetAllSpriteQuadrantPlacements();Drawing::UpdatePaletteEffects();ViewportRender(rt,WindowGetMain()->viewport);
             if(auto* window=wm->FindByClass(WindowClass::handheldMenu))window->onDraw(rt);else H::DrawExplorer(rt);
+            Check(H::FooterHeight({ 512, 384 }, H::LastControlHints) == 28, "Runtime footer expanded beyond one row");
             Image image;image.Width=512;image.Height=384;image.Depth=8;image.Stride=rt.LineStride();image.Palette=Drawing::gPalette;
             const auto* bytes=reinterpret_cast<uint8_t*>(rt.bits);image.Pixels.assign(bytes,bytes+rt.LineStride()*rt.height);
             Imaging::WriteToFile((std::filesystem::path(folder)/name).string(),image,ImageFormat::png);engine.EndDraw();};
@@ -215,6 +216,8 @@ int main(int argc, char** argv)
         H::SceneryTools::SelectCategory(H::SceneryTools::Category::walls);Check(H::SceneryTools::Select(wallIndex),"Wall select failed");H::BeginScenery();H::SceneryTools::UpdatePreview(CoordsXY{960,960});capture("20-scenery-build.png");press(H::Action::contextSecondary);capture("21-scenery-adjust.png");H::EndTerrain();
         H::AreaTools::settings={};H::AreaTools::settings.width=2;H::AreaTools::settings.height=2;H::BeginAreaTools();H::UpdateExplorer(input);capture("22-landscape-build.png");press(H::Action::contextSecondary);capture("23-landscape-adjust.png");H::EndTerrain();
         W::HandheldDashboardOpen();capture("24-dashboard.png");
+        press(H::Action::openMenu);capture("26-park-menu.png");W::HandheldMenuMove(7);press(H::Action::confirm);capture("27-controller-guide.png");
+        press(H::Action::back);press(H::Action::back);WindowCullDead();Check(!W::HandheldDashboardIsOpen(),"Guide Back trapped gameplay");
         std::cout<<"PASS staff native hire/duties/patrol/dismissal safety/tab and roster focus; guest needs/thoughts/spending/tracking/follow/pickup/map\n";
         std::cout<<"PASS "<<roster.size()<<" guests, 50 full presentation snapshots "<<elapsed<<" ms in native runtime; native needs and money unchanged\n";
         return 0;

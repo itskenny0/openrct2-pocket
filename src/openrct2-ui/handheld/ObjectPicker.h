@@ -162,7 +162,8 @@ namespace OpenRCT2::Ui::Handheld
                                         { "A", "Select" },
                                         { "B", "Back" },
                                         { "L1/R1", "Page" },
-                                        { searchControl ? "X" : "START", searchControl ? "Search" : startAction } };
+                                        { searchControl ? "X" : "START", searchControl ? "Search" : startAction,
+                                          searchControl ? HintPriority::normal : HintPriority::guide } };
         if (!extraAction.empty())
             hints.push_back({ "X", extraAction });
         DrawFooter(rt, screen, hints);
