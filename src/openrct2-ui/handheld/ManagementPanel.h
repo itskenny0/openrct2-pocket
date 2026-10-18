@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "Panel.h"
+#include "ColourGrid.h"
 
 #include <optional>
 
@@ -48,6 +49,8 @@ namespace OpenRCT2::Ui::Handheld
         std::string navigationHint;
         std::vector<std::string> rowValues; // Dense label/value reports; values are not actions.
         bool contentSized{};
+        std::vector<uint16_t> colourValues; // Native palette entries; focus is a spatial swatch grid.
+        uint16_t currentColour{};
         size_t columns = 1; // Controller text entry uses the same content shell.
     };
     struct ManagementLayout
@@ -98,6 +101,11 @@ namespace OpenRCT2::Ui::Handheld
             std::string(model.destructive ? "{DANGER}" : model.confirmation ? "{GOLD}" : "{WHITE}") + model.title, width - 24);
         Fill(rt, p + ScreenCoordsXY{12, 55}, {width - 24, 1}, Theme::edge);
         if (model.destructive) Fill(rt,p+ScreenCoordsXY{12,55},{width-24,2},static_cast<Drawing::PaletteIndex>(PocketPalette::destructive));
+        if (!model.colourValues.empty())
+        {
+            DrawColourGrid(rt, p, size, model.colourValues, model.rows, model.selected, model.currentColour);
+            return;
+        }
         const int valueX = 14 + (width - 30) * 45 / 100;
         for (size_t i = 0; i < model.stats.size(); ++i)
         {

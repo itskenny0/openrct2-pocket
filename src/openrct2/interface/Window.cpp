@@ -800,6 +800,8 @@ static constexpr float kWindowScrollLocations[][2] = {
         {
             titleWind->windowPos.x = (width - titleWind->width) / 2;
             titleWind->windowPos.y = height - 182;
+            // Specialized title menus own their logical bounds after the desktop placement.
+            titleWind->onResize();
         }
 
         WindowBase* versionWind = windowMgr->FindByClass(WindowClass::titleVersion);

@@ -36,7 +36,7 @@ for folder in ['language','scenario_patches','shaders']:
  shutil.copytree(repo/'data'/folder,data/folder,dirs_exist_ok=True)
 # Protected local translation is not a release input: use committed canonical bytes.
 (data/'language/eo-ZZ.txt').write_bytes(subprocess.check_output(['git','show','HEAD:data/language/eo-ZZ.txt'],cwd=repo))
-shutil.copytree(a.assets/'objects',data/'object',dirs_exist_ok=True);shutil.copytree(a.assets/'title-sequences',data/'title',dirs_exist_ok=True)
+shutil.copytree(a.assets/'objects',data/'object',dirs_exist_ok=True);shutil.copytree(a.assets/'title-sequences',data/'sequence',dirs_exist_ok=True)
 (pak/'RCT2').mkdir(exist_ok=True);(pak/'RCT2/PUT_YOUR_ORIGINAL_ASSETS_HERE.txt').write_text('Copy your original RCT2 Data, ObjData and Scenarios folders here. Data/g1.dat must exist. Proprietary assets are not included.\n')
 sources=pak/'Sources';sources.mkdir(exist_ok=True);subprocess.run(['git','archive','--format=zip','-o',str(sources/'openrct2-pocket-source.zip'),'HEAD'],cwd=repo,check=True)
 for name in ['licence.txt','readme.md']:
@@ -51,7 +51,10 @@ OpenRCT2 data assets: pinned assets.json from bundled source, official objects v
 No RollerCoaster Tycoon proprietary assets are included.
 ''')
 def digest(f):return hashlib.sha256(f.read_bytes()).hexdigest()
-manifest={'architecture':'AArch64 / ARMv8 Cortex-A53 / Linux LP64','minimum_kernel_from_ELF':'3.10.108','runtime':'private glibc 2.26 loader; target SDK SDL 2.26.1; dependency closure verified via readelf','source_local_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip(),'source_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],cwd=repo,text=True).strip(),'physical_validation':False,'logical_resolution':[512,384],'physical_resolution':[1024,768],'dependencies':copied,'files':{str(f.relative_to(pak)):digest(f) for f in sorted(pak.rglob('*')) if f.is_file()}}
+# A standard checksum list can verify the actual SD-card copy on macOS/Linux.
+(game/'SHA256SUMS.txt').write_text(''.join(digest(f)+'  '+str(f.relative_to(game))+'\n'
+    for f in sorted(game.rglob('*')) if f.is_file() and f.name!='SHA256SUMS.txt' and not any(p.startswith('.') for p in f.relative_to(game).parts)))
+manifest={'architecture':'AArch64 / ARMv8 Cortex-A53 / Linux LP64','minimum_kernel_from_ELF':'3.10.108','runtime':'private glibc 2.26 loader; target SDK SDL 2.26.1; dependency closure verified via readelf','source_local_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip(),'source_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],cwd=repo,text=True).strip(),'physical_validation':False,'logical_resolution':[512,384],'physical_resolution':[1024,768],'dependencies':copied,'files':{str(f.relative_to(pak)):digest(f) for f in sorted(pak.rglob('*')) if f.is_file() and f!=pak/'manifest.json' and not any(p.startswith('.') for p in f.relative_to(pak).parts)}}
 # Do not expose private build filesystem paths in distributable provenance.
 manifest['dependencies']={n:Path(v).name for n,v in copied.items()}
 if a.canonical_commit:manifest['source_canonical_commit']=a.canonical_commit

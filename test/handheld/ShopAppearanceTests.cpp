@@ -178,7 +178,7 @@ int main(int argc, char** argv)
         const auto cancelled=ShopAppearanceContext::Capture(*ride);press(H::Action::confirm);Check(!W::HandheldShopAppearancePresentation().confirmation && ShopAppearanceContext::Capture(*ride)==cancelled,"Cancel applied appearance");capture("04-unchanged-cancellation.png");
         press(H::Action::confirm);W::HandheldMenuMove(1);H::Frame duplicate;duplicate.actions={H::Action::confirm,H::Action::confirm};
         Check(H::HandleMenuInput(controller,duplicate),"Appearance apply input not consumed");GameActions::ProcessQueue(state);
-        Check(W::HandheldShopAppearancePresentation().status=="Native appearance applied","Apply did not return to selected channel");capture("05-native-applied.png");
+        Check(W::HandheldShopAppearancePresentation().status=="Appearance updated","Apply did not return to selected channel");capture("05-native-applied.png");
         // Real SDL virtual held input must not cross a Cancel-first review.
         SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS,"1");Check(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER|SDL_INIT_EVENTS)==0,"SDL controller init failed");
         {

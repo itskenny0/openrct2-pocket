@@ -54,6 +54,14 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         std::optional<GameActions::RideSetAppearanceType> appearance{};
         uint32_t index{};
     };
+    inline bool IsColourSetting(const Setting& setting)
+    {
+        using A = GameActions::RideSetAppearanceType;
+        if (!setting.appearance || setting.values.size() < Drawing::kColourNumNormal) return false;
+        return *setting.appearance == A::trackColourMain || *setting.appearance == A::trackColourAdditional
+            || *setting.appearance == A::trackColourSupports || *setting.appearance == A::vehicleColourBody
+            || *setting.appearance == A::vehicleColourTrim || *setting.appearance == A::vehicleColourTertiary;
+    }
     std::vector<Setting> Settings(const Ride& ride, bool maintenance = false);
     std::vector<Setting> VehicleSettings(const Ride& ride);
     std::vector<Setting> DispatchSettings(const Ride& ride);

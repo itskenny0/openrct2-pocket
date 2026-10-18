@@ -147,24 +147,32 @@ namespace OpenRCT2::Ui::Windows
 
             if (Handheld::IsEnabled())
             {
-                width = 328;
-                height = 210;
-                windowPos = { (ContextGetWidth() - width) / 2, ContextGetHeight() - height - 8 };
+                onResize();
                 int32_t row = 0;
                 for (auto index : { WIDX_START_NEW_GAME, WIDX_CONTINUE_SAVED_GAME, WIDX_MULTIPLAYER, WIDX_GAME_TOOLS })
                 {
                     if (widgets[index].isVisible())
                     {
                         auto& item = widgets[index];
-                        item.left = 10;
-                        item.right = width - 11;
-                        item.top = 46 + row * Handheld::kPanelRowPitch;
-                        item.bottom = item.top + 27;
+                        item.left = (width - 320) / 2 + 12;
+                        item.right = item.left + 295;
+                        item.top = 197 + row * 34;
+                        item.bottom = item.top + 31;
                         ++row;
                     }
                 }
             }
             initScrollWidgets();
+        }
+
+        void onResize() override
+        {
+            if (!Handheld::IsEnabled()) return;
+            // The engine's desktop title anchor is y=height-182. A taller Pocket
+            // menu must opt out or its rows/footer extend below the screen.
+            width = ContextGetWidth();
+            height = ContextGetHeight();
+            windowPos = {0, 0};
         }
 
         void onMouseUp(WidgetIndex widgetIndex) override
@@ -313,20 +321,29 @@ namespace OpenRCT2::Ui::Windows
         {
             if (Handheld::IsEnabled())
             {
-                Handheld::DrawPanelHeading(rt, *this, "OPENRCT2 POCKET");
+                // Preserve the native animated title park and OpenRCT2 branding.
+                const ScreenCoordsXY logo{(width - 232) / 2, 8};
+                GfxDrawSprite(rt, ImageId(SPR_G2_LOGO), logo);
+                GfxDrawSprite(rt, ImageId(SPR_G2_TITLE), logo + ScreenCoordsXY{104, 18});
+                const ScreenCoordsXY p{(width - 320) / 2, 148};
+                const int count = widgets[WIDX_MULTIPLAYER].isVisible() ? 4 : 3;
+                Handheld::DrawSurface(rt, p, {320, 68 + count * 34});
+                Handheld::DrawSectionLabel(rt, p + ScreenCoordsXY{12, 14}, 296, "OPENRCT2 POCKET");
                 static constexpr const char* labels[] = { "New park", "Load saved park", "Multiplayer", "Game tools" };
+                static constexpr Handheld::PanelIcon icons[] = { Handheld::PanelIcon::terrain, Handheld::PanelIcon::folder,
+                    Handheld::PanelIcon::play, Handheld::PanelIcon::save };
                 int32_t row = 0;
                 for (auto index : { WIDX_START_NEW_GAME, WIDX_CONTINUE_SAVED_GAME, WIDX_MULTIPLAYER, WIDX_GAME_TOOLS })
                 {
                     if (widgets[index].isVisible())
                     {
-                        Handheld::DrawPanelRow(
-                            rt, *this, windowPos.y + 54 + row * Handheld::kPanelRowPitch, labels[index],
-                            _handheldSelection == index);
+                        Handheld::DrawActionRow(rt, p + ScreenCoordsXY{12, 49 + row * 34}, {296, 32},
+                            labels[index], {}, _handheldSelection == index, true, icons[index]);
                         ++row;
                     }
                 }
-                Handheld::DrawPanelCommands(rt, *this, "Exit");
+                Handheld::DrawFooter(rt, {ContextGetWidth(), ContextGetHeight()},
+                    {{"D-pad", "Navigate"}, {"A", "Select"}, {"B", "Exit"}});
                 return;
             }
             Rectangle::filter(rt, _filterRect, FilterPaletteID::palette51);

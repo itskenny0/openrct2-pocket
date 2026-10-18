@@ -1,0 +1,15 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+Building object index (2504 items)
+Finished building object index in 0.11 seconds.
+Building track design index (0 items)
+Finished building track design index in 0.00 seconds.
+Building scenario index (0 items)
+Finished building scenario index in 0.00 seconds.
+ERROR[/workspace/scratch/3dd26b9bb351/repo/src/openrct2/object/ObjectFactory.cpp:315 (CreateObjectFromLegacyFile)]: Error: Unable to open 'ObjData/WBRG.POB' when processing object ObjData/WBRG.POB
+[rct2.scenery_wall.wbrg] Warning (3): Unable to open 'WBRG.DAT'
+ERROR[/workspace/scratch/3dd26b9bb351/repo/src/openrct2/object/ObjectFactory.cpp:315 (CreateObjectFromLegacyFile)]: Error: Unable to open 'ObjData/CORROOF.POB' when processing object ObjData/CORROOF.POB
+[rct2.scenery_small.corroof] Warning (3): Unable to open 'CORROOF.DAT'
+INFO: Handheld controller: Virtual Controller (instance 0)
+PASS scenery direct rotation/colours/modes/scatter; catalog/More return; no Adjust placement or viewport pan
+PASS terrain brush/material/edge/operation controls; cancel; native wall and area action exact costs

@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/scratch/3dd26b9bb351/repo/packaging/handheld/nextui/verify-package.py", line 24, in <module>
+    assert any(n.startswith(prefix+'game/data/'+folder) for n in names),'Missing resources '+folder
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Missing resources sequence/

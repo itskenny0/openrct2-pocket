@@ -219,6 +219,7 @@ namespace OpenRCT2::Ui::Handheld
         DrawModernText(rt, { pos.x + width + 5, pos.y }, std::string(name == "A" ? "{WHITE}" : "{MUTED}") + label);
     }
     inline void DrawFooter(Drawing::RenderTarget&, ScreenSize, const std::vector<ControlHint>&);
+    inline void DrawFooterAt(Drawing::RenderTarget&, ScreenCoordsXY, ScreenSize, const std::vector<ControlHint>&);
     // Word wrapping preserves the color on every line and never splits UTF-8.
     inline void DrawWrappedLabel(Drawing::RenderTarget& rt, ScreenCoordsXY p, int width, std::string text, int lines = 2)
     {
@@ -258,10 +259,10 @@ namespace OpenRCT2::Ui::Handheld
         bool selected = false, const std::string& valueInk = "{WHITE}")
     {
         Fill(rt, p, size, selected ? Theme::gold : Theme::raised);
-        DrawModernEllipsised(rt, p + ScreenCoordsXY{8, 9}, size.width - 16,
+        DrawModernEllipsised(rt, p + ScreenCoordsXY{8, size.height < 34 ? 5 : 9}, size.width - 16,
             std::string(selected ? "{BLACK}" : "{MUTED}") + label);
         DrawStrongText(
-            rt, p + ScreenCoordsXY{ 8, size.height >= 40 ? 27 : 23 }, std::string(selected ? "{BLACK}" : valueInk) + value,
+            rt, p + ScreenCoordsXY{ 8, size.height >= 40 ? 27 : size.height < 34 ? size.height - 12 : 23 }, std::string(selected ? "{BLACK}" : valueInk) + value,
             size.width - 16);
     }
 
@@ -305,7 +306,8 @@ namespace OpenRCT2::Ui::Handheld
         const auto pos = window.windowPos + ScreenCoordsXY{ 1, window.height - 29 };
         Fill(rt, pos, { window.width - 2, 28 }, Theme::raised);
         Fill(rt, pos, { window.width - 2, 1 }, Theme::edge);
-        DrawFooter(rt, { rt.width, rt.height }, { { "D-pad", "Choose" }, { "A", "Select" }, { "B", backLabel } });
+        DrawFooterAt(rt, window.windowPos, {window.width, window.height},
+            {{"D-pad", "Choose"}, {"A", "Select"}, {"B", backLabel}});
     }
 
     inline void DrawTabs(
@@ -589,6 +591,16 @@ namespace OpenRCT2::Ui::Handheld
         Concept::Rule(rt, { 0, screen.height - height }, screen.width);
         for (const auto& p : MeasureFooter(screen, hints))
             DrawCommand(rt, { p.x, p.y }, 0, p.hint.key.c_str(), p.hint.label.c_str());
+    }
+    inline void DrawFooterAt(
+        Drawing::RenderTarget& rt, ScreenCoordsXY origin, ScreenSize size, const std::vector<ControlHint>& hints)
+    {
+        LastControlHints = hints;
+        const int height = FooterHeight(size, hints);
+        Fill(rt, origin + ScreenCoordsXY{0, size.height - height}, {size.width, height}, Theme::ink);
+        Concept::Rule(rt, origin + ScreenCoordsXY{0, size.height - height}, size.width);
+        for (const auto& p : MeasureFooter(size, hints))
+            DrawCommand(rt, origin + ScreenCoordsXY{p.x, p.y}, 0, p.hint.key.c_str(), p.hint.label.c_str());
     }
     inline void DrawModeBadge(Drawing::RenderTarget& rt, ScreenCoordsXY p, const std::string& label)
     {

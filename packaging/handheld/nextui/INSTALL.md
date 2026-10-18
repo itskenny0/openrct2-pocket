@@ -1,6 +1,11 @@
 # OpenRCT2 Pocket: NextUI Brick release candidate
 
-1. Extract the ZIP onto the SD card root. The result must be:
+1. For an update, rename the existing package's `game` folder to an unused
+   backup name such as `game-before-rc2`. Then copy the new ZIP's `game` folder
+   into the package. Copy the new `launch.sh`, instructions and metadata too.
+   Keep the package's existing `RCT2` folder and the SD card's `.userdata` folder.
+   Use a fresh `game` folder, rather than merging old runtime files.
+   For a first installation, extract the ZIP onto the SD card root. The result must be:
    `Tools/tg5040/OpenRCT2 Pocket.pak/launch.sh`.
 2. Copy your original RollerCoaster Tycoon 2 `Data`, `ObjData`, and `Scenarios`
    folders into `Tools/tg5040/OpenRCT2 Pocket.pak/RCT2/`.
@@ -29,9 +34,19 @@ NextUI tg5040 controls; Bluetooth/USB enumeration and alternate firmware require
 manual checking. `OPENRCT2_BRICK_KEEP_MAPPING=1` preserves an existing supplied SDL
 mapping. `OPENRCT2_RCT2_PATH` can select another original installation directory.
 
-This is a real AArch64 native-engine testing build, not a physical-device-verified
-release. GPU/display/audio, every physical button, save/resume on your SD card,
-sleep behavior and performance still need your first Brick test. Back up saves.
+The prior RC1 plus the complete runtime replacement was reported launching and
+playing well on a Brick. This RC2 refinement has native desktop interaction and
+ARM package checks; its changed title/picker screens still need a Brick retest.
+Audio, every button, suspend/resume, SD-card save round trips and performance
+remain physical-device checks. Back up saves.
 
 The final footer is single-row. Start opens the park menu; its Controls entry
 shows the shortcuts from menu entry. See `manifest.json` for source/build identity.
+
+Title sequences belong in `game/data/sequence/` (the engine lookup path).
+`game/data/title/` was the incorrect RC1 package destination and caused the
+blank startup background. RC2 validates the default sequence's archive and parks.
+
+To check the files actually copied to the SD card on macOS or Linux, open
+Terminal in the new `game` folder and run `shasum -a 256 -c SHA256SUMS.txt`.
+Every entry should report OK. This checks the transferred files, not just the ZIP.

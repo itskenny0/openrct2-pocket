@@ -1,9 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include <iostream>
 #include <openrct2-ui/handheld/Panel.h>
+#include <openrct2-ui/handheld/ColourGrid.h>
 using namespace OpenRCT2::Ui::Handheld;
 int main()
 {
+    if (MoveColourGrid(0, 72, -1, 0) != 0 || MoveColourGrid(0, 72, 0, 1) != 8
+        || MoveColourGrid(7, 72, 1, 0) != 7 || MoveColourGrid(71, 72, 0, 1) != 71
+        || MoveColourGrid(71, 74, 0, 1) != 73 || MoveColourGrid(73, 74, 1, 0) != 73
+        || MoveColourGrid(0, 0, 0, 1) != 0) return 3;
+    for (size_t count : {1u, 72u, 74u})
+        for (size_t i=0; i<count; ++i)
+            for (auto [x,y] : {std::pair{-1,0}, {1,0}, {0,-1}, {0,1}})
+                if (MoveColourGrid(i,count,x,y)>=count) return 4;
     std::vector<std::vector<ControlHint>> cases{
         { { "D-pad", "Navigate" }, { "A", "Select" }, { "B", "Park" }, { "L1/R1", "Section" } },
         { { "D-pad", "Choose" },

@@ -30,7 +30,14 @@ The target cannot run the sprite generator during cross-compilation. Supply matc
 python3 packaging/handheld/nextui/package.py --build brick-build --sysroot "$ROOT"  --assets /absolute/assets --stage /absolute/stage  --strip "$BRICK_SDK/compiler/aarch64-linux-gnu/bin/aarch64-linux-gnu-strip"
 ```
 
-Zip the stage's Tools directory preserving Unix executable modes. The package helper rejects non-AArch64 dependencies or missing generated graphics. It includes source and dependency provenance; original RCT2 assets must be supplied separately.
+Create the ZIP from the manifest (not a recursive filesystem sweep):
+
+```sh
+python3 packaging/handheld/nextui/archive-package.py --stage /absolute/stage --output OpenRCT2-Pocket-Brick-RC2.zip
+```
+
+This checks each file's bytes while archiving and excludes unlisted transfer/staging
+temporary files. Archive verification also rejects unlisted or duplicate entries. The package helper rejects non-AArch64 dependencies or missing generated graphics. It includes source and dependency provenance; original RCT2 assets must be supplied separately.
 
 ## Runtime checks and limits
 

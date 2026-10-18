@@ -498,4 +498,49 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 - Verification: Clean AArch64 configure/build, ELF architecture inspection and QEMU GUI/CLI version checks pass. Package CRC/modes/hashes/runtime closure have their own verification script.
 - Physical status: Device graphics, controls, audio, sleep and SD-card saves remain unverified; this build fix does not close device QA.
 
-Inventory: **45 entries**; 2 Confirmed, 18 Unverified, 25 Fixed, 0 Deferred.
+## FP-F1 — Title resource lookup
+
+- Description: Home background remained blank because the release installed title parks in data/title instead of the engine's data/sequence directory.
+- Severity: Major
+- Status: Fixed
+- Implementation: package.py uses sequence; verify-package.py checks the actual path and validates the default park sequence ZIP, script and included parks.
+- Verification: FirstParkFlowTests fails with zero installed sequences against RC1 layout, then plays the real animated title park after correcting the directory. Native 01-title.png reviewed at 512x384.
+- Evidence: FIRST-PLAY-REFINEMENTS.md; captures/first-play-refinements/; evidence/first-play-refinements/.
+
+## FP-F2 — Title layout and dirty redraw
+
+- Description: Desktop resize positioning pushed the taller Pocket menu below the display; footer drawing depended on clipped render-target dimensions.
+- Severity: Major
+- Status: Fixed
+- Implementation: Title resize callback owns Pocket bounds; shared embedded footer uses explicit window origin/size. Native logo/animation and slate actions have a dedicated startup footer.
+- Verification: FirstParkFlowTests checks 512x384 title bounds, title-specific controls, pixel equality between full and tiled dirty redraw, scenario entry and repeated Back.
+- Physical status: Changed title still needs a Brick retest.
+
+## FP-F3 — Appearance choices
+
+- Description: Colors exposed through numeric adjustment or a long text-only palette feel like debug settings.
+- Severity: Minor
+- Status: Fixed
+- Implementation: Shared native swatch grid, applied marker/name and selected name; D-pad spatial movement. Other discrete appearance settings use named choices. Native review/cancel/apply and stale-context validation retained.
+- Verification: FirstParkFlowTests exercises a researched Balloon Stall in Electric Fields; ShopAppearanceTests covers native apply/cancel, stale objects, held input and save/reload. Footer tests check grid edges and special-color short rows. Native captures reviewed.
+
+## FP-F4 — Shop information hierarchy and wording
+
+- Description: Shop inspection stacked small text and showed an unavailable financial sentinel as a monetary value; several screens exposed implementation terminology.
+- Severity: Minor
+- Status: Fixed
+- Implementation: Shared compact metric cards, separate product details, five action rows and Open/Closed treatment; unavailable income/profit is labelled. Player-facing appearance/style/design/load text is shorter and avoids redundant native-action terminology.
+- Verification: ShopAppearanceTests retains management/actions/accounting; FirstParkFlowTests captures all five shop actions without pagination. Native 06-shop.png and appearance/review captures checked at logical resolution.
+
+## FP-01 — First-play density follow-up
+
+- Description: The Build menu still exposes fourteen entries through eight visible rows; long selected path-surface names truncate, and flat-ride instructions repeat the footer.
+- Severity: Minor
+- Status: Confirmed
+- Source: FirstParkFlowTests native captures 04-build-menu.png, 05-paths.png and 10-flat-entrance.png; source audit.
+- Suggested solution: Preserve existing routes while grouping Build categories into shared cards; full selected surface names in Adjust; compact Build/Entrance/Exit indicator. Plan focus and Back behavior before changing menu structure.
+- Scope: Focused UI maintenance proposals in FIRST-PLAY-REFINEMENTS.md, not new gameplay features. No claim these are fixed.
+
+- Device evidence update: User reports RC1 launches and plays well after replacing the complete runtime folder. That confirms ordinary startup/gameplay on one Brick installation; audio, every button, suspend, performance and save-round-trip matrices remain unverified. The cause of the earlier invalid installed library files is unknown.
+
+Inventory: **50 entries**; 3 Confirmed, 18 Unverified, 29 Fixed, 0 Deferred.

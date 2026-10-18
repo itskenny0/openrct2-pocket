@@ -580,7 +580,7 @@ namespace OpenRCT2::Ui::Windows
                     model.rows.push_back("Inspect connections / station...");
                     if (current == Page::trackContext)
                     {
-                        model.title = "NATIVE TRACK CONTEXT";
+                        model.title = "TRACK CONNECTIONS";
                         model.stats.clear();
                         model.rows = Handheld::TrackEditing::Inspection(*_trackBlock);
                     }
@@ -597,7 +597,7 @@ namespace OpenRCT2::Ui::Windows
                             if (_trackBlock->type == TrackElemType::beginStation || _trackBlock->type == TrackElemType::middleStation
                                 || _trackBlock->type == TrackElemType::endStation)
                             {
-                                model.bodyLines.push_back("Native stations may split / renumber.");
+                                model.bodyLines.push_back("Station sections may be renumbered.");
                                 model.bodyLines.push_back(Handheld::TrackEditing::AccessRemovalLabel(*_trackBlock));
                                 model.bodyLines.push_back("Rebuild deleted entrances/exits explicitly.");
                             }
@@ -607,12 +607,12 @@ namespace OpenRCT2::Ui::Windows
                         {
                             model.stats.clear();
                             model.bodyLines = { "Remove: " + Handheld::TrackEditing::Label(*_trackBlock),
-                                "Native stations may split / renumber.", Handheld::TrackEditing::AccessRemovalLabel(*_trackBlock), "Rebuild deleted entrances/exits explicitly." };
+                                "Station sections may be renumbered.", Handheld::TrackEditing::AccessRemovalLabel(*_trackBlock), "Rebuild deleted entrances/exits explicitly." };
                         }
                         model.rows = { "Cancel", "Confirm" };
                         model.status = current != Page::trackSpeedConfirm && _trackCost < 0
-                            ? "Native refund " + Handheld::FormatMoney(-_trackCost)
-                            : "Native cost " + Handheld::FormatMoney(_trackCost);
+                            ? "Refund " + Handheld::FormatMoney(-_trackCost)
+                            : "Cost " + Handheld::FormatMoney(_trackCost);
                     }
                 }
                 else
@@ -628,12 +628,12 @@ namespace OpenRCT2::Ui::Windows
                 model.breadcrumb = "Rides / Save / Scenery";
                 model.title = "DESIGN SCENERY";
                 model.stats.emplace_back("Selected", std::to_string(Handheld::DesignAuthoring::SceneryCount()));
-                model.rows = { "Name / export...", "Select native nearby", "No scenery" };
+                model.rows = { "Name / export...", "Select nearby scenery", "No scenery" };
                 for (size_t i = 0; i < Handheld::DesignAuthoring::sceneryBaseline.size(); ++i)
                     model.rows.push_back(Handheld::DesignAuthoring::SceneryLabel(i));
                 model.selected = selected;
                 model.primaryAction = selected >= 3 ? "Toggle" : "Choose";
-                model.status = _status.empty() ? "Native nearby selection; A toggles" : _status;
+                model.status = _status.empty() ? "Choose scenery to include in the design" : _status;
                 return model;
             }
             if (current == Page::designExport)
@@ -646,7 +646,7 @@ namespace OpenRCT2::Ui::Windows
                 model.rows = { "Cancel", "Export design" };
                 model.confirmation = true;
                 model.selected = selected;
-                model.status = _status.empty() ? "Native tested / rated design" : _status;
+                model.status = _status.empty() ? "Includes tested ride ratings" : _status;
                 model.primaryAction = "Choose";
                 return model;
             }
@@ -682,7 +682,7 @@ namespace OpenRCT2::Ui::Windows
                     model.title = Handheld::RideAccess::PointLabel(point);
                     model.bodyLines = {"Tile " + std::to_string(point.source.x / 32) + "," + std::to_string(point.source.y / 32),
                         "Height Z " + std::to_string(point.source.z) + " / direction " + std::to_string(point.source.direction),
-                        "Native edit updates queues / paths.", "Maze hedges follow native access rules."};
+                        "Connected paths and queues will update.", "Maze openings follow the entrance position."};
                     model.rows = Handheld::RideAccess::Current(point)
                         ? std::vector<std::string>{"Move access...", "Remove access...", "Back to access list"}
                         : std::vector<std::string>{"Back to access list"};
@@ -899,14 +899,14 @@ namespace OpenRCT2::Ui::Windows
     public:
         Handheld::ManagementPresentation shopAppearancePresentation() const {
             using namespace Handheld;
-            ManagementPresentation model;model.breadcrumb="Shops / Native appearance";
+            ManagementPresentation model;model.breadcrumb="Shops / Appearance";
             const auto* ride=_shop?ShopManagement::Find(*_shop):nullptr;
             model.title=ride?ride->getName():"Shop unavailable";model.selected=_focus.index();
             model.rows=rows();model.status=_status;
             if(_page==Page::shopAppearance) {
                 if(ride) {const auto* object=GetContext()->GetObjectManager().GetLoadedObject<RideObject>(ride->subtype);
-                    model.bodyLines={object?object->GetName():"Object unavailable","Native supported building / item controls"};}
-                if(!_shop || ShopAppearance::Settings(*_shop).empty())model.status="No native appearance controls for this object";
+                    model.bodyLines={object?object->GetName():"Object unavailable"};}
+                if(!_shop || ShopAppearance::Settings(*_shop).empty())model.status="This building has no colour options";
             } else if(_shopAppearanceDraft) {
                 const auto& d=*_shopAppearanceDraft;
                 model.stats={{"Channel",d.setting.name},{"Current",ShopAppearance::Label(d.setting,d.setting.current)}};
@@ -914,11 +914,15 @@ namespace OpenRCT2::Ui::Windows
                     model.confirmation=true;model.title="Apply shop appearance?";
                     model.stats.push_back({"Proposed",ShopAppearance::Label(d.setting,d.value)});
                     const auto quote=ShopAppearance::Action(d,false);
-                    model.stats.push_back({"Native cost",quote.error==GameActions::Status::ok?Handheld::FormatMoney(quote.cost):"Unavailable"});
-                    model.bodyLines={"Native appearance action / exact reviewed object"};
-                } else model.bodyLines={"A: review chosen value / B: cancel"};
+                    model.stats.push_back({"Cost",quote.error==GameActions::Status::ok?Handheld::FormatMoney(quote.cost):"Unavailable"});
+                    model.bodyLines={"Changes only the selected building."};
+                } else if (RideManagement::IsColourSetting(d.setting)) {
+                    model.colourValues = d.setting.values;
+                    model.currentColour = d.setting.current;
+                    model.title = d.setting.name;
+                }
             }
-            if(_shopAppearanceBusy)model.status="Applying native change...";
+            if(_shopAppearanceBusy)model.status="Applying colour...";
             return model;
         }
     private:
@@ -1293,6 +1297,13 @@ namespace OpenRCT2::Ui::Windows
             if (next != Page::financeEditor && next != Page::financeConfirm)
                 _financeDraft.reset();
             _focus = {};
+            if (next == Page::ridesPrice && _ridesDraft && _ridesDraft->setting
+                && _ridesDraft->setting->appearance)
+            {
+                const auto& values = _ridesDraft->setting->values;
+                const auto selected = std::find(values.begin(), values.end(), _ridesDraft->value);
+                if (selected != values.end()) _focus.move(static_cast<int>(selected - values.begin()), values.size());
+            }
             if(next==Page::finances)_focus.move(static_cast<int>(std::min(_financeTabs.rows[_financeTabs.tab],rows().size()-1)),rows().size());
             if(next==Page::research)_focus.move(static_cast<int>(std::min(_researchTabs.rows[_researchTabs.tab],rows().size()-1)),rows().size());
             if(next==Page::marketing)_focus.move(static_cast<int>(std::min(_marketingTabs.rows[_marketingTabs.tab],rows().size()-1)),rows().size());
@@ -1458,7 +1469,7 @@ namespace OpenRCT2::Ui::Windows
                 }
                 case Page::shopAppearanceEditor:
                     return _shopAppearanceDraft?_shopAppearanceDraft->setting.labels:std::vector<std::string>{"Shop unavailable"};
-                case Page::shopAppearanceReview:return {"Cancel","Apply native change"};
+                case Page::shopAppearanceReview:return {"Cancel","Apply change"};
                 case Page::shopPrices:
                 {
                     std::vector<std::string> result;
@@ -1527,7 +1538,7 @@ namespace OpenRCT2::Ui::Windows
                     return { "Apply text", "Cancel" };
                 case Page::sceneryClearOptions: return Handheld::SceneryClear::Options();
                 case Page::terrainPaintConfirm: return {"Apply paint","Cancel"};
-                case Page::sceneryClearConfirm: return {"Clear native area", "Cancel"};
+                case Page::sceneryClearConfirm: return {"Clear area", "Cancel"};
                 case Page::sceneryGroups:
                 {
                     std::vector<std::string> list;
@@ -1547,7 +1558,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::sceneryStyleEditor:
                     return {_signStyle ? Handheld::SceneryTools::StyleValue(*_signStyle) : "Sign unavailable", "Review change", "Cancel"};
                 case Page::sceneryStyleConfirm:
-                    return {"Apply native style", "Cancel"};
+                    return {"Apply style", "Cancel"};
                 case Page::sceneryOptions:
                     return Handheld::SceneryTools::Options();
                 case Page::sceneryPicker:
@@ -1589,7 +1600,7 @@ namespace OpenRCT2::Ui::Windows
                     result.push_back("Back to options");return result;
                 }
                 case Page::designInspect: {
-                    std::vector<std::string> result{ fileDesignEligible() ? "Place this design" : "Placement unavailable", "Back to files", "Choose native vehicle" };
+                    std::vector<std::string> result{ fileDesignEligible() ? "Place this design" : "Placement unavailable", "Back to files", "Choose vehicle" };
                     if (_designMetadata) { auto lines=Handheld::DesignAvailability::Lines(*_designMetadata);result.insert(result.end(),lines.begin(),lines.end()); }
                     return result;
                 }
@@ -1685,7 +1696,7 @@ namespace OpenRCT2::Ui::Windows
                 page(Page::parkFiles);
             }
             else page(Page::load);
-            _status = "Native load failed. Choose another file or Back.";
+            _status = "Could not load park. Choose another file or Back.";
             invalidate();
         }
         size_t dashboardSectionIndex() const
@@ -2425,6 +2436,17 @@ namespace OpenRCT2::Ui::Windows
             }
             else if (_page == Page::ridesPrice)
             {
+                if (_ridesDraft && _ridesDraft->setting && _ridesDraft->setting->appearance)
+                {
+                    const auto next = Handheld::RideManagement::IsColourSetting(*_ridesDraft->setting)
+                        ? Handheld::MoveColourGrid(_focus.index(), rows().size(), x, y)
+                        : static_cast<size_t>(std::clamp<int>(static_cast<int>(_focus.index()) + (y ? y : x), 0, rows().size() - 1));
+                    _focus.move(static_cast<int>(next) - static_cast<int>(_focus.index()), rows().size());
+                    _ridesDraft->value = _ridesDraft->setting->values[next];
+                    _status.clear();
+                    invalidate();
+                    return;
+                }
                 if (y)
                     move(y);
                 if (x && _ridesDraft)
@@ -2635,6 +2657,14 @@ namespace OpenRCT2::Ui::Windows
         {
             if (!shopManagement())
                 return;
+            if (_page == Page::shopAppearanceEditor && _shopAppearanceDraft
+                && Handheld::RideManagement::IsColourSetting(_shopAppearanceDraft->setting))
+            {
+                const auto next = Handheld::MoveColourGrid(_focus.index(), rows().size(), x, y);
+                _focus.move(static_cast<int>(next) - static_cast<int>(_focus.index()), rows().size());
+                invalidate();
+                return;
+            }
             if (y != 0)
             {
                 move(y);
@@ -4758,7 +4788,15 @@ namespace OpenRCT2::Ui::Windows
                         page(Page::ridesRoster);
                         break;
                     }
-                    if (choice < 2)
+                    if (_ridesDraft->setting && _ridesDraft->setting->appearance)
+                    {
+                        if (choice < _ridesDraft->setting->values.size())
+                        {
+                            _ridesDraft->value = _ridesDraft->setting->values[choice];
+                            page(Page::ridesConfirm);
+                        }
+                    }
+                    else if (choice < 2)
                     {
                         Handheld::RideManagement::AdjustPrice(*_ridesDraft, choice == 0 ? -1 : 1);
                         _status.clear();
@@ -5308,7 +5346,7 @@ namespace OpenRCT2::Ui::Windows
                                 if(lifetime.expired() || flags.has(WindowFlag::dead) || request!=_shopAppearanceRequest || _page!=Page::shopAppearanceReview)return;
                                 _shopAppearanceBusy=false;
                                 if(outcome->error==GameActions::Status::ok) {
-                                    page(Page::shopAppearance);_focus.move(static_cast<int>(_shopAppearanceChannel),rows().size());_status="Native appearance applied";
+                                    page(Page::shopAppearance);_focus.move(static_cast<int>(_shopAppearanceChannel),rows().size());_status="Appearance updated";
                                 } else _status=outcome->getErrorMessage();invalidate();
                             });
                         if(result.error!=GameActions::Status::ok){_shopAppearanceBusy=false;_status=result.getErrorMessage();}
@@ -5509,15 +5547,15 @@ namespace OpenRCT2::Ui::Windows
                             _loadFile = Handheld::FileBrowsing::Capture(entry.path);
                             if (!_loadFile) { _status="File unavailable. Refresh the folder."; invalidate(); }
                             else {
-                                _parkFilePreview.reset(); _parkPreviewStatus="Native preview unavailable for this format";
+                                _parkFilePreview.reset(); _parkPreviewStatus="Preview unavailable for this format";
                                 if(ParkImporter::ExtensionIsOpenRCT2ParkFile(_loadFile->path.extension().u8string())) {
                                     try {
                                         auto importer=ParkImporter::CreateParkFile(GetContext()->GetObjectRepository());
                                         auto stream=FileStream(_loadFile->path.u8string(),FileMode::open);
                                         importer->LoadFromStream(&stream,false,true,_loadFile->path.u8string());
                                         _parkFilePreview=importer->GetParkPreview();
-                                        _parkPreviewStatus=_parkFilePreview->parkName.empty() ? "Native preview has no stored summary" : "";
-                                    } catch(const std::exception&) { _parkPreviewStatus="Native preview unavailable; importer decides on Load"; }
+                                        _parkPreviewStatus=_parkFilePreview->parkName.empty() ? "This file has no park summary" : "";
+                                    } catch(const std::exception&) { _parkPreviewStatus="Preview unavailable; try loading the park"; }
                                 }
                                 page(Page::parkInspect);
                             }
@@ -5599,18 +5637,18 @@ namespace OpenRCT2::Ui::Windows
             }
             if (_page==Page::designVehicles || _page==Page::designWarnings || _page==Page::designConfirm) {
                 Handheld::ManagementPresentation model;
-                model.breadcrumb="Designs / Native choices";
-                model.title=_page==Page::designVehicles?"Choose native vehicle":_page==Page::designWarnings?"Availability and warnings":"Place saved design?";
+                model.breadcrumb="Designs / Options";
+                model.title=_page==Page::designVehicles?"Choose vehicle":_page==Page::designWarnings?"Availability and warnings":"Place saved design?";
                 model.rows=rows();model.selected=_focus.index();
                 if (_page==Page::designConfirm) {
                     model.confirmation=true;
                     model.bodyLines=Handheld::Designs::WarningLines();
-                    model.stats={{"Native cost",Handheld::FormatMoney(Handheld::Designs::ReviewCost())}};
+                    model.stats={{"Cost",Handheld::FormatMoney(Handheld::Designs::ReviewCost())}};
                     if (auto p=Handheld::Designs::ReviewLocation()) model.stats.push_back({"Origin / direction",std::to_string(p->x)+","+std::to_string(p->y)+","+std::to_string(p->z)+" / "+std::to_string(p->direction)});
                 } else {
                     const auto labels=rows();const auto text=_focus.index()<labels.size()?labels[_focus.index()]:std::string{};
                     model.bodyLines={Handheld::FileBrowsing::Detail(text,_designDetail),"Left/Right: full selected detail"};
-                    if (_page==Page::designVehicles && _designVehicles.empty()) model.status="No native compatible researched vehicles loaded";
+                    if (_page==Page::designVehicles && _designVehicles.empty()) model.status="No compatible researched vehicles available";
                 }
                 if (!_status.empty()) model.status=_status;
                 Handheld::DrawManagementContent(rt,{8,8},{496,348},model);
@@ -5622,7 +5660,7 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::ManagementPresentation model;
                 model.rows=rows(); model.selected=_focus.index();
                 if(_page==Page::parkInspect) {
-                    model.breadcrumb="Load / Native file information";
+                    model.breadcrumb="Load / Park information";
                     model.title=_loadFile ? _loadFile->path.filename().u8string() : "File unavailable";
                     if(_parkFilePreview && !_parkFilePreview->parkName.empty()) {
                         const auto& p=*_parkFilePreview;
@@ -5631,7 +5669,7 @@ namespace OpenRCT2::Ui::Windows
                     }
                     model.status=_status.empty() ? _parkPreviewStatus : _status;
                 } else {
-                    model.breadcrumb="Designs / Native file information";
+                    model.breadcrumb="Designs / Design information";
                     model.title=_designFile ? _designFile->path.filename().u8string() : "File unavailable";
                     if(_designMetadata) {
                         const auto& d=*_designMetadata;
@@ -5644,8 +5682,8 @@ namespace OpenRCT2::Ui::Windows
                         model.stats.clear();
                         const auto labels=rows(); const auto text=_focus.index()<labels.size()?labels[_focus.index()]:std::string{};
                         model.bodyLines={Handheld::FileBrowsing::Detail(text,_designDetail), "Left/Right: full selected detail"};
-                    } else model.bodyLines={"Native preview / availability below", "", "", ""};
-                    model.status=_status.empty() ? (fileDesignEligible() ? (_designChoice?"Selected vehicle: "+_designChoice->ToString():"Native original vehicle") : _designMetadata?Handheld::Designs::UnavailableReason(*_designMetadata):_designFileStatus) : _status;
+                    } else model.bodyLines={"Design details", "", "", ""};
+                    model.status=_status.empty() ? (fileDesignEligible() ? (_designChoice?"Selected vehicle: "+_designChoice->ToString():"Original vehicle") : _designMetadata?Handheld::Designs::UnavailableReason(*_designMetadata):_designFileStatus) : _status;
                     if(_designFile && !Handheld::FileBrowsing::Current(*_designFile)) model.status="File changed. Back and select again.";
                 }
                 Handheld::DrawManagementContent(rt,{8,8},{496,348},model);
@@ -5797,7 +5835,7 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::DrawActionStrip(rt,{ContextGetWidth(),ContextGetHeight()});
                 Handheld::DrawFooter(
                     rt, { ContextGetWidth(), ContextGetHeight() },
-                    { { "D-pad", "Choose" }, { "A", "Select / review" }, { "B", "Back" } });
+                    { { "D-pad", "Choose" }, { "A", _page == Page::shopAppearanceEditor ? "Review" : "Select" }, { "B", "Back" } });
                 return;
             }
             if (shopManagement())
@@ -5874,7 +5912,7 @@ namespace OpenRCT2::Ui::Windows
                 model.title = _signStyle ? Handheld::SceneryTools::StyleValue(*_signStyle) : "Sign unavailable";
                 model.rows = rows(); model.selected = _focus.index();
                 model.confirmation = _page == Page::sceneryStyleConfirm;
-                model.status = _status.empty() ? "Native style / no construction charge" : _status;
+                model.status = _status.empty() ? "No charge to change this style" : _status;
                 Handheld::DrawManagementPanel(rt, {ContextGetWidth(), ContextGetHeight()}, model);
                 return;
             }
@@ -5887,7 +5925,7 @@ namespace OpenRCT2::Ui::Windows
                 model.selected = _focus.index();
                 model.columns = _page == Page::sceneryName ? Handheld::TextEntry::columns : 1;
                 model.confirmation = _page == Page::sceneryConfirm;
-                model.status = _status.empty() ? "32 characters / native sign action" : _status;
+                model.status = _status.empty() ? "Up to 32 characters" : _status;
                 Handheld::DrawManagementContent(
                     rt, Handheld::Concept::kMenuOrigin,
                     { 324, Handheld::Layout::ContentHeight({ ContextGetWidth(), ContextGetHeight() }) }, model);

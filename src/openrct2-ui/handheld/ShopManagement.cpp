@@ -2,6 +2,7 @@
 #include "ShopManagement.h"
 
 #include "Currency.h"
+#include "ManagementPanel.h"
 
 #include <openrct2-ui/UiStringIds.h>
 #include <openrct2/GameState.h>
@@ -121,6 +122,39 @@ namespace OpenRCT2::Ui::Handheld::ShopManagement
         const auto* ride = target ? Find(*target) : nullptr;
         const auto prices = target ? Prices(*target) : std::vector<Price>{};
         const bool noMoney = getGameState().park.flags.has(ParkFlag::noMoney);
+        if (ride && view == View::inspection)
+        {
+            ManagementPresentation model;
+            model.breadcrumb = "Shops / Facilities";
+            model.title = ride->getName();
+            auto status = Formatter();
+            ride->formatStatusTo(status);
+            model.headerStatus = FormatStringIDLegacy(STR_STRINGID, status.Data());
+            model.headerInk = ride->status == RideStatus::open ? "{POSITIVE}" : "{WHITE}";
+            auto earnings = [noMoney](money64 value) {
+                return noMoney ? std::string("Not applicable") : value == kMoney64Undefined ? std::string("Unavailable") : Money(value);
+            };
+            model.stats = {{"Customers", std::to_string(ride->totalCustomers)},
+                           {"Customers / hr", std::to_string(RideCustomersPerHour(*ride))},
+                           {"Income / hr", earnings(ride->incomePerHour)}, {"Profit / hr", earnings(ride->profit)}};
+            model.summaryMetrics = true;
+            model.metricColumns = 2;
+            model.metricHeight = 34;
+            model.rowHeight = 26;
+            for (const auto& price : prices)
+            {
+                const auto sold = price.primary ? ride->numPrimaryItemsSold : ride->numSecondaryItemsSold;
+                model.bodyLines.push_back(price.name + "  " + (noMoney ? "Free" : Money(price.value))
+                    + (price.item == ShopItem::admission ? "" : " / " + std::to_string(sold) + " sold"));
+            }
+            model.rows = {ride->status == RideStatus::open ? "Close shop" : "Open shop", "Prices...", "Demolish...", "Rename...", "Appearance..."};
+            model.rowEnabled = {true, !noMoney && !prices.empty(), true, true, true};
+            model.selected = focus;
+            model.status = feedback;
+            DrawManagementContent(rt, p, {320, Layout::ContentHeight(screen)}, model);
+            DrawFooter(rt, screen, {{"D-pad", "Choose"}, {"A", "Select"}, {"B", "Back"}});
+            return;
+        }
         Box(rt, p, { width, view == View::inspection ? 348 : 252 });
         auto text = [&](int y, const std::string& s, bool strong = false) {
             if (strong)
@@ -136,33 +170,7 @@ namespace OpenRCT2::Ui::Handheld::ShopManagement
         text(12, "{MUTED}Shops / Facilities");
         text(32, "{WHITE}" + (ride ? ride->getName() : "Shop unavailable"), true);
         Rule(rt, p + ScreenCoordsXY{ 10, 54 }, width - 20);
-        if (ride && view == View::inspection)
-        {
-            auto status = Formatter();
-            ride->formatStatusTo(status);
-            text(64, "{WHITE}" + FormatStringIDLegacy(STR_STRINGID, status.Data()), true);
-            text(87, "{MUTED}Customers  " + std::to_string(ride->totalCustomers));
-            text(105, "{MUTED}Customers / hr  " + std::to_string(RideCustomersPerHour(*ride)));
-            text(123, "{MUTED}Income / hr  " + Money(ride->incomePerHour));
-            text(141, "{MUTED}Profit / hr  " + Money(ride->profit));
-            for (size_t i = 0; i < prices.size(); ++i)
-            {
-                const auto& price = prices[i];
-                const auto sold = price.primary ? ride->numPrimaryItemsSold : ride->numSecondaryItemsSold;
-                text(
-                    164 + i * 18,
-                    "{WHITE}" + price.name + "  " + (noMoney ? "Free" : Money(price.value))
-                        + (price.item == ShopItem::admission ? "" : " / " + std::to_string(sold) + " sold"));
-            }
-            if (prices.empty())
-                text(164, "{MUTED}No products or admission price");
-            row(198, ride->status == RideStatus::open ? "Close" : "Open", focus == 0);
-            row(222, noMoney ? "No-money park" : prices.empty() ? "Prices unavailable" : "Prices...", focus == 1);
-            row(246, "Demolish...", focus == 2);
-            row(270, "Rename...", focus == 3);
-            row(294, "Appearance...", focus == 4);
-        }
-        else if (ride && view == View::prices)
+        if (ride && view == View::prices)
         {
             text(66, "{MUTED}Product / admission prices");
             for (size_t i = 0; i < prices.size(); ++i)

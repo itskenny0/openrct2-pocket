@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 """Check a ready-to-transfer NextUI ZIP without running device graphics."""
-import argparse, hashlib, json, re, subprocess, tempfile, zipfile
+import argparse, hashlib, io, json, re, struct, subprocess, tempfile, zipfile
 from pathlib import Path
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('archive',type=Path)
@@ -18,10 +18,19 @@ with zipfile.ZipFile(a.archive) as z:
  for n in ['launch.sh','game/openrct2','game/openrct2-cli','game/input-map','game/lib/ld-linux-aarch64.so.1']:
   assert (z.getinfo(prefix+n).external_attr>>16)&0o111,'Not executable: '+n
  manifest=json.loads(z.read(prefix+'manifest.json'))
+ assert names=={prefix+n for n in manifest['files']}|{prefix+'manifest.json'},'Archive contains unlisted or missing files'
+ assert len(z.namelist())==len(names),'Duplicate archive entries'
  for n,digest in manifest['files'].items():assert hashlib.sha256(z.read(prefix+n)).hexdigest()==digest,'Hash mismatch '+n
  assert manifest['logical_resolution']==[512,384] and manifest['physical_resolution']==[1024,768]
- for folder in ['language/','object/','title/']:
+ for folder in ['language/','object/','sequence/']:
   assert any(n.startswith(prefix+'game/data/'+folder) for n in names),'Missing resources '+folder
+ # Check the engine's actual resource lookup directory and the default sequence contents.
+ title=prefix+'game/data/sequence/openrct2.parkseq'
+ assert title in names,'Missing default title sequence at engine lookup path'
+ with zipfile.ZipFile(io.BytesIO(z.read(title))) as sequence:
+  assert sequence.testzip() is None,'Corrupt default title sequence'
+  assert sequence.read('script.txt').strip(),'Empty title sequence script'
+  assert any(n.endswith(('.park','.sv6','.sc6')) for n in sequence.namelist()),'Title sequence has no park'
  config=z.read(prefix+'config.ini').decode();assert 'window_scale = 2.0' in config and 'window_width = 1024' in config
  launcher=z.read(prefix+'launch.sh').decode();assert '.userdata/tg5040/openrct2-pocket' in launcher and '--openrct2-data-path="$GAME_DIR/data"' in launcher
  with tempfile.TemporaryDirectory(prefix='pocket-package-check-') as d:
@@ -29,6 +38,14 @@ with zipfile.ZipFile(a.archive) as z:
   for f in [game/'openrct2',game/'openrct2-cli',game/'input-map',*lib.iterdir()]:
    f.chmod(0o755)
    b=f.read_bytes();assert b[:4]==b'\x7fELF' and int.from_bytes(b[18:20],'little')==183,'Non-AArch64 ELF '+str(f)
+   assert b[4:6]==b'\x02\x01','Not ELF64 little-endian: '+str(f)
+   phoff=struct.unpack_from('<Q',b,32)[0];phsize,phnum=struct.unpack_from('<HH',b,54)
+   assert phoff+phsize*phnum<=len(b),'Truncated ELF headers: '+str(f)
+   for i in range(phnum):
+    offset=phoff+i*phsize
+    start=struct.unpack_from('<Q',b,offset+8)[0];size=struct.unpack_from('<Q',b,offset+32)[0]
+    assert start+size<=len(b),'Truncated ELF segment: '+str(f)
+
    needs=re.findall(r'Shared library: \[([^]]+)\]',subprocess.check_output(['readelf','-d',str(f)],text=True))
    for name in needs:assert (lib/name).is_file(),'Missing runtime dependency '+name
   if a.qemu:

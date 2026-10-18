@@ -991,7 +991,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             }
             model.rows.push_back("Back to dashboard");
             if (roster.empty())
-                model.status = "No non-shop rides in this park";
+                model.status = "No rides built yet";
             return model;
         }
         const auto* ride = target ? Resolve(*target) : nullptr;
@@ -1072,7 +1072,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                                 { "Requested vehicles", std::to_string(ride->proposedNumTrains) },
                                 { "Requested cars / train",
                                   std::to_string(std::max(0, ride->proposedNumCarsPerTrain - zero)) } };
-                model.status = "Native limits / close before changing";
+                model.status = "Close the ride before changing vehicles";
             }
             if (view == View::dispatch)
             {
@@ -1082,7 +1082,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             if (view == View::appearance)
             {
                 model.breadcrumb = "Rides / Appearance";
-                model.stats = { { "Changes", "Native colours and entrance styles" } };
+                model.stats = { { "Changes", "Colours and entrance styles" } };
             }
             if (view == View::music)
             {
@@ -1194,7 +1194,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             if (!supports)
                 model.status = "Data logging unavailable for this ride";
             else if (!measurement || !measurement->flags.has(RideMeasurementFlag::running) || measurement->num_items == 0)
-                model.status = "Waiting for a native vehicle departure";
+                model.status = "Waiting for a vehicle to depart";
             else if (graphMetric > 3 || (graphMetric >= 2 && !measurement->flags.has(RideMeasurementFlag::gForces)))
                 model.status = "G-force logging unavailable";
             else
@@ -1255,7 +1255,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.breadcrumb = "Rides / Randomize vehicle colours";
                 model.stats.emplace_back("Channels", std::to_string(draft->randomColours.size()));
                 model.stats.emplace_back("Cost", "No charge");
-                model.status = "Apply proposed random colours to current scheme";
+                model.status = "Applies the colours to this scheme";
             }
             else if (draft->renaming)
             {
@@ -1287,14 +1287,14 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                         "Effective trains / cars",
                         std::to_string(draft->effectiveVehicles[0]) + " / "
                             + std::to_string(std::max(0, draft->effectiveVehicles[1] - (entry ? entry->zero_cars : 0))));
-                    model.status = "Native limits may clamp requested counts";
+                    model.status = "Vehicle counts follow the ride limits";
                 }
                 if (queried.error == GameActions::Status::ok
                     && draft->setting->key == GameActions::RideSetSetting::minWaitingTime)
-                    model.status = "Native maximum wait increases if needed";
+                    model.status = "Maximum wait also increases if needed";
                 if (queried.error == GameActions::Status::ok
                     && draft->setting->key == GameActions::RideSetSetting::maxWaitingTime)
-                    model.status = "Native minimum wait decreases if needed";
+                    model.status = "Minimum wait also decreases if needed";
             }
             else if (draft->status)
                 model.stats.emplace_back(
@@ -1309,7 +1309,18 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             }
             if (!draft->demolition)
                 model.stats.emplace_back(
-                    "Action cost", queried.error == GameActions::Status::ok ? FormatMoney(queried.cost) : "Unavailable");
+                    "Cost", queried.error == GameActions::Status::ok ? FormatMoney(queried.cost) : "Unavailable");
+            if (view == View::price && draft->setting && draft->setting->appearance)
+            {
+                model.title = draft->setting->name;
+                if (IsColourSetting(*draft->setting)) model.colourValues = draft->setting->values;
+                model.currentColour = draft->setting->current;
+                model.rows = draft->setting->labels;
+                model.primaryAction = "Review";
+                model.editing = false;
+                model.navigationHint = "Choose";
+                return model;
+            }
             model.rows = view == View::price ? std::vector<std::string>{ "Decrease", "Increase", "Review...", "Cancel" }
                                              : std::vector<std::string>{ "Confirm", "Cancel" };
             if (queried.error != GameActions::Status::ok && feedback.empty())
