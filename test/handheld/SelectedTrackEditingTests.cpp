@@ -118,7 +118,7 @@ int main(int argc, char** argv)
         back.actions.push_back(H::Action::back);
         auto openBlock = [&] {
             W::HandheldRideOpen(ride.id);
-            FocusRideTabAction("Edit track blocks...");
+            FocusRideTabAction("Edit track...");
             H::HandleMenuInput(controller, confirm);
             H::HandleMenuInput(controller, confirm);
         };
@@ -128,7 +128,7 @@ int main(int argc, char** argv)
         Check(inspect != rows.end(), "Context control missing");
         W::HandheldMenuMove(static_cast<int>(inspect - rows.begin()));
         H::HandleMenuInput(controller, confirm);
-        Check(W::HandheldRidesPresentation().title == "NATIVE TRACK CONTEXT", "Native context page missing");
+        Check(W::HandheldRidesPresentation().title == "TRACK CONNECTIONS", "Native context page missing");
         H::HandleMenuInput(controller, back);
         H::HandleMenuInput(controller, back);
         Check(W::HandheldRidesPresentation().selected == 0 && E::Context(station) == baseline
@@ -187,7 +187,7 @@ int main(int argc, char** argv)
             if (family == 0)
             {
                 W::HandheldRideOpen(target.id);
-                FocusRideTabAction("Edit track blocks...");
+                FocusRideTabAction("Edit track...");
                 H::HandleMenuInput(controller, confirm);
                 H::HandleMenuInput(controller, confirm);
                 auto choices = W::HandheldRidesPresentation().rows;

@@ -646,7 +646,8 @@ namespace OpenRCT2::Ui::Handheld
     {
         if (GetWindowManager()->FindByClass(WindowClass::handheldMenu) != nullptr)
         {
-            if (Windows::HandheldDashboardIsOpen())
+            if (Windows::HandheldTrackSelectionMove(frame.navigateX,frame.navigateY)) {}
+            else if (Windows::HandheldDashboardIsOpen())
                 Windows::HandheldDashboardMove(frame.navigateX, frame.navigateY);
             else if (Windows::HandheldObjectPickerIsOpen())
                 Windows::HandheldObjectPickerMove(frame.navigateX, frame.navigateY);
@@ -660,7 +661,9 @@ namespace OpenRCT2::Ui::Handheld
                 Windows::HandheldMenuMove(frame.navigateY);
             for (const auto action : frame.actions)
             {
-                if (Windows::HandheldParkMapIsOpen() && action == Action::openBuild)
+                if ((action==Action::previousOption || action==Action::nextOption)
+                    && Windows::HandheldTrackSelectionMove(action==Action::previousOption ? -1 : 1,0)) {}
+                else if (Windows::HandheldParkMapIsOpen() && action == Action::openBuild)
                     Windows::HandheldParkMapSubjects();
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::contextPrimary)
                     Invoke(ShortcutId::kViewGeneralRotateClockwise);
@@ -673,6 +676,8 @@ namespace OpenRCT2::Ui::Handheld
                 else if (action == Action::contextPrimary && Windows::HandheldObjectPickerCamera())
                 { /* Accessible without a stick-click; camera preserves the construction draft. */
                 }
+                else if (action==Action::contextSecondary && Windows::HandheldObjectPickerGroup()) {}
+                else if (action==Action::contextPrimary && Windows::HandheldDashboardNews()) {}
                 else if (
                     Windows::HandheldObjectPickerIsOpen() && (action == Action::previousOption || action == Action::nextOption))
                     Windows::HandheldObjectPickerMove(0, action == Action::nextOption ? 2 : -2);
@@ -1493,6 +1498,7 @@ namespace OpenRCT2::Ui::Handheld
                             _terrainStatus.clear();
                             _scatterFeedback = false;
                         }
+                        else Windows::HandheldNewsOpen();
                         break;
                     case Action::back:
                     case Action::openMenu:
@@ -1539,6 +1545,14 @@ namespace OpenRCT2::Ui::Handheld
         using namespace Drawing;
         const auto c = Centre();
         const auto height = ContextGetHeight();
+        if(!_terrainActive && !Paths::IsActive()) {
+            const auto& recent=getGameState().park.newsItems.getRecent();
+            if(!recent.empty()) {
+                Concept::Box(rt,{8,36},{ContextGetWidth()-16,28});
+                DrawModernText(rt,{16,46},"{GOLD}Y News");
+                DrawModernEllipsised(rt,{74,46},ContextGetWidth()-90,Windows::HandheldNewsText(recent.front().text));
+            }
+        }
         const auto context = _terrainActive || Paths::IsActive() ? Layout::Context::construction : Layout::Context::park;
         if (Layout::ShowsHud(context) && rt.y < Layout::hudTop + Layout::hudHeight && rt.y + rt.height > Layout::hudTop)
             DrawHud(rt, { ContextGetWidth(), height }, NativeHud());

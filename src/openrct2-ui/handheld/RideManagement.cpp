@@ -1030,7 +1030,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             if (Mazes::CanResume(*target))
                 model.rows.push_back("Edit maze...");
             if (TrackEditing::Eligible(*target))
-                model.rows.push_back("Edit track blocks...");
+                model.rows.push_back("Edit track...");
             model.rows.push_back("Save design...");
             model.rows.push_back("Rename...");
             model.rows.push_back("Appearance...");

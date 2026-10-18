@@ -11,6 +11,7 @@
 #include "handheld/WindowVisibility.h"
 
 #include "handheld/Explorer.h"
+#include "handheld/CustomTracks.h"
 #include "handheld/FlatRides.h"
 #include "handheld/GuestManagement.h"
 #include "handheld/GuestFollow.h"
@@ -588,6 +589,7 @@ public:
             }
 
             case INTENT_ACTION_SUSPEND_SHOP_PREVIEW:
+                Handheld::CustomTracks::RemovePreviewTemporarily();
                 // Native whole-tick scope also excludes provisional access elements.
                 Handheld::Mazes::RemovePreviewTemporarily();
                 Handheld::AccessPreview::Suspend();
@@ -595,6 +597,7 @@ public:
                 Handheld::FlatRides::RemovePreviewTemporarily();
                 break;
             case INTENT_ACTION_RESUME_SHOP_PREVIEW:
+                Handheld::CustomTracks::RestorePreview();
                 Handheld::Shops::RestorePreview();
                 Handheld::FlatRides::RestorePreview();
                 Handheld::AccessPreview::Restore();

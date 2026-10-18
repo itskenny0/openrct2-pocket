@@ -648,6 +648,7 @@ namespace OpenRCT2::Ui::Handheld
                 rt, screen,
                 { { "D-pad", "Move" },
                   { "A", "Inspect" },
+                  { "Y", "News" },
                   { "B", "Back" },
                   { "SEL", "Build" },
                   { "START", "Park" },

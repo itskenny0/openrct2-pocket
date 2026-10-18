@@ -108,6 +108,25 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
             }
         return {};
     }
+    inline std::optional<Block> Next(const Block& block)
+    {
+        if (!Valid(block)) return {};
+        const auto& c=TrackMetadata::GetTrackElementDescriptor(block.type).sequenceData.sequences[0].clearance;
+        const auto xy=CoordsXY(block.origin)+CoordsXY{c.x,c.y}.rotate(block.origin.direction);
+        for(auto* e:TileElementsView<TrackElement>(xy))
+            if(!e->isGhost() && e->getRideIndex()==block.ride.id && e->getTrackType()==block.type
+                && e->getSequenceIndex()==0 && e->getDirection()==block.origin.direction && e->getBaseZ()==block.origin.z+c.z) {
+                CoordsXYE input{xy,reinterpret_cast<TileElement*>(e)}, next{};
+                int32_t z{}, direction{};
+                if(!trackBlockGetNext(&input,&next,&z,&direction) || !TrackIsConnectedByShape(input.element,next.element))return {};
+                auto* track=next.element->asTrack();
+                const auto& offset=TrackMetadata::GetTrackElementDescriptor(track->getTrackType()).sequenceData.sequences[track->getSequenceIndex()].clearance;
+                const auto origin=CoordsXYZD{CoordsXY{next.x,next.y}-CoordsXY{offset.x,offset.y}.rotate(track->getDirection()),track->getBaseZ()-offset.z,track->getDirection()};
+                for(const auto& candidate:Blocks(block.ride))
+                    if(candidate.origin==origin && candidate.type==track->getTrackType())return candidate;
+            }
+        return {};
+    }
     inline std::vector<int32_t> Context(const Block& block)
     {
         const auto* ride = RideManagement::Resolve(block.ride);

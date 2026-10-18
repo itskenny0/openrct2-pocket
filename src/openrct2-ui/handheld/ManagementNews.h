@@ -9,7 +9,7 @@ namespace OpenRCT2::Ui::Handheld::ManagementNews
         none,
         finance,
         marketing,
-        research
+        research, guests, park, awards
     };
     inline std::optional<ResearchCatalog::Target> ResearchTarget(const ParkInformation::NewsTarget& news)
     {
@@ -25,6 +25,9 @@ namespace OpenRCT2::Ui::Handheld::ManagementNews
     {
         if (!ParkInformation::Current(news) || news.item.hasButton())
             return Link::none;
+        if(news.item.type==News::ItemType::peeps)return Link::guests;
+        if(news.item.type==News::ItemType::graph)return Link::park;
+        if(news.item.type==News::ItemType::award)return Link::awards;
         if (news.item.type == News::ItemType::money)
             return Link::finance;
         if (news.item.type == News::ItemType::campaign)
@@ -37,6 +40,9 @@ namespace OpenRCT2::Ui::Handheld::ManagementNews
     {
         switch (Available(news))
         {
+            case Link::guests:return "View Guests";
+            case Link::park:return "View Park";
+            case Link::awards:return "View Awards";
             case Link::finance:
                 return "View Finances";
             case Link::marketing:
@@ -44,7 +50,7 @@ namespace OpenRCT2::Ui::Handheld::ManagementNews
             case Link::research:
                 return "Inspect invention";
             default:
-                return ParkInformation::SubjectCurrent(news) ? "Inspect subject" : "Subject unavailable";
+                return !ParkInformation::SubjectCurrent(news) ? "Subject unavailable" : news.ride ? "Open ride management" : news.guest ? "Inspect guest" : "Inspect staff";
         }
     }
 } // namespace OpenRCT2::Ui::Handheld::ManagementNews

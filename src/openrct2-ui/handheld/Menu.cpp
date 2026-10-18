@@ -48,6 +48,8 @@
 #include "StaffPatrol.h"
 #include "TextEntry.h"
 #include "TrackEditing.h"
+#include "NativeTrackThumbnail.h"
+#include <openrct2/interface/Viewport.h>
 #include "TreePicker.h"
 #include "Trees.h"
 
@@ -77,6 +79,7 @@
 #include <openrct2/scenario/Scenario.h>
 #include <openrct2/ui/WindowManager.h>
 #include <sstream>
+#include <cctype>
 
 namespace OpenRCT2::Ui::Windows
 {
@@ -375,6 +378,8 @@ namespace OpenRCT2::Ui::Windows
         std::vector<Handheld::ParkInformation::NewsTarget> _parkNews;
         std::optional<Handheld::ParkInformation::NewsTarget> _parkNewsTarget;
         size_t _parkNewsPage{}, _parkNewsFocus{};
+        bool _newsFromPark{}, _newsFromDashboard{};
+        Handheld::Dashboard::State _newsDashboard;
         bool _parkGuestHistory{};
         bool _managementNewsReturn{};
         std::vector<Handheld::MapSubjects::Target> _mapSubjects;
@@ -1545,7 +1550,7 @@ namespace OpenRCT2::Ui::Windows
                     if (_ridesTarget && Handheld::Mazes::CanResume(*_ridesTarget))
                         result.push_back("Edit maze...");
                     if (_ridesTarget && Handheld::TrackEditing::Eligible(*_ridesTarget))
-                        result.push_back("Edit track blocks...");
+                        result.push_back("Edit track...");
                     return result;
                 }
                 case Page::customChoice:
@@ -1896,7 +1901,7 @@ namespace OpenRCT2::Ui::Windows
             _picker.setEntries(
                 _page == Page::terrainMaterialPicker ? Handheld::TerrainMaterials::Entries(_terrainMaterialEdge)
                     : _page == Page::pathSurfacePicker   ? Handheld::PathSurfaces::Entries()
-                    : _page == Page::trackPiecePicker ? Handheld::CustomTracks::Pieces()
+                    : _page == Page::trackPiecePicker ? Handheld::CustomTracks::Pieces(true)
                     : _page == Page::designPicker  ? Handheld::Designs::Entries()
                     : _page == Page::ridePicker    ? rideEntries
                     : _page == Page::shopPicker    ? Handheld::Shops::Entries()
@@ -2045,6 +2050,19 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::PickerIdentity{ ObjectType::ride, kObjectEntryIndexNull,
                                           std::to_string(static_cast<int>(Handheld::CustomTracks::Selection())) });
         }
+        void openNews(bool fromPark)
+        {
+            _newsDashboard=_dashboard;_newsFromPark=fromPark;_newsFromDashboard=!fromPark;
+            _parkNews=Handheld::ParkInformation::NewsList();_parkNewsFocus=0;_parkNewsPage=0;
+            _dashboard.section=Handheld::Dashboard::Section::overview;_dashboard.focus=Handheld::Dashboard::Focus::content;
+            if(fromPark && !_parkNews.empty()) {
+                _parkNewsTarget=_parkNews.front();page(Page::parkNewsDetail);
+                if(Handheld::ParkInformation::SubjectCurrent(*_parkNewsTarget) || Handheld::ManagementNews::Available(*_parkNewsTarget)!=Handheld::ManagementNews::Link::none)
+                    _focus.move(2,rows().size());
+            } else page(Page::parkNews);
+        }
+        bool dashboardNews(){if(_page!=Page::dashboard)return false;openNews(false);return true;}
+        bool pickerGroup(){if(_page!=Page::trackPiecePicker || !Handheld::CustomTracks::Active())return false;Handheld::CustomTracks::NextGroup();_picker={};refreshPicker();_status.clear();invalidate();return true;}
         bool picker() const
         {
             return _page == Page::terrainMaterialPicker || _page == Page::pathSurfacePicker || _page == Page::sceneryPicker || _page == Page::trackPiecePicker || _page == Page::designPicker
@@ -2733,6 +2751,81 @@ namespace OpenRCT2::Ui::Windows
         {
             pauseManagement();
         }
+        bool trackSelectionMove(int x, int y)
+        {
+            if (_page != Page::trackBlocks) return false;
+            if (x && _focus.index() < _trackBlocks.size())
+            {
+                auto next = x < 0 ? Handheld::TrackEditing::Previous(_trackBlocks[_focus.index()])
+                                  : Handheld::TrackEditing::Next(_trackBlocks[_focus.index()]);
+                if (next) {
+                    auto it = std::find(_trackBlocks.begin(), _trackBlocks.end(), *next);
+                    if (it != _trackBlocks.end()) _focus.move(static_cast<int>(it-_trackBlocks.begin())-static_cast<int>(_focus.index()), rows().size());
+                } else _status = x < 0 ? "Start of this section" : "End of this section";
+            }
+            if (y) { _focus.move(y, rows().size()); _status.clear(); }
+            invalidate(); return true;
+        }
+        void drawTrackSelection(RenderTarget& rt)
+        {
+            const auto* block = _page == Page::trackBlocks
+                ? (_focus.index() < _trackBlocks.size() ? &_trackBlocks[_focus.index()] : nullptr)
+                : (_trackBlock ? &*_trackBlock : nullptr);
+            if (block && Handheld::TrackEditing::Valid(*block))
+            {
+                auto* main = WindowGetMain();
+                if (main && main->viewport) {
+                    auto& view = *main->viewport;
+                    main->savedViewPos = Translate3DTo2DWithZ(view.rotation, {block->origin.x+16,block->origin.y+16,block->origin.z})
+                        - ScreenCoordsXY{view.zoom.ApplyTo(ContextGetWidth()*3/4-view.pos.x),view.zoom.ApplyTo(ContextGetHeight()/2-view.pos.y)};
+                    view.viewPos = main->savedViewPos;
+                    main->flags.unset(WindowFlag::scrollingToLocation);
+                    // Highlight only for this synchronous native viewport draw. Never retain map mutations.
+                    std::vector<std::pair<TrackElement*,bool>> highlights;
+                    const auto& data = TrackMetadata::GetTrackElementDescriptor(block->type).sequenceData;
+                    for (uint8_t i=0; i<data.numSequences; ++i) {
+                        const auto& c=data.sequences[i].clearance;
+                        auto xy=CoordsXY(block->origin)+CoordsXY{c.x,c.y}.rotate(block->origin.direction);
+                        for(auto* e:TileElementsView<TrackElement>(xy))
+                            if(!e->isGhost() && e->getRideIndex()==block->ride.id && e->getTrackType()==block->type
+                                && e->getDirection()==block->origin.direction && e->getSequenceIndex()==i && e->getBaseZ()==block->origin.z+c.z) {
+                                highlights.emplace_back(e,e->isHighlighted()); e->setHighlight(true);
+                            }
+                    }
+                    ViewportRender(rt, main->viewport);
+                    for (auto [element,original] : highlights) element->setHighlight(original);
+                }
+            }
+            using namespace Handheld;
+            if (_page == Page::trackBlocks) {
+                Concept::Box(rt,{8,36},{216,242});
+                Concept::Heading(rt,{18,48},"Select track");
+                DrawWrappedLabel(rt,{18,80},196,block ? CustomTracks::PieceName(block->type) : "Back to ride",3);
+                if (block) {
+                    Drawing::RenderTarget preview;
+                    SelectedLiftAndInverted trackFlags{};
+                    if(block->chain)trackFlags.set(LiftHillAndInverted::liftHill);
+                    if(block->inverted)trackFlags.set(LiftHillAndInverted::inverted);
+                    if(ClipRenderTarget(preview,rt,{20,122},192,92)) DrawNativeTrackThumbnail(preview,block->ride.id,block->type,block->origin.direction,trackFlags);
+                    DrawModernText(rt,{18,220},"{MUTED}Piece "+std::to_string(_focus.index()+1)+" / "+std::to_string(_trackBlocks.size()));
+                }
+                DrawModernEllipsised(rt,{18,248},196,_status.empty()?"{WHITE}A Edit selected piece":_status);
+                DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"L1/R1","Connected"},{"D-pad","Browse"},{"A","Edit"},{"B","Ride"}});
+            } else {
+                auto model=ridesPresentationFor(Page::trackBlock,_focus.index());
+                model.title=block ? CustomTracks::PieceName(block->type) : "Track unavailable";
+                model.breadcrumb="Ride / Track piece";model.stats.clear();model.rowHeight=24;
+                for(auto& row:model.rows) {
+                    if(row=="Locate block")row="Locate piece";
+                    else if(row=="Remove block...")row="Remove piece...";
+                    else if(row=="Back to blocks")row="Choose another piece";
+                    else if(row=="Replace block...")row="Replace piece...";
+                    else if(row=="Inspect connections / station...")row="Connections / station details";
+                }
+                DrawManagementContent(rt,{8,36},{240,312},model);
+                DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Choose"},{"A","Select"},{"B","Pieces"}});
+            }
+        }
         void move(int32_t direction)
         {
             if (dashboardRailFocused())
@@ -2765,7 +2858,7 @@ namespace OpenRCT2::Ui::Windows
                 page(Page::guestRideHistory);
                 return;
             }
-            if (_managementNewsReturn && (_page==Page::finances || _page==Page::marketing || _page==Page::researchItem || _page==Page::researchCatalog))
+            if (_managementNewsReturn && (_page==Page::finances || _page==Page::marketing || _page==Page::researchItem || _page==Page::researchCatalog || _page==Page::guestRoster || _page==Page::overview || _page==Page::parkAwards))
             {
                 _managementNewsReturn=false; _dashboard.section=Handheld::Dashboard::Section::overview;
                 _dashboard.focus=Handheld::Dashboard::Focus::content; page(Page::parkNewsDetail); return;
@@ -2810,10 +2903,14 @@ namespace OpenRCT2::Ui::Windows
                     else { _dashboard.section = Handheld::Dashboard::Section::overview; page(Page::overview); }
                     break;
                 case Page::parkNewsDetail:
+                    if(_newsFromPark){close();break;}
                     page(Page::parkNews);
                     _focus.move(static_cast<int>(_parkNewsFocus), rows().size());
                     break;
                 case Page::parkNews:
+                    if(_newsFromPark){close();break;}
+                    if(_newsFromDashboard){_dashboard=_newsDashboard;page(Page::dashboard);break;}
+                    [[fallthrough]];
                 case Page::parkAwards:
                 case Page::parkHistory:
                     _dashboard.section = Handheld::Dashboard::Section::overview;
@@ -4122,6 +4219,9 @@ namespace OpenRCT2::Ui::Windows
                         {
                             if(link==Handheld::ManagementNews::Link::finance) { _dashboard.section=Handheld::Dashboard::Section::finances; page(Page::finances); }
                             else if(link==Handheld::ManagementNews::Link::marketing) { _dashboard.section=Handheld::Dashboard::Section::marketing; page(Page::marketing); }
+                            else if(link==Handheld::ManagementNews::Link::guests){_dashboard.section=Handheld::Dashboard::Section::guests;page(Page::guestRoster);}
+                            else if(link==Handheld::ManagementNews::Link::park)page(Page::overview);
+                            else if(link==Handheld::ManagementNews::Link::awards)page(Page::parkAwards);
                             else { _researchItem=Handheld::ManagementNews::ResearchTarget(*_parkNewsTarget); _researchCatalog=Handheld::ResearchCatalog::Roster(0); _researchFilter=0; page(Page::researchItem); }
                             _managementNewsReturn=true;
                         }
@@ -4130,7 +4230,10 @@ namespace OpenRCT2::Ui::Windows
                         else if (_parkNewsTarget->guest) inspectMapSubject(*_parkNewsTarget->guest, Page::parkNewsDetail);
                         else if (_parkNewsTarget->staff) inspectMapSubject(*_parkNewsTarget->staff, Page::parkNewsDetail);
                     }
-                    else back();
+                    else if(choice==4 && _parkNewsTarget && Handheld::ParkInformation::DismissCurrentMessage(*_parkNewsTarget)) {
+                        _parkNews=Handheld::ParkInformation::NewsList();page(Page::parkNews);
+                    }
+                    else if(choice==3) {page(Page::parkNews);_focus.move(static_cast<int>(_parkNewsFocus),rows().size());}
                     break;
                 case Page::parkAwards:
                     if (choice + 1 == rows().size()) page(Page::overview);
@@ -4155,6 +4258,7 @@ namespace OpenRCT2::Ui::Windows
                     if (choice >= 3 && choice <= 5)
                     {
                         Handheld::EndTerrain();
+                        _newsFromPark=false;_newsFromDashboard=false;
                         _parkNews = Handheld::ParkInformation::NewsList();
                         page(choice == 3 ? Page::parkNews : choice == 4 ? Page::parkAwards : Page::parkHistory);
                     }
@@ -4420,7 +4524,7 @@ namespace OpenRCT2::Ui::Windows
                         rows.insert(rows.begin() + 7, "Place entrance / exit...");
                         if (choice <= 7) --choice;
                     }
-                    if (choice < rows.size() && rows[choice] == "Edit track blocks...")
+                    if (choice < rows.size() && rows[choice] == "Edit track...")
                     {
                         if (_pausedHere && (gGamePaused & GAME_PAUSED_NORMAL))
                         {
@@ -5456,7 +5560,7 @@ namespace OpenRCT2::Ui::Windows
                         const auto t = *_ridesTarget;
                         launchRideTool([=] { return Handheld::ResumeMaze(t.id); });
                     }
-                    else if (_ridesTarget && _focus.index() < rows().size() && rows()[_focus.index()] == "Edit track blocks...")
+                    else if (_ridesTarget && _focus.index() < rows().size() && rows()[_focus.index()] == "Edit track...")
                     {
                         if (_pausedHere && (gGamePaused & GAME_PAUSED_NORMAL))
                         {
@@ -5661,6 +5765,7 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
+            if (_page == Page::trackBlocks || _page == Page::trackBlock) { drawTrackSelection(rt); return; }
             if (choiceCards())
             {
                 Handheld::DrawChoiceCards(rt, {ContextGetWidth(), ContextGetHeight()},
@@ -5910,8 +6015,12 @@ namespace OpenRCT2::Ui::Windows
             if (_page == Page::trackPiecePicker)
             {
                 Handheld::DrawObjectPicker(
-                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Track pieces", _status, "No compatible pieces",
+                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Track pieces", _status.empty() ? "Y Group: "+Handheld::CustomTracks::GroupName(Handheld::CustomTracks::CurrentGroup()) : _status, "No compatible pieces",
                     false, "Ride", "Camera");
+                const auto* e=_picker.selected();const ScreenCoordsXY p{336,36};Handheld::Concept::Box(rt,p,{168,246});
+                Handheld::DrawHeadingText(rt,p+ScreenCoordsXY{10,12},"{WHITE}Selected piece",148);
+                if(e&&!e->identity.key.empty()&&std::isdigit(static_cast<unsigned char>(e->identity.key[0]))){Drawing::RenderTarget preview;if(ClipRenderTarget(preview,rt,p+ScreenCoordsXY{8,40},152,110))e->drawPreview(preview);}
+                Handheld::DrawWrappedLabel(rt,p+ScreenCoordsXY{10,162},148,e ? e->name : "No compatible piece",4);
                 return;
             }
             if (_page == Page::designPicker)
@@ -6483,6 +6592,11 @@ namespace OpenRCT2::Ui::Windows
 
 namespace OpenRCT2::Ui::Windows
 {
+    std::string HandheldNewsText(const std::string& text){return Handheld::ParkInformation::PlainText(text);}
+    void HandheldNewsOpen(){HandheldDashboardOpen();auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);if(w)static_cast<HandheldMenuWindow*>(w)->openNews(true);}
+    bool HandheldDashboardNews(){auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);return w&&static_cast<HandheldMenuWindow*>(w)->dashboardNews();}
+    bool HandheldTrackSelectionMove(int x,int y){auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);return w&&static_cast<HandheldMenuWindow*>(w)->trackSelectionMove(x,y);}
+    bool HandheldObjectPickerGroup(){auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);return w&&static_cast<HandheldMenuWindow*>(w)->pickerGroup();}
     bool HandheldFinancesIsOpen()
     {
         const auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);

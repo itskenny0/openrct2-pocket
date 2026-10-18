@@ -1,7 +1,7 @@
 # OpenRCT2 Pocket: NextUI Brick release candidate
 
 1. For an update, rename the existing package's `game` folder to an unused
-   backup name such as `game-before-rc3`. Then copy the new ZIP's `game` folder
+   backup name such as `game-before-rc4`. Then copy the new ZIP's `game` folder
    into the package. Copy the new `launch.sh`, instructions and metadata too.
    Keep the package's existing `RCT2` folder and the SD card's `.userdata` folder.
    Use a fresh `game` folder, rather than merging old runtime files.
@@ -34,10 +34,15 @@ NextUI tg5040 controls; Bluetooth/USB enumeration and alternate firmware require
 manual checking. `OPENRCT2_BRICK_KEEP_MAPPING=1` preserves an existing supplied SDL
 mapping. `OPENRCT2_RCT2_PATH` can select another original installation directory.
 
-The prior RC1 plus the complete runtime replacement was reported launching and
-playing well on a Brick. RC3 adds visual building choices, path state/material
-panels, guided flat-ride placement and scenery/terrain color palettes. It has
-native desktop interaction and ARM package checks, but still needs a Brick retest.
+RC3 was tested on a real Brick. This RC4 candidate unifies park guest/staff/ride
+inspection, restores native coaster ghosts, adds native piece thumbnails and
+compatible groups, replaces the built-track coordinate list with spatial selection,
+and connects native park news to management. It has native desktop runtime and
+ARM package checks; a physical Brick retest is still required.
+
+Path Line/Fill work was explicitly deferred. The reported RC3 device issue where
+money is spent without visible paths remains unresolved; no path fix is claimed.
+Keep a backup park and use Single path placement pending further investigation.
 Audio, every button, suspend/resume, SD-card save round trips and performance
 remain physical-device checks. Back up saves.
 

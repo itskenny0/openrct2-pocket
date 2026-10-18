@@ -93,6 +93,11 @@ namespace OpenRCT2::Ui::Windows
     bool HandheldGuestsIsOpen();
     Handheld::ManagementPresentation HandheldGuestsPresentation();
     void HandheldGuestOpen(const Handheld::GuestManagement::Target&);
+    bool HandheldObjectPickerGroup();
+    bool HandheldTrackSelectionMove(int x,int y);
+    std::string HandheldNewsText(const std::string& text);
+    void HandheldNewsOpen();
+    bool HandheldDashboardNews();
     void HandheldPeepPlacementOptionsOpen();
     void HandheldStaffOpen(std::optional<Handheld::StaffManagement::Target> target = {});
     Handheld::ManagementPresentation HandheldStaffPresentation();

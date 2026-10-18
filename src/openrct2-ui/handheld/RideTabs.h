@@ -18,7 +18,7 @@ namespace OpenRCT2::Ui::Handheld::RideTabs
         if (label == "Statistics...") return statistics;
         if (label == "Operations..." || label == "Maintenance..." || label == "Vehicles..."
             || label == "Dispatch..." || label == "Continue track..." || label == "Edit maze..."
-            || label == "Edit track blocks..." || label == "Access / paths...") return operations;
+            || label == "Edit track..." || label == "Access / paths...") return operations;
         return overview;
     }
     inline std::vector<size_t> Indices(const ManagementPresentation& source, size_t tab)

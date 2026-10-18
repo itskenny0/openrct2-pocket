@@ -39,7 +39,13 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     bool SetPlacementSeat(uint8_t seat);
     void Bank();
     void Chain();
-    std::vector<PickerEntry> Pieces();
+    enum class PieceGroup { all, straight, station, turns, slopes, banks, special, count };
+    PieceGroup GroupOf(TrackElemType);
+    PieceGroup CurrentGroup();
+    std::string GroupName(PieceGroup);
+    void NextGroup();
+    std::vector<PickerEntry> Pieces(bool filtered=false);
+    bool HasPreview();
     std::string PieceName(TrackElemType type);
     void DrawPiecePreview(Drawing::RenderTarget& rt, TrackElemType type);
     TrackElemType Selection();

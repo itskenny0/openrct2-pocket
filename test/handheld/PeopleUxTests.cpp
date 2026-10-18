@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Native initialized scenario fixture; construction and editing use real actions.
 #include <SDL.h>
+#include <openrct2/management/NewsItem.h>
+#include <openrct2-ui/handheld/ParkInformation.h>
 #include "RideTabNavigation.h"
 #include <openrct2-ui/handheld/PeopleTabs.h>
 #include <openrct2-ui/handheld/PeopleNavigation.h>
@@ -173,6 +175,24 @@ int main(int argc, char** argv)
         closeMenu();W::HandheldStaffOpen({});W::HandheldMenuMove(3);capture("07-staff-roster.png");
         const auto row=sm().selected;press(H::Action::confirm);press(H::Action::back);Check(sm().selected==row,"Staff roster focus lost");
         const auto pageStart=sm().selected;press(H::Action::nextOption);Check(sm().selected>pageStart,"Staff shoulder paging failed");capture("08-staff-page.png");closeMenu();
+        {
+            const auto employeeFromPark=S::Roster().front();W::StaffOpen(state.entities.tryGetEntity<Staff>(employeeFromPark.id));
+            Check(sm().tabs.size()==4&&!wm->FindByClass(WindowClass::peep),"Park staff opened legacy inspection");press(H::Action::back);WindowCullDead();
+            const auto selectedGuest=G::Roster().front();const auto camera=WindowGetMain()->viewport->viewPos;
+            News::InitQueue(state.park);News::AddItemToQueue(state.park.newsItems,News::ItemType::peep,"Guest native event",selectedGuest.id.ToUnderlying());
+            press(H::Action::contextSecondary);press(H::Action::confirm);
+            Check(gm().title==G::Resolve(selectedGuest)->getName(),"Guest news lost subject identity");
+            press(H::Action::back);Check(W::HandheldParkMapSubjectsPresentation().breadcrumb=="Overview / Park news","Guest news return failed");press(H::Action::back);
+            const auto news=H::ParkInformation::NewsList().front();News::DisableNewsItems(state.park.newsItems,News::ItemType::peep,selectedGuest.id.ToUnderlying());
+            Check(!H::ParkInformation::SubjectCurrent(news),"Stale guest news reference accepted");
+
+            W::GuestOpen(state.entities.tryGetEntity<Guest>(selectedGuest.id));
+            Check(!wm->FindByClass(WindowClass::peep)&&gm().tabs.size()==4,"Native park guest opened legacy window");
+            Check(gm().title==G::Resolve(selectedGuest)->getName()&&WindowGetMain()->viewport->viewPos==camera,"Park guest identity/camera changed");
+            press(H::Action::nextOption);capture("09a-park-guest-needs.png");press(H::Action::nextOption);
+            Check(gm().selectedTab==2,"Park guest Thoughts unavailable");press(H::Action::back);WindowCullDead();
+            Check(!wm->FindByClass(WindowClass::handheldMenu),"Park guest Back did not return to park");
+        }
         const auto guest=G::Roster().front();Check(!G::Resolve(guest)->getName().empty(),"Native real-name object missing");W::HandheldGuestOpen(guest);Check(gm().tabs.size()==4,"Guest workspace missing");capture("09-guest-overview.png");
 
         const auto* native=G::Resolve(guest);const auto happy=native->happiness;const auto cash=native->cashInPocket;

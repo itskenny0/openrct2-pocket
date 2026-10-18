@@ -202,7 +202,7 @@ int main(int argc, char** argv)
         H::EndTerrain();
         auto openReplacement = [&] {
             W::HandheldRideOpen(ride.id);
-            FocusRideTabAction("Edit track blocks...");
+            FocusRideTabAction("Edit track...");
             H::HandleMenuInput(controller, confirm);
             const auto currentBlocks = H::TrackEditing::Blocks(ride);
             const auto selected = std::find_if(
@@ -243,7 +243,7 @@ int main(int argc, char** argv)
         Check(H::TrackEditing::Valid(seatBlock), "Replacement did not preserve native seat/geometry");
         H::EndTerrain();
         W::HandheldRideOpen(ride.id);
-        FocusRideTabAction("Edit track blocks...");
+        FocusRideTabAction("Edit track...");
         H::HandleMenuInput(controller, confirm);
         H::HandleMenuInput(controller, confirm);
         auto backwardRows = W::HandheldRidesPresentation().rows;

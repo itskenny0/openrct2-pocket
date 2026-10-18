@@ -274,7 +274,7 @@ int main(int argc, char** argv)
             auto openBlock = [&](const E::Block& block) {
                 Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
                 W::HandheldRideOpen(block.ride.id);
-                FocusRideTabAction("Edit track blocks...");
+                FocusRideTabAction("Edit track...");
                 H::HandleMenuInput(controller, confirm);
                 const auto blocks = E::Blocks(block.ride);
                 auto found = std::find(blocks.begin(), blocks.end(), block);

@@ -564,30 +564,30 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 ## RC4-01 — Line/Fill real-device construction failure
 
 - Severity: Critical
-- Status: Confirmed (user device report); root cause unresolved.
+- Status: Deferred by user request; reported device defect and root cause remain unresolved.
 - Report: On flat ground, Line and Fill consume money without visible paths on Brick/NextUI RC3.
 - Investigation: Existing native batch tests, full-live-tick variant and actual cursor-targeting probe pass against unchanged RC3. Native map elements, exact cash, rendering and persistence were checked. This does not close the reported hardware failure.
-- Next step: Reproduce with the affected Brick park save; correct the demonstrated cause before RC4 acceptance.
+- Next step: Reproduce with the affected Brick park save when path work resumes. The user explicitly excluded paths from this continuation; this candidate does not claim a path fix.
 - Evidence: RC4-PATH-INVESTIGATION.md; captures/rc4-investigation/; evidence/rc4-investigation/.
 
 ## RC4-02 — Park guest selection opens legacy inspection
 
 - Severity: Major
-- Status: Confirmed
+- Status: Fixed in native runtime; Brick retest pending
 - Report/source trace: Park input falls through ViewportInteractionLeftClick/GuestOpen, whereas the dashboard uses the tabbed guest workspace.
-- Next step: Unify entry while retaining guest identity, caller return, follow and pickup. Not implemented in this checkpoint.
+- Verification: Native GuestOpen now reaches the modern workspace with exact guest identity and park return. Dashboard roster return, needs/thoughts, tracking, follow and pickup pass PeopleUxTests. Staff and ride native entry points also use their modern workspaces. See RC4-REAL-PLAY.md.
 
 ## RC4-03 — Coaster construction preview/selection friction
 
 - Severity: Major
-- Status: Confirmed (device usability report)
-- Next step: Improve actual native ghost visibility and continuous piece selection. Preserve eligibility, geometry, undo and advanced pieces. Not implemented in this checkpoint.
+- Status: Fixed in native runtime; Brick usability retest pending
+- Verification: Restored native ghosts across provisional scopes/full simulation ticks and save operations; native thumbnail catalog, compatible piece groups, enlarged active thumbnail and spatial built-track selection. Native geometry, costs, undo and save/reload pass Rc4IntegrationTests; advanced editing passes SelectedTrackEditingTests. See RC4-REAL-PLAY.md.
 
 ## RC4-04 — Park events disconnected from ordinary play
 
 - Severity: Major
-- Status: Confirmed (device usability report)
+- Status: Fixed in native runtime; Brick retest pending
 - Source finding: Native news history and target-aware management routes already exist; ordinary-play discoverability and handoff still need improvement.
-- Next step: Integrate existing native events without text-based subject guessing or duplicate event simulation. Not implemented in this checkpoint.
+- Verification: Park Y and dashboard X open native news; current event ribbon hides during construction. Native subjects/category targets reach ride, guest/staff, research, finance, marketing, park and awards screens with caller-aware Back. Informational/stale events remain safe. Native dismissal archives the current item. See RC4-REAL-PLAY.md.
 
-Inventory: **56 entries**; 6 Confirmed, 19 Unverified, 31 Fixed, 0 Deferred.
+Inventory: **56 entries**; 2 Confirmed, 19 Unverified, 34 Fixed, 1 Deferred.

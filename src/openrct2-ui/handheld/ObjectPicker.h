@@ -135,7 +135,7 @@ namespace OpenRCT2::Ui::Handheld
             if (entries[index].drawPreview)
             {
                 Drawing::RenderTarget preview;
-                if (ClipRenderTarget(preview, rt, cell + ScreenCoordsXY{ 17, 4 }, 60, 62))
+                if (ClipRenderTarget(preview, rt, cell + ScreenCoordsXY{ 4, 4 }, 86, 62))
                     entries[index].drawPreview(preview);
             }
             else if (

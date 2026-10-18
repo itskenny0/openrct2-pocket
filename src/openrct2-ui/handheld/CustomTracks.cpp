@@ -3,6 +3,8 @@
 
 #include "Explorer.h"
 #include "TrackPreview.h"
+#include "NativeTrackThumbnail.h"
+#include <cctype>
 
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2/actions/ride/RideCreateAction.h>
@@ -60,6 +62,9 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     static std::optional<Block> previous, anchor;
     static std::optional<Preview> ghost;
     static TrackPreview nativePreview;
+    static std::optional<CoordsXY> previewTile;
+    static bool previewWanted{};
+    static PieceGroup pieceGroup{PieceGroup::all};
     static std::string feedback;
     static GA::Result Invalid(const char* text)
     {
@@ -223,7 +228,12 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     {
         auto* main = WindowGetMain();
         if (endpoint && main && main->viewport)
-            WindowScrollToLocation(*main, { endpoint->x + 16, endpoint->y + 16, endpoint->z });
+        {
+            auto& view=*main->viewport;
+            main->savedViewPos=Translate3DTo2DWithZ(view.rotation,{endpoint->x+16,endpoint->y+16,endpoint->z})
+                - ScreenCoordsXY{view.zoom.ApplyTo(ContextGetWidth()*3/4-view.pos.x),view.zoom.ApplyTo(ContextGetHeight()/2-view.pos.y)};
+            view.viewPos=main->savedViewPos;main->flags.unset(WindowFlag::scrollingToLocation);main->invalidate();
+        }
     }
     bool Active()
     {
@@ -335,7 +345,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             return "Station";
         const auto native = FormatStringIDLegacy(ted.description, nullptr);
         if (!native.empty())
-            return native;
+            return native+(ted.sequenceData.numSequences>1 ? " / "+std::to_string(ted.sequenceData.numSequences)+" tiles" : "");
         const auto& d = ted.definition;
         auto slopeName = [](TrackPitch value) -> std::string {
             switch (value)
@@ -354,7 +364,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         };
         const int turn = (ted.coordinates.rotationEnd - ted.coordinates.rotationBegin) & 3;
         if (turn == 1 || turn == 3)
-            return std::string(ted.flags.has(TrackElementFlag::turnLeft) ? "Left turn" : "Right turn")
+            return std::string(ted.flags.has(TrackElementFlag::turnLeft) ? "Left turn" : "Right turn")+" / "+std::to_string(ted.sequenceData.numSequences)+" tiles"
                 + (d.rollEnd != TrackRoll::none ? " / bank" : "")
                 + (d.pitchEnd != TrackPitch::none ? " / " + slopeName(d.pitchEnd) : "");
         if (d.pitchStart != d.pitchEnd)
@@ -370,6 +380,12 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     // Shared native-metadata preview: live picker and component validation use the same renderer.
     void DrawPiecePreview(Drawing::RenderTarget& rt, TrackElemType type)
     {
+        if (target && RideManagement::Resolve(*target)) {
+            SelectedLiftAndInverted flags{};
+            if(chain && type==selected)flags.set(LiftHillAndInverted::liftHill);
+            if(placementInverted)flags.set(LiftHillAndInverted::inverted);
+            Windows::DrawNativeTrackThumbnail(rt,target->id,type,endpoint ? endpoint->direction : 0,flags);return;
+        }
         const auto& ted = GetTrackElementDescriptor(type);
         int minX = 0, maxX = 0, minY = 0, maxY = 0;
         for (int n = 0; n < ted.sequenceData.numSequences; ++n)
@@ -389,7 +405,20 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         }
         DrawModernText(rt, { rt.x + 4, rt.y + 48 }, "{MUTED}" + std::to_string(ted.sequenceData.numSequences) + " tiles");
     }
-    std::vector<PickerEntry> Pieces()
+    PieceGroup GroupOf(TrackElemType type) {
+        switch(GetTrackElementDescriptor(type).definition.group) {
+            case TrackGroup::flat:case TrackGroup::straight:return PieceGroup::straight;
+            case TrackGroup::stationEnd:return PieceGroup::station;
+            case TrackGroup::curveVerySmall:case TrackGroup::curveSmall:case TrackGroup::curve:case TrackGroup::curveLarge:case TrackGroup::sBend:return PieceGroup::turns;
+            case TrackGroup::slope:case TrackGroup::slopeSteepDown:case TrackGroup::slopeSteepUp:case TrackGroup::flatToSteepSlope:case TrackGroup::slopeToFlat:case TrackGroup::slopeVertical:case TrackGroup::slopeSteepLong:case TrackGroup::diagSlope:case TrackGroup::diagSlopeSteepUp:case TrackGroup::diagSlopeSteepDown:case TrackGroup::diagSlopeSteepLong:case TrackGroup::liftHill:case TrackGroup::liftHillSteep:case TrackGroup::poweredLift:case TrackGroup::liftHillCable:return PieceGroup::slopes;
+            case TrackGroup::flatRollBanking:case TrackGroup::slopeRollBanking:case TrackGroup::slopeCurveBanked:case TrackGroup::slopeCurveLargeBanked:case TrackGroup::helixUpBankedHalf:case TrackGroup::helixDownBankedHalf:case TrackGroup::helixUpBankedQuarter:case TrackGroup::helixDownBankedQuarter:return PieceGroup::banks;
+            default:return PieceGroup::special;
+        }
+    }
+    PieceGroup CurrentGroup(){return pieceGroup;}
+    std::string GroupName(PieceGroup group){static const char* names[]{"All","Straight","Stations","Turns","Slopes","Banking","Special"};return names[static_cast<size_t>(group)];}
+    void NextGroup(){for(int n=0;n<static_cast<int>(PieceGroup::count);++n){pieceGroup=static_cast<PieceGroup>((static_cast<int>(pieceGroup)+1)%static_cast<int>(PieceGroup::count));if(pieceGroup==PieceGroup::all)return;for(const auto& e:Pieces())if(!e.identity.key.empty()&&std::isdigit(static_cast<unsigned char>(e.identity.key[0]))&&GroupOf(static_cast<TrackElemType>(std::stoi(e.identity.key)))==pieceGroup)return;}}
+    std::vector<PickerEntry> Pieces(bool filtered)
     {
         std::vector<PickerEntry> result;
         for (int i = 0; i < static_cast<int>(TrackElemType::count); ++i)
@@ -397,12 +426,14 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             auto type = static_cast<TrackElemType>(i);
             if (!Supported(type) || type == TrackElemType::beginStation || type == TrackElemType::middleStation)
                 continue;
+            if(filtered && pieceGroup!=PieceGroup::all && GroupOf(type)!=pieceGroup)continue;
             PickerEntry entry{ { ObjectType::ride, kObjectEntryIndexNull, std::to_string(i) },
                                PieceName(type),
                                ZoomLevel{ 0 } };
             entry.drawPreview = [type](Drawing::RenderTarget& rt) { DrawPiecePreview(rt, type); };
             result.push_back(std::move(entry));
         }
+        std::stable_sort(result.begin(),result.end(),[](const auto& a,const auto& b){return GroupOf(static_cast<TrackElemType>(std::stoi(a.identity.key)))<GroupOf(static_cast<TrackElemType>(std::stoi(b.identity.key)));});
         const auto coveredBase = TrackConstructionSupport::CoveredBase(selected);
         const auto coveredNext = coveredBase.value_or(GetTrackElementDescriptor(selected).alternativeType);
         if (coveredNext != TrackElemType::none && Supported(coveredNext))
@@ -444,11 +475,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         const auto flags = GetTrackElementDescriptor(selected).flags;
         return flags.has(TrackElementFlag::allowLiftHill) || flags.has(TrackElementFlag::curveAllowsLift);
     }
-    void ClearPreview()
-    {
-        ghost.reset();
-        nativePreview.clear();
-    }
+    static void RemoveGhost(){ghost.reset();nativePreview.clear();}
+    void ClearPreview(){previewWanted=false;RemoveGhost();}
     void End()
     {
         ClearPreview();
@@ -479,7 +507,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         endpoint.reset();
         previous.reset();
         anchor.reset();
-        depth = 0;
+        depth = 0;previewTile.reset();pieceGroup=PieceGroup::all;
         camera = false;
         backward = false;
         placementInverted = false;
@@ -633,7 +661,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     }
     void Cycle(int direction)
     {
-        auto entries = Pieces();
+        auto entries = Pieces(true);
         std::erase_if(entries, [](const auto& entry) {
             return entry.identity.key.empty() || entry.identity.key.front() < '0' || entry.identity.key.front() > '9';
         });
@@ -651,7 +679,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         if (StationPlacement())
         {
             ClearPreview();
-            stationOffset = std::clamp(stationOffset + (direction > 0 ? 8 : -8), 0, 256);
+            stationOffset = std::clamp(stationOffset + (direction > 0 ? kLandHeightStep : -kLandHeightStep), 0, 256);
             return;
         }
         const std::array slopes{ TrackPitch::down60, TrackPitch::down25, TrackPitch::none, TrackPitch::up25, TrackPitch::up60 };
@@ -930,6 +958,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     }
     void Update(std::optional<CoordsXY> tile)
     {
+        previewTile=tile;previewWanted=true;
         if (!active || busy)
             return;
         if (!target || !RideManagement::Resolve(*target)
@@ -952,14 +981,14 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         const auto q = Action(false);
         if (!request || q.error != GA::Status::ok)
         {
-            ClearPreview();
+            RemoveGhost();
             return;
         }
         const Preview next{ *request, chain, trackTypeHasSpeedSetting(request->type) ? placementSpeed : uint8_t{ 6 },
                             SeatSupported() ? placementSeat : uint8_t{ 0 }, placementInverted };
-        if (ghost && *ghost == next)
+        if (ghost && *ghost == next && nativePreview.exists())
             return;
-        ClearPreview();
+        RemoveGhost();
         SelectedLiftAndInverted flags{};
         if (chain)
             flags.set(LiftHillAndInverted::liftHill);
@@ -972,13 +1001,13 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     void RemovePreviewTemporarily()
     {
         ++depth;
-        ClearPreview();
+        RemoveGhost();
     }
     void RestorePreview()
     {
-        if (depth)
-            --depth;
+        if (depth && --depth==0 && active && !busy && previewWanted)Update(previewTile);
     }
+    bool HasPreview(){return ghost.has_value()&&nativePreview.exists();}
     void DrawPanel(Drawing::RenderTarget& rt, ScreenSize screen)
     {
         using namespace Concept;
@@ -991,59 +1020,21 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             DrawActionStrip(rt, screen);
             return;
         }
-        Box(rt, p, { 216, 254 });
-        Heading(
-            rt, p + ScreenCoordsXY{ 10, 12 },
-            replacement ? "Rebuild removed"
-                : StationPlacement() ? "Place station"
-                : backward     ? "Build backward"
-                               : "Build track");
-        Rule(rt, p + ScreenCoordsXY{ 8, 38 }, 184);
-        Box(rt, p + ScreenCoordsXY{ 8, 48 }, { 200, 40 }, true);
-        DrawWrappedLabel(rt, p + ScreenCoordsXY{ 14, 54 }, 188, "{BLACK}" + PieceName(selected), 2);
-        const auto& d = GetTrackElementDescriptor(selected).definition;
-        const auto displayPitch = backward ? d.pitchStart : d.pitchEnd;
-        const auto displayRoll = backward ? d.rollStart : d.rollEnd;
-        DrawModernText(
-            rt, p + ScreenCoordsXY{ 10, 98 },
-            "{WHITE}Slope "
-                + std::string(
-                    displayPitch == TrackPitch::none         ? "Level"
-                        : displayPitch == TrackPitch::up25   ? "Up 25"
-                        : displayPitch == TrackPitch::up60   ? "Up 60"
-                        : displayPitch == TrackPitch::down25 ? "Down 25"
-                        : displayPitch == TrackPitch::down60 ? "Down 60"
-                                                             : "Special"));
-        DrawModernText(
-            rt, p + ScreenCoordsXY{ 10, 120 },
-            trackTypeHasSpeedSetting(selected) ? "{MUTED}Speed "
-                    + FormatStringID(STR_VELOCITY, static_cast<uint16_t>((placementSpeed * 9) >> 2))
-                                               : "{WHITE}Bank "
-                    + std::string(displayRoll == TrackRoll::none        ? "Level"
-                                      : displayRoll == TrackRoll::left  ? "Left"
-                                      : displayRoll == TrackRoll::right ? "Right"
-                                                                        : "Inverted"));
-        DrawModernText(
-            rt, p + ScreenCoordsXY{ 10, 142 },
-            std::string("{MUTED}Chain ") + (ChainAllowed() ? (chain ? "On" : "Off") : "Unavailable"));
-        DrawModernText(
-            rt, p + ScreenCoordsXY{ 10, 164 }, "{WHITE}Height " + (endpoint ? std::to_string(endpoint->z / 8) : "Unavailable"));
-        DrawModernText(
-            rt, p + ScreenCoordsXY{ 10, 206 },
-            camera ? "{GOLD}CAMERA / B Build"
-                : SeatSupported()
-                ? "{MUTED}Seat " + std::to_string(placementSeat) + (placementInverted ? " / Inv" : " / SEL options")
-                : placementInverted ? "{WHITE}Inverted / START Ride"
-                                    : "{WHITE}START Ride / SEL Pieces");
-        DrawModernText(
-            rt, p + ScreenCoordsXY{ 10, 230 }, camera ? "{WHITE}D-pad Pan / B Build" : "{WHITE}L2/R2 Slope / Select Pieces");
-        static const char* directions[]{"West","South","East","North"};
-        DrawModernText(
-            rt, p + ScreenCoordsXY{ 10, 186 },
-            endpoint ? "{WHITE}" + std::string(directions[endpoint->direction & 3]) : "{WHITE}Choose origin");
+        Box(rt, p, {216,230});
+        Heading(rt,p+ScreenCoordsXY{10,12},replacement ? "Rebuild removed" : StationPlacement() ? "Place station" : backward ? "Build backward" : "Build track");
+        Rule(rt,p+ScreenCoordsXY{8,38},200);
+        DrawWrappedLabel(rt,p+ScreenCoordsXY{10,48},196,"{WHITE}"+PieceName(selected),2);
         Drawing::RenderTarget preview;
-        if (ClipRenderTarget(preview, rt, p + ScreenCoordsXY{ 146, 135 }, 60, 62))
-            DrawPiecePreview(preview, selected);
+        if(ClipRenderTarget(preview,rt,p+ScreenCoordsXY{8,88},108,82))DrawPiecePreview(preview,selected);
+        const auto& d=GetTrackElementDescriptor(selected).definition;
+        const auto displayPitch=backward ? d.pitchStart : d.pitchEnd;
+        const auto bank=backward ? d.rollStart : d.rollEnd;
+        DrawModernText(rt,p+ScreenCoordsXY{120,96},"{MUTED}Slope");
+        DrawModernText(rt,p+ScreenCoordsXY{120,114},displayPitch==TrackPitch::none ? "Level" : displayPitch==TrackPitch::up25 ? "Up 25" : displayPitch==TrackPitch::up60 ? "Up 60" : displayPitch==TrackPitch::down25 ? "Down 25" : displayPitch==TrackPitch::down60 ? "Down 60" : "Special");
+        DrawModernText(rt,p+ScreenCoordsXY{120,140},trackTypeHasSpeedSetting(selected) ? "{MUTED}Speed" : "{MUTED}Bank");
+        DrawModernText(rt,p+ScreenCoordsXY{120,158},trackTypeHasSpeedSetting(selected) ? FormatStringID(STR_VELOCITY,static_cast<uint16_t>((placementSpeed*9)>>2)) : bank==TrackRoll::none ? "Level" : bank==TrackRoll::left ? "Left" : bank==TrackRoll::right ? "Right" : "Inverted");
+        DrawModernText(rt,p+ScreenCoordsXY{10,184},std::string("{MUTED}Chain ")+(ChainAllowed() ? chain ? "On" : "Off" : "N/A")+"   Height "+(endpoint ? std::to_string(endpoint->z/8) : "--"));
+        DrawModernEllipsised(rt,p+ScreenCoordsXY{10,208},196,camera ? "D-pad Pan / B Build" : SeatSupported() ? "Seat "+std::to_string(placementSeat)+(placementInverted?" / Inverted":" / Select options") : placementInverted ? "Inverted / Select pieces" : "L2/R2 Slope / Select Pieces");
         DrawModeBadge(rt, p + ScreenCoordsXY{ 144, 8 }, camera ? "CAMERA" : "BUILD");
         std::vector<ControlHint> hints{ { "D-pad", "Move", camera ? HintPriority::normal : HintPriority::guide },
                                         { "A", camera ? "Build mode" : "Build" },
