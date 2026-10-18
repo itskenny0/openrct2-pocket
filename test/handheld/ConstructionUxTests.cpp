@@ -111,6 +111,18 @@ int main(int argc,char** argv) { try {
  press(H::Action::nextOption);
  const auto colours=S::Current().colours;move(1,0);
  Check(S::Current().colours[0]!=colours[0],"Colour shortcut failed");capture("03-scenery-colour.ppm",true);
+ const auto beforePicker=S::Current().colours[0];
+ press(H::Action::confirm);move(0,1);capture("03b-scenery-palette.ppm",true);
+ Check(S::Current().colours[0]==beforePicker,"Palette navigation applied scenery colour");
+ press(H::Action::back);Check(S::Current().colours[0]==beforePicker,"Palette cancel changed scenery colour");
+ press(H::Action::confirm);move(0,1);press(H::Action::confirm);
+ const auto wantedIndex=H::MoveColourGrid(H::ConstructionAdjust::ColourIndex(beforePicker),72,0,1);
+ Check(S::Current().colours[0]==W::ColourDropDownIndexToColour(wantedIndex),"Palette applied wrong native scenery colour");
+ for (int colour=0;colour<72;++colour) {
+  const auto index=H::ConstructionAdjust::ColourIndex(S::Current().colours[0]);
+  S::Configure(7,1);Check(S::Current().colours[0]==W::ColourDropDownIndexToColour((index+1)%72),"Normal palette cycle omitted or included a colour");
+ }
+ Check(getGameState().park.cash==navigationCash&&WindowGetMain()->viewport->viewPos.x==view.x,"Palette changed park or camera");
  press(H::Action::contextPrimary);Check(wm->FindByClass(WindowClass::handheldMenu),"More missing");press(H::Action::back);WindowCullDead();
  move(1,0);Check(S::Current().colours[0]!=colours[0],"More lost Colour group");
  press(H::Action::openBuild);capture("04-catalog-return.ppm");press(H::Action::back);WindowCullDead();
@@ -141,6 +153,20 @@ int main(int argc,char** argv) { try {
  press(H::Action::confirm);move(1,0);const auto edgeChoice=W::HandheldObjectPickerFocus();press(H::Action::confirm);WindowCullDead();
  Check(H::AreaTools::settings.edge==edgeChoice&&edgeChoice!=kObjectEntryIndexNull,"Native edge selection failed");
  Check(!H::TerrainMaterials::Select(false,{ObjectType::terrainSurface,selectedMaterial,"stale"}),"Changed material identity accepted");capture("09a-terrain-paint-adjust.ppm",true);
+ const auto preservedEdge=H::AreaTools::settings.edge;
+ const auto preservedColour=H::AreaTools::settings.edgeColour;
+ auto* colouredEdge=objects.LoadObject("official.terrain_edge.stucco");Check(colouredEdge,"Colourable edge fixture missing");
+ H::AreaTools::settings.edge=objects.GetLoadedObjectEntryIndex(colouredEdge);
+ Check(H::AreaTools::EdgeColourSupported(H::AreaTools::settings.edge),"Fixture edge has no colour channel");
+ move(0,1);move(0,1);const auto terrainColour=H::AreaTools::settings.edgeColour;
+ press(H::Action::confirm);move(0,1);capture("09b-terrain-palette.ppm",true);
+ Check(H::AreaTools::settings.edgeColour==terrainColour,"Terrain palette navigation changed tool colour");
+ press(H::Action::back);Check(H::AreaTools::settings.edgeColour==terrainColour,"Terrain palette cancel changed colour");
+ press(H::Action::confirm);move(0,1);press(H::Action::confirm);
+ const auto edgeIndex=H::MoveColourGrid(H::ConstructionAdjust::ColourIndex(terrainColour),72,0,1);
+ Check(H::AreaTools::settings.edgeColour==W::ColourDropDownIndexToColour(edgeIndex),"Terrain palette applied wrong native colour");
+ Check(getGameState().park.cash==navigationCash,"Terrain palette changed accounting");
+ H::AreaTools::settings.edge=preservedEdge;H::AreaTools::settings.edgeColour=preservedColour;move(0,-1);move(0,-1);
  press(H::Action::contextPrimary);press(H::Action::back);WindowCullDead();
  press(H::Action::back);capture("10-terrain-build.ppm",true);
  press(H::Action::slopeUp);Check(H::AreaTools::settings.operation==H::AreaTools::Operation::raise,"Direct operation switch failed");

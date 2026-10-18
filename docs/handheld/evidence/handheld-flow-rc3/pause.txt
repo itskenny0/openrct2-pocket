@@ -1,0 +1,5 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+PASS paused native save/reload and explicit Resume
+PASS Build/Paths back hierarchy and focused queue return
+PASS Resume/B clear only normal pause, preserve engine reasons and avoid reintroducing pause on cleanup

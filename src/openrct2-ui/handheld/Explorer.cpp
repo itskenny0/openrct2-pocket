@@ -957,6 +957,26 @@ namespace OpenRCT2::Ui::Handheld
         {
             auto indices=_sceneryTool ? ConstructionAdjust::SceneryRows(_constructionAdjust.focus.tab)
                 : ConstructionAdjust::TerrainRows(_constructionAdjust.focus.tab);
+            if (_constructionAdjust.palette)
+            {
+                _constructionAdjust.colourChoice=MoveColourGrid(_constructionAdjust.colourChoice,72,frame.navigateX,frame.navigateY);
+                for (const auto action:frame.actions)
+                {
+                    if (action==Action::back || action==Action::contextSecondary) _constructionAdjust.palette=false;
+                    else if (action==Action::confirm)
+                    {
+                        const auto colourRow=indices[_constructionAdjust.row];
+                        const auto currentColour=ConstructionAdjust::CurrentColour(_sceneryTool,colourRow);
+                        const auto delta=static_cast<int>(_constructionAdjust.colourChoice)
+                            -static_cast<int>(ConstructionAdjust::ColourIndex(currentColour));
+                        if (_sceneryTool) SceneryTools::Configure(colourRow,delta);
+                        else AreaTools::Configure(colourRow,delta);
+                        _constructionAdjust.palette=false;
+                    }
+                    input.suspend();break;
+                }
+                return; // Palette navigation cannot pan, place, or recolour the park.
+            }
             _constructionAdjust.move(frame.navigateY,indices.size());
             const auto row=indices[_constructionAdjust.row];
             const bool enabled=_sceneryTool ? ConstructionAdjust::SceneryEnabled(row) : ConstructionAdjust::TerrainEnabled(row);
@@ -975,7 +995,12 @@ namespace OpenRCT2::Ui::Handheld
                 if(action==Action::back || action==Action::contextSecondary) _constructionAdjust.active=false;
                 else if(action==Action::confirm)
                 {
-                    if(_areaTool && _constructionAdjust.focus.tab==2 && row<=6)
+                    if (enabled && ConstructionAdjust::ColourRow(_sceneryTool,row))
+                    {
+                        _constructionAdjust.colourChoice=ConstructionAdjust::ColourIndex(ConstructionAdjust::CurrentColour(_sceneryTool,row));
+                        _constructionAdjust.palette=true;
+                    }
+                    else if(_areaTool && _constructionAdjust.focus.tab==2 && row<=6)
                         Windows::HandheldTerrainMaterialPickerOpen(row==6);
                     else _constructionAdjust.active=false; // Return to building, never place on this press.
                 }
@@ -1562,13 +1587,13 @@ namespace OpenRCT2::Ui::Handheld
                     costAmount = FormatMoney(result.cost) + (_sceneryTool && SceneryTools::ScatterActive() ? " est." : "");
                 }
                 else
-                    status += "  " + result.getErrorMessage();
+                    status = result.getErrorMessage(); // The panel already names the tool and stage.
             }
             else
-                status += _sceneryTool && SceneryTools::Current().mode == SceneryTools::Mode::pick ? "  Point at placed scenery"
-                    : _colourRide     ? "  Point at this ride track / Y scheme"
-                    : _sceneryRemovalTool ? "  Point at small scenery"
-                                          : "  Move onto land";
+                status = _sceneryTool && SceneryTools::Current().mode == SceneryTools::Mode::pick ? "Point at placed scenery"
+                    : _colourRide     ? "Point at this ride's track"
+                    : _sceneryRemovalTool ? "Point at small scenery"
+                                          : "Move onto land";
             if (!_terrainStatus.empty())
                 status = _sceneryTool && SceneryTools::ScatterActive() && _scatterFeedback ? SceneryTools::ScatterStatus() : _terrainStatus;
         }
@@ -1659,7 +1684,8 @@ namespace OpenRCT2::Ui::Handheld
                     : SceneryTools::ScatterActive() ? SceneryTools::ScatterReviewed() ? "Apply" : "Review"
                     : SceneryTools::Current().mode==SceneryTools::Mode::remove ? "Remove"
                     : SceneryTools::Current().mode==SceneryTools::Mode::recolour ? "Paint" : "Place",
-                    _areaTool && _constructionAdjust.active && _constructionAdjust.focus.tab==2 && _constructionAdjust.row<2);
+                    _constructionAdjust.active && ConstructionAdjust::PickerAction(_constructionAdjust,_sceneryTool),
+                    _constructionAdjust.palette);
             else if (_treeTool)
                 DrawTreeFooter(rt, { ContextGetWidth(), height });
             else if (_colourRide)
@@ -1674,6 +1700,9 @@ namespace OpenRCT2::Ui::Handheld
                 DrawGameplayFooter(
                     rt, { ContextGetWidth(), height }, status, _terrainActive, _surfaceTool || _colourRide.has_value());
         }
+        // A colour palette owns the D-pad; placement feedback/cursor is unrelated
+        // here and suggested a placement error while merely choosing a colour.
+        if (_constructionAdjust.active && _constructionAdjust.palette && (_sceneryTool || _areaTool)) return;
         const bool feedback = !_terrainStatus.empty() || (Paths::BatchActive() && !Paths::BatchMessage().empty());
         if (Paths::BatchActive() && (feedback || costAmount.empty()))
             DrawConstructionMessage(rt,{ContextGetWidth(),height},status);

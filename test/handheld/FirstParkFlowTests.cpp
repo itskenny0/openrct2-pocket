@@ -12,6 +12,7 @@
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/Shops.h>
 #include <openrct2-ui/handheld/FlatRides.h>
+#include <openrct2-ui/handheld/ConstructionAdjust.h>
 #include <openrct2-ui/handheld/ShopAppearance.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
@@ -92,7 +93,10 @@ int main(int argc,char** argv)
   wm->CloseByClass(WindowClass::parkInformation);wm->CloseByClass(WindowClass::error);WindowCullDead();InputSetState(InputState::normal);gGamePaused=0;
   capture("03-started-park.png");
   // Enter the production Build -> Paths menus without shortcuts or a mouse.
-  W::HandheldBuildOpen();capture("04-build-menu.png");W::HandheldMenuMove(2);press(H::Action::confirm);capture("04b-path-mode-menu.png");press(H::Action::confirm);
+  W::HandheldBuildOpen();capture("04-build-menu.png");nav(1,0);nav(1,0);press(H::Action::confirm);
+  capture("04b-path-mode-menu.png");press(H::Action::back);press(H::Action::confirm);
+  // Back restores the Paths card rather than jumping to the first Build action.
+  press(H::Action::confirm);
   Check(H::Paths::IsActive()&&!wm->FindByClass(WindowClass::handheldMenu),"Build/Paths did not enter construction");
   auto& state=getGameState();const auto startingCash=state.park.cash;
   std::vector<CoordsXY> pathTiles;
@@ -110,6 +114,8 @@ int main(int argc,char** argv)
   Check(state.park.cash==startingCash-quoted,"Path charges differ from native quotes");
   const auto* pathSurface=MapGetSurfaceElementAt(pathTiles.front());lookAt({pathTiles.front().x+16,pathTiles.front().y+16,pathSurface->getBaseZ()});
   capture("05-paths.png");H::Paths::End();
+  W::HandheldBuildOpen();nav(0,1);nav(0,1);nav(1,0);nav(1,0);press(H::Action::confirm);
+  capture("05c-scenery-categories.png");press(H::Action::back);press(H::Action::back);
   // Existing catalog/research eligibility supplies all objects; do not unlock objects.
   auto shops=H::Shops::Entries();std::stable_sort(shops.begin(),shops.end(),[](const auto& a,const auto& b){
    auto colour=[](const auto& e){const auto* entry=GetRideEntryByIndex(e.identity.index);return entry && !entry->flags.has(RideEntryFlag::disableColourTab) && GetRideTypeDescriptor(ShopPlacement::Type(e.identity.index)).flags.has(RtdFlag::hasTrackColourMain);};
@@ -127,6 +133,21 @@ int main(int argc,char** argv)
    Check(vendors.size()==n+1,"Shop action did not create vendor");
   }
   Check(vendors.size()==2,"Placed vendors missing from management");
+  // Follow the production Build -> Shops route and cancel without buying anything.
+  W::HandheldBuildOpen();nav(1,0);nav(1,0);nav(1,0);nav(0,1);capture("05a-shop-choice.png");press(H::Action::confirm);
+  Check(W::HandheldObjectPickerIsOpen(),"Visual Build/Shop route missing");capture("05b-shop-catalog.png");
+  press(H::Action::back);press(H::Action::back);
+  H::SceneryTools::SelectCategory(H::SceneryTools::Category::small);
+  const auto scenery=H::SceneryTools::Entries(H::SceneryTools::Category::small);
+  const auto colourObject=std::find_if(scenery.begin(),scenery.end(),[](const auto& e){return H::SceneryTools::Channels(H::SceneryTools::Category::small,e.identity.index)[0];});
+  Check(colourObject!=scenery.end(),"Scenario has no eligible colourable small scenery");
+  Check(H::SceneryTools::Select(colourObject->identity.index),"Scenery selection failed");H::BeginScenery();
+  press(H::Action::contextSecondary);press(H::Action::nextOption);capture("09d-scenery-adjust.png");
+  const auto sceneryColour=H::SceneryTools::Current().colours[0];const auto sceneryCash=state.park.cash;
+  press(H::Action::confirm);nav(1,0);capture("09e-scenery-palette.png");press(H::Action::back);
+  Check(H::SceneryTools::Current().colours[0]==sceneryColour&&state.park.cash==sceneryCash,"Palette cancellation changed scenery or accounting");
+  press(H::Action::nextOption);capture("09f-scenery-mode.png");press(H::Action::back);
+  Check(H::IsSceneryToolActive(),"Adjust Back abandoned scenery tool");H::EndTerrain();
   const auto shopTarget=H::ShopManagement::Capture(vendors.front());Check(shopTarget.has_value(),"Shop inspection target missing");lookAt(shopTarget->location);
   W::HandheldRideOpen(vendors.front());capture("06-shop.png");W::HandheldMenuMove(4);press(H::Action::confirm);capture("07-shop-appearance.png");
   auto appearance=W::HandheldShopAppearancePresentation();
@@ -138,7 +159,12 @@ int main(int argc,char** argv)
   }
   press(H::Action::back);press(H::Action::back);
   auto flats=H::FlatRides::Entries();Check(!flats.empty(),"Scenario has no researched flat rides");
-  Check(H::BeginFlatRide(flats.front().identity.index),"Flat ride catalog choice failed");
+  H::EndTerrain();W::HandheldBuildOpen();
+  // A fresh menu starts on the first card; select Rides on its third row.
+  nav(0,1);nav(0,1);press(H::Action::confirm);
+  Check(W::HandheldObjectPickerIsOpen(),"Visual Build/Ride route missing");capture("09b-ride-catalog.png");
+  press(H::Action::confirm);Check(H::FlatRides::CurrentStage()==H::FlatRides::Stage::ride,"Ride catalog did not enter flat placement");
+  capture("09c-flat-placement.png");
   std::optional<CoordsXY> location;
   for(int y=32;y<state.mapSize.y*32-32&&!location;y+=32)for(int x=32;x<state.mapSize.x*32-32&&!location;x+=32)
    if(H::FlatRides::Action(CoordsXY{x,y},false).error==GameActions::Status::ok)location=CoordsXY{x,y};

@@ -536,11 +536,29 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 
 - Description: The Build menu still exposes fourteen entries through eight visible rows; long selected path-surface names truncate, and flat-ride instructions repeat the footer.
 - Severity: Minor
-- Status: Confirmed
+- Status: Fixed
 - Source: FirstParkFlowTests native captures 04-build-menu.png, 05-paths.png and 10-flat-entrance.png; source audit.
 - Suggested solution: Preserve existing routes while grouping Build categories into shared cards; full selected surface names in Adjust; compact Build/Entrance/Exit indicator. Plan focus and Back behavior before changing menu structure.
-- Scope: Focused UI maintenance proposals in FIRST-PLAY-REFINEMENTS.md, not new gameplay features. No claim these are fixed.
+- RC3 implementation / verification: Shared icon cards expose all fourteen Build routes and spatial Path/Scenery/track-entry choices; wrapped material names/native previews, path mode strip, compact ride progress/thumbnail and wider catalog cells. FirstParkFlowTests verifies nested Back/focus, native construction/accounting and save/reload; PathBatchTests and RideFlowTests retain preview/cancellation/access behavior. Native 512x384 before/after captures reviewed in captures/handheld-flow-rc3/. The specific observed eight-row/truncation/repeated-stage defects are addressed; advanced More editors, physical fit and wide Fill occlusion remain open below and in existing entries.
+
+## FP-F5 — Scenery / terrain color choices
+
+- Description: Supported tool colors were textual cyclic adjustments rather than visible choices; scenery modulo-72 enum cycling could select special entries and omit normal colors whose enum values are 72/73.
+- Severity: Minor
+- Status: Fixed
+- Implementation: Supported rows display swatches and open the shared native-order palette with A. D-pad only changes the local choice, A selects the tool setting, B/Y cancels to Adjust. Scenery cycling uses the actual ordered normal palette, excluding the special invisible/void choices.
+- Verification: ConstructionUxTests checks draft isolation, cancel/use, all 72 normal choices, native costs, camera and held input. FirstParkFlowTests captures palette/mode on actual scenario scenery and verifies cancellation/accounting. Existing native actions, eligibility and queues remain authoritative.
+- Evidence: HANDHELD-FLOW-RC3.md; captures/handheld-flow-rc3/; evidence/handheld-flow-rc3/.
+
+## FP-02 — Advanced and device density review
+
+- Description: Advanced track/design/connection and legacy More editors still contain technical text; catalog tile labels can abbreviate despite full selected detail. Build intentionally retains overlapping quick/full tools.
+- Severity: Minor
+- Status: Unverified
+- Reproduction: Read long entries and advanced options during real Brick play; assess whether grouping the retained Build routes actually improves speed.
+- Suggested solution: Target only observed friction, keeping full geometry/details and all routes discoverable. Do not equate a visual grid with verified physical comfort.
+- Evidence: RC3 native captures and HANDHELD-FLOW-RC3.md scope/limits. Device readability/comfort remains S-02/S-04; wide Fill remains P7-01.
 
 - Device evidence update: User reports RC1 launches and plays well after replacing the complete runtime folder. That confirms ordinary startup/gameplay on one Brick installation; audio, every button, suspend, performance and save-round-trip matrices remain unverified. The cause of the earlier invalid installed library files is unknown.
 
-Inventory: **50 entries**; 3 Confirmed, 18 Unverified, 29 Fixed, 0 Deferred.
+Inventory: **52 entries**; 2 Confirmed, 19 Unverified, 31 Fixed, 0 Deferred.

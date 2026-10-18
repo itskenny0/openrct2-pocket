@@ -1,7 +1,7 @@
 # OpenRCT2 Pocket: NextUI Brick release candidate
 
 1. For an update, rename the existing package's `game` folder to an unused
-   backup name such as `game-before-rc2`. Then copy the new ZIP's `game` folder
+   backup name such as `game-before-rc3`. Then copy the new ZIP's `game` folder
    into the package. Copy the new `launch.sh`, instructions and metadata too.
    Keep the package's existing `RCT2` folder and the SD card's `.userdata` folder.
    Use a fresh `game` folder, rather than merging old runtime files.
@@ -35,8 +35,9 @@ manual checking. `OPENRCT2_BRICK_KEEP_MAPPING=1` preserves an existing supplied 
 mapping. `OPENRCT2_RCT2_PATH` can select another original installation directory.
 
 The prior RC1 plus the complete runtime replacement was reported launching and
-playing well on a Brick. This RC2 refinement has native desktop interaction and
-ARM package checks; its changed title/picker screens still need a Brick retest.
+playing well on a Brick. RC3 adds visual building choices, path state/material
+panels, guided flat-ride placement and scenery/terrain color palettes. It has
+native desktop interaction and ARM package checks, but still needs a Brick retest.
 Audio, every button, suspend/resume, SD-card save round trips and performance
 remain physical-device checks. Back up saves.
 

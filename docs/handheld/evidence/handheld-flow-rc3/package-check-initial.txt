@@ -1,0 +1,4 @@
+openrct2: OpenRCT2, v0.5.5 (39c32e3 on handheld/modern-ui-paths)
+openrct2-cli: OpenRCT2, v0.5.5 (39c32e3 on handheld/modern-ui-paths)
+PASS: archive CRC, safe paths, modes, hashes, ARM64 ELF/dependency closure, resources, launcher, isolated saves
+PASS: packaged GUI/CLI version execution under QEMU; device graphics/gameplay unverified

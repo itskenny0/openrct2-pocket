@@ -3,6 +3,20 @@
 #include "Panel.h"
 namespace OpenRCT2::Ui::Handheld
 {
+    // Presentation only: progress reflects the caller's actual construction stage.
+    inline void DrawPlacementSteps(Drawing::RenderTarget& rt, ScreenCoordsXY p, int width, size_t active)
+    {
+        static constexpr std::array labels{"Ride", "Entry", "Exit"};
+        const int pitch = width / 3;
+        for (size_t i=0; i<labels.size(); ++i)
+        {
+            const auto cell = p + ScreenCoordsXY{static_cast<int>(i)*pitch, 0};
+            Fill(rt, cell, {pitch-3, 24}, i == active ? Theme::gold : Theme::raised);
+            DrawModernEllipsised(rt, cell + ScreenCoordsXY{4, 7}, pitch-10,
+                std::string(i == active ? "{BLACK}" : "{MUTED}") + labels[i]);
+            if (i < active) Fill(rt, cell + ScreenCoordsXY{3, 21}, {pitch-9, 2}, static_cast<Drawing::PaletteIndex>(PocketPalette::positive));
+        }
+    }
     inline void DrawConstructionOverlay(
         Drawing::RenderTarget& rt, ScreenCoordsXY p, const std::string& title, const std::string& object,
         const std::string& mode, const std::string& geometry, const std::string& height,

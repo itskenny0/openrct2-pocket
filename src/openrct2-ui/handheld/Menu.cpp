@@ -5,6 +5,7 @@
 #include "Currency.h"
 #include "CustomTracks.h"
 #include "Dashboard.h"
+#include "ChoiceCards.h"
 #include "Designs.h"
 #include "DesignAuthoring.h"
 #include "Explorer.h"
@@ -974,9 +975,51 @@ namespace OpenRCT2::Ui::Windows
             _parkMap.Update();
             invalidate();
         }
+        bool choiceCards() const
+        {
+            return _page == Page::build || _page == Page::paths || _page == Page::sceneryCategory
+                || _page == Page::customChoice;
+        }
+        std::vector<Handheld::ChoiceCard> choices() const
+        {
+            using I = Handheld::PanelIcon;
+            if (_page == Page::build)
+                return {{0,"Raise land","Lift the ground under your cursor",I::raise},
+                    {1,"Lower land","Lower the ground under your cursor",I::lower},
+                    {2,"Paths","Footpaths, queues, connected paths and removal",I::path},
+                    {3,"Water","Raise or lower water",I::terrain,SPR_TAB_WATER},
+                    {4,"Surfaces","Choose a ground surface",I::terrain,SPR_G2_TAB_LAND},
+                    {5,"Remove scenery","Remove an existing scenery object",I::remove},
+                    {6,"Trees","Choose a tree from the visual catalog",I::tree},
+                    {7,"Shops & facilities","Food, drinks, shops and guest facilities",I::folder,SPR_SHOP_ITEM_BURGER},
+                    {8,"Rides","Choose a ride, then place or construct it",I::play,SPR_TAB_RIDE_0},
+                    {9,"Saved designs","Browse your saved track designs",I::folder},
+                    {10,"Scenery","Trees, buildings, fences, signs and path furniture",I::largeScenery},
+                    {11,"Landscape","Brush, shape, water and terrain painting",I::terrain,SPR_G2_TAB_LAND},
+                    {12,"Land & rights","Buy available land or construction rights",I::terrain},
+                    {13,"Park","Return to your park",I::back}};
+            if (_page == Page::paths)
+                return {{0,"Footpath","Place individual tiles; Y Adjust also offers Line and Fill",I::path},
+                    {1,"Queue","Build a queue for a ride entrance",I::path},
+                    {2,"Remove","Remove a path tile under your cursor",I::remove},
+                    {4,"Extend path","Build from an endpoint, including slopes and bridges",I::path},
+                    {5,"Extend queue","Continue a queue from an endpoint",I::path},
+                    {3,"Build menu","Return to the other building tools",I::back}};
+            if (_page == Page::customChoice)
+                return {{0,"Build track","Construct your own track, piece by piece",I::play,SPR_TAB_RIDE_0},
+                    {1,"Saved design","Choose an existing design from the visual catalog",I::folder},
+                    {2,"Back","Return to the ride catalog",I::back}};
+            return {{0,"Trees & small","Plants, trees and small scenery objects",I::tree},
+                {1,"Buildings","Large scenery and building objects",I::largeScenery},
+                {2,"Walls & fences","Choose a wall or fence",I::walls},
+                {3,"Signs","Banners and signs",I::furniture},
+                {4,"Path furniture","Benches, bins, lamps and other path additions",I::furniture},
+                {5,"Clear area","Select which scenery types to clear with a brush",I::remove},
+                {6,"Build menu","Return to the other building tools",I::back}};
+        }
         bool constructionMenu() const
         {
-            return _page == Page::researchCatalog || _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
+            return choiceCards() || _page == Page::researchCatalog || _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
                 || _page == Page::staffPatrolClear || _page == Page::rightsOptions || _page == Page::rightsConfirm
                 || (_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) || _page == Page::areaOptions || _page == Page::terrainPaintConfirm || _page == Page::sceneryOptions || _page == Page::parkInspect || (_page == Page::designInspect || _page == Page::designVehicles || _page == Page::designWarnings || _page == Page::designConfirm) || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
                 || _page == Page::sceneryConfirm || _page == Page::sceneryGroups || _page == Page::sceneryStyle
@@ -984,6 +1027,13 @@ namespace OpenRCT2::Ui::Windows
         }
         void constructionMove(int x, int y)
         {
+            if (choiceCards())
+            {
+                const auto next = Handheld::MoveChoiceCards(choices(), _focus.index(), _page == Page::build ? 4 : 3, x, y);
+                _focus.move(static_cast<int>(next) - static_cast<int>(_focus.index()), rows().size());
+                invalidate();
+                return;
+            }
             if ((_page == Page::designInspect || _page == Page::designVehicles || _page == Page::designWarnings) && x) {
                 const auto labels=rows(); const auto text=_focus.index()<labels.size()?labels[_focus.index()]:std::string{};
                 _designDetail=static_cast<size_t>(std::clamp<int64_t>(static_cast<int64_t>(_designDetail)+x,0,Handheld::FileBrowsing::DetailPages(text)-1));
@@ -1049,7 +1099,7 @@ namespace OpenRCT2::Ui::Windows
             const ScreenSize target{ _page == Page::overwrite || _page == Page::discard || _page == Page::exit ? 330
                                                                                                                : size.width,
                                      size.height };
-            const ScreenSize bounds = (_page == Page::staffPatrolClear || _page == Page::rightsConfirm
+            const ScreenSize bounds = (choiceCards() || _page == Page::staffPatrolClear || _page == Page::rightsConfirm
                                        || _page == Page::parkInspect || (_page == Page::designInspect || _page == Page::designVehicles || _page == Page::designWarnings || _page == Page::designConfirm) || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch || _page == Page::sceneryConfirm
                                        || (_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement() || managementShell())
                 ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
@@ -1058,7 +1108,7 @@ namespace OpenRCT2::Ui::Windows
             WindowSetResize(*this, bounds, bounds);
             WindowSetPosition(
                 *this,
-                (_page == Page::staffPatrolClear || _page == Page::rightsConfirm || _page == Page::parkInspect || (_page == Page::designInspect || _page == Page::designVehicles || _page == Page::designWarnings || _page == Page::designConfirm) || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
+                (choiceCards() || _page == Page::staffPatrolClear || _page == Page::rightsConfirm || _page == Page::parkInspect || (_page == Page::designInspect || _page == Page::designVehicles || _page == Page::designWarnings || _page == Page::designConfirm) || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
                  || _page == Page::sceneryConfirm || (_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement()
                  || managementShell())
                     ? ScreenCoordsXY{ 0, 0 }
@@ -5611,6 +5661,14 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
+            if (choiceCards())
+            {
+                Handheld::DrawChoiceCards(rt, {ContextGetWidth(), ContextGetHeight()},
+                    _page == Page::build ? "Build your park" : _page == Page::paths ? "Paths & queues"
+                        : _page == Page::customChoice ? "Build this ride" : "Scenery",
+                    choices(), _focus.index(), _page == Page::build ? 4 : 3, _page == Page::build ? "Park" : "Back");
+                return;
+            }
             if (_page == Page::controls)
             {
                 Handheld::ManagementPresentation model;

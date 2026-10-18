@@ -384,8 +384,15 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         if (row == 6)
             current.height = 0;
         if (row >= 7 && row <= 9 && Channels(current.category, current.object)[row - 7])
-            current.colours[row - 7] = static_cast<Drawing::Colour>(
-                (static_cast<int>(current.colours[row - 7]) + delta + 72) % 72);
+        {
+            // Native enum values are not the ordered normal palette: silver and
+            // light water follow the two special entries. Cycle actual choices.
+            int index=0;
+            for (uint8_t i=0;i<Drawing::kColourNumNormal;++i)
+                if (Windows::ColourDropDownIndexToColour(i)==current.colours[row-7]) { index=i;break; }
+            current.colours[row-7]=Windows::ColourDropDownIndexToColour(
+                (index+delta%Drawing::kColourNumNormal+Drawing::kColourNumNormal)%Drawing::kColourNumNormal);
+        }
         if (row == 16 && current.category == Category::small) current.scatter = !current.scatter;
         if (row == 17) current.scatterSize = std::clamp<int>(current.scatterSize + delta, 1, 64);
         if (row == 18) current.scatterDensity = static_cast<ScatterToolDensity>((static_cast<int>(current.scatterDensity)+delta+3)%3);

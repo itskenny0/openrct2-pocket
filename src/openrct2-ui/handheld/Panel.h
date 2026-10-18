@@ -436,14 +436,14 @@ namespace OpenRCT2::Ui::Handheld
         Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& name, bool available, Direction direction)
     {
         using namespace Concept;
-        Box(rt, pos, { kRailWidth, 146 });
-        Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, "Shops / Facilities");
-        Section(rt, pos + ScreenCoordsXY{ 10, 35 }, "Building");
-        Row(rt, pos + ScreenCoordsXY{ 8, 54 }, name, Icon::path, available);
-        Rule(rt, pos + ScreenCoordsXY{ 8, 99 }, 148);
+        Box(rt, pos, { 184, 146 });
+        Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, "Place shop");
+        DrawWrappedLabel(rt,pos+ScreenCoordsXY{12,42},160,(available ? "{WHITE}" : "{DISABLED}")+name,2);
+        Rule(rt, pos + ScreenCoordsXY{ 12, 83 }, 160);
         DrawModernText(
-            rt, pos + ScreenCoordsXY{ 12, 116 },
-            "{MUTED}Rotation " + std::string(std::array{ "NW", "SW", "SE", "NE" }[direction & 3]));
+            rt, pos + ScreenCoordsXY{ 12, 96 },
+            "{MUTED}Faces " + std::string(std::array{ "NW", "SW", "SE", "NE" }[direction & 3]));
+        DrawCommand(rt,pos+ScreenCoordsXY{12,121},32,"SELECT","Turn");
     }
 
     inline void DrawTrackColourOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, uint8_t scheme, bool target)

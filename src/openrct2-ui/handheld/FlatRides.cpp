@@ -4,6 +4,7 @@
 #include "TrackPreview.h"
 #include "AccessPreview.h"
 #include "RideAccess.h"
+#include "ConstructionPanel.h"
 
 #include <openrct2/actions/ride/FlatRideEntrancePlaceAction.h>
 #include <openrct2/actions/ride/FlatRidePlaceAction.h>
@@ -315,29 +316,33 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
         using namespace Concept;
         const bool placing = stage == Stage::ride;
         const auto p = kOrigin;
-        Box(rt, p, { kRailWidth, 174 });
+        Box(rt, p, { 216, 190 });
         Heading(rt, p + ScreenCoordsXY{ 10, 12 }, editing ? "Move ride access" : "Build ride");
-        DrawStrongText(rt,p+ScreenCoordsXY{10,35},"{WHITE}"+Name(),144);
-        Row(rt, p + ScreenCoordsXY{ 8, 54 },
-            placing                        ? "Place ride"
-                : stage == Stage::entrance ? "Entrance"
-                                           : "Exit",
-            Icon::path, true);
-        Rule(rt, p + ScreenCoordsXY{ 8, 99 }, 148);
-        DrawModernEllipsised(
-            rt, p + ScreenCoordsXY{ 12, 116 }, 140,
-            placing ? "{MUTED}Ground placement" : "{MUTED}Station " + std::to_string(stationIndex.ToUnderlying() + 1));
-        DrawModernEllipsised(rt,p+ScreenCoordsXY{12,140},140,placing ? "{WHITE}Direction "+std::to_string(direction+1) : "{WHITE}START/B Return to ride");
+        DrawWrappedLabel(rt,p+ScreenCoordsXY{12,36},192,Name(),2);
+        if (!editing) DrawPlacementSteps(rt, p+ScreenCoordsXY{12,76}, 192, placing ? 0 : stage == Stage::entrance ? 1 : 2);
+        else DrawStrongText(rt,p+ScreenCoordsXY{12,80},stage == Stage::entrance ? "{WHITE}Move entrance" : "{WHITE}Move exit",192);
+        if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject(ObjectType::ride, selected))
+        {
+            Drawing::RenderTarget thumbnail;
+            if (ClipRenderTarget(thumbnail, rt, p+ScreenCoordsXY{12,110},64,64))
+            {
+                thumbnail.zoom_level=ZoomLevel{1};
+                object->DrawPreview(thumbnail,128,128);
+            }
+        }
+        DrawStrongText(rt,p+ScreenCoordsXY{86,116},placing ? "{WHITE}Place ride" : stage == Stage::entrance ? "{WHITE}Place entrance" : "{WHITE}Place exit",118);
+        DrawModernEllipsised(rt,p+ScreenCoordsXY{86,140},118,placing ? "{MUTED}Faces "+std::string(std::array{"NW","SW","SE","NE"}[direction & 3]) : "{MUTED}Station "+std::to_string(stationIndex.ToUnderlying()+1));
+        if (!editing) DrawCommand(rt,p+ScreenCoordsXY{86,163},32,"SELECT","Turn");
         DrawActionStrip(rt, screen);
 
         std::vector<ControlHint> hints{ { "D-pad", "Move" },
                                         { "A", editing ? "Review" : "Place" },
                                         { "B", target ? "Ride" : "Cancel" },
-                                        { "START", target ? "Ride" : "Park" } };
+                                        { "START", target ? "Ride" : "Park", HintPriority::guide } };
         if (!editing)
         {
             hints.push_back({ "Y", "Rides" });
-            hints.push_back({ "SELECT", "Turn" });
+            hints.push_back({ "SELECT", "Turn", HintPriority::guide });
         }
         DrawFooter(rt, screen, hints);
         }

@@ -2,9 +2,22 @@
 #include <iostream>
 #include <openrct2-ui/handheld/Panel.h>
 #include <openrct2-ui/handheld/ColourGrid.h>
+#include <openrct2-ui/handheld/ChoiceCards.h>
 using namespace OpenRCT2::Ui::Handheld;
 int main()
 {
+    for (size_t count : {3u,6u,7u,14u})
+    {
+        std::vector<ChoiceCard> cards;
+        for (size_t i=0;i<count;++i) cards.push_back({count-1-i,"Choice","Detail"});
+        const size_t columns=count==14 ? 4 : 3;
+        for (const auto& card:cards)
+            for (const auto [x,y]:{std::pair{-1,0},{1,0},{0,-1},{0,1}})
+                if (MoveChoiceCards(cards,card.action,columns,x,y)>=count) return 5;
+        if (MoveChoiceCards(cards,cards.front().action,columns,-1,0)!=cards.front().action
+            || MoveChoiceCards(cards,cards[columns-1].action,columns,1,0)!=cards[columns-1].action
+            || MoveChoiceCards(cards,cards.front().action,columns,0,-1)!=cards.front().action) return 6;
+    }
     if (MoveColourGrid(0, 72, -1, 0) != 0 || MoveColourGrid(0, 72, 0, 1) != 8
         || MoveColourGrid(7, 72, 1, 0) != 7 || MoveColourGrid(71, 72, 0, 1) != 71
         || MoveColourGrid(71, 74, 0, 1) != 73 || MoveColourGrid(73, 74, 1, 0) != 73

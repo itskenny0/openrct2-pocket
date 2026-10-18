@@ -4,6 +4,7 @@
 #include "ConstructionPanel.h"
 #include "PathBatch.h"
 #include "RideAccess.h"
+#include "PathSurfacePicker.h"
 
 #include <algorithm>
 #include <cstring>
@@ -931,49 +932,67 @@ namespace OpenRCT2::Ui::Handheld::Paths
     }
     void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position)
     {
-        if (BatchActive())
-        {
-            const auto p = position;
-            DrawSurface(rt, p, { 204, batch.review ? 210 : 190 });
-            DrawHeadingText(rt, p + ScreenCoordsXY{12,12}, batch.mode == BuildMode::line ? "Line path" : "Fill paths", 180);
-            DrawModernEllipsised(rt,p+ScreenCoordsXY{12,40},180,"{WHITE}"+SurfaceName());
-            DrawModernText(rt,p+ScreenCoordsXY{12,62},IsQueue() ? "{WHITE}QUEUE / FLAT" : "{WHITE}FOOTPATH / FLAT");
-            const auto dims = std::to_string(batch.selection.width)+" x "+std::to_string(batch.selection.height)
-                +" / "+std::to_string(batch.selection.width*batch.selection.height)+" tiles";
-            DrawModernEllipsised(rt,p+ScreenCoordsXY{12,84},180,"{MUTED}"+(batch.start ? dims : "A Set start / max 64 tiles"));
-            DrawModernText(rt,p+ScreenCoordsXY{12,106},"{MUTED}Height "+std::to_string(fixedHeight.value_or(target ? target->z : 0)/kCoordsZStep));
-            if (batch.review)
-            {
-                DrawStrongText(rt, p + ScreenCoordsXY{ 12, 128 }, "{CAUTION}Build these paths?", 180);
-                DrawModernText(rt, p + ScreenCoordsXY{ 12, 150 }, "{WHITE}Stops at the first problem.");
-                DrawModernText(rt, p + ScreenCoordsXY{ 12, 170 }, "{WHITE}Built paths stay. You pay.");
-                DrawModernText(rt,p+ScreenCoordsXY{12,190},"{MUTED}A Build / B Preview");
-            }
-            else
-            {
-                const auto state = batch.busy ? "Building / please wait"
-                    : IsAdjusting()           ? "L1/R1 Single / Line / Fill"
-                    : batch.start             ? "+ New   = Path   X Blocked"
-                                              : "Y Adjust / L2/R2 Height";
-                DrawModernEllipsised(rt,p+ScreenCoordsXY{12,128},180,"{WHITE}"+std::string(state));
-                DrawModernEllipsised(rt,p+ScreenCoordsXY{12,150},180,"{MUTED}"+(batch.notice.empty()
-                    ? batch.start ? "A Review / B Cancel selection" : "Select Surface / B Exit" : batch.notice));
-                DrawModernEllipsised(rt,p+ScreenCoordsXY{12,170},180,std::string("{MUTED}")+(IsAdjusting() ? "Up/Down Height / B Build" : "S Start / D End / Y Adjust"));
-            }
-            return;
-        }
+        const auto p = position;
+        const bool review = BatchActive() && batch.review;
+        const int height = review ? 242 : IsAdjusting() ? 228 : BatchActive() ? 206 : 184;
+        DrawSurface(rt,p,{216,height});
+        DrawHeadingText(rt,p+ScreenCoordsXY{12,12},IsAdjusting() ? "{WHITE}Adjust path"
+            : IsRemoving() ? "{WHITE}Remove path" : IsQueue() ? "{WHITE}Queue" : "{WHITE}Footpath",192);
         if (!IsConnected())
         {
-            DrawPathOverlay(rt, position, SurfaceName(), IsQueue(), IsRemoving(), PlacementName(), false, IsAdjusting());
-            if (IsAdjusting())
-                DrawModernText(rt, position + ScreenCoordsXY{ 12, 170 }, "{WHITE}L1/R1 Single / Line / Fill");
-            return;
+            static constexpr std::array names{"Single","Line","Fill"};
+            for (size_t i=0;i<names.size();++i)
+            {
+                const auto cell=p+ScreenCoordsXY{12+static_cast<int>(i)*65,36};
+                const bool selected=static_cast<size_t>(Mode())==i;
+                Fill(rt,cell,{61,24},selected ? Theme::gold : Theme::raised);
+                DrawModernText(rt,cell+ScreenCoordsXY{6,7},std::string(selected ? "{BLACK}" : "{MUTED}")+names[i]);
+            }
         }
-        auto geometry = PlacementName();
-        if (const auto hint = geometry.find(" / Y turn"); hint != std::string::npos)
-            geometry.erase(hint); // Y opens settings; keep room for the actual endpoint height.
-        DrawPathOverlay(rt, position, SurfaceName(), IsQueue(), false,
-            geometry + (ConnectedReady() && target ? " / Height " + std::to_string(target->z / kCoordsZStep) : " / Choose start"), true, IsAdjusting());
+        else DrawStrongText(rt,p+ScreenCoordsXY{12,42},"{WHITE}EXTEND",192);
+        if (const auto current=PathSurfaces::Current())
+            if (const auto* object=GetContext()->GetObjectManager().GetLoadedObject(current->type,current->index))
+            {
+                Drawing::RenderTarget preview;
+                if (ClipRenderTarget(preview,rt,p+ScreenCoordsXY{12,70},48,44))
+                {
+                    preview.zoom_level=ZoomLevel{1};
+                    object->DrawPreview(preview,96,88);
+                }
+            }
+        DrawWrappedLabel(rt,p+ScreenCoordsXY{68,72},136,SurfaceName(),3);
+        if (BatchActive())
+        {
+            const auto dims=std::to_string(batch.selection.width)+" x "+std::to_string(batch.selection.height)
+                +" / "+std::to_string(batch.selection.width*batch.selection.height)+" tiles";
+            DrawStrongText(rt,p+ScreenCoordsXY{12,124},"{WHITE}"+(batch.start ? dims : "Choose a start tile"),192);
+            DrawModernText(rt,p+ScreenCoordsXY{12,146},"{MUTED}Height "+std::to_string(fixedHeight.value_or(target ? target->z : 0)/kCoordsZStep));
+            if (review)
+            {
+                DrawStrongText(rt,p+ScreenCoordsXY{12,169},"{CAUTION}Build this selection?",192);
+                DrawWrappedLabel(rt,p+ScreenCoordsXY{12,192},192,
+                    "Stops at the first problem. Completed tiles stay and are charged.",3);
+            }
+            else if (IsAdjusting())
+            {
+                DrawCommand(rt,p+ScreenCoordsXY{12,170},38,"L1/R1","Mode");
+                DrawCommand(rt,p+ScreenCoordsXY{12,196},38,"D-pad","Height");
+            }
+            else DrawWrappedLabel(rt,p+ScreenCoordsXY{12,169},192,
+                batch.notice.empty() ? batch.start ? "+ New   = Existing   X Blocked" : "Up to 64 tiles per selection" : batch.notice,2);
+        }
+        else
+        {
+            auto geometry=PlacementName();
+            if (const auto hint=geometry.find(" / Y turn"); hint!=std::string::npos) geometry.erase(hint);
+            DrawWrappedLabel(rt,p+ScreenCoordsXY{12,124},192,"{MUTED}"+geometry,2);
+            if (IsAdjusting())
+            {
+                DrawCommand(rt,p+ScreenCoordsXY{12,166},38,"D-pad",IsConnected() ? "Turn / slope" : "Turn / height");
+                if (!IsConnected()) DrawCommand(rt,p+ScreenCoordsXY{12,196},38,"L1/R1","Mode");
+            }
+            else DrawCommand(rt,p+ScreenCoordsXY{12,164},38,"L2/R2",IsConnected() ? "Slope" : "Height");
+        }
     }
     std::string SurfaceName()
     {

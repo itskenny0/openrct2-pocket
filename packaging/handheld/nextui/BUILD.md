@@ -33,7 +33,7 @@ python3 packaging/handheld/nextui/package.py --build brick-build --sysroot "$ROO
 Create the ZIP from the manifest (not a recursive filesystem sweep):
 
 ```sh
-python3 packaging/handheld/nextui/archive-package.py --stage /absolute/stage --output OpenRCT2-Pocket-Brick-RC2.zip
+python3 packaging/handheld/nextui/archive-package.py --stage /absolute/stage --output OpenRCT2-Pocket-Brick-RC3.zip
 ```
 
 This checks each file's bytes while archiving and excludes unlisted transfer/staging

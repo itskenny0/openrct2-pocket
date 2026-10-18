@@ -128,14 +128,14 @@ namespace OpenRCT2::Ui::Handheld
         {
             const auto index = start + slot;
             const bool selected = index == picker.focus();
-            const auto cell = p + ScreenCoordsXY{ 12 + static_cast<int>(slot % 3) * 76, 36 + static_cast<int>(slot / 3) * 92 };
-            Box(rt, cell, { 68, 84 }, selected);
+            const auto cell = p + ScreenCoordsXY{ 12 + static_cast<int>(slot % 3) * 100, 36 + static_cast<int>(slot / 3) * 92 };
+            Box(rt, cell, { 94, 84 }, selected);
             // The same loaded Object::DrawPreview path as desktop object selection.
             // Native sprite minification fits tall objects without an asset pipeline.
             if (entries[index].drawPreview)
             {
                 Drawing::RenderTarget preview;
-                if (ClipRenderTarget(preview, rt, cell + ScreenCoordsXY{ 4, 4 }, 60, 62))
+                if (ClipRenderTarget(preview, rt, cell + ScreenCoordsXY{ 17, 4 }, 60, 62))
                     entries[index].drawPreview(preview);
             }
             else if (
@@ -143,14 +143,14 @@ namespace OpenRCT2::Ui::Handheld
                     entries[index].identity.type, entries[index].identity.index))
             {
                 Drawing::RenderTarget preview;
-                if (ClipRenderTarget(preview, rt, cell + ScreenCoordsXY{ 4, 4 }, 60, 62))
+                if (ClipRenderTarget(preview, rt, cell + ScreenCoordsXY{ 4, 4 }, 86, 62))
                 {
                     preview.zoom_level = entries[index].previewZoom;
-                    object->DrawPreview(preview, preview.zoom_level.ApplyTo(60), preview.zoom_level.ApplyTo(62));
+                    object->DrawPreview(preview, preview.zoom_level.ApplyTo(86), preview.zoom_level.ApplyTo(62));
                 }
             }
             DrawModernEllipsised(
-                rt, cell + ScreenCoordsXY{ 4, 70 }, 60, (selected ? "{BLACK}" : "{WHITE}") + entries[index].name);
+                rt, cell + ScreenCoordsXY{ 5, 70 }, 84, (selected ? "{BLACK}" : "{WHITE}") + entries[index].name);
         }
         Rule(rt, p + ScreenCoordsXY{ 12, detailTop }, 296);
         const auto* selected = picker.selected();
