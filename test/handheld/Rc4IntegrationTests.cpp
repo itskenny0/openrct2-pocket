@@ -187,15 +187,15 @@ int main(int argc, char** argv)
         auto event=[&](News::ItemType type,const char* text,uint32_t assoc){closeMenu();News::InitQueue(state.park);News::AddItemToQueue(state.park.newsItems,type,text,assoc);};
         event(News::ItemType::ride,"The ride has broken down",ride.id.ToUnderlying());capture("10-native-news-hud.png");
         press(H::Action::contextSecondary);auto detail=W::HandheldParkMapSubjectsPresentation();
-        Check(detail.selected==2&&detail.rows[2]=="Open ride management","News does not focus native ride action");capture("11-ride-event.png");
+        Check(detail.selected==0&&detail.rows[0]=="Open ride management","News does not focus native ride action");capture("11-ride-event.png");
         press(H::Action::confirm);Check(W::HandheldRidesPresentation().title==H::RideManagement::Resolve(ride)->getName(),"Wrong news ride");capture("12-news-ride-management.png");
         press(H::Action::back);press(H::Action::back);WindowCullDead();Check(!wm->FindByClass(WindowClass::handheldMenu),"News Back failed to return to park");
         Check(!state.park.newsItems.getRecent().empty(),"Back dismissed event");
         event(News::ItemType::money,"The park is running low on cash",0);press(H::Action::contextSecondary);press(H::Action::confirm);
         Check(W::HandheldFinancesIsOpen(),"Money event did not reach finance");press(H::Action::back);press(H::Action::back);
         event(News::ItemType::blank,"Information without a subject",0);press(H::Action::contextSecondary);detail=W::HandheldParkMapSubjectsPresentation();
-        Check(detail.selected==0&&detail.rows[2]=="Subject unavailable","Informational event invented target");
-        W::HandheldMenuMove(4);press(H::Action::confirm);Check(state.park.newsItems.getRecent().empty()&&state.park.newsItems.getArchived().size()==1,"Dismiss did not use native archive");
+        Check(detail.selected==0&&std::find(detail.rows.begin(),detail.rows.end(),"Open ride management")==detail.rows.end(),"Informational event invented target");
+        W::HandheldMenuMove(static_cast<int>(std::find(detail.rows.begin(),detail.rows.end(),"Dismiss current message")-detail.rows.begin()));press(H::Action::confirm);Check(state.park.newsItems.getRecent().empty()&&state.park.newsItems.getArchived().size()==1,"Dismiss did not use native archive");
         capture("13-news-history.png");press(H::Action::back);
         W::HandheldDashboardOpen();const auto section=W::HandheldDashboardSectionIndex();press(H::Action::contextPrimary);
         Check(W::HandheldParkMapSubjectsPresentation().breadcrumb=="Overview / Park news","Dashboard X did not open news");
@@ -209,14 +209,14 @@ int main(int argc, char** argv)
         const auto invented=std::find_if(state.researchItemsInvented.begin(),state.researchItemsInvented.end(),[&](const auto& item){return item.type==Research::EntryType::ride&&item.entryIndex==wooden;});
         Check(invented!=state.researchItemsInvented.end(),"Native invented ride reference missing");
         event(News::ItemType::research,"New ride researched",invented->rawValue);press(H::Action::contextSecondary);
-        Check(W::HandheldParkMapSubjectsPresentation().rows[2]=="Inspect invention","Research news has no native invention target");
+        Check(W::HandheldParkMapSubjectsPresentation().rows[0]=="Inspect invention","Research news has no native invention target");
         press(H::Action::confirm);press(H::Action::back);
         Check(W::HandheldParkMapSubjectsPresentation().breadcrumb=="Overview / Park news","Research news return failed");press(H::Action::back);
         Check(H::ResumeCustomTrack(ride.id),"Construction resume failed");const auto draft=C::Endpoint();const auto choice=C::Selection();const auto balance=state.park.cash;
         W::HandheldDashboardOpen();press(H::Action::contextPrimary);press(H::Action::back);press(H::Action::back);
         Check(C::Active()&&C::Endpoint()==draft&&C::Selection()==choice&&state.park.cash==balance,"News navigation lost construction draft");H::EndTerrain();
         event(News::ItemType::ride,"Stale ride reference",65534);press(H::Action::contextSecondary);
-        Check(W::HandheldParkMapSubjectsPresentation().rows[2]=="Subject unavailable","Invalid ride identifier accepted");closeMenu();
+        {const auto m=W::HandheldParkMapSubjectsPresentation();Check(std::find(m.rows.begin(),m.rows.end(),"Open ride management")==m.rows.end(),"Invalid ride identifier accepted");}closeMenu();
         std::cout<<"RC4 native ghost lifecycle/geometry/cost, catalog, spatial editor and news handoffs passed\n";
         return 0;
     } catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}

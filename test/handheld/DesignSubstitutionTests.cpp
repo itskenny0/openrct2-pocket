@@ -119,7 +119,7 @@ int main(int argc, char** argv)
         };
         H::ControllerInput controller;
         auto press=[&](H::Action action){H::Frame f;f.actions={action};Check(H::HandleMenuInput(controller,f),"Controller menu input not consumed");};
-        auto choose=[&](int row){W::HandheldMenuMove(row);press(H::Action::confirm);};
+        auto choose=[&](int row){W::HandheldMenuMove(-1000);W::HandheldMenuMove(row);press(H::Action::confirm);};
         namespace A = H::DesignAvailability;
         auto* vehicle=objects.LoadObject("rct2.ride.mono1");
         Check(vehicle,"Native vehicle fixture missing");
@@ -183,7 +183,7 @@ int main(int argc, char** argv)
         W::HandheldDesignFilesOpen();choose(2);capture("02-empty-folder.png");press(H::Action::back);
         W::HandheldDesignFilesOpen();choose(3);capture("03-native-folder.png");choose(2);capture("04-missing-original-inspection.png");
         W::HandheldMenuMove(3);capture("05-required-object-detail.png");W::HandheldMenuMove(-1);press(H::Action::confirm);capture("06-eligible-native-vehicles.png");
-        choose(1);capture("07-explicit-vehicle-native-preview.png");press(H::Action::confirm);
+        choose(1);capture("07-explicit-vehicle-native-preview.png");W::HandheldMenuMove(-2);press(H::Action::confirm);
         Check(H::Designs::Active() && H::Designs::BrowserReturn(),"Browser explicit substitute handoff failed");
         Check(H::Designs::Selection()==file.string(),"Browser selected file identity lost");
         Check(H::Designs::Draft()->trackAndVehicle.vehicleObject==alternate->GetDescriptor(),"Explicit vehicle not retained");
@@ -196,7 +196,7 @@ int main(int argc, char** argv)
         // B/Y browser return keeps the selected file and explicit same-file choice.
         W::HandheldDesignPickerOpen();capture("08-selected-file-browser-return.png");
         press(H::Action::confirm);choose(2);capture("09-choice-cancel-return.png");press(H::Action::back);
-        choose(2);choose(1);press(H::Action::confirm);Check(H::Designs::Active(),"Same-file explicit choice not recovered");
+        choose(2);choose(1);W::HandheldMenuMove(-2);press(H::Action::confirm);Check(H::Designs::Active(),"Same-file explicit choice not recovered");
         const CoordsXY site{1408,1408};captureFocus={1424,1424,112};
         auto count=[&](bool ghost){size_t n=0;for(int y=32;y<2016;y+=32)for(int x=32;x<2016;x+=32)for(auto* e:TileElementsView<>(CoordsXY{x,y}))if(e->isGhost()==ghost)++n;return n;};
         const auto beforeCash=state.park.cash;const auto beforeElements=count(false);const auto beforeRides=RideManager(state).size();

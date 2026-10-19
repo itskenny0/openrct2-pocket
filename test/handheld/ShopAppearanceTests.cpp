@@ -173,20 +173,21 @@ int main(int argc, char** argv)
         W::HandheldRideOpen(target.id);choose(4);choose(0);captureFocus={720,656,112};capture("02-native-palette.png");
         W::HandheldMenuMove(24);capture("11-paged-native-palette.png");W::HandheldMenuMove(-24);
         auto model=W::HandheldShopAppearancePresentation();Check(model.rows.size()==Drawing::kColourNumNormal,"Native palette list differs");
-        W::HandheldMenuMove(1);press(H::Action::confirm);model=W::HandheldShopAppearancePresentation();
-        Check(model.confirmation && model.selected==0,"Appearance review not Cancel-first");capture("03-cancel-first-review.png");
-        const auto cancelled=ShopAppearanceContext::Capture(*ride);press(H::Action::confirm);Check(!W::HandheldShopAppearancePresentation().confirmation && ShopAppearanceContext::Capture(*ride)==cancelled,"Cancel applied appearance");capture("04-unchanged-cancellation.png");
+        const auto cancelled=ShopAppearanceContext::Capture(*ride);
+        W::HandheldMenuMove(1);press(H::Action::back);
+        Check(!W::HandheldShopAppearancePresentation().confirmation && ShopAppearanceContext::Capture(*ride)==cancelled,"Palette cancel applied appearance");capture("04-unchanged-cancellation.png");
         press(H::Action::confirm);W::HandheldMenuMove(1);H::Frame duplicate;duplicate.actions={H::Action::confirm,H::Action::confirm};
         Check(H::HandleMenuInput(controller,duplicate),"Appearance apply input not consumed");GameActions::ProcessQueue(state);
-        Check(W::HandheldShopAppearancePresentation().status=="Appearance updated","Apply did not return to selected channel");capture("05-native-applied.png");
+        Check(!W::HandheldShopAppearancePresentation().confirmation && W::HandheldShopAppearancePresentation().status=="Appearance updated","Direct Apply did not return to selected channel");capture("05-native-applied.png");
         // Real SDL virtual held input must not cross a Cancel-first review.
         SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS,"1");Check(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER|SDL_INIT_EVENTS)==0,"SDL controller init failed");
         {
             H::ControllerInput input;input.update(true,1000);const auto device=SDL_JoystickAttachVirtual(SDL_JOYSTICK_TYPE_GAMECONTROLLER,SDL_CONTROLLER_AXIS_MAX,SDL_CONTROLLER_BUTTON_MAX,0);Check(device>=0,"Virtual controller absent");auto* joystick=SDL_JoystickOpen(device);Check(joystick,"Virtual joystick absent");
             auto pump=[&](){SDL_Event event;while(SDL_PollEvent(&event))input.handleEvent(event);};pump();input.update(true,1010);pump();input.update(true,1020);
             choose(0);W::HandheldMenuMove(1);Check(SDL_JoystickSetVirtualButton(joystick,SDL_CONTROLLER_BUTTON_A,1)==0,"Virtual A failed");SDL_JoystickUpdate();pump();auto frame=input.update(true,1030);Check(H::HandleMenuInput(input,frame),"Virtual A not consumed");
-            Check(W::HandheldShopAppearancePresentation().confirmation && input.update(true,1800).actions.empty(),"Held A crossed review");
-            capture("06-held-a-review.png");SDL_JoystickSetVirtualButton(joystick,SDL_CONTROLLER_BUTTON_A,0);SDL_JoystickUpdate();pump();input.update(true,1810);press(H::Action::back);press(H::Action::back);SDL_JoystickClose(joystick);SDL_JoystickDetachVirtual(device);
+            GameActions::ProcessQueue(state);
+            Check(!W::HandheldShopAppearancePresentation().confirmation && input.update(true,1800).actions.empty(),"Held A repeated an edit");
+            capture("06-held-a-review.png");SDL_JoystickSetVirtualButton(joystick,SDL_CONTROLLER_BUTTON_A,0);SDL_JoystickUpdate();pump();input.update(true,1810);SDL_JoystickClose(joystick);SDL_JoystickDetachVirtual(device);
         }
         // Bind review to exact native allocation, even a same-location/same-object replacement.
         auto stale=A::Begin(target,0);stale->value=stale->setting.values[stale->setting.current==stale->setting.values.front()?1:0];
@@ -195,9 +196,9 @@ int main(int argc, char** argv)
         auto replacement=place("balln",{704,640});Check(replacement.id==target.id,"Native slot reuse fixture failed");
         Check(queued.Execute(state,state.park).error!=GameActions::Status::ok && A::Action(*stale,true).error!=GameActions::Status::ok,"Reused shop accepted old appearance review");
         targets[1]=replacement;
-        W::HandheldRideOpen(replacement.id);choose(4);choose(0);W::HandheldMenuMove(1);press(H::Action::confirm);
+        W::HandheldRideOpen(replacement.id);choose(4);choose(0);W::HandheldMenuMove(1);
         auto nativeChange=GameActions::RideSetAppearanceAction(replacement.id,Channel::trackColourMain,static_cast<uint16_t>(Drawing::Colour::brightRed),0);
-        Check(GameActions::Execute(&nativeChange,state).error==GameActions::Status::ok,"Concurrent native action failed");GameActions::ProcessQueue(state);W::HandheldMenuMove(1);press(H::Action::confirm);
+        Check(GameActions::Execute(&nativeChange,state).error==GameActions::Status::ok,"Concurrent native action failed");GameActions::ProcessQueue(state);press(H::Action::confirm);
         Check(W::HandheldShopAppearancePresentation().status.find("changed")!=std::string::npos,"Stale UI review lacks recoverable error");capture("07-stale-review-recovery.png");
         W::HandheldMenuBack();W::HandheldMenuBack();W::HandheldMenuBack();
         const auto save=std::filesystem::path(argv[2])/"shop-appearance.park";
@@ -249,7 +250,7 @@ int main(int argc, char** argv)
         size_t realRides=0;for(const auto& r:state.rides)realRides+=!r.id.IsNull();Check(realRides==targets.size(),"Temporary preview ride persisted in autosave");
         W::HandheldRideOpen(targets[1].id);choose(4);captureFocus={720,656,112};capture("14-autosave-reload-preservation.png");
         choose(0);W::HandheldMenuMove(1);press(H::Action::confirm);
-        Check(W::HandheldShopAppearancePresentation().confirmation,"Load cleanup review fixture missing");
+        Check(!W::HandheldShopAppearancePresentation().confirmation,"Direct appearance unexpectedly entered review");
         auto pending=A::Begin(*M::Capture(targets[1].id),0);pending->value=pending->setting.values[pending->setting.current==pending->setting.values.front()?1:0];
         const auto reloadValue=pending->setting.current;
         GameActions::RideSetAppearanceAction pendingAction(pending->target.id,*pending->setting.appearance,pending->value,0);

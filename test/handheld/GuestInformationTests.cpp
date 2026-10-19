@@ -108,8 +108,8 @@ int main(int argc, char** argv)
         const auto cash=state.park.cash;const auto accounting=state.park.expenditureTable;const auto history=G::RideHistory(target);
         Check(history.size()==2 && history[0]==rides[0] && history[1]==rides[2],"Native history membership/order differs");
         H::ControllerInput input;H::Frame confirm;confirm.actions={H::Action::confirm};H::Frame cancel;cancel.actions={H::Action::back};
-        W::HandheldGuestOpen(target);FocusPersonAction(false,"Ride history...");H::HandleMenuInput(input,confirm);Check(W::HandheldGuestsPresentation().breadcrumb=="Guests / Native ride history","Controller history entry failed");
-        H::HandleMenuInput(input,confirm);Check(W::HandheldRidesIsOpen(),"History inspection failed");H::HandleMenuInput(input,cancel);Check(W::HandheldGuestsPresentation().breadcrumb=="Guests / Native ride history","History return failed");H::HandleMenuInput(input,cancel);
+        W::HandheldGuestOpen(target);FocusPersonAction(false,"Ride history...");H::HandleMenuInput(input,confirm);Check(W::HandheldGuestsPresentation().breadcrumb=="Guests / Ride history","Controller history entry failed");
+        H::HandleMenuInput(input,confirm);Check(W::HandheldRidesIsOpen(),"History inspection failed");H::HandleMenuInput(input,cancel);Check(W::HandheldGuestsPresentation().breadcrumb=="Guests / Ride history","History return failed");H::HandleMenuInput(input,cancel);
         // Native GuestList fixture: each state uses the desktop action/thought formatter contract.
         const auto savedState=person->state;
         const auto savedRide=person->currentRide;

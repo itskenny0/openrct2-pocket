@@ -288,7 +288,7 @@ namespace OpenRCT2::Ui::Windows
             if (release) PauseToggle();
             const auto query = Handheld::Designs::Query(Handheld::CurrentTerrainTile());
             if (release) PauseToggle();
-            _designQuote = query.cost;
+            _designQuote = query.error == GameActions::Status::ok || query.error == GameActions::Status::insufficientFunds ? query.cost : kMoney64Undefined;
             _designReadiness = query.error == GameActions::Status::ok ? "Ready to place"
                 : query.getErrorMessage().empty() ? query.getErrorTitle() : query.getErrorMessage();
         }
@@ -1454,7 +1454,11 @@ namespace OpenRCT2::Ui::Windows
             if (next != Page::financeEditor && next != Page::financeConfirm)
                 _financeDraft.reset();
             _focus = {};
-            if (const auto count = rows().size(); count && _pageRows.count(next))
+            const bool restorePage = next==Page::ridesOperations || next==Page::ridesVehicles || next==Page::ridesDispatch
+                || next==Page::ridesMaintenance || next==Page::ridesAppearance || next==Page::ridesMusic
+                || next==Page::shopAppearance || next==Page::designOptions || next==Page::designInspect
+                || next==Page::designWarnings || next==Page::designVehicles;
+            if (const auto count = rows().size(); restorePage && count && _pageRows.count(next))
                 _focus.move(static_cast<int>(std::min(_pageRows.at(next), count - 1)), count);
             if (next == Page::ridesPrice && _ridesDraft && _ridesDraft->setting
                 && (_ridesDraft->setting->appearance || rideVehicleChoice()))
@@ -3489,7 +3493,7 @@ namespace OpenRCT2::Ui::Windows
             auto actionPage=_page;
             if(_page==Page::staffInspect) {
                 const auto model=staffPresentation();
-                if(choice<model.rowEnabled.size() && !model.rowEnabled[choice]){_status="Unavailable for this role or current state";invalidate();return;}
+                if(choice<model.rowEnabled.size() && !model.rowEnabled[choice]){_status=model.rows[choice]=="Costume..."?"Only entertainers wear costumes":model.rows[choice]=="Uniform colour..."?"Entertainers use costume colours":"This employee cannot be picked up now";invalidate();return;}
                 _staffTabs.save(choice);
                 if(_staffTabs.tab==1) {
                     if(!_staffTarget || Handheld::StaffManagement::Orders(_staffTarget->type).empty()){_staffTabs.tab=0;page(Page::staffInspect);return;}
@@ -5089,7 +5093,7 @@ namespace OpenRCT2::Ui::Windows
                     {
                         const auto result = choice < 3 ? Handheld::DesignAuthoring::SetNearby(choice == 1)
                             : Handheld::DesignAuthoring::ToggleScenery(choice - 3);
-                        _status = result.error == GameActions::Status::ok ? "Native scenery selection updated" : result.getErrorMessage();
+                        _status = result.error == GameActions::Status::ok ? "Design scenery updated" : result.getErrorMessage();
                         invalidate();
                     }
                     break;
@@ -5797,7 +5801,7 @@ namespace OpenRCT2::Ui::Windows
                             _designMetadata.reset();_designFilePreview.reset();_designFileStatus.clear();
                             if(_designFile) _designMetadata=TrackDesignImport(entry.path.u8string().c_str());
                             if(!_designFile) _designFileStatus="File removed or unreadable";
-                            else if(!_designMetadata) _designFileStatus="Native design parser rejected this file";
+                            else if(!_designMetadata) _designFileStatus="This design file could not be read";
                             else if(!Handheld::Designs::Eligible(*_designMetadata)) _designFileStatus=Handheld::Designs::UnavailableReason(*_designMetadata);
                             else _designFilePreview=Handheld::Designs::FileEntry(entry.path.u8string(),{},260,144);
                             page(Page::designInspect);
@@ -5831,7 +5835,7 @@ namespace OpenRCT2::Ui::Windows
                     else if(!fileDesignEligible()) { _status=_designFileStatus;invalidate(); }
                     else if(Handheld::BeginSavedDesign(_designFile->path.u8string(),_designChoice)) {
                         Handheld::Designs::SetBrowserReturn(true); close();
-                    } else { _status="Native placement unavailable. Back and inspect again.";invalidate(); }
+                    } else { _status="Placement unavailable. Back and inspect again.";invalidate(); }
                     break;
                 case Page::parkFiles:
                 {
@@ -6061,16 +6065,16 @@ namespace OpenRCT2::Ui::Windows
                 model.rowHeight = 30; model.status = _status;
                 Handheld::DrawManagementContent(rt, {8,36}, {232,312}, model);
                 Handheld::Concept::Box(rt, {248,36}, {256,312});
-                Handheld::DrawWrappedLabel(rt, {258,50}, 236,
-                    fs::u8path(Handheld::Designs::Selection()).stem().u8string(), 2);
                 Drawing::RenderTarget image;
                 if (_designWorkspacePreview && _designWorkspacePreview->drawPreview
                     && ClipRenderTarget(image, rt, {246,82}, 260,144))
                     _designWorkspacePreview->drawPreview(image);
+                Handheld::DrawWrappedLabel(rt, {258,50},236,_designWorkspacePreview?_designWorkspacePreview->name
+                    :fs::u8path(Handheld::Designs::Selection()).stem().u8string(),2);
                 const auto* draft = Handheld::Designs::Draft();
                 const auto* vehicle = draft ? GetContext()->GetObjectManager().GetLoadedObject(draft->trackAndVehicle.vehicleObject) : nullptr;
                 Handheld::DrawWrappedLabel(rt, {258,232},236,vehicle ? vehicle->GetName() : "Vehicle unavailable",2);
-                Handheld::DrawModernText(rt,{258,274},"Cost "+Handheld::FormatMoney(_designQuote),{},236);
+                Handheld::DrawModernText(rt,{258,274},_designQuote==kMoney64Undefined?"Choose land for cost":"Cost "+Handheld::FormatMoney(_designQuote),{},236);
                 Handheld::DrawWrappedLabel(rt, {258,296},236,_designReadiness,3);
                 Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},
                     {{"D-pad","Choose / adjust"},{"A","Select"},{"B","Placement"}});
@@ -6180,8 +6184,7 @@ namespace OpenRCT2::Ui::Windows
                 if (_page == Page::parkHistory) Handheld::ParkInformation::DrawHistory(rt, _parkGuestHistory);
                 if (_page == Page::financeHistory) Handheld::FinanceInformation::DrawHistory(rt,_financeGraph);
                 if (_page == Page::researchItem && _researchItem) Handheld::ResearchCatalog::DrawPreview(rt,*_researchItem);
-                Handheld::Concept::Box(rt, {8, 359}, {496, 25});
-                Handheld::DrawModernText(rt, {16, 369}, "D-pad Select   A Choose   B Back   Start Back", {}, 480);
+                Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Choose"},{"A","Select"},{"B","Back"}});
                 return;
             }
             if (managementShell())

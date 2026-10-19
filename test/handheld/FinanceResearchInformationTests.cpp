@@ -351,7 +351,6 @@ int main(int argc, char** argv)
             Check(found != list.end(), "Native linked message absent");
             W::HandheldMenuMove(static_cast<int>(found - list.begin()));
             H::HandleMenuInput(input, confirm);
-            W::HandheldMenuMove(2);
             H::HandleMenuInput(input, confirm);
         };
         openNews(News::ItemType::money);

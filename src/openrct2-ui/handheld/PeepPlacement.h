@@ -150,7 +150,7 @@ namespace OpenRCT2::Ui::Handheld::PeepPlacement
         const auto* peep = target ? Resolve(*target) : nullptr;
         DrawConstructionOverlay(
             rt, pos, "Place person", peep ? peep->getName() : "Person unavailable",
-            busy ? "Native action pending" : "A: Place / B: Cancel", "Land or path", "Select: Options");
+            busy ? "Placement pending" : "A: Place / B: Cancel", "Land or path", "Select: Options");
     }
     inline ManagementPresentation CancelPresentation(size_t selected)
     {
@@ -161,7 +161,8 @@ namespace OpenRCT2::Ui::Handheld::PeepPlacement
         model.rows = { "Cancel pickup", "Keep placing" };
         model.selected = selected;
         model.confirmation = true;
-        model.status = "Native restoration rules apply";
+        model.status = Network::GetPickupPeepOldX(Network::GetCurrentPlayerId()) == kLocationNull
+            ? "No previous position; place this person first" : "Returns to the previous position";
         return model;
     }
 } // namespace OpenRCT2::Ui::Handheld::PeepPlacement

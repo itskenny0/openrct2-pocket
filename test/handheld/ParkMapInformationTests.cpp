@@ -238,7 +238,7 @@ int main(int argc, char** argv)
         Check(news.size() == 1 && news[0].archived && I::Current(news[0]), "Archived news missing");
         News::RemoveItem(state.park.newsItems, News::ItemHistoryStart);
         Check(!I::Current(news[0]) && !I::Location(news[0]), "Expired archived message accepted");
-        Check(I::Awards(0).status == "No active native awards", "Empty awards missing");
+        Check(I::Awards(0).status == "No active awards", "Empty awards missing");
         AwardGrant(AwardType::bestStaff);
         Check(
             I::Awards(0).rows.size() == 2 && I::Awards(0).rows[0].starts_with("Positive:"), "Native award information missing");
@@ -353,7 +353,6 @@ int main(int argc, char** argv)
         openRecord("Park news...");
         W::HandheldMenuMove(static_cast<int>(found - subjectNews.begin()));
         H::HandleMenuInput(input, confirm);
-        W::HandheldMenuMove(2);
         H::HandleMenuInput(input, confirm);
         Check(W::HandheldGuestsIsOpen(), "News inspection handoff failed");
         W::HandheldMenuBack();

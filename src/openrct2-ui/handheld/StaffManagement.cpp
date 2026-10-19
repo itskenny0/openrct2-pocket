@@ -35,7 +35,7 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         auto image=ImageId(animation.baseImage+1+animation.frameOffsets.front()*4);
         if(role!=StaffType::entertainer)image=ImageId(image.GetIndex(),StaffGetColour(role),StaffGetColour(role));
         std::array<Drawing::PaletteIndex,48*64> pixels{};
-        Drawing::RenderTarget sprite{};sprite.bits=pixels.data();sprite.width=48;sprite.height=64;
+        Drawing::RenderTarget sprite{};sprite.bits=pixels.data();sprite.width=48;sprite.height=64;sprite.DrawingEngine=rt.DrawingEngine;
         GfxDrawSprite(sprite,image,{24,56});
         const auto origin=pos-ScreenCoordsXY{48,112};
         for(int y=0;y<128;++y)for(int x=0;x<96;++x) {

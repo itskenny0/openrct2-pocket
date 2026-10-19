@@ -154,7 +154,7 @@ int main(int argc,char** argv)
   Check(appearance.rows.size()>1,"Chosen shop has no appearance channels");{press(H::Action::confirm);auto colours=W::HandheldShopAppearancePresentation();
    Check(!colours.colourValues.empty(),"Shop colour swatches missing");{
     const auto original=colours.selected;nav(0,1);auto moved=W::HandheldShopAppearancePresentation();Check(moved.selected==H::MoveColourGrid(original,moved.rows.size(),0,1),"Shop D-pad did not follow swatch grid");capture("08-shop-colours.png");
-    press(H::Action::confirm);capture("09-shop-colour-review.png");Check(W::HandheldShopAppearancePresentation().confirmation,"Colour review absent");press(H::Action::back);press(H::Action::back);
+    press(H::Action::confirm);GameActions::ProcessQueue(state);capture("09-shop-colour-applied.png");Check(!W::HandheldShopAppearancePresentation().confirmation,"Colour still requires review");
    }
   }
   press(H::Action::back);press(H::Action::back);
