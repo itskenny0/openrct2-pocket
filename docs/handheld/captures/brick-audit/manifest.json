@@ -1,0 +1,207 @@
+{
+  "source_checkpoint": "a1b463aa0ea0e93b4854d499f23e07257d09adf9",
+  "original_game_graphics": true,
+  "physical_brick_tested": false,
+  "captures": [
+    {
+      "file": "costumes.png",
+      "sha256": "6a329f68ed937440b253d33f7aeb0ec6d5ce9c85f8f9474c52fa5c5eacf6f203",
+      "width": 512,
+      "height": 384,
+      "driver": "BrickAuditTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "design-funds-error.png",
+      "sha256": "7df96695c1835fd7aec0d75cb2c19a48c31a08501baf60210ea55090ef8e95d7",
+      "width": 512,
+      "height": 384,
+      "driver": "DesignSubstitutionTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "design-inspection.png",
+      "sha256": "6084915e57c05ef255b828bf2bed514ea699d5260dafb39cbbbcbb92318f6b2e",
+      "width": 512,
+      "height": 384,
+      "driver": "DesignSubstitutionTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "design-partial-quote.png",
+      "sha256": "8cc2e6b5c99c32b8f5a79c395781193bcd87706e51a2c9c32b5196f8558464b0",
+      "width": 512,
+      "height": 384,
+      "driver": "DesignSubstitutionTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "design-partial-result.png",
+      "sha256": "97fdb54b6765be69d23c0c1c69851a54f5b41ad581cab5134e2ffd9afbf94369",
+      "width": 512,
+      "height": 384,
+      "driver": "DesignSubstitutionTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "design-review.png",
+      "sha256": "65768e6f0f4e81b120a8170ae8e14367b6da0f00fcef0c14683f9678443128ed",
+      "width": 512,
+      "height": 384,
+      "driver": "DesignSubstitutionTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "design-rotated.png",
+      "sha256": "70d5646b40538769ebf5b90099f1ee340d958b66a4ae2e33a011df6c95ee5c22",
+      "width": 512,
+      "height": 384,
+      "driver": "DesignSubstitutionTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "design-vehicles.png",
+      "sha256": "102064dca99254dd3813b418613f5397fa50dd7af50d32356213af977d58d794",
+      "width": 512,
+      "height": 384,
+      "driver": "DesignSubstitutionTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "design-warnings.png",
+      "sha256": "e8632286a967e72bfd143abca5567cc6e0c18e61f767681a26727deaaad9ce99",
+      "width": 512,
+      "height": 384,
+      "driver": "DesignSubstitutionTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "design-workspace.png",
+      "sha256": "a29135ffb9bea7be4bd28b01288a2580a3ae138446c3a7c50735bb098d7daad4",
+      "width": 512,
+      "height": 384,
+      "driver": "DesignSubstitutionTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "export-scenery.png",
+      "sha256": "57a00f26692a46b83aa2f07f327ad77f0e1925bcb4419e93f4b35a8bf642b430",
+      "width": 512,
+      "height": 384,
+      "driver": "SaveLoadBrowsingTests",
+      "provenance": "native scenario viewport/component"
+    },
+    {
+      "file": "guide-build.png",
+      "sha256": "a9fcee931c1c69e091ec8d8f1aa5d067c1f6bf368ca2434eb42f24a130dafe36",
+      "width": 512,
+      "height": 384,
+      "driver": "BrickAuditTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "guide-menus.png",
+      "sha256": "9b809addaa7da3401fb87b816cbb277f1babe7392bd60def0f1e9b0b8252fa95",
+      "width": 512,
+      "height": 384,
+      "driver": "BrickAuditTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "guide-park.png",
+      "sha256": "747a2aaa63a49a475ea3d15c56910db93f1f10887994cba61813f5ffd05996a6",
+      "width": 512,
+      "height": 384,
+      "driver": "BrickAuditTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "hire-roles.png",
+      "sha256": "cdf104af2faa90ccd6a6b7350a89d9ddca0390cab67cc5f9eb223c8af1269539",
+      "width": 512,
+      "height": 384,
+      "driver": "BrickAuditTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "keyboard.png",
+      "sha256": "9d5181f2a57a60f8c471c0ee08187a5fd37ca25f9e8000c7e9bc694982dfc060",
+      "width": 512,
+      "height": 384,
+      "driver": "BrickAuditTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "map-details.png",
+      "sha256": "c3e10fd34a2d28356e89b8d0a34f3b3ec662b96e0ff5c6833ebe08ead23ed53d",
+      "width": 512,
+      "height": 384,
+      "driver": "BrickAuditTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "map.png",
+      "sha256": "506eef139ca7be2439ad3ec29c677486fbdd656a13a1da221b5ac87d2734d8cc",
+      "width": 512,
+      "height": 384,
+      "driver": "BrickAuditTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "news.png",
+      "sha256": "6e3c070e0dd01d1e1131c1083ad7c4a21539df8901ff7cdc56908797d265a824",
+      "width": 512,
+      "height": 384,
+      "driver": "BrickAuditTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "patrol-brush.png",
+      "sha256": "c41eaad231e73e2b13e9c79b303f985638d79f17b1efb5dc4e03daad1ac50705",
+      "width": 512,
+      "height": 384,
+      "driver": "BrickAuditTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "research-filter.png",
+      "sha256": "1795c7433af6fe24b776cb199816a61dd4480e5bdcf107eb6e19dd2a55220485",
+      "width": 512,
+      "height": 384,
+      "driver": "BrickAuditTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "research.png",
+      "sha256": "ea18d7dcbe6dfb7623abac9cd33a9da0c86ce81c3a234fccb34cd5bd782a710a",
+      "width": 512,
+      "height": 384,
+      "driver": "BrickAuditTests",
+      "provenance": "native initialized park fixture viewport/component"
+    },
+    {
+      "file": "saved-park.png",
+      "sha256": "cdb38d5171bab36d7d67f6be4a86abfc711e72756d56f49b2e61dafdb9cf9840",
+      "width": 512,
+      "height": 384,
+      "driver": "SaveLoadBrowsingTests",
+      "provenance": "native scenario viewport/component"
+    },
+    {
+      "file": "shop-colours.png",
+      "sha256": "f5f0a8c3bbb4e7c244c4e4e97f6d472e1a7d53bd86775ea6ecaa881c30bda7d7",
+      "width": 512,
+      "height": 384,
+      "driver": "FirstParkFlowTests",
+      "provenance": "native scenario viewport/component"
+    },
+    {
+      "file": "spatial-track-actions.png",
+      "sha256": "ec9f782438b000d3a8d68393053dad9a3885bcf437992de88611927c5ffd3b7a",
+      "width": 512,
+      "height": 384,
+      "driver": "Rc4IntegrationTests",
+      "provenance": "native initialized park fixture viewport/component"
+    }
+  ]
+}

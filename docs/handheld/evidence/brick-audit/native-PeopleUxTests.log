@@ -1,0 +1,10 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+Building object index (2504 items)
+Finished building object index in 0.06 seconds.
+Building track design index (0 items)
+Finished building track design index in 0.00 seconds.
+Building scenario index (172 items)
+Finished building scenario index in 0.29 seconds.
+PASS staff native hire/duties/patrol/dismissal safety/tab and roster focus; guest needs/thoughts/spending/tracking/follow/pickup/map
+PASS 1024 guests, 50 full presentation snapshots 1 ms in native runtime; native needs and money unchanged

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Asset-backed scenario, native actions/progression, production Pocket window rendering.
 #include <SDL.h>
+#include "RideTabNavigation.h"
+#include <openrct2-ui/handheld/DesignAuthoring.h>
+#include <openrct2/world/MapSelection.h>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -150,6 +153,21 @@ int main(int argc, char** argv)
             Check(cash == state.park.cash && ledger == state.park.expenditureTable, "Rendering changed accounting");
             provenance << name << " ticks=" << state.currentTicks << " cash=" << cash << "\n";
         };
+        // Real tested scenario ride: scenery export selection must draw spatially
+        // without changing selection ownership or park accounting.
+        std::optional<H::RideManagement::Target> exportTarget;
+        for(const auto& ride:RideManager(state)) {
+            const auto candidate=H::RideManagement::Identify(ride.id);
+            if(candidate && H::DesignAuthoring::Begin(*candidate).error==GameActions::Status::ok) {exportTarget=candidate;H::DesignAuthoring::End();break;}
+        }
+        Check(exportTarget.has_value(),"Scenario has no tested ride for native export");
+        W::HandheldRideOpen(exportTarget->id);FocusRideTabAction("Save design...");press(H::Action::confirm);choose(1);
+        Check(!H::DesignAuthoring::sceneryBaseline.empty(),"Native nearby export scenery missing");
+        W::HandheldMenuMove(2);
+        const auto exportFlags=gMapSelectFlags;const auto exportType=gMapSelectType;const auto exportA=gMapSelectPositionA,exportB=gMapSelectPositionB;const auto exportCash=state.park.cash;
+        capture("25-design-export-scenery.png");
+        Check(gMapSelectFlags==exportFlags && gMapSelectType==exportType && gMapSelectPositionA==exportA && gMapSelectPositionB==exportB && state.park.cash==exportCash,"Export selection render leaked native state");
+        press(H::Action::back);Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);WindowCullDead();
         W::HandheldLoadOpen(); choose(3);
         Check(W::HandheldConstructionMenuIsOpen(),"Browser not routed to controller");
         capture("01-park-browser.png");

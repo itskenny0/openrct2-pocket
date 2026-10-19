@@ -18,3 +18,5 @@ Runtime screenshots use the actual viewport/production Pocket renderer, user-own
 No physical Brick gameplay, installation, frame-rate or input-feel validation is claimed. The reported Line/Fill device bug remains deferred; none of these results establishes its resolution.
 
 The ARM package verification results will be recorded separately after packaging.
+
+Follow-up verification and current limits: [BRICK-NATIVE-AUDIT-IMPLEMENTATION.md](BRICK-NATIVE-AUDIT-IMPLEMENTATION.md).

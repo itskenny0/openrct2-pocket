@@ -211,7 +211,21 @@ int main(int argc, char** argv)
         Check(count(true)>0 && count(false)==beforeElements && state.park.cash==beforeCash
             && H::Designs::Draft()->trackAndVehicle.vehicleObject==alternate->GetDescriptor(),"Autosave changed real state or selected alternative");
         H::Designs::ClearPreview();Check(count(true)==0,"Native substituted ghost cleanup failed");
-        W::HandheldDesignOptionsOpen();capture("11-native-placement-options.png");choose(6);capture("12-native-warning-list.png");press(H::Action::back);press(H::Action::back);
+        // Put the actual controller cursor over the same native quoted site.
+        auto* main=WindowGetMain();main->viewport->zoom=ZoomLevel{0};
+        main->viewport->viewPos=Translate3DTo2DWithZ(main->viewport->rotation,{site.x+16,site.y+16,MapGetHighestZ(site)})-ScreenCoordsXY{256,192};
+        main->savedViewPos=main->viewport->viewPos;H::UpdateExplorer(controller);
+        W::HandheldDesignOptionsOpen();capture("11-native-placement-options.png");
+        const auto initialFacing=H::Designs::Orientation();const auto optionCash=state.park.cash;
+        choose(1);Check(H::Designs::HeightOffset().has_value(),"Controller height did not become manual");
+        choose(2);Check(!H::Designs::HeightOffset(),"Controller automatic-height toggle failed");
+        choose(3);Check(H::Designs::Orientation()==((initialFacing+1)&3),"Controller orientation did not rotate design");
+        capture("25-design-rotated.png");H::Frame left;left.navigateX=-1;Check(H::HandleMenuInput(controller,left),"Design adjustment input not consumed");
+        Check(H::Designs::Orientation()==initialFacing,"Controller reverse rotation failed");
+        choose(4);Check(!H::Designs::IncludesScenery(),"Scenery toggle did not turn off");choose(4);
+        Check(H::Designs::IncludesScenery() && state.park.cash==optionCash,"Design option edits spent cash or lost scenery");
+        choose(5);capture("26-design-vehicles.png");press(H::Action::back);
+        capture("24-design-workspace.png");choose(6);capture("12-native-warning-list.png");press(H::Action::back);press(H::Action::back);
         Check(H::Designs::Review(site),"Native substitute review failed");
         Check(!H::Designs::ChooseVehicle(vehicle->GetDescriptor()),"Reviewed vehicle mutated");
         W::HandheldDesignReviewOpen();capture("13-cancel-first-native-quote.png");

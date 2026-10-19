@@ -1,0 +1,11 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+Building object index (2504 items)
+Finished building object index in 0.06 seconds.
+Building track design index (0 items)
+Finished building track design index in 0.00 seconds.
+Building scenario index (172 items)
+Finished building scenario index in 0.25 seconds.
+Scatter controller native target 1600,1600 / context 512x384
+Native clear categories/bounds, stale reviews, whole multi-tile refunds, cancellation, paths preserved/opt-in passed
+Scenery groups, native banner/sign styles, stale/bounds, SDL Cancel-first and persistence passed

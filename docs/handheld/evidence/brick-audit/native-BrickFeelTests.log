@@ -1,0 +1,20 @@
+ninja: Entering directory `/workspace/scratch/3bb079f67558/native-build'
+[0/2] Re-checking globbed directories...
+[1/7] Building CXX object CMakeFiles/openrct2.dir/src/openrct2-ui/windows/StaffList.cpp.o
+[2/7] Building CXX object CMakeFiles/openrct2.dir/src/openrct2-ui/windows/TrackDesignPlace.cpp.o
+[3/7] Building CXX object CMakeFiles/openrct2.dir/src/openrct2-ui/windows/TileInspector.cpp.o
+[4/7] Building CXX object CMakeFiles/openrct2.dir/src/openrct2-ui/windows/TitleMenu.cpp.o
+[5/7] Building CXX object CMakeFiles/openrct2.dir/src/openrct2-ui/windows/Staff.cpp.o
+[6/7] Building CXX object CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/Menu.cpp.o
+[7/7] Linking CXX executable openrct2
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+Building object index (2504 items)
+Finished building object index in 0.04 seconds.
+Building track design index (0 items)
+Finished building track design index in 0.00 seconds.
+Building scenario index (172 items)
+Finished building scenario index in 0.27 seconds.
+WARNING[/workspace/scratch/3bb079f67558/openrct2-pocket/src/openrct2-ui/drawing/engines/HardwareDisplayDrawingEngine.cpp:115 (Resize)]: HWDisplayDrawingEngine::Resize error: Parameter 'renderer' is invalid
+WARNING[/workspace/scratch/3bb079f67558/openrct2-pocket/src/openrct2-ui/drawing/engines/HardwareDisplayDrawingEngine.cpp:115 (Resize)]: HWDisplayDrawingEngine::Resize error: Parameter 'renderer' is invalid
+PASS direct price Apply / B discard / native stale guard / cash invariants / spatial access restoration / continuous 40-guest roster / held-scroll bounds / uniform grid Apply and Cancel / single-row footer

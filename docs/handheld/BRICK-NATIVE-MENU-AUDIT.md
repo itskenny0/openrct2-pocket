@@ -1,5 +1,7 @@
 # Brick-native menu audit — RC4
 
+Current implementation status: the remaining reachable BF01–BF10 workflows are implemented and native-verified in [BRICK-NATIVE-AUDIT-IMPLEMENTATION.md](BRICK-NATIVE-AUDIT-IMPLEMENTATION.md). The findings below describe the historical audit base. Physical Brick verification and the deferred Line/Fill bug remain open.
+
 Audit base: canonical `1ac1b0bf9f0702349d90acf65f86384562eb0273` on
 `handheld/modern-ui-paths`. This is a review and proposed next pass, not a new UI
 implementation or a claim that every screen was physically played on a Brick.

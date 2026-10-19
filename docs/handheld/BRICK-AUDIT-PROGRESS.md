@@ -65,3 +65,7 @@ news layout, track-action ordering, direct shop appearance, final audit/backlog.
   scenery while restoring temporary map-selection state.
 
 Broader regression checks and final capture publication remain in progress.
+
+## Final native validation
+
+Native Release GUI build, all sixteen native drivers and seven standalone checks pass. The focus-bookmark correction is published as `a1b463a`. See [BRICK-NATIVE-AUDIT-IMPLEMENTATION.md](BRICK-NATIVE-AUDIT-IMPLEMENTATION.md) for the delivered workflow inventory, evidence and precise remaining device/coverage limits. Earlier pending notes above describe incremental source checkpoints.

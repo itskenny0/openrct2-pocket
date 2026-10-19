@@ -1,5 +1,7 @@
 # Brick menu feel: first implementation pass
 
+Follow-up: [Brick-native audit implementation](BRICK-NATIVE-AUDIT-IMPLEMENTATION.md) records the completed reachable secondary workflows and native verification. The first-pass remaining list below is historical; current remaining QA is in that report.
+
 Continues canonical `2e819797f21379db2213f9cbef3bacd6207a53a7` and the
 [menu audit](BRICK-NATIVE-MENU-AUDIT.md). This is a bounded first pass, not
 completion of BF01–BF10 or the full RC4 milestone. The hardware Line/Fill defect
