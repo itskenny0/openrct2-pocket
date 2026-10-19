@@ -21,7 +21,7 @@ namespace OpenRCT2::Ui::Handheld
                 keys.emplace_back(1, c);
             for (char c = '0'; c <= '9'; ++c)
                 keys.emplace_back(1, c);
-            for (const auto* key : { "-", ".", "'", "&", "(", ")", "Spc", "Del", "Case", "Clr", "OK", "Back" })
+            for (const auto* key : { "-", ".", "'", "&", "(", ")", "Space", "Delete", "Case", "Clear", "Done", "Back" })
                 keys.emplace_back(key);
             return keys;
         }

@@ -47,8 +47,8 @@ namespace OpenRCT2::Ui::Handheld::PeopleTabs
             const bool changed = draft != StaffManagement::Resolve(target)->staffOrders;
             model.headerStatus = changed ? "Unsaved duties" : "Current duties";
             model.headerInk = changed ? "{CAUTION}" : "{WHITE}";
-            model.status = changed ? "Unsaved / Apply saves / B reviews changes" : "No duty changes pending";
-            model.bodyLines={"A toggles duties. Apply orders saves changes."};
+            model.status = changed ? "Unsaved duties" : "";
+            model.bodyLines.clear();
             if(StaffManagement::Orders(target.type).empty()) {model.rows={"Overview"};model.bodyLines={"This role has no configurable duties."};}
         } else {
             Actions(model,native,StaffActions(tabs.tab));
@@ -113,7 +113,7 @@ namespace OpenRCT2::Ui::Handheld::PeopleTabs
                                     guest->toilet >= 160 };
             for (size_t i = 0; i < model.stats.size(); ++i)
                 model.meterAttention.push_back(attention[i]);
-            model.bodyLines = { "Happiness / energy: higher is better.", "Other needs: lower is better.  ! Needs attention" };
+            model.bodyLines.clear();
         } else if(tabs.tab==2) {
             model.rows = GuestManagement::Thoughts(*guest);
             for(auto& thought:model.rows)thought=ThoughtLabel(ParkInformation::PlainText(thought,true));

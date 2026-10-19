@@ -3621,11 +3621,10 @@ namespace OpenRCT2::Ui::Windows
                         page(Page::sceneryOptions);
                     else if (choice == 46 && _signTarget)
                     {
-                        const auto query = Handheld::SceneryTools::SetText(*_signTarget, _nameEntry.text, false);
+                        const auto query = Handheld::SceneryTools::SetText(*_signTarget, _nameEntry.text, true);
                         if (query.error == GameActions::Status::ok)
                         {
-                            page(Page::sceneryConfirm);
-                            _focus.move(1, 2);
+                            page(Page::sceneryOptions);
                         }
                         else
                         {
@@ -4144,9 +4143,9 @@ namespace OpenRCT2::Ui::Windows
                     else if (choice == 46 && _staffTarget)
                     {
                         const auto result = Handheld::StaffManagement::SetName(
-                            *_staffTarget, _staffNameBaseline, _nameEntry.text, false);
+                            *_staffTarget, _staffNameBaseline, _nameEntry.text, true);
                         if (result.error == GameActions::Status::ok)
-                            page(Page::staffNameConfirm);
+                            page(Page::staffInspect);
                         else
                             _status = Handheld::Finances::Feedback(result);
                     }
@@ -5012,7 +5011,7 @@ namespace OpenRCT2::Ui::Windows
                     else if (choice == 46 && _ridesDraft)
                     {
                         _ridesDraft->name = _nameEntry.text;
-                        page(Page::ridesConfirm);
+                        applyRideDraft();
                     }
                     else
                     {
@@ -5031,7 +5030,7 @@ namespace OpenRCT2::Ui::Windows
                         if (choice < _ridesDraft->setting->values.size())
                         {
                             _ridesDraft->value = _ridesDraft->setting->values[choice];
-                            page(Page::ridesConfirm);
+                            applyRideDraft();
                         }
                     }
                     else if(choice==0) {
@@ -5200,9 +5199,9 @@ namespace OpenRCT2::Ui::Windows
                     else if (choice == 46 && _guestTarget)
                     {
                         const auto result = Handheld::GuestManagement::SetName(
-                            *_guestTarget, _guestNameBaseline, _nameEntry.text, false);
+                            *_guestTarget, _guestNameBaseline, _nameEntry.text, true);
                         if (result.error == GameActions::Status::ok)
-                            page(Page::guestNameConfirm);
+                            page(Page::guestInspect);
                         else
                             _status = Handheld::Finances::Feedback(result);
                     }
