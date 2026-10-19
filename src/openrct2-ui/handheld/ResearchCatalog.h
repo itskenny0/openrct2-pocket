@@ -95,7 +95,7 @@ namespace OpenRCT2::Ui::Handheld::ResearchCatalog
         std::vector<PickerEntry> entries;
         for (const auto& target : roster)
             entries.push_back({{target.item.type == Research::EntryType::ride ? ObjectType::ride : ObjectType::sceneryGroup,
-                target.item.entryIndex, std::to_string(target.item.rawValue) + ":" + std::to_string(target.occurrence)}, Name(target), ZoomLevel{2}});
+                target.item.entryIndex, std::to_string(target.item.rawValue) + ":" + std::to_string(target.occurrence)}, Name(target), target.item.type == Research::EntryType::ride ? ZoomLevel{1} : ZoomLevel{2}});
         std::optional<PickerIdentity> preferred;
         if (selected < entries.size()) preferred = entries[selected].identity;
         ObjectPicker picker; picker.setEntries(std::move(entries),preferred); return picker;

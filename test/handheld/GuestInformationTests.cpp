@@ -148,7 +148,7 @@ int main(int argc, char** argv)
         W::HandheldGuestOpen(target);FocusPersonAction(false,"Ride history...");H::HandleMenuInput(input,confirm);H::HandleMenuInput(input,confirm);W::HandheldDashboardPage(2);choose(W::HandheldRidesPresentation(),"Customers...");
         choose(W::HandheldRidesPresentation(),"Guests thinking about ride...");
         Check(W::HandheldGuestsPresentation().rows[3]==person->getName(),"Ride filter controller roster failed");
-        choose(W::HandheldGuestsPresentation(),"Name filter...");choose(W::HandheldGuestsPresentation(),"G");choose(W::HandheldGuestsPresentation(),"OK");
+        choose(W::HandheldGuestsPresentation(),"Name filter...");choose(W::HandheldGuestsPresentation(),"G");choose(W::HandheldGuestsPresentation(),"Done");
         Check(W::HandheldGuestsPresentation().rows[3]==person->getName(),"Controller name filter apply failed");
         choose(W::HandheldGuestsPresentation(),"Name filter...");choose(W::HandheldGuestsPresentation(),"Z");H::HandleMenuInput(input,cancel);
         Check(W::HandheldGuestsPresentation().rows[3]==person->getName(),"Cancelled name draft changed membership");
@@ -160,7 +160,7 @@ int main(int argc, char** argv)
         Check(W::HandheldParkMapSubjectsPresentation().title==person->getName(),"Map inspection return context lost");
         H::HandleMenuInput(input,cancel);H::HandleMenuInput(input,cancel);Check(W::HandheldParkMapIsOpen(),"Map subject return failed");
         H::HandleMenuInput(input,cancel);Check(W::HandheldGuestsPresentation().title.find("Thinking / ")==0,"Map return lost roster filter");
-        choose(W::HandheldGuestsPresentation(),"Name filter...");choose(W::HandheldGuestsPresentation(),"Clr");choose(W::HandheldGuestsPresentation(),"OK");
+        choose(W::HandheldGuestsPresentation(),"Name filter...");choose(W::HandheldGuestsPresentation(),"Clear");choose(W::HandheldGuestsPresentation(),"Done");
         H::HandleMenuInput(input,cancel);Check(W::HandheldRidesPresentation().breadcrumb=="Rides / Customers","Filtered roster return lost ride context");
         person->thoughts[0]=savedThought;person->peepFlags=originalFlags;
         W::HandheldGuestOpen(target);

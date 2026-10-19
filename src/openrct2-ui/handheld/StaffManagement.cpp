@@ -34,7 +34,15 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         if(animation.frameOffsets.empty())return;
         auto image=ImageId(animation.baseImage+1+animation.frameOffsets.front()*4);
         if(role!=StaffType::entertainer)image=ImageId(image.GetIndex(),StaffGetColour(role),StaffGetColour(role));
-        GfxDrawSprite(rt,image,pos);
+        std::array<Drawing::PaletteIndex,48*64> pixels{};
+        Drawing::RenderTarget sprite{};sprite.bits=pixels.data();sprite.width=48;sprite.height=64;
+        GfxDrawSprite(sprite,image,{24,56});
+        const auto origin=pos-ScreenCoordsXY{48,112};
+        for(int y=0;y<128;++y)for(int x=0;x<96;++x) {
+            const auto colour=pixels[y/2*48+x/2];const int px=origin.x+x,py=origin.y+y;
+            if(colour!=static_cast<Drawing::PaletteIndex>(0) && px>=rt.x && px<rt.x+rt.width && py>=rt.y && py<rt.y+rt.height)
+                rt.bits[(py-rt.y)*rt.LineStride()+px-rt.x]=colour;
+        }
     }
     static std::unordered_map<uint16_t, uint64_t> gRemovedStaff;
     void Invalidate(EntityId id)

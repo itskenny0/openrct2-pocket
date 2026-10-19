@@ -211,7 +211,7 @@ int main(int argc, char** argv)
         Check(count(true)>0 && count(false)==beforeElements && state.park.cash==beforeCash
             && H::Designs::Draft()->trackAndVehicle.vehicleObject==alternate->GetDescriptor(),"Autosave changed real state or selected alternative");
         H::Designs::ClearPreview();Check(count(true)==0,"Native substituted ghost cleanup failed");
-        W::HandheldDesignOptionsOpen();capture("11-native-placement-options.png");choose(8);capture("12-native-warning-list.png");press(H::Action::back);press(H::Action::back);
+        W::HandheldDesignOptionsOpen();capture("11-native-placement-options.png");choose(6);capture("12-native-warning-list.png");press(H::Action::back);press(H::Action::back);
         Check(H::Designs::Review(site),"Native substitute review failed");
         Check(!H::Designs::ChooseVehicle(vehicle->GetDescriptor()),"Reviewed vehicle mutated");
         W::HandheldDesignReviewOpen();capture("13-cancel-first-native-quote.png");
@@ -236,7 +236,7 @@ int main(int argc, char** argv)
         Check(!H::Designs::Completed() && state.park.cash==beforeCash && !H::Designs::HasReview(),"Changed descriptor accepted");
         capture("15-stale-descriptor-recovery.png",false);Ui::GetWindowManager()->CloseByClass(WindowClass::error);
         Check(!H::Designs::LastError().empty(),"Rejected native review detail lost");
-        W::HandheldDesignOptionsOpen();choose(8);capture("21-stale-native-error-detail.png");press(H::Action::back);press(H::Action::back);
+        W::HandheldDesignOptionsOpen();choose(6);capture("21-stale-native-error-detail.png");press(H::Action::back);press(H::Action::back);
         alternate->SetVersion(version);
         Check(H::Designs::Review(site),"File review failed");
         GameActions::SavedTrackDesignPlaceAction bound(*H::Designs::ReviewLocation(),*H::Designs::Draft(),Config::Get().general.defaultInspectionInterval,H::Designs::ReviewCost(),true);
@@ -253,7 +253,7 @@ int main(int argc, char** argv)
         Check(H::Designs::Review(site),"Failure review failed");
         GameActions::CheatSetAction noFunds(CheatType::setMoney,0);Check(GameActions::Execute(&noFunds,state).error==GameActions::Status::ok,"Native funds fixture failed");GameActions::ProcessQueue(state);
         Check(H::Designs::Confirm().error!=GameActions::Status::ok && state.park.cash==0 && count(false)==beforeElements,"Native funds failure mutated map");
-        W::HandheldDesignOptionsOpen();choose(8);capture("22-native-funds-failure-detail.png");press(H::Action::back);press(H::Action::back);
+        W::HandheldDesignOptionsOpen();choose(6);capture("22-native-funds-failure-detail.png");press(H::Action::back);press(H::Action::back);
         GameActions::CheatSetAction funds(CheatType::setMoney,beforeCash);Check(GameActions::Execute(&funds,state).error==GameActions::Status::ok,"Native funds restore failed");GameActions::ProcessQueue(state);
         Check(H::Designs::Review(site),"Placement recovery review failed");const auto cost=H::Designs::ReviewCost();
         auto identity=H::FileBrowsing::Capture(file);Check(identity.has_value(),"Roundtrip identity missing");

@@ -45,3 +45,23 @@ Source checkpoint (runtime verification pending):
 
 Remaining: native verification/captures; compact saved-file inspection/quick slots,
 news layout, track-action ordering, direct shop appearance, final audit/backlog.
+
+## Batch 3 — secondary actions and previews
+
+- Native Release GUI build and BrickFeelTests PASS after the environment restore.
+- BrickAuditTests PASS for direct ride naming/Done/B discard, staff sprite screens,
+  visible brush shortcuts, visual research browsing, map/details and safe return,
+  actual news subjects, guide sections and configured A/B mappings. Captures are
+  genuine 512×384 native viewport/component frames; no physical Brick was tested.
+- News presents its actual subject and primary contextual action first, followed
+  by available location/history/dismissal; paging appears only for long messages.
+- Quick slots and file inspection lead with park name, real native preview when
+  present, native date, rating, guests and rides. Browse retains folders/Refresh.
+- Saved-design file inspection moves compatibility identifiers into Details.
+- Track actions prioritize Continue/Replace/Remove while retaining advanced actions.
+- Shop appearance applies its guarded native action directly; B cancels the palette.
+- Ride vehicle-object choices use native visual cards and retain train-change review.
+- Design export uses readable scenery names and spatially highlights selected
+  scenery while restoring temporary map-selection state.
+
+Broader regression checks and final capture publication remain in progress.

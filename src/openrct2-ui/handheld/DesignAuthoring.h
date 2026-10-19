@@ -68,10 +68,10 @@ namespace OpenRCT2::Ui::Handheld::DesignAuthoring
         if (index >= sceneryBaseline.size())
             return "Scenery unavailable";
         const auto& element = sceneryBaseline[index];
-        const auto* object = GetContext()->GetObjectManager().GetLoadedObject(element.sceneryObject);
-        const auto name = object ? object->GetName() : std::string(element.sceneryObject.GetName());
-        return std::string(selectedScenery[index] ? "+ " : "- ") + name + " / " + std::to_string(element.loc.x / 32) + ","
-            + std::to_string(element.loc.y / 32);
+        const auto resolved=TrackDesignResolveScenery(element);
+        const auto* object=resolved?GetContext()->GetObjectManager().GetLoadedObject(resolved->Type,resolved->Index):nullptr;
+        const auto name = object ? object->GetName() : "Scenery unavailable";
+        return std::string(selectedScenery[index] ? "+ " : "- ") + name;
     }
 
     inline GameActions::Result Error(std::string message)

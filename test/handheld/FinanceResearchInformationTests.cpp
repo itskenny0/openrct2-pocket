@@ -308,14 +308,14 @@ int main(int argc, char** argv)
         W::HandheldMenuMove(static_cast<int>(catalogAction-project.rows.begin())-static_cast<int>(project.selected));
         H::HandleMenuInput(input, confirm);
         Check(
-            W::HandheldParkMapSubjectsPresentation().rows.size() == R::Roster(0).size() + 2, "Catalog controller entry failed");
+            W::HandheldParkMapSubjectsPresentation().rows.size() == R::Roster(0).size(), "Catalog controller entry failed");
         H::HandleMenuInput(input, confirm);
         Check(
             W::HandheldParkMapSubjectsPresentation().breadcrumb == "Research / Invention details",
             "Research item entry failed");
         H::HandleMenuInput(input, cancel);
         H::Frame filter;
-        filter.navigateX = 1;
+        filter.actions={H::Action::contextSecondary};
         H::HandleMenuInput(input, filter);
         Check(W::HandheldParkMapSubjectsPresentation().title == R::Category(1), "Catalog filter controller failed");
         const auto catalogSave = std::string(argv[2]) + "/research-catalog.park";

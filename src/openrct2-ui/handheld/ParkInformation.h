@@ -147,16 +147,15 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
         model.title = "Park news";
         model.selected = selected;
         for (const auto& target : list)
-            model.rows.push_back(std::string(target.archived ? "Archive: " : "Recent: ") + PlainText(target.item.text, true));
+            model.rows.push_back(PlainText(target.item.text, true));
         if (list.empty())
         {
-            model.rows = { "Refresh" };
+            model.rows = { "No park news" };
             model.status = "No park news yet";
         }
         else
             model.status = "A Details  B Overview";
-        if (!list.empty())
-            model.rows.push_back("Refresh news");
+
         return model;
     }
     inline ManagementPresentation NewsDetail(const NewsTarget& target, size_t page, size_t selected, const std::string& status)

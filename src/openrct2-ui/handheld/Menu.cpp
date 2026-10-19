@@ -1,4 +1,5 @@
 #include "ShopAppearance.h"
+#include "SavedParkPresentation.h"
 #include "DesignAvailability.h"
 // SPDX-License-Identifier: GPL-3.0-only
 #include "AreaTools.h"
@@ -320,6 +321,8 @@ namespace OpenRCT2::Ui::Windows
             _designDetail=0; page(Page::designVehicles);
         }
         std::optional<ParkPreview> _parkFilePreview;
+        std::array<std::optional<ParkPreview>,3> _slotPreviews;
+        bool _designDetailsFromFile{};
         std::string _parkPreviewStatus;
         std::optional<Handheld::FileBrowsing::Identity> _designFile;
         std::unique_ptr<TrackDesign> _designMetadata;
@@ -444,6 +447,17 @@ namespace OpenRCT2::Ui::Windows
             return _page == Page::researchCatalog || _page == Page::researchItem || _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::mapSubjects || _page == Page::mapSubject || _page == Page::parkNews || _page == Page::parkNewsDetail || _page == Page::parkAwards
                 || _page == Page::parkHistory;
         }
+        std::vector<size_t> newsActions() const {
+            std::vector<size_t> actions;
+            if (!_parkNewsTarget) return actions;
+            const auto& target=*_parkNewsTarget;
+            if (Handheld::ParkInformation::SubjectCurrent(target) || Handheld::ManagementNews::Available(target)!=Handheld::ManagementNews::Link::none) actions.push_back(2);
+            if (Handheld::ParkInformation::Location(target)) actions.push_back(1);
+            actions.push_back(3);
+            if (Handheld::ParkInformation::IsCurrentMessage(target))actions.push_back(4);
+            if (Handheld::GuestManagement::TextLines(Handheld::ParkInformation::PlainText(target.item.text)).size()>6)actions.push_back(0);
+            return actions;
+        }
         Handheld::ManagementPresentation parkInformationPresentation() const
         {
             using namespace Handheld::ParkInformation;
@@ -456,7 +470,17 @@ namespace OpenRCT2::Ui::Windows
             if (_page == Page::parkNews) return NewsPresentation(_parkNews, _focus.index());
             if (_page == Page::parkNewsDetail && _parkNewsTarget) {
                 auto model=NewsDetail(*_parkNewsTarget,_parkNewsPage,_focus.index(),_status);
-                model.rows[2]=Handheld::ManagementNews::Label(*_parkNewsTarget); return model;
+                model.rows[2]=Handheld::ManagementNews::Label(*_parkNewsTarget);
+                const auto source=model.rows;model.rows.clear();
+                for(const auto action:newsActions())if(action<source.size())model.rows.push_back(source[action]);
+                const auto& target=*_parkNewsTarget;
+                std::string subject;
+                if(target.ride) {if(const auto* ride=Handheld::RideManagement::Resolve(*target.ride))subject=ride->getName();}
+                else if(target.guest) {if(const auto* guest=Handheld::GuestManagement::Resolve(*target.guest))subject=guest->getName();}
+                else if(target.staff) {if(const auto* staff=Handheld::StaffManagement::Resolve(*target.staff))subject=staff->getName();}
+                if(!subject.empty())model.stats={{"Subject",subject}};
+                if(Handheld::GuestManagement::TextLines(PlainText(target.item.text)).size()<=6 && _status.empty())model.status.clear();
+                return model;
             }
             if (_page == Page::parkAwards) return Awards(_focus.index());
             return History(_parkGuestHistory, _focus.index());
@@ -538,6 +562,18 @@ namespace OpenRCT2::Ui::Windows
         bool _ridesReviewResumed{};
         uint64_t _ridesRequest{};
         std::shared_ptr<int> _ridesLifetime = std::make_shared<int>(0);
+        bool rideVehicleChoice() const {
+            return _page==Page::ridesPrice && _ridesDraft && _ridesDraft->setting
+                && _ridesDraft->setting->vehicle==GameActions::RideSetVehicleType::rideEntry;
+        }
+        Handheld::ObjectPicker rideVehiclePicker() const {
+            std::vector<Handheld::PickerEntry> entries;
+            if(rideVehicleChoice())for(size_t i=0;i<_ridesDraft->setting->values.size();++i)
+                entries.push_back({{ObjectType::ride,static_cast<ObjectEntryIndex>(_ridesDraft->setting->values[i])},_ridesDraft->setting->labels[i],ZoomLevel{1}});
+            std::optional<Handheld::PickerIdentity> selected;
+            if(_focus.index()<entries.size())selected=entries[_focus.index()].identity;
+            Handheld::ObjectPicker picker;picker.setEntries(std::move(entries),selected);return picker;
+        }
         Page ridesDraftParent() const
         {
             if (_ridesDraft && !_ridesDraft->randomColours.empty())
@@ -621,6 +657,14 @@ namespace OpenRCT2::Ui::Windows
                     model.rows.push_back("Build backward...");
                     if (Handheld::TrackEditing::CanReplace(*_trackBlock)) model.rows.push_back("Replace block...");
                     model.rows.push_back("Inspect connections / station...");
+                    if (current == Page::trackBlock) {
+                        const std::vector<std::string> order{"Continue section...","Replace block...","Remove block...",
+                            "Build backward...","Speed -","Speed +","Review speed...","Inspect connections / station...","Locate block","Back to blocks"};
+                        std::vector<std::string> sorted;
+                        for(const auto& label:order) if(std::find(model.rows.begin(),model.rows.end(),label)!=model.rows.end())sorted.push_back(label);
+                        model.rows=std::move(sorted);
+                    }
+
                     if (current == Page::trackContext)
                     {
                         model.title = "TRACK CONNECTIONS";
@@ -754,6 +798,9 @@ namespace OpenRCT2::Ui::Windows
                     : current == Page::ridesPrice       ? View::price
                                                         : View::confirmation,
                 selected, _ridesRoster, _ridesTarget, _ridesDraft, _status, _rideGraphMetric, _rideGraphOffset);
+            if (current == Page::ridesPrice && rideVehicleChoice()) {
+                model.rows=_ridesDraft->setting->labels;model.selected=selected;model.stats.clear();
+            }
             if (current == Page::ridesInspect)
             {
                 const auto stats = Handheld::RideManagement::Presentation(View::statistics,0,{},_ridesTarget);
@@ -1377,6 +1424,8 @@ namespace OpenRCT2::Ui::Windows
             if(next!=Page::shopAppearanceEditor && next!=Page::shopAppearanceReview)_shopAppearanceDraft.reset();
             _shopAppearanceBusy=false;++_shopAppearanceRequest;
             _page = next;
+            if (next == Page::save || next == Page::load)
+                for (size_t slot=0;slot<3;++slot) _slotPreviews[slot]=Handheld::SavedParkPresentation::Read(SlotPath(slot));
             if (next == Page::designOptions) refreshDesignWorkspace();
             if (next == Page::ridesName || next == Page::designName || next == Page::designScenery || next == Page::designExport)
             {
@@ -1408,7 +1457,7 @@ namespace OpenRCT2::Ui::Windows
             if (const auto count = rows().size(); count && _pageRows.count(next))
                 _focus.move(static_cast<int>(std::min(_pageRows.at(next), count - 1)), count);
             if (next == Page::ridesPrice && _ridesDraft && _ridesDraft->setting
-                && _ridesDraft->setting->appearance)
+                && (_ridesDraft->setting->appearance || rideVehicleChoice()))
             {
                 const auto& values = _ridesDraft->setting->values;
                 const auto selected = std::find(values.begin(), values.end(), _ridesDraft->value);
@@ -1709,12 +1758,12 @@ namespace OpenRCT2::Ui::Windows
                 }
                 case Page::designWarnings: {
                     auto result=Handheld::Designs::WarningLines();
-                    if (const auto* td=Handheld::Designs::Draft()) {auto detail=Handheld::DesignAvailability::Lines(*td);result.insert(result.end(),detail.begin(),detail.end());}
+                    if (const auto* td=_designDetailsFromFile ? _designMetadata.get() : Handheld::Designs::Draft()) {auto detail=Handheld::DesignAvailability::Lines(*td);result.insert(result.end(),detail.begin(),detail.end());}
                     result.push_back("Back to options");return result;
                 }
                 case Page::designInspect: {
                     std::vector<std::string> result{ fileDesignEligible() ? "Place this design" : "Placement unavailable", "Back to files", "Choose vehicle" };
-                    if (_designMetadata) { auto lines=Handheld::DesignAvailability::Lines(*_designMetadata);result.insert(result.end(),lines.begin(),lines.end()); }
+                    result.push_back("Details / compatibility...");
                     return result;
                 }
                 case Page::parkFiles: return _files.Rows();
@@ -1731,7 +1780,7 @@ namespace OpenRCT2::Ui::Windows
                     {
                         std::error_code error;
                         const bool exists = fs::exists(SlotPath(slot), error);
-                        result.push_back("Pocket " + std::to_string(slot + 1) + (exists ? "  Saved park" : "  Empty"));
+                        result.push_back("Pocket " + std::to_string(slot + 1) + " / " + (_slotPreviews[slot] && !_slotPreviews[slot]->parkName.empty() ? _slotPreviews[slot]->parkName : exists ? "Saved park" : "Empty"));
                     }
                     result.push_back(_page == Page::load ? "Browse parks / autosaves..." : "Named Save As...");
                     return result;
@@ -2116,7 +2165,7 @@ namespace OpenRCT2::Ui::Windows
             if(fromPark && !_parkNews.empty()) {
                 _parkNewsTarget=_parkNews.front();page(Page::parkNewsDetail);
                 if(Handheld::ParkInformation::SubjectCurrent(*_parkNewsTarget) || Handheld::ManagementNews::Available(*_parkNewsTarget)!=Handheld::ManagementNews::Link::none)
-                    _focus.move(2,rows().size());
+                    _focus.move(0,rows().size());
             } else page(Page::parkNews);
         }
         bool dashboardNews(){if(_page!=Page::dashboard)return false;openNews(false);return true;}
@@ -2569,6 +2618,11 @@ namespace OpenRCT2::Ui::Windows
             }
             else if (_page == Page::ridesPrice)
             {
+                if (rideVehicleChoice()) {
+                    auto picker=rideVehiclePicker();picker.move(x,y);
+                    _focus.move(static_cast<int>(picker.focus())-static_cast<int>(_focus.index()),rows().size());
+                    _ridesDraft->value=_ridesDraft->setting->values[picker.focus()];invalidate();return;
+                }
                 if (_ridesDraft && _ridesDraft->setting && _ridesDraft->setting->appearance)
                 {
                     const auto next = Handheld::RideManagement::IsColourSetting(*_ridesDraft->setting)
@@ -3299,7 +3353,7 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::parkInspect: page(Page::parkFiles); break;
                 case Page::designVehicles: page(_designVehicleFromFile?Page::designInspect:Page::designOptions); break;
-                case Page::designWarnings: page(Page::designOptions);break;
+                case Page::designWarnings: page(_designDetailsFromFile?Page::designInspect:Page::designOptions);break;
                 case Page::designInspect: _designMetadata.reset();_designFilePreview.reset();page(Page::designFiles);break;
                 case Page::designFiles: page(Page::designPicker);refreshPicker();break;
                 case Page::saveFiles: _saveDraft.reset(); page(Page::save); break;
@@ -3325,6 +3379,24 @@ namespace OpenRCT2::Ui::Windows
                         close();
                     break;
             }
+        }
+        void applyShopAppearanceDraft()
+        {
+                    if(_shopAppearanceDraft) {
+                        const auto q=Handheld::ShopAppearance::Action(*_shopAppearanceDraft,false);
+                        if(q.error!=GameActions::Status::ok){_status=q.getErrorMessage();invalidate();return;}
+                        _shopAppearanceBusy=true;const auto request=++_shopAppearanceRequest;
+                        const auto result=Handheld::ShopAppearance::Action(*_shopAppearanceDraft,true,
+                            [this,request,lifetime=std::weak_ptr<int>(_shopAppearanceLifetime)](const auto*,const GameActions::Result* outcome){
+                                if(lifetime.expired() || flags.has(WindowFlag::dead) || request!=_shopAppearanceRequest || (_page!=Page::shopAppearanceEditor && _page!=Page::shopAppearanceReview))return;
+                                _shopAppearanceBusy=false;
+                                if(outcome->error==GameActions::Status::ok) {
+                                    page(Page::shopAppearance);_focus.move(static_cast<int>(_shopAppearanceChannel),rows().size());_status="Appearance updated";
+                                } else _status=outcome->getErrorMessage();invalidate();
+                            });
+                        if(result.error!=GameActions::Status::ok){_shopAppearanceBusy=false;_status=result.getErrorMessage();}
+                        invalidate();
+                    }
         }
         void applyRideDraft()
         {
@@ -3440,7 +3512,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::designOptions:
                     if (choice == 0) { close(); break; }
                     if (choice == 5) { openDesignVehicles(false); break; }
-                    if (choice == 6) { _designDetail = 0; page(Page::designWarnings); break; }
+                    if (choice == 6) { _designDetailsFromFile=false; _designDetail = 0; page(Page::designWarnings); break; }
                     constructionMove(1, 0);
                     break;
                 case Page::designConfirm:
@@ -4323,6 +4395,8 @@ namespace OpenRCT2::Ui::Windows
                     else { _parkNews = Handheld::ParkInformation::NewsList(); invalidate(); }
                     break;
                 case Page::parkNewsDetail:
+                    if (choice >= newsActions().size()) break;
+                    choice = newsActions()[choice];
                     if (choice == 0 && _parkNewsTarget)
                     {
                         const auto count = Handheld::GuestManagement::TextLines(Handheld::ParkInformation::PlainText(_parkNewsTarget->item.text)).size();
@@ -4520,22 +4594,22 @@ namespace OpenRCT2::Ui::Windows
                         if (result.error == GameActions::Status::ok) { _trackCost=result.cost; _trackContext=Handheld::TrackEditing::Context(*_trackBlock); page(Page::trackReplaceConfirm); }
                         else { _status=result.getErrorMessage(); invalidate(); }
                     }
-                    else if (choice == 0)
+                    else if (ridesPresentationFor(Page::trackBlock,choice).rows[choice] == "Locate block")
                     {
                         const auto origin = _trackBlock->origin;
                         close();
                         if (auto* main = WindowGetMain())
                             WindowScrollToLocation(*main, origin);
                     }
-                    else if (choice == 1 || choice == 5)
+                    else if (ridesPresentationFor(Page::trackBlock,choice).rows[choice] == "Remove block..." || ridesPresentationFor(Page::trackBlock,choice).rows[choice] == "Review speed...")
                     {
-                        const auto speed = choice == 5 ? std::optional<uint8_t>{ _trackSpeed } : std::nullopt;
+                        const auto speed = ridesPresentationFor(Page::trackBlock,choice).rows[choice] == "Review speed..." ? std::optional<uint8_t>{ _trackSpeed } : std::nullopt;
                         const auto result = Handheld::TrackEditing::Change(*_trackBlock, speed);
                         if (result.error == GameActions::Status::ok)
                         {
                             _trackCost = result.cost;
                             _trackContext = Handheld::TrackEditing::Context(*_trackBlock);
-                            page(choice == 1 ? Page::trackRemoveConfirm : Page::trackSpeedConfirm);
+                            page(ridesPresentationFor(Page::trackBlock,choice).rows[choice] == "Remove block..." ? Page::trackRemoveConfirm : Page::trackSpeedConfirm);
                         }
                         else
                         {
@@ -4543,7 +4617,7 @@ namespace OpenRCT2::Ui::Windows
                             invalidate();
                         }
                     }
-                    else if (choice == 2)
+                    else if (ridesPresentationFor(Page::trackBlock,choice).rows[choice] == "Back to blocks")
                     {
                         _trackBlocks = Handheld::TrackEditing::Blocks(*_ridesTarget);
                         page(Page::trackBlocks);
@@ -4551,7 +4625,7 @@ namespace OpenRCT2::Ui::Windows
                     else if (trackTypeHasSpeedSetting(_trackBlock->type))
                     {
                         const int minimum = getGameState().cheats.unlockOperatingLimits ? 0 : 2;
-                        _trackSpeed = std::clamp<int>(_trackSpeed + (choice == 3 ? -2 : 2), minimum, kMaximumTrackSpeed);
+                        _trackSpeed = std::clamp<int>(_trackSpeed + (ridesPresentationFor(Page::trackBlock,choice).rows[choice] == "Speed -" ? -2 : 2), minimum, kMaximumTrackSpeed);
                         invalidate();
                     }
                     break;
@@ -5065,7 +5139,12 @@ namespace OpenRCT2::Ui::Windows
                         page(Page::ridesRoster);
                         break;
                     }
-                    if (_ridesDraft->setting && _ridesDraft->setting->appearance)
+                    if (rideVehicleChoice()) {
+                        if(choice<_ridesDraft->setting->values.size()) {
+                            _ridesDraft->value=_ridesDraft->setting->values[choice];page(Page::ridesConfirm);
+                        }
+                    }
+                    else if (_ridesDraft->setting && _ridesDraft->setting->appearance)
                     {
                         if (choice < _ridesDraft->setting->values.size())
                         {
@@ -5569,27 +5648,13 @@ namespace OpenRCT2::Ui::Windows
                     if(_shopAppearanceDraft && choice<_shopAppearanceDraft->setting.values.size()) {
                         _shopAppearanceDraft->value=_shopAppearanceDraft->setting.values[choice];
                         const auto q=Handheld::ShopAppearance::Action(*_shopAppearanceDraft,false);
-                        if(q.error==GameActions::Status::ok)page(Page::shopAppearanceReview);
+                        if(q.error==GameActions::Status::ok)applyShopAppearanceDraft();
                         else {_status=q.getErrorMessage();invalidate();}
                     }
                     break;
                 case Page::shopAppearanceReview:
                     if(choice==0) {back();break;}
-                    if(_shopAppearanceDraft) {
-                        const auto q=Handheld::ShopAppearance::Action(*_shopAppearanceDraft,false);
-                        if(q.error!=GameActions::Status::ok){_status=q.getErrorMessage();invalidate();break;}
-                        _shopAppearanceBusy=true;const auto request=++_shopAppearanceRequest;
-                        const auto result=Handheld::ShopAppearance::Action(*_shopAppearanceDraft,true,
-                            [this,request,lifetime=std::weak_ptr<int>(_shopAppearanceLifetime)](const auto*,const GameActions::Result* outcome){
-                                if(lifetime.expired() || flags.has(WindowFlag::dead) || request!=_shopAppearanceRequest || _page!=Page::shopAppearanceReview)return;
-                                _shopAppearanceBusy=false;
-                                if(outcome->error==GameActions::Status::ok) {
-                                    page(Page::shopAppearance);_focus.move(static_cast<int>(_shopAppearanceChannel),rows().size());_status="Appearance updated";
-                                } else _status=outcome->getErrorMessage();invalidate();
-                            });
-                        if(result.error!=GameActions::Status::ok){_shopAppearanceBusy=false;_status=result.getErrorMessage();}
-                        invalidate();
-                    }
+                    applyShopAppearanceDraft();
                     break;
                 case Page::shopPrices:
                     if (_shop)
@@ -5734,13 +5799,13 @@ namespace OpenRCT2::Ui::Windows
                             if(!_designFile) _designFileStatus="File removed or unreadable";
                             else if(!_designMetadata) _designFileStatus="Native design parser rejected this file";
                             else if(!Handheld::Designs::Eligible(*_designMetadata)) _designFileStatus=Handheld::Designs::UnavailableReason(*_designMetadata);
-                            else _designFilePreview=Handheld::Designs::FileEntry(entry.path.u8string());
+                            else _designFilePreview=Handheld::Designs::FileEntry(entry.path.u8string(),{},260,144);
                             page(Page::designInspect);
                         }
                     }
                     break;
                 case Page::designWarnings:
-                    if (choice+1==rows().size()) page(Page::designOptions);
+                    if (choice+1==rows().size()) page(_designDetailsFromFile?Page::designInspect:Page::designOptions);
                     break;
                 case Page::designVehicles: {
                     if (choice>=_designVehicles.size()) {page(_designVehicleFromFile?Page::designInspect:Page::designOptions);break;}
@@ -5752,7 +5817,7 @@ namespace OpenRCT2::Ui::Windows
                     const auto chosen=_designVehicles[choice];
                     if (_designVehicleFromFile) {
                         _designChoice=chosen;
-                        _designFilePreview=Handheld::Designs::FileEntry(_designFile->path.u8string(),chosen);
+                        _designFilePreview=Handheld::Designs::FileEntry(_designFile->path.u8string(),chosen,260,144);
                         page(Page::designInspect);
                     } else if (Handheld::Designs::ChooseVehicle(chosen)) page(Page::designOptions);
                     else {_status="Vehicle unavailable. Back and choose again.";invalidate();}
@@ -5761,7 +5826,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::designInspect:
                     if(choice==1) page(Page::designFiles);
                     else if(choice==2) { openDesignVehicles(true); }
-                    else if(choice>2) { invalidate(); }
+                    else if(choice==3) { _designDetailsFromFile=true; _designDetail=0;page(Page::designWarnings); }
                     else if(!_designFile || !Handheld::FileBrowsing::Current(*_designFile)) { _status="Design file changed. Back and select again.";invalidate(); }
                     else if(!fileDesignEligible()) { _status=_designFileStatus;invalidate(); }
                     else if(Handheld::BeginSavedDesign(_designFile->path.u8string(),_designChoice)) {
@@ -5920,6 +5985,55 @@ namespace OpenRCT2::Ui::Windows
                     Handheld::DrawWrappedLabel(rt,{340,56},152,_page==Page::staffRoles?Handheld::StaffManagement::RoleName(role):costumes[row].second,4);
                     Handheld::StaffManagement::DrawSpritePreview(rt,{416,192},role,costume);
                 }
+                Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Choose"},{"A","Select"},{"B","Back"}});return;
+            }
+            if (rideVehicleChoice()) {
+                const auto picker=rideVehiclePicker();
+                Handheld::DrawObjectPicker(rt,{ContextGetWidth(),ContextGetHeight()},picker,"Ride vehicles","A: Review train changes","No vehicles available");return;
+            }
+            if (_page == Page::designScenery) {
+                const auto selected=_focus.index();
+                if(selected>=3 && selected-3<Handheld::DesignAuthoring::sceneryBaseline.size()) {
+                    const auto& element=Handheld::DesignAuthoring::sceneryBaseline[selected-3];
+                    if(auto* main=WindowGetMain();main && main->viewport) {
+                        auto& view=*main->viewport;
+                        main->savedViewPos=Translate3DTo2DWithZ(view.rotation,element.loc)
+                            -ScreenCoordsXY{view.zoom.ApplyTo(384-view.pos.x),view.zoom.ApplyTo(192-view.pos.y)};
+                        view.viewPos=main->savedViewPos;main->flags.unset(WindowFlag::scrollingToLocation);
+                        const auto selectionFlags=gMapSelectFlags;const auto type=gMapSelectType;const auto a=gMapSelectPositionA,b=gMapSelectPositionB;
+                        gMapSelectFlags={MapSelectFlag::enable};gMapSelectType=MapSelectType::full;gMapSelectPositionA=gMapSelectPositionB=CoordsXY(element.loc);
+                        ViewportRender(rt,main->viewport);
+                        gMapSelectFlags=selectionFlags;gMapSelectType=type;gMapSelectPositionA=a;gMapSelectPositionB=b;
+                    }
+                }
+                auto model=ridesPresentationFor(_page,selected);model.breadcrumb="Save design / Scenery";
+                Handheld::DrawManagementContent(rt,{8,36},{240,312},model);
+                Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Choose"},{"A","Toggle / select"},{"B","Back"}});return;
+            }
+            if (_page == Page::save || _page == Page::load || _page == Page::parkInspect || _page == Page::designInspect) {
+                const bool slots=_page==Page::save || _page==Page::load;
+                const bool design=_page==Page::designInspect;
+                Handheld::ManagementPresentation model;model.rows=rows();model.selected=_focus.index();model.rowHeight=38;
+                model.title=slots?(_page==Page::save?"Save park":"Load park"):design?"Saved design":"Saved park";
+                model.status=_status;
+                if(!slots) {
+                    const auto filename=design?(_designFile?_designFile->path.filename().u8string():""):(_loadFile?_loadFile->path.filename().u8string():"");
+                    model.bodyLines={filename};model.rowHeight=30;
+                }
+                Handheld::DrawManagementContent(rt,{8,36},{232,312},model);
+                Handheld::Concept::Box(rt,{248,36},{256,312});
+                const auto* park=slots?(_focus.index()<3 && _slotPreviews[_focus.index()]?&*_slotPreviews[_focus.index()]:nullptr)
+                    :_parkFilePreview?&*_parkFilePreview:nullptr;
+                if(!design && park) Handheld::SavedParkPresentation::Draw(rt,*park);
+                else if(design) {
+                    Handheld::DrawWrappedLabel(rt,{258,50},236,_designFile?_designFile->path.stem().u8string():"File unavailable",2);
+                    Drawing::RenderTarget image;
+                    if(_designFilePreview && _designFilePreview->drawPreview && ClipRenderTarget(image,rt,{246,82},260,144))_designFilePreview->drawPreview(image);
+                    const auto* object=_designMetadata?GetContext()->GetObjectManager().GetLoadedObject(_designChoice.value_or(_designMetadata->trackAndVehicle.vehicleObject)):nullptr;
+                    Handheld::DrawWrappedLabel(rt,{258,236},236,object?object->GetName():"Choose another vehicle",2);
+                    const auto readiness=fileDesignEligible()?"Ready / choose land for cost":_designMetadata?Handheld::Designs::UnavailableReason(*_designMetadata):_designFileStatus;
+                    Handheld::DrawWrappedLabel(rt,{258,286},236,readiness,4);
+                } else Handheld::DrawWrappedLabel(rt,{258,154},236,slots?"Choose a saved park or Browse.":_parkPreviewStatus,4);
                 Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Choose"},{"A","Select"},{"B","Back"}});return;
             }
             if (_page == Page::researchCatalog || _page == Page::designVehicles) {
@@ -6159,7 +6273,7 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::DrawActionStrip(rt,{ContextGetWidth(),ContextGetHeight()});
                 Handheld::DrawFooter(
                     rt, { ContextGetWidth(), ContextGetHeight() },
-                    { { "D-pad", "Choose" }, { "A", _page == Page::shopAppearanceEditor ? "Review" : "Select" }, { "B", "Back" } });
+                    { { "D-pad", "Choose" }, { "A", _page == Page::shopAppearanceEditor ? "Apply" : "Select" }, { "B", "Back" } });
                 return;
             }
             if (shopManagement())

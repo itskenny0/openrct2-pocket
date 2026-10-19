@@ -291,7 +291,7 @@ int main(int argc, char** argv)
             const auto index=static_cast<size_t>(it-keys.begin());W::HandheldMenuMove(static_cast<int>(index)-static_cast<int>(keyFocus));
             H::HandleMenuInput(controller,confirm);keyFocus=index;
         };
-        pressKey("B");pressKey("OK");
+        pressKey("B");pressKey("Done");
         Check(W::HandheldSceneryPickerIsOpen() && S::Search()=="B" && S::Current()==selectedBeforeSearch,
             "Controller search apply changed placement selection or missed results");
         const auto stableFocus=W::HandheldObjectPickerFocus();
@@ -300,12 +300,12 @@ int main(int argc, char** argv)
         H::HandleMenuInput(controller,searchAction);keyFocus=0;pressKey("Z");H::HandleMenuInput(controller,back);
         Check(W::HandheldSceneryPickerIsOpen() && S::Search()=="B" && W::HandheldObjectPickerFocus()==stableFocus,
             "Cancelled search changed query or native focus");
-        H::HandleMenuInput(controller,searchAction);keyFocus=0;pressKey("Clr");
+        H::HandleMenuInput(controller,searchAction);keyFocus=0;pressKey("Clear");
         for(char c:std::string("NO-MATCH-4871")) { pressKey(std::string(1,c)); }
-        pressKey("OK");
+        pressKey("Done");
         Check(W::HandheldSceneryPickerIsOpen() && S::Entries(S::Category::banners).empty(),"Native empty search fabricated results");
         capture("landscaping-06-native-search-empty.png",true);
-        H::HandleMenuInput(controller,searchAction);keyFocus=0;pressKey("Clr");pressKey("OK");
+        H::HandleMenuInput(controller,searchAction);keyFocus=0;pressKey("Clear");pressKey("Done");
         Check(S::Search().empty() && !S::Entries(S::Category::banners).empty(),"Controller clear did not restore eligible objects");
         capture("landscaping-07-native-search-clear.png",true);
         H::HandleMenuInput(controller,confirm);
