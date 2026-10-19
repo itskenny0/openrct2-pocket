@@ -122,7 +122,7 @@ int main(int argc,char** argv)
         open(0);Check(model().tabs.size()==3,"Park tabs absent");capture("09-park-administration.png");
         select("Admission...");const auto admission=park.entranceFee;press(H::Action::confirm);Check(model().editing,"Park admission still requires another menu");nav(1,0);press(H::Action::back);
         Check(model().tabs.size()==3&&model().selected==1&&park.entranceFee==admission,"Admission cancel lost park focus/applied draft");
-        press(H::Action::confirm);nav(1,0);press(H::Action::confirm);select("Set admission");press(H::Action::confirm);GameActions::ProcessQueue(state);
+        press(H::Action::confirm);nav(1,0);select("Apply price");press(H::Action::confirm);GameActions::ProcessQueue(state);
         Check(park.entranceFee==admission+1.00_GBP&&model().tabs.size()==3&&model().selected==1,"Native admission commit/park return failed");
         press(H::Action::nextOption);capture("10-park-objectives.png");press(H::Action::nextOption);capture("11-park-records.png");
         select("Park history...");press(H::Action::confirm);capture("12-park-native-history.png");press(H::Action::back);Check(model().selectedTab==2&&model().selected==2,"History Back lost Records focus");

@@ -152,7 +152,7 @@ namespace OpenRCT2::Ui::Handheld::RightsTools
             model.stats = { { "For sale", std::to_string(c.available) },
                             { "Already owned", std::to_string(c.owned) },
                             { "Unavailable", std::to_string(c.unavailable) },
-                            { "Native cost", FormatMoney(draft.cost) } };
+                            { "Cost", FormatMoney(draft.cost) } };
         }
         const auto q = Action(draft, false);
         model.status = status.empty()

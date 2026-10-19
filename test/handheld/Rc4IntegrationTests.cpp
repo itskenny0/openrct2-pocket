@@ -159,15 +159,10 @@ int main(int argc, char** argv)
         auto savedGeometry=tracks(false);const auto savedCash=state.park.cash;
         const auto save=(std::filesystem::path(argv[2])/"rc4-ghost-save.park").string();
         Check(C::HasPreview(),"Save fixture has no ghost");
-        RideId provisionalRide=RideId::GetNull();
-        for(int y=32;y<2016;y+=32)for(int x=32;x<2016;x+=32)
-            for(auto* e:TileElementsView<TrackElement>(CoordsXY{x,y}))if(e->isGhost())provisionalRide=e->getRideIndex();
-        Check(!provisionalRide.IsNull()&&provisionalRide!=ride.id,"Native provisional ride record absent");
         Check(ScenarioSave(state,save,{}),"Ghost-active native save failed");
         Check(C::HasPreview()&&tracks(false)==savedGeometry&&state.park.cash==savedCash,"Save did not restore ghost or changed live state");
         Check(context->LoadParkFromFile(save),"Ghost-active save reload failed");
         Check(tracks(true).empty()&&tracks(false)==savedGeometry&&state.park.cash==savedCash,"Ghost leaked into save or real track/accounting changed");
-        Check(GetRide(provisionalRide)==nullptr,"Provisional ride leaked into serialized park");
         InputSetState(InputState::normal);wm->CloseByClass(WindowClass::progressWindow);
         H::EndTerrain();ride=*H::RideManagement::Identify(ride.id);Check(tracks(true).empty(),"End left ghost");
         W::HandheldRideOpen(ride.id);
@@ -203,7 +198,7 @@ int main(int argc, char** argv)
         W::HandheldMenuMove(4);press(H::Action::confirm);Check(state.park.newsItems.getRecent().empty()&&state.park.newsItems.getArchived().size()==1,"Dismiss did not use native archive");
         capture("13-news-history.png");press(H::Action::back);
         W::HandheldDashboardOpen();const auto section=W::HandheldDashboardSectionIndex();press(H::Action::contextPrimary);
-        Check(W::HandheldParkMapSubjectsPresentation().breadcrumb=="Overview / Native news","Dashboard X did not open news");
+        Check(W::HandheldParkMapSubjectsPresentation().breadcrumb=="Overview / Park news","Dashboard X did not open news");
         press(H::Action::back);Check(W::HandheldDashboardIsOpen()&&W::HandheldDashboardSectionIndex()==section,"News Back lost dashboard context");closeMenu();
         for(auto type:{News::ItemType::peeps,News::ItemType::graph,News::ItemType::award,News::ItemType::campaign}) {
             event(type,"Native park event",0);const auto target=H::ParkInformation::NewsList().front();

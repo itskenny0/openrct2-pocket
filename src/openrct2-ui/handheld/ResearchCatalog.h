@@ -89,10 +89,10 @@ namespace OpenRCT2::Ui::Handheld::ResearchCatalog
     inline ManagementPresentation Presentation(const std::vector<Target>& roster, uint8_t filter, size_t selected)
     {
         ManagementPresentation model;
-        model.breadcrumb = "Research / Native invention records";
+        model.breadcrumb = "Research / Invention catalog";
         model.title = Category(filter);
         model.selected = selected;
-        model.stats = { { "Native records", std::to_string(roster.size()) } };
+        model.stats = { { "Items", std::to_string(roster.size()) } };
         for (const auto& target : roster)
             model.rows.push_back(Name(target));
         model.rows.push_back("Change category");

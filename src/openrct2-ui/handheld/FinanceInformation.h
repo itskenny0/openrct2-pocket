@@ -124,7 +124,7 @@ namespace OpenRCT2::Ui::Handheld::FinanceInformation
         graph %= 3;
         sample = std::min<size_t>(63, sample);
         ManagementPresentation model;
-        model.breadcrumb = "Finances / Native weekly history";
+        model.breadcrumb = "Finances / History";
         model.title = names[graph];
         model.selected = selected;
         model.stats = { { "Current", Money(Current(graph)) },

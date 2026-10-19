@@ -77,13 +77,15 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         ManagementPresentation model;
         model.breadcrumb = "Staff / Role uniform";
         model.title = RoleName(target.type) + " uniforms";
-        std::string name = "Special colour";
-        for (uint8_t i = 0; i < 72; ++i)
-            if (Windows::ColourDropDownIndexToColour(i) == value)
-                name = FmtString(FormatStringID(Windows::ColourDropDownIndexToName(i))).WithoutFormatTokens();
-        model.rows = { "Colour: " + name, "Apply to entire role", "Cancel" };
-        model.selected = selected;
-        model.status = "Left / Right changes colour";
+        for(uint8_t i=0;i<72;++i) {
+            const auto colour=Windows::ColourDropDownIndexToColour(i);
+            model.colourValues.push_back(static_cast<uint16_t>(colour));
+            model.rows.push_back(FmtString(FormatStringID(Windows::ColourDropDownIndexToName(i))).WithoutFormatTokens());
+            if(colour==value)model.selected=i;
+        }
+        model.currentColour=static_cast<uint16_t>(StaffGetColour(target.type));
+        model.primaryAction="Apply to role";
+        model.status="Changes every "+RoleName(target.type)+" uniform";
         return model;
     }
     GameActions::Result SetName(const Target& target, const std::string& baseline, const std::string& value, bool execute)
@@ -211,7 +213,7 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         std::optional<uint8_t> orders, const std::string& status)
     {
         ManagementPresentation model;
-        model.breadcrumb = "Park dashboard / Staff";
+        model.breadcrumb = "Park / Staff";
         model.title = "Staff";
         model.selected = selected;
         model.status = status;
@@ -230,9 +232,10 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
                 const auto* staff = Resolve(entry);
                 model.rows.push_back(staff ? staff->getName() : "Employee unavailable");
                 const auto index=model.rows.size()-1;
-                const auto first=3+(std::max<size_t>(selected,3)-3)/capacity*capacity;
+                const auto first=std::max<size_t>(selected,3)-std::min(std::max<size_t>(selected,3)-3,capacity+3);
+                const auto last=std::max<size_t>(selected,3)+capacity+3;
                 std::string detail;
-                if(staff && index>=first && index<first+capacity) {
+                if(staff && index>=first && index<last) {
                     Formatter ft;formatPeepActionTo(*staff,ft);
                     detail=RoleName(entry.type)+" / "+FormatStringIDLegacy(STR_STRINGID,ft.Data());
                 }

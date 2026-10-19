@@ -225,9 +225,9 @@ namespace OpenRCT2::Ui::Handheld::Designs
         std::vector<std::string> lines{VehicleNotice(), HeightNotice(), SceneryNotice()};
         if (!lastError.empty()) lines.insert(lines.begin(),"Rejected: "+lastError);
         if (scenery && sceneryOmitted) lines.push_back("Native scenery omissions: "+std::to_string(sceneryOmitted));
-        if (scenery && sceneryWarning) lines.push_back("Native policy: ALL design scenery omitted");
+        if (scenery && sceneryWarning) lines.push_back("This design will be placed without scenery");
         lines.push_back("Native settings may clamp to selected vehicle rules");
-        lines.push_back("Native placement failure has no universal scenery rollback");
+        lines.push_back("Some scenery may remain if placement fails");
         return lines;
     }
     bool Active()

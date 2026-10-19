@@ -80,7 +80,7 @@ namespace OpenRCT2::Ui::Handheld::Finances
     {
         const auto& park = getGameState().park;
         ManagementPresentation model;
-        model.breadcrumb = "Park dashboard / Finances";
+        model.breadcrumb = "Park / Finances";
         model.title = "Finances";
         model.selected = selected;
         model.status = status;
@@ -108,7 +108,7 @@ namespace OpenRCT2::Ui::Handheld::Finances
         model.contentSized=true;
         model.confirmation = view == View::confirmation;
         model.stats = { { "Current", FormatMoney(draft->baseline) },
-                        { model.editing ? "Draft" : "New value", FormatMoney(draft->value) } };
+                        { "New value", FormatMoney(draft->value) } };
         if (model.editing)
             model.highlightedStat = 1;
         if (loan)
@@ -120,12 +120,11 @@ namespace OpenRCT2::Ui::Handheld::Finances
             model.stats.push_back({ "Loan limit", FormatMoney(park.maxBankLoan) });
             model.stats.push_back({ "Interest", std::to_string(park.bankLoanInterestRate) + "%" });
         }
-        else
-            model.stats.push_back({ "Cash change", FormatMoney(0) });
         model.rows = model.editing
-            ? std::vector<std::string>{ "Review change...", "Cancel" }
+            ? std::vector<std::string>{ loan ? "Review loan change" : "Apply price", "Cancel" }
             : std::vector<std::string>{ loan ? draft->value >= draft->baseline ? "Borrow" : "Repay" : "Set admission",
                                         "Cancel" };
+        model.primaryAction=model.editing && !loan ? "Apply" : "Review";
         const auto result = Action(*draft, false);
         if (model.status.empty())
             model.status = result.error == GameActions::Status::ok

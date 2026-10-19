@@ -81,7 +81,7 @@ namespace OpenRCT2::Ui::Handheld::ParkOverview
         const auto& state = getGameState();
         const auto& park = state.park;
         ManagementPresentation model;
-        model.breadcrumb = "Park dashboard / Overview";
+        model.breadcrumb = "Park / Overview";
         model.title = park.name;
         model.selected = selected;
         model.status = feedback;

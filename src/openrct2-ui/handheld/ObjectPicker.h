@@ -116,26 +116,30 @@ namespace OpenRCT2::Ui::Handheld
         using namespace Concept;
         const auto p = kMenuOrigin;
         const auto& entries = picker.entries();
-        const auto start = picker.page() * ObjectPicker::pageSize;
-        const auto visible = std::min(ObjectPicker::pageSize, entries.size() - start);
-        const int detailTop = 40 + static_cast<int>((visible + ObjectPicker::columns - 1) / ObjectPicker::columns) * 92;
+        const int viewportHeight=184;
+        const int offset=ListOffset(picker.focus()/3,(entries.size()+2)/3,viewportHeight,92);
+        const auto start=static_cast<size_t>(offset/92)*3;
+        const int detailTop=224;
         Box(rt, p, { 320, detailTop + 78 });
         Heading(rt, p + ScreenCoordsXY{ 12, 12 }, title);
         DrawModernText(
             rt, p + ScreenCoordsXY{ 194, 12 },
-            "{MUTED}" + std::to_string(picker.page() + 1) + "/" + std::to_string(picker.pages()));
-        for (size_t slot = 0; slot < ObjectPicker::pageSize && start + slot < entries.size(); ++slot)
+            "{MUTED}" + std::to_string(entries.empty()?0:picker.focus()+1) + " / " + std::to_string(entries.size()));
+        Drawing::RenderTarget gridRt;
+        if(ClipRenderTarget(gridRt,rt,p+ScreenCoordsXY{0,36},320,viewportHeight))
+        {
+        for (size_t slot = 0; slot < ObjectPicker::pageSize+ObjectPicker::columns && start + slot < entries.size(); ++slot)
         {
             const auto index = start + slot;
             const bool selected = index == picker.focus();
-            const auto cell = p + ScreenCoordsXY{ 12 + static_cast<int>(slot % 3) * 100, 36 + static_cast<int>(slot / 3) * 92 };
-            Box(rt, cell, { 94, 84 }, selected);
+            const auto cell=ScreenCoordsXY{12+static_cast<int>(slot%3)*100,static_cast<int>((start+slot)/3)*92-offset};
+            Box(gridRt, cell, { 94, 84 }, selected);
             // The same loaded Object::DrawPreview path as desktop object selection.
             // Native sprite minification fits tall objects without an asset pipeline.
             if (entries[index].drawPreview)
             {
                 Drawing::RenderTarget preview;
-                if (ClipRenderTarget(preview, rt, cell + ScreenCoordsXY{ 4, 4 }, 86, 62))
+                if (ClipRenderTarget(preview, gridRt, cell + ScreenCoordsXY{ 4, 4 }, 86, 62))
                     entries[index].drawPreview(preview);
             }
             else if (
@@ -143,14 +147,15 @@ namespace OpenRCT2::Ui::Handheld
                     entries[index].identity.type, entries[index].identity.index))
             {
                 Drawing::RenderTarget preview;
-                if (ClipRenderTarget(preview, rt, cell + ScreenCoordsXY{ 4, 4 }, 86, 62))
+                if (ClipRenderTarget(preview, gridRt, cell + ScreenCoordsXY{ 4, 4 }, 86, 62))
                 {
                     preview.zoom_level = entries[index].previewZoom;
                     object->DrawPreview(preview, preview.zoom_level.ApplyTo(86), preview.zoom_level.ApplyTo(62));
                 }
             }
             DrawModernEllipsised(
-                rt, cell + ScreenCoordsXY{ 5, 70 }, 84, (selected ? "{BLACK}" : "{WHITE}") + entries[index].name);
+                gridRt, cell + ScreenCoordsXY{ 5, 70 }, 84, (selected ? "{BLACK}" : "{WHITE}") + entries[index].name);
+        }
         }
         Rule(rt, p + ScreenCoordsXY{ 12, detailTop }, 296);
         const auto* selected = picker.selected();
@@ -161,7 +166,7 @@ namespace OpenRCT2::Ui::Handheld
         std::vector<ControlHint> hints{ { "D-pad", "Choose" },
                                         { "A", "Select" },
                                         { "B", "Back" },
-                                        { "L1/R1", "Page" },
+                                        { "L1/R1", "Browse" },
                                         { searchControl ? "X" : "START", searchControl ? "Search" : startAction,
                                           searchControl ? HintPriority::normal : HintPriority::guide } };
         if (!extraAction.empty())

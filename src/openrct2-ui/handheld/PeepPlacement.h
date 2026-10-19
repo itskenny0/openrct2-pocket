@@ -158,7 +158,7 @@ namespace OpenRCT2::Ui::Handheld::PeepPlacement
         model.breadcrumb = "Person / Cancel placement";
         const auto* peep = target ? Resolve(*target) : nullptr;
         model.title = peep ? peep->getName() : "Person unavailable";
-        model.rows = { "Cancel native pickup", "Keep placing" };
+        model.rows = { "Cancel pickup", "Keep placing" };
         model.selected = selected;
         model.confirmation = true;
         model.status = "Native restoration rules apply";

@@ -332,7 +332,7 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
     ManagementPresentation HistoryPresentation(const Target& target, const std::vector<RideManagement::Target>& list, size_t selected)
     {
         ManagementPresentation model;
-        model.breadcrumb = "Guests / Native ride history";
+        model.breadcrumb = "Guests / Ride history";
         const auto* guest = Resolve(target);
         model.title = guest ? guest->getName() : "Guest unavailable";
         model.selected = selected;
@@ -342,7 +342,7 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
             model.rows.push_back(HistoryRideCurrent(target, rideTarget) ? ride->getName() : "Ride unavailable");
         }
         model.rows.push_back("Back to guest");
-        model.status = !guest ? "Guest no longer in park" : list.empty() ? "No retained native rides" : "Native ride order; A Inspect ride";
+        model.status = !guest ? "Guest no longer in park" : list.empty() ? "No ride history yet" : "A Inspect ride";
         return model;
     }
     ManagementPresentation Presentation(
@@ -350,7 +350,7 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
         const std::string& status, const std::string& text, size_t textPage)
     {
         ManagementPresentation model;
-        model.breadcrumb = "Park dashboard / Guests";
+        model.breadcrumb = "Park / Guests";
         model.title = "Guests";
         model.selected = selected;
         model.status = status;
@@ -377,12 +377,13 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
             model.rows={"Map roster", "Name filter...", "Tracked only"};model.rowDetails.resize(3);
             model.toolbarCount=3;model.denseRoster=true;model.listLabel="GUESTS / CURRENT ACTIVITY / HAPPINESS";
             const auto capacity=MeasureManagement({ContextGetWidth()-16,Layout::ContentHeight({ContextGetWidth(),ContextGetHeight()})},model).capacity;
-            const auto first=3+(std::max<size_t>(selected,3)-3)/capacity*capacity;
+            const auto first=std::max<size_t>(selected,3)-std::min(std::max<size_t>(selected,3)-3,capacity+3);
+                const auto last=std::max<size_t>(selected,3)+capacity+3;
             for (const auto& entry : roster) {
                 const auto index=model.rows.size();
-                const auto* guest=index>=first && index<first+capacity ? Resolve(entry) : nullptr;
+                const auto* guest=index>=first && index<last ? Resolve(entry) : nullptr;
                 model.rows.push_back(guest ? guest->getName() : "");
-                model.rowDetails.push_back(guest && index>=first && index<first+capacity ? Status(*guest)+" / Happy "+std::to_string(guest->happiness*100/255)+"%"+(guest->peepFlags.has(PeepFlag::tracking)?" / Tracked":"") : "");
+                model.rowDetails.push_back(guest && index>=first && index<last ? Status(*guest)+" / Happy "+std::to_string(guest->happiness*100/255)+"%"+(guest->peepFlags.has(PeepFlag::tracking)?" / Tracked":"") : "");
             }
             model.rows.push_back("Back to Guests");
             if (roster.empty())

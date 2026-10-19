@@ -16,6 +16,7 @@
 #include "GuestManagement.h"
 #include "GuestFollow.h"
 #include "ListFocus.h"
+#include <map>
 #include "MarketingManagement.h"
 #include "Mazes.h"
 #include "Panel.h"
@@ -30,6 +31,7 @@
 #include "ResearchCatalog.h"
 #include "ManagementNews.h"
 #include "RideAccess.h"
+#include <openrct2/world/MapSelection.h>
 #include "RideManagement.h"
 #include "RideTabs.h"
 #include "RideNavigation.h"
@@ -477,6 +479,14 @@ namespace OpenRCT2::Ui::Windows
         size_t _ridesRosterFocus{};
         size_t _ridesInspectFocus{};
         bool _rideFromPark{};
+        std::map<std::string,Handheld::ListScroll> _scrollViews;
+        std::string scrollKey() const
+        {
+            return std::to_string(static_cast<int>(_page))+":"+std::to_string(_rideTabs.tab)+":"+
+                std::to_string(_guestTabs.tab)+":"+std::to_string(_staffTabs.tab)+":"+
+                std::to_string(_financeTabs.tab)+":"+std::to_string(_researchTabs.tab)+":"+
+                std::to_string(_parkTabs.tab)+":"+std::to_string(_marketingTabs.tab);
+        }
         Handheld::RideTabs::State _rideTabs;
         bool _ridesTabChild{};
         bool _ridesBusy{};
@@ -686,9 +696,6 @@ namespace OpenRCT2::Ui::Windows
                 {
                     const auto& point = *_accessPoint;
                     model.title = Handheld::RideAccess::PointLabel(point);
-                    model.bodyLines = {"Tile " + std::to_string(point.source.x / 32) + "," + std::to_string(point.source.y / 32),
-                        "Height Z " + std::to_string(point.source.z) + " / direction " + std::to_string(point.source.direction),
-                        "Connected paths and queues will update.", "Maze openings follow the entrance position."};
                     model.rows = Handheld::RideAccess::Current(point)
                         ? std::vector<std::string>{"Move access...", "Remove access...", "Back to access list"}
                         : std::vector<std::string>{"Back to access list"};
@@ -2092,6 +2099,7 @@ namespace OpenRCT2::Ui::Windows
         }
         void onUpdate() override
         {
+            if(_scrollViews[scrollKey()].moving())invalidate();
             if (_page == Page::sceneryPicker) { refreshPicker(); invalidate(); }
             if (_page == Page::parkMap) { _parkMap.Update(); invalidate(); }
             if (parkInformation()) { _ledger.Clamp(); invalidate(); }
@@ -2489,11 +2497,10 @@ namespace OpenRCT2::Ui::Windows
             }
             else if (_page == Page::staffUniform)
             {
-                if (y)
-                    move(y);
-                if (x && _focus.index() == 0)
-                    _staffUniformDraft = static_cast<Drawing::Colour>((EnumValue(_staffUniformDraft) + x + 72) % 72);
-                invalidate();
+                size_t current=0;
+                for(uint8_t i=0;i<72;++i)if(ColourDropDownIndexToColour(i)==_staffUniformDraft)current=i;
+                _staffUniformDraft=ColourDropDownIndexToColour(Handheld::MoveColourGrid(current,72,x,y));
+                _status.clear();invalidate();
             }
             else if (_page == Page::ridesName || _page == Page::designName || _page == Page::staffName || _page == Page::guestName || _page == Page::guestFilterName)
             {
@@ -2766,6 +2773,32 @@ namespace OpenRCT2::Ui::Windows
             if (y) { _focus.move(y, rows().size()); _status.clear(); }
             invalidate(); return true;
         }
+        void drawAccessSelection(RenderTarget& rt)
+        {
+            const auto* point=_page==Page::accessManage ? (_focus.index()<_accessPoints.size() ? &_accessPoints[_focus.index()] : nullptr)
+                : (_accessPoint ? &*_accessPoint : nullptr);
+            auto* main=WindowGetMain();
+            if(point && Handheld::RideAccess::Current(*point) && main && main->viewport) {
+                auto& view=*main->viewport;
+                main->savedViewPos=Translate3DTo2DWithZ(view.rotation,{point->source.x+16,point->source.y+16,point->source.z})
+                    -ScreenCoordsXY{view.zoom.ApplyTo(ContextGetWidth()*3/4-view.pos.x),view.zoom.ApplyTo(ContextGetHeight()/2-view.pos.y)};
+                view.viewPos=main->savedViewPos;main->flags.unset(WindowFlag::scrollingToLocation);
+                const auto oldFlags=gMapSelectFlags;const auto oldType=gMapSelectType;
+                const auto oldA=gMapSelectPositionA,oldB=gMapSelectPositionB;
+                gMapSelectFlags={MapSelectFlag::enable};gMapSelectType=MapSelectType::full;
+                gMapSelectPositionA=gMapSelectPositionB=CoordsXY(point->source);
+                ViewportRender(rt,main->viewport);
+                gMapSelectFlags=oldFlags;gMapSelectType=oldType;gMapSelectPositionA=oldA;gMapSelectPositionB=oldB;
+            }
+            auto model=ridesPresentationFor(_page,_focus.index());
+            model.breadcrumb="Ride / Entrances & exits";model.rowHeight=34;
+            if(_page==Page::accessManage) {
+                model.title=point ? Handheld::RideAccess::PointLabel(*point) : "Entrances & exits";
+                model.bodyLines={"Selected point is shown in the park."};
+            }
+            Handheld::DrawManagementContent(rt,{8,36},{248,312},model);
+            Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Choose"},{"A","Select"},{"B","Back"}});
+        }
         void drawTrackSelection(RenderTarget& rt)
         {
             const auto* block = _page == Page::trackBlocks
@@ -2835,7 +2868,11 @@ namespace OpenRCT2::Ui::Windows
                 invalidate();
                 return;
             }
-            _focus.move(direction, rows().size());
+            const auto count=rows().size();
+            if(count) {
+                const auto next=std::clamp<int64_t>(static_cast<int64_t>(_focus.index())+direction,0,static_cast<int64_t>(count)-1);
+                _focus.move(static_cast<int32_t>(next)-static_cast<int32_t>(_focus.index()),count);
+            }
             if ((_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles)) { _fileFocus = _focus.index(); _fileDetail = 0; }
             _status.clear();
             invalidate();
@@ -3231,6 +3268,75 @@ namespace OpenRCT2::Ui::Windows
                     else
                         close();
                     break;
+            }
+        }
+        void applyRideDraft()
+        {
+            if (_ridesDraft)
+            {
+                const auto query = Handheld::RideManagement::Action(*_ridesDraft, false);
+                if (query.error != GameActions::Status::ok)
+                {
+                    _status = Handheld::Finances::Feedback(query);
+                    invalidate();
+                    return;
+                }
+                const auto expectedPage=_page;
+                const auto request = ++_ridesRequest;
+                _ridesBusy = true;
+                const auto result = Handheld::RideManagement::Action(
+                    *_ridesDraft, true,
+                    [this, request, expectedPage, lifetime = std::weak_ptr<int>(_ridesLifetime)](
+                        const GameActions::GameAction*, const GameActions::Result* outcome) {
+                        if (lifetime.expired() || request != _ridesRequest || _page != expectedPage)
+                            return;
+                        _ridesBusy = false;
+                        if (outcome->error == GameActions::Status::ok)
+                        {
+                            const bool demolished = _ridesDraft && _ridesDraft->demolition;
+                            // A native vehicle-object change intentionally changes the identity's object field.
+                            // Refresh only after this owned action succeeds; external changes remain stale.
+                            if (_ridesDraft && _ridesDraft->setting
+                                && _ridesDraft->setting->vehicle == GameActions::RideSetVehicleType::rideEntry)
+                                _ridesTarget = Handheld::RideManagement::Identify(_ridesDraft->target.id);
+                            if (_ridesDraft && _ridesDraft->refurbishment)
+                                _ridesTarget = Handheld::RideManagement::Identify(_ridesDraft->target.id);
+                            const auto destination = _ridesDraft && _ridesDraft->renaming
+                                ? (_ridesTarget && _ridesTarget->shop ? Page::shop : Page::ridesInspect)
+                                : ridesDraftParent();
+                            page(demolished ? Page::ridesRoster : destination);
+                            _status = demolished ? "Ride demolished" : "Ride updated";
+                        }
+                        else
+                            _status = Handheld::Finances::Feedback(*outcome);
+                        invalidate();
+                    });
+                if (result.error != GameActions::Status::ok)
+                {
+                    _ridesBusy = false;
+                    _status = Handheld::Finances::Feedback(result);
+                }
+                invalidate();
+            }
+        }
+        void applyFinanceDraft()
+        {
+            if (_financeDraft)
+            {
+                const auto expectedPage=_page;
+                _civicBusy=true;
+                const auto result=Handheld::Finances::Action(*_financeDraft,true,
+                    [this,expectedPage,lifetime=std::weak_ptr<int>(_civicLifetime)](const auto*,const GameActions::Result* outcome){
+                        if(lifetime.expired())return;
+                        _civicBusy=false;
+                        if(_page!=expectedPage)return;
+                        if(outcome->error==GameActions::Status::ok){page(_financeReturnPage);_status="Financial change applied";}
+                        else _status=Handheld::Finances::Feedback(*outcome);
+                        invalidate();
+                    });
+                if(result.error!=GameActions::Status::ok){_civicBusy=false;_status=Handheld::Finances::Feedback(result);}
+                else if(_civicBusy)_status="Applying financial change...";
+                invalidate();
             }
         }
         void confirm()
@@ -4026,19 +4132,11 @@ namespace OpenRCT2::Ui::Windows
                     page(Page::staff);
                     break;
                 case Page::staffUniform:
-                    if (choice == 0)
-                        _staffUniformDraft = static_cast<Drawing::Colour>((EnumValue(_staffUniformDraft) + 1) % 72);
-                    else if (choice == 1 && _staffTarget)
-                    {
-                        const auto result = Handheld::StaffManagement::SetUniform(
-                            *_staffTarget, _staffUniformBaseline, _staffUniformDraft, true);
-                        if (result.error == GameActions::Status::ok)
-                            page(Page::staffInspect);
-                        else
-                            _status = Handheld::Finances::Feedback(result);
+                    if(_staffTarget) {
+                        const auto result=Handheld::StaffManagement::SetUniform(*_staffTarget,_staffUniformBaseline,_staffUniformDraft,true);
+                        if(result.error==GameActions::Status::ok)page(Page::staffInspect);
+                        else {_status=Handheld::Finances::Feedback(result);invalidate();}
                     }
-                    else
-                        page(Page::staffInspect);
                     break;
                 case Page::staffName:
                     if (choice == 47)
@@ -4137,8 +4235,10 @@ namespace OpenRCT2::Ui::Windows
                     else if (_financeDraft)
                     {
                         const auto result = Handheld::Finances::Action(*_financeDraft, false);
-                        if (result.error == GameActions::Status::ok)
-                            page(Page::financeConfirm);
+                        if (result.error == GameActions::Status::ok) {
+                            if(_financeDraft->field==Handheld::Finances::Field::loan)page(Page::financeConfirm);
+                            else applyFinanceDraft();
+                        }
                         else
                         {
                             _status = Handheld::Finances::Feedback(result);
@@ -4147,24 +4247,8 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::financeConfirm:
-                    if (choice == 1)
-                        page(_financeReturnPage);
-                    else if (_financeDraft)
-                    {
-                        _civicBusy=true;
-                        const auto result=Handheld::Finances::Action(*_financeDraft,true,
-                            [this,lifetime=std::weak_ptr<int>(_civicLifetime)](const auto*,const GameActions::Result* outcome){
-                                if(lifetime.expired())return;
-                                _civicBusy=false;
-                                if(_page!=Page::financeConfirm)return;
-                                if(outcome->error==GameActions::Status::ok){page(_financeReturnPage);_status="Financial change applied";}
-                                else _status=Handheld::Finances::Feedback(*outcome);
-                                invalidate();
-                            });
-                        if(result.error!=GameActions::Status::ok){_civicBusy=false;_status=Handheld::Finances::Feedback(result);}
-                        else if(_civicBusy)_status="Applying financial change...";
-                        invalidate();
-                    }
+                    if(choice==1)page(_financeReturnPage);
+                    else applyFinanceDraft();
                     break;
                 case Page::mapSubjects:
                     if (choice < _mapSubjects.size())
@@ -4950,68 +5034,14 @@ namespace OpenRCT2::Ui::Windows
                             page(Page::ridesConfirm);
                         }
                     }
-                    else if (choice < 2)
-                    {
-                        Handheld::RideManagement::AdjustPrice(*_ridesDraft, choice == 0 ? -1 : 1);
-                        _status.clear();
-                        invalidate();
-                    }
-                    else if (choice == 2)
-                        page(Page::ridesConfirm);
-                    else
-                        page(ridesDraftParent());
+                    else if(choice==0) {
+                        if(_ridesDraft->setting && _ridesDraft->setting->vehicle.has_value())page(Page::ridesConfirm);
+                        else applyRideDraft();
+                    } else page(ridesDraftParent());
                     break;
                 case Page::ridesConfirm:
-                    if (choice == 1)
-                    {
-                        page(ridesDraftParent());
-                        break;
-                    }
-                    if (_ridesDraft)
-                    {
-                        const auto query = Handheld::RideManagement::Action(*_ridesDraft, false);
-                        if (query.error != GameActions::Status::ok)
-                        {
-                            _status = Handheld::Finances::Feedback(query);
-                            invalidate();
-                            break;
-                        }
-                        const auto request = ++_ridesRequest;
-                        _ridesBusy = true;
-                        const auto result = Handheld::RideManagement::Action(
-                            *_ridesDraft, true,
-                            [this, request, lifetime = std::weak_ptr<int>(_ridesLifetime)](
-                                const GameActions::GameAction*, const GameActions::Result* outcome) {
-                                if (lifetime.expired() || request != _ridesRequest || _page != Page::ridesConfirm)
-                                    return;
-                                _ridesBusy = false;
-                                if (outcome->error == GameActions::Status::ok)
-                                {
-                                    const bool demolished = _ridesDraft && _ridesDraft->demolition;
-                                    // A native vehicle-object change intentionally changes the identity's object field.
-                                    // Refresh only after this owned action succeeds; external changes remain stale.
-                                    if (_ridesDraft && _ridesDraft->setting
-                                        && _ridesDraft->setting->vehicle == GameActions::RideSetVehicleType::rideEntry)
-                                        _ridesTarget = Handheld::RideManagement::Identify(_ridesDraft->target.id);
-                                    if (_ridesDraft && _ridesDraft->refurbishment)
-                                        _ridesTarget = Handheld::RideManagement::Identify(_ridesDraft->target.id);
-                                    const auto destination = _ridesDraft && _ridesDraft->renaming
-                                        ? (_ridesTarget && _ridesTarget->shop ? Page::shop : Page::ridesInspect)
-                                        : ridesDraftParent();
-                                    page(demolished ? Page::ridesRoster : destination);
-                                    _status = demolished ? "Ride demolished" : "Ride updated";
-                                }
-                                else
-                                    _status = Handheld::Finances::Feedback(*outcome);
-                                invalidate();
-                            });
-                        if (result.error != GameActions::Status::ok)
-                        {
-                            _ridesBusy = false;
-                            _status = Handheld::Finances::Feedback(result);
-                        }
-                        invalidate();
-                    }
+                    if(choice==1)page(ridesDraftParent());
+                    else applyRideDraft();
                     break;
                 case Page::guests:
                     if (choice == 2 || choice == 3)
@@ -5765,6 +5795,15 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
+            Handheld::ListScrollScope listMotion(_scrollViews[scrollKey()]);
+            if(_page==Page::staffUniform && _staffTarget) {
+                auto model=staffPresentation();model.breadcrumb="Staff / Uniform colour";
+                Handheld::DrawManagementContent(rt,{8,36},{248,312},model);
+                Handheld::DrawModernText(rt,{18,82},"All "+Handheld::StaffManagement::RoleName(_staffTarget->type)+" uniforms",{},228);
+                Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Colour"},{"A","Apply to role"},{"B","Cancel"}});return;
+            }
+            if(_page==Page::accessManage || _page==Page::accessPoint){drawAccessSelection(rt);return;}
+
             if (_page == Page::trackBlocks || _page == Page::trackBlock) { drawTrackSelection(rt); return; }
             if (choiceCards())
             {

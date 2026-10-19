@@ -74,7 +74,7 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
         m.rows = {"Apply native edit", "Cancel"};
         m.bodyLines = {PointLabel(d.point), "From: " + Coordinates(d.point.source)};
         if (!d.remove) m.bodyLines.push_back("To: " + Coordinates(d.destination));
-        m.bodyLines.push_back("Native cost: " + FormatMoney(d.cost));
+        m.bodyLines.push_back("Cost: " + FormatMoney(d.cost));
         m.bodyLines.push_back("Reconnect queue / exit path afterward.");
         m.bodyLines.push_back("Native maze hedges update with access.");
         if (!d.remove) m.bodyLines.push_back("Sequential move; failure may leave a gap.");

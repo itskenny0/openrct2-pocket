@@ -78,7 +78,7 @@ namespace OpenRCT2::Ui::Handheld::ResearchManagement
     {
         const auto& state = getGameState();
         ManagementPresentation model;
-        model.breadcrumb = "Park dashboard / Research";
+        model.breadcrumb = "Park / Research";
         model.title = "Research";
         model.selected = selected;
         model.status = status;

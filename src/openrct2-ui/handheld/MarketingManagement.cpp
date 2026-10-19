@@ -149,7 +149,7 @@ namespace OpenRCT2::Ui::Handheld::MarketingManagement
         const std::vector<Target>& targets, const std::string& status)
     {
         ManagementPresentation model;
-        model.breadcrumb = "Park dashboard / Marketing";
+        model.breadcrumb = "Park / Marketing";
         model.title = "Marketing";
         model.selected = selected;
         model.status = status;

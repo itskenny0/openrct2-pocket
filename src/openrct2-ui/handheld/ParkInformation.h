@@ -143,7 +143,7 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
     inline ManagementPresentation NewsPresentation(const std::vector<NewsTarget>& list, size_t selected)
     {
         ManagementPresentation model;
-        model.breadcrumb = "Overview / Native news";
+        model.breadcrumb = "Overview / Park news";
         model.title = "Park news";
         model.selected = selected;
         for (const auto& target : list)
@@ -151,7 +151,7 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
         if (list.empty())
         {
             model.rows = { "Refresh" };
-            model.status = "No native park messages";
+            model.status = "No park news yet";
         }
         else
             model.status = "A Details  B Overview";

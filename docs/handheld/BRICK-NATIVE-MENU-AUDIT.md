@@ -379,3 +379,11 @@ by tabs. Do not spend the next implementation pass polishing unreachable views.
 | `overwrite` | Save / load |
 | `discard` | Save / load |
 | `exit` | Save / load |
+
+## First implementation pass
+
+See [BRICK-FEEL-FIRST-PASS.md](BRICK-FEEL-FIRST-PASS.md) for implemented scrolling,
+ordinary numeric edits, spatial access selection and uniform palettes, native
+verification and the exact remaining scope. This audit remains the broader
+inventory; its historical observations are not claims that all findings remain
+unchanged or that the whole pass is complete.

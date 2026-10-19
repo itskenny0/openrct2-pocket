@@ -593,10 +593,11 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 ## BF-01 — Secondary menus still expose engineering language and parameter forms
 
 - Severity: Major usability issue (review judgment)
-- Status: Confirmed from current presenters and representative native captures; proposed changes not implemented.
+- Status: Partially implemented; remaining findings stay Confirmed. See BRICK-FEEL-FIRST-PASS.md.
 - Scope: All 139 declared Pocket menu states, shared tabbed presenters and active tool overlays audited. Not every state/value combination was interactively played on a physical Brick.
 - Findings: Saved-design descriptors/policy reports, coordinate-first entrance/exit management, generic multi-screen value editors, map metadata, technical research catalog, repeated help and free-change reviews.
-- Next step: Follow prioritized BF01–BF10 findings in BRICK-NATIVE-MENU-AUDIT.md. Keep current slate-green design, visual catalogs, native simulation/actions, advanced functionality and single-row footer. Paths remain deferred.
+- Implemented: Continuous clipped scrolling for management/secondary lists and visual catalogs; adjacent roster preparation; direct numeric/price Apply; spatial access selection; role-wide uniform palette; initial copy/density cleanup.
+- Next step: Continue the remaining prioritized BF01–BF10 findings in BRICK-NATIVE-MENU-AUDIT.md. Keep current slate-green design, visual catalogs, native simulation/actions, advanced functionality and single-row footer. Paths remain deferred.
 - Evidence: Current source and existing captures/rc4/, captures/handheld-flow-rc3/, captures/footer-brick-rc1/. Historical images are not new runtime verification.
 
 Inventory: **57 entries**; 3 Confirmed, 19 Unverified, 34 Fixed, 1 Deferred.

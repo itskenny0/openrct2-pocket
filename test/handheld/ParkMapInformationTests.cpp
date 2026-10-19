@@ -222,7 +222,7 @@ int main(int argc, char** argv)
                 && I::PlainText("{RED}Río{NEWLINE}Second") == "Río\nSecond",
             "Native formatting escaped into list/detail presentation");
         Check(I::NewsList().empty(), "Native initial news should be empty");
-        Check(I::NewsPresentation({}, 0).status == "No native park messages", "Empty news state missing");
+        Check(I::NewsPresentation({}, 0).status == "No park news yet", "Empty news state missing");
         const uint32_t assoc = 640u | (640u << 16);
         News::AddItemToQueue(state.park.newsItems, News::ItemType::blank, "Native fixture location message", assoc);
         auto news = I::NewsList();

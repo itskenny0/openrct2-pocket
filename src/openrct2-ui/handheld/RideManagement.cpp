@@ -975,7 +975,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
         const std::optional<Draft>& draft, const std::string& feedback, size_t graphMetric, size_t graphOffset)
     {
         ManagementPresentation model;
-        model.breadcrumb = "Park dashboard / Rides";
+        model.breadcrumb = "Park / Rides";
         model.title = "Rides";
         model.selected = selected;
         model.status = feedback;
@@ -1307,7 +1307,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.stats.emplace_back("Current price", FormatMoney(ride->price[0]));
                 model.stats.emplace_back("Draft price", FormatMoney(draft->price));
             }
-            if (!draft->demolition)
+            if (!draft->demolition && queried.cost!=0)
                 model.stats.emplace_back(
                     "Cost", queried.error == GameActions::Status::ok ? FormatMoney(queried.cost) : "Unavailable");
             if (view == View::price && draft->setting && draft->setting->appearance)
@@ -1321,8 +1321,16 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.navigationHint = "Choose";
                 return model;
             }
-            model.rows = view == View::price ? std::vector<std::string>{ "Decrease", "Increase", "Review...", "Cancel" }
-                                             : std::vector<std::string>{ "Confirm", "Cancel" };
+            const bool vehicleReview=draft->setting && draft->setting->vehicle.has_value();
+            if(view==View::price) {
+                model.title=draft->setting ? draft->setting->name : "Admission price";
+                model.primaryAction=vehicleReview ? "Review" : "Apply";
+                model.navigationHint="Adjust";
+                model.summaryMetrics=true;model.metricColumns=1;
+                if(feedback.empty())model.status=queried.error==GameActions::Status::ok ? "Left/Right: Adjust" : Finances::Feedback(queried);
+            }
+            model.rows = view == View::price ? std::vector<std::string>{vehicleReview ? "Review configuration" : "Apply change", "Cancel"}
+                : std::vector<std::string>{draft->demolition ? "Demolish ride" : draft->refurbishment ? "Refurbish ride" : "Apply change", "Cancel"};
             if (queried.error != GameActions::Status::ok && feedback.empty())
                 model.status = Finances::Feedback(queried);
         }

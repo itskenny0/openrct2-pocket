@@ -2,6 +2,7 @@
 #pragma once
 #include "Panel.h"
 #include "ColourGrid.h"
+#include "ListScroll.h"
 
 #include <optional>
 
@@ -82,8 +83,14 @@ namespace OpenRCT2::Ui::Handheld
         const int width = size.width;
         const auto layout = MeasureManagement(size, model);
         const auto [columns, rowHeight, rowStart, statColumns, statHeight, capacity] = layout;
-        const size_t first = model.toolbarCount + (std::max(model.selected, model.toolbarCount) - model.toolbarCount) / capacity * capacity;
-        const size_t visible = std::min(capacity, model.rows.size() - std::min(first, model.rows.size()));
+        const size_t toolbar=std::min(model.toolbarCount,model.rows.size());
+        const size_t count=model.rows.size()-toolbar;
+        const size_t selectedItem=std::max(model.selected,toolbar)-toolbar;
+        const size_t totalRows=(count+columns-1)/columns;
+        const int listHeight=std::max(rowHeight,size.height-rowStart-34);
+        const int offset=ListOffset(selectedItem/columns,totalRows,listHeight,rowHeight);
+        const size_t first=toolbar+static_cast<size_t>(offset/rowHeight)*columns;
+        const size_t end=std::min(model.rows.size(),toolbar+static_cast<size_t>((offset+listHeight+rowHeight-1)/rowHeight)*columns);
         DrawSurface(rt, p, size);
         DrawSectionLabel(rt, p + ScreenCoordsXY{12, 13}, width - 24 - (model.headerStatus.empty() ? 0 : 138), model.breadcrumb);
         if (!model.headerStatus.empty()
@@ -173,55 +180,57 @@ namespace OpenRCT2::Ui::Handheld
         }
         if (!model.rows.empty() && model.bodyLines.empty())
             DrawSectionLabel(rt, p + ScreenCoordsXY{12, rowStart - 12}, width - 24,
-                !model.listLabel.empty() ? model.listLabel : model.confirmation ? "REVIEW & DECIDE" : model.rosterCards ? "CHOOSE A RIDE" : "ACTIONS");
-        for (size_t i = first; i < first + visible; ++i)
+                !model.listLabel.empty() ? model.listLabel : model.confirmation ? "REVIEW & DECIDE" : model.rosterCards ? "CHOOSE A RIDE" : "");
+        Drawing::RenderTarget listRt;
+        if(ClipRenderTarget(listRt,rt,p+ScreenCoordsXY{0,rowStart},width-8,listHeight))
         {
-            const int y = rowStart + static_cast<int>((i - first) / columns) * rowHeight;
+        for (size_t i = first; i < end; ++i)
+        {
+            const int y = static_cast<int>((i - toolbar) / columns) * rowHeight-offset;
             const int cellWidth = (width - 20) / columns;
-            const int x = 10 + static_cast<int>((i - first) % columns) * cellWidth;
+            const int x = 10 + static_cast<int>((i - toolbar) % columns) * cellWidth;
             const bool enabled = i < model.rowEnabled.size() ? model.rowEnabled[i]
                 : model.rows[i].find("unavailable") == std::string::npos && model.rows[i].find("Unavailable") == std::string::npos;
             if (columns > 2) // Native on-screen keyboard retains its compact cells.
             {
-                if (focused && i == model.selected) Fill(rt, p + ScreenCoordsXY{x, y}, {cellWidth - 2, rowHeight - 2}, Theme::gold);
-                DrawModernEllipsised(rt, p + ScreenCoordsXY{x + 3, y + 6}, cellWidth - 6,
+                if (focused && i == model.selected) Fill(listRt, ScreenCoordsXY{x, y}, {cellWidth - 2, rowHeight - 2}, Theme::gold);
+                DrawModernEllipsised(listRt, ScreenCoordsXY{x + 3, y + 6}, cellWidth - 6,
                     std::string(focused && i == model.selected ? "{BLACK}" : "{WHITE}") + model.rows[i]);
             }
             else if (i < model.rowValues.size())
             {
                 const bool selected=focused&&i==model.selected;
-                if(selected)Fill(rt,p+ScreenCoordsXY{x,y},{cellWidth-4,rowHeight-2},Theme::gold);
-                DrawModernEllipsised(rt,p+ScreenCoordsXY{x+8,y+7},cellWidth-164,
+                if(selected)Fill(listRt,ScreenCoordsXY{x,y},{cellWidth-4,rowHeight-2},Theme::gold);
+                DrawModernEllipsised(listRt,ScreenCoordsXY{x+8,y+7},cellWidth-164,
                     std::string(selected?"{BLACK}":"{WHITE}")+model.rows[i]);
-                DrawModernEllipsised(rt,p+ScreenCoordsXY{x+cellWidth-150,y+7},140,
+                DrawModernEllipsised(listRt,ScreenCoordsXY{x+cellWidth-150,y+7},140,
                     std::string(selected?"{BLACK}":"{WHITE}")+model.rowValues[i]);
             }
             else if (model.listLabel.starts_with("CURRENT THOUGHTS"))
             {
                 const bool selected = focused && i == model.selected;
-                Fill(rt, p + ScreenCoordsXY{ x, y }, { cellWidth - 4, rowHeight - 2 }, selected ? Theme::gold : Theme::ink);
+                Fill(listRt, ScreenCoordsXY{ x, y }, { cellWidth - 4, rowHeight - 2 }, selected ? Theme::gold : Theme::ink);
                 DrawWrappedLabel(
-                    rt, p + ScreenCoordsXY{ x + 8, y + 7 }, cellWidth - 20,
+                    listRt, ScreenCoordsXY{ x + 8, y + 7 }, cellWidth - 20,
                     std::string(selected ? "{BLACK}" : "{WHITE}") + model.rows[i], 2);
             }
             else
                 DrawActionRow(
-                    rt, p + ScreenCoordsXY{ x, y }, { cellWidth - 4, rowHeight - 2 }, model.rows[i],
+                    listRt, ScreenCoordsXY{ x, y }, { cellWidth - 4, rowHeight - 2 }, model.rows[i],
                     i < model.rowDetails.size() ? model.rowDetails[i] : "", focused && i == model.selected, enabled,
                     PanelIcon::none, model.destructive && i == 0);
+        }
         }
         // Feedback and overflow have independent lines, so failures never hide pagination.
         if (!model.status.empty())
             DrawModernEllipsised(rt, p + ScreenCoordsXY{12, size.height - 29}, width - 24, "{WHITE}" + model.status);
-        DrawPagePosition(rt, p + ScreenCoordsXY{12, size.height - 13}, width - 24, std::max(model.selected,model.toolbarCount)-model.toolbarCount, model.rows.size()-model.toolbarCount, capacity);
-        if (model.rows.size()-model.toolbarCount > capacity)
+        if(count>capacity)
         {
-            const int trackHeight = std::max(8, size.height - rowStart - 40);
-            Fill(rt, p + ScreenCoordsXY{width - 6, rowStart}, {2, trackHeight}, Theme::raised);
-            const auto pages = (model.rows.size()-model.toolbarCount + capacity - 1) / capacity;
-            const int thumb = std::max(3, trackHeight / static_cast<int>(pages));
-            Fill(rt, p + ScreenCoordsXY{width - 6, rowStart + static_cast<int>((std::max(model.selected,model.toolbarCount)-model.toolbarCount) / capacity) * (trackHeight - thumb) / static_cast<int>(pages - 1)},
-                {2, thumb}, Theme::gold);
+            DrawModernText(rt,p+ScreenCoordsXY{12,size.height-13},"{MUTED}"+std::to_string(std::min(selectedItem+1,count))+" / "+std::to_string(count));
+            const int totalHeight=std::max(listHeight,static_cast<int>(totalRows)*rowHeight);
+            const int thumb=std::max(8,listHeight*listHeight/totalHeight);
+            Fill(rt,p+ScreenCoordsXY{width-6,rowStart},{2,listHeight},Theme::raised);
+            Fill(rt,p+ScreenCoordsXY{width-6,rowStart+offset*(listHeight-thumb)/std::max(1,totalHeight-listHeight)},{2,thumb},Theme::gold);
         }
     }
     // Compatibility wrapper for construction-era captures; Dashboard uses the content region directly.

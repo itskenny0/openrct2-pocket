@@ -2,6 +2,7 @@
 #pragma once
 #include "ConceptStyle.h"
 #include "ModernText.h"
+#include "ListScroll.h"
 
 #include <array>
 #include <cmath>
@@ -359,11 +360,14 @@ namespace OpenRCT2::Ui::Handheld
     {
         DrawPanelHeading(rt, window, model.title);
         const auto p = window.windowPos;
-        const size_t first = model.selected >= 8 ? model.selected - 7 : 0;
-        for (size_t i = first; i < model.rows.size() && i < first + 8; ++i)
-            DrawIconRow(
-                rt, p + ScreenCoordsXY{ 10, 43 + static_cast<int32_t>(i - first) * kPanelRowPitch }, window.width - 20,
-                model.rows[i], i == model.selected, i < model.icons.size() ? model.icons[i] : PanelIcon::none);
+        const int listHeight=std::max(32,window.height-43-58);
+        const int offset=ListOffset(model.selected,model.rows.size(),listHeight,kPanelRowPitch);
+        const size_t first=offset/kPanelRowPitch;
+        Drawing::RenderTarget listRt;
+        if(ClipRenderTarget(listRt,rt,p+ScreenCoordsXY{0,43},window.width,listHeight))
+            for(size_t i=first;i<model.rows.size() && static_cast<int>(i)*kPanelRowPitch-offset<listHeight;++i)
+                DrawIconRow(listRt,{10,static_cast<int>(i)*kPanelRowPitch-offset},window.width-20,
+                    model.rows[i],i==model.selected,i<model.icons.size() ? model.icons[i] : PanelIcon::none);
         DrawModernEllipsised(
             rt, p + ScreenCoordsXY{ 13, window.height - 45 }, window.width - 26, model.status, { Drawing::Colour::white });
         DrawOverlayCommands(rt, window);
