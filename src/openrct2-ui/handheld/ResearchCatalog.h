@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "ManagementPanel.h"
+#include "ObjectPicker.h"
+#include "Shops.h"
+#include "FlatRides.h"
+#include "Mazes.h"
 #include "ParkInformation.h"
 
 #include <openrct2/Context.h>
@@ -81,10 +85,31 @@ namespace OpenRCT2::Ui::Handheld::ResearchCatalog
     {
         const auto* object = Loaded(target.item);
         if (object && (!target.descriptor || object->GetDescriptor() != *target.descriptor))
-            return "Changed native object";
+            return "Item changed";
         if (!object)
-            return "Unavailable native object #" + std::to_string(target.item.entryIndex);
+            return "Unavailable item #" + std::to_string(target.item.entryIndex);
         return ParkInformation::PlainText(FormatStringIDLegacy(target.item.getName(), nullptr), true);
+    }
+    inline ObjectPicker Picker(const std::vector<Target>& roster, size_t selected)
+    {
+        std::vector<PickerEntry> entries;
+        for (const auto& target : roster)
+            entries.push_back({{target.item.type == Research::EntryType::ride ? ObjectType::ride : ObjectType::sceneryGroup,
+                target.item.entryIndex, std::to_string(target.item.rawValue) + ":" + std::to_string(target.occurrence)}, Name(target), ZoomLevel{2}});
+        std::optional<PickerIdentity> preferred;
+        if (selected < entries.size()) preferred = entries[selected].identity;
+        ObjectPicker picker; picker.setEntries(std::move(entries),preferred); return picker;
+    }
+    enum class BuildKind { none, shop, flat, maze, track };
+    inline BuildKind Construction(const Target& target)
+    {
+        if (!Current(target) || !Invented(target.item) || target.item.type != Research::EntryType::ride) return BuildKind::none;
+        const auto i = target.item.entryIndex;
+        if (Shops::Eligible(i)) return BuildKind::shop;
+        if (FlatRides::Eligible(i)) return BuildKind::flat;
+        if (Mazes::Eligible(i)) return BuildKind::maze;
+        if (TrackConstructionSupport::Available(i,target.item.baseRideType)) return BuildKind::track;
+        return BuildKind::none;
     }
     inline ManagementPresentation Presentation(const std::vector<Target>& roster, uint8_t filter, size_t selected)
     {
@@ -95,10 +120,9 @@ namespace OpenRCT2::Ui::Handheld::ResearchCatalog
         model.stats = { { "Items", std::to_string(roster.size()) } };
         for (const auto& target : roster)
             model.rows.push_back(Name(target));
-        model.rows.push_back("Change category");
-        model.rows.push_back("Back to Research");
-        model.status = roster.empty() ? "No native records in this category"
-                                      : "Native list order; Left/Right filters, A Details";
+
+        model.status = roster.empty() ? "No items in this category"
+                                      : "Left/Right category / A Details";
         return model;
     }
     inline ManagementPresentation Detail(const Target& target, size_t selected)
@@ -106,7 +130,8 @@ namespace OpenRCT2::Ui::Handheld::ResearchCatalog
         ManagementPresentation model;
         model.breadcrumb = "Research / Invention details";
         model.selected = selected;
-        model.rows = { "Back to catalog" };
+        model.rows = Construction(target) == BuildKind::none ? std::vector<std::string>{"Back to catalog"}
+            : std::vector<std::string>{"Build this item", "Back to catalog"};
         if (!Current(target))
         {
             model.title = "Research record changed";
@@ -117,12 +142,12 @@ namespace OpenRCT2::Ui::Handheld::ResearchCatalog
         model.stats = { { "Category",
                           EnumValue(target.item.category) <= 6 ? Category(EnumValue(target.item.category) + 1)
                                                                : "Unavailable" },
-                        { "Native availability",
-                          Invented(target.item)     ? "Invented and loaded"
-                              : Loaded(target.item) ? "Not yet invented"
+                        { "Availability",
+                          Invented(target.item)     ? "Researched"
+                              : Loaded(target.item) ? "Not researched"
                                                     : "Object missing" } };
         model.bodyLines.assign(8, "");
-        model.status = Loaded(target.item) ? "Read-only native object preview" : "Native record retained; preview unavailable";
+        model.status = Loaded(target.item) ? "Researched item" : "Preview unavailable";
         return model;
     }
     inline void DrawPreview(Drawing::RenderTarget& rt, const Target& target)

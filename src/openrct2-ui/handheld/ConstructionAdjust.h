@@ -32,7 +32,14 @@ namespace OpenRCT2::Ui::Handheld::ConstructionAdjust
         switch (group)
         {
             case 0: return {2,3,6};
-            case 1: return {7,8,9};
+            case 1: {
+                std::vector<size_t> rows;
+                const auto& current = SceneryTools::Current();
+                const auto channels = SceneryTools::Channels(current.category, current.object);
+                for (size_t i = 0; i < channels.size(); ++i)
+                    if (channels[i]) rows.push_back(7 + i);
+                return rows.empty() ? std::vector<size_t>{static_cast<size_t>(-1)} : rows;
+            }
             case 2: return {10};
             default: return {16,17,18};
         }
@@ -41,6 +48,7 @@ namespace OpenRCT2::Ui::Handheld::ConstructionAdjust
     {
         using namespace SceneryTools;
         const auto& s=Current();
+        if (row == static_cast<size_t>(-1)) return false;
         if (row==2) return CanRotate();
         if (row==3 || row>=16) return s.category==Category::small;
         if (row>=7 && row<=9) return Channels(s.category,s.object)[row-7];
@@ -77,7 +85,7 @@ namespace OpenRCT2::Ui::Handheld::ConstructionAdjust
     inline bool PickerAction(const State& state, bool scenery)
     {
         const auto rows=scenery ? SceneryRows(state.focus.tab) : TerrainRows(state.focus.tab);
-        const auto row=rows[state.row];
+        const auto row=rows[std::min(state.row, rows.size() - 1)];
         return scenery ? ColourRow(true,row) && SceneryEnabled(row)
             : state.focus.tab==2 && (row<=6 || (ColourRow(false,row) && TerrainEnabled(row)));
     }
@@ -87,6 +95,7 @@ namespace OpenRCT2::Ui::Handheld::ConstructionAdjust
         const std::vector<std::string> tabs=scenery ? std::vector<std::string>{"Object","Colour","Mode","Scatter"}
             : std::vector<std::string>{"Brush","Shape","Paint"};
         const auto indices=scenery ? SceneryRows(state.focus.tab) : TerrainRows(state.focus.tab);
+        const auto selectedRow = std::min(state.row, indices.size() - 1);
         const auto options=scenery ? SceneryTools::Options() : AreaTools::Options();
         DrawSurface(rt,pos,{224,282});
         if (state.palette)
@@ -101,7 +110,7 @@ namespace OpenRCT2::Ui::Handheld::ConstructionAdjust
             DrawHeadingText(rt,pos+ScreenCoordsXY{12,12},"Choose colour",200);
             DrawModernText(rt,pos+ScreenCoordsXY{12,38},scenery ? "{MUTED}Scenery colour" : "{MUTED}Terrain colour");
             DrawColourGrid(rt,pos,{224,282},values,labels,state.colourChoice,
-                static_cast<uint16_t>(CurrentColour(scenery,indices[state.row])));
+                static_cast<uint16_t>(CurrentColour(scenery,indices[selectedRow])));
             return;
         }
         DrawHeadingText(rt,pos+ScreenCoordsXY{12,12},scenery ? "Adjust scenery" : "Adjust terrain",200);
@@ -134,23 +143,24 @@ namespace OpenRCT2::Ui::Handheld::ConstructionAdjust
                 }
                 continue;
             }
-            auto label=options[row];
+            auto label = row == static_cast<size_t>(-1) ? "No adjustable colours" : options[row];
             if(scenery && row==18) label="Density: "+std::to_string(static_cast<int>(SceneryTools::Current().scatterDensity)+1)+" / 3";
             const auto cell=pos+ScreenCoordsXY{8,(scenery ? 148 : 120)+static_cast<int>(i)*30};
             const bool colour=ColourRow(scenery,row) && (scenery ? SceneryEnabled(row) : TerrainEnabled(row));
             if (colour)
             {
-                Fill(rt,cell,{208,28},i==state.row ? Theme::gold : Theme::ink);
-                DrawModernEllipsised(rt,cell+ScreenCoordsXY{10,9},156,(i==state.row ? "{BLACK}" : "{WHITE}")+label);
+                Fill(rt,cell,{208,28},i==selectedRow ? Theme::gold : Theme::ink);
+                DrawModernEllipsised(rt,cell+ScreenCoordsXY{10,9},156,(i==selectedRow ? "{BLACK}" : "{WHITE}")+label);
                 const auto shade=Drawing::getColourMap(CurrentColour(scenery,row));
                 Fill(rt,cell+ScreenCoordsXY{180,5},{22,18},Theme::edge);
                 Fill(rt,cell+ScreenCoordsXY{182,7},{18,14},shade.midLight);
             }
-            else DrawActionRow(rt,cell,{208,28},label,"",i==state.row,
+            else DrawActionRow(rt,cell,{208,28},label,"",i==selectedRow,
                 scenery ? SceneryEnabled(row) : TerrainEnabled(row));
         }
         DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 12, 250 }, 200,
-            ColourRow(scenery,indices[state.row]) ? "{MUTED}A Colour picker" : "{MUTED}Left/Right: Change value");
+            indices[selectedRow] == static_cast<size_t>(-1) ? "{MUTED}Choose another object to recolour"
+                : ColourRow(scenery,indices[selectedRow]) ? "{MUTED}A Colour picker" : "{MUTED}Left/Right: Change value");
         DrawCommand(rt,pos+ScreenCoordsXY{12,266},24,"X","More settings");
     }
     inline void Footer(Drawing::RenderTarget& rt, ScreenSize screen, bool adjusting, bool scenery, const std::string& apply="Apply", bool material=false, bool palette=false)

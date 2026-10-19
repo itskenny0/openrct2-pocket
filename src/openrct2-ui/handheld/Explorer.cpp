@@ -387,6 +387,7 @@ namespace OpenRCT2::Ui::Handheld
         _sceneryTarget.reset();
     }
 
+    std::optional<CoordsXY> CurrentTerrainTile() { return _terrainTile; }
     void EndTerrain()
     {
         RideNavigation::construction.reset();
@@ -669,6 +670,8 @@ namespace OpenRCT2::Ui::Handheld
                     Invoke(ShortcutId::kViewGeneralRotateClockwise);
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::contextSecondary)
                     Windows::HandheldParkMapControl(0);
+                else if (Windows::HandheldParkMapIsOpen() && action == Action::slopeUp)
+                    Windows::HandheldParkMapControl(2);
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::previousOption)
                     Windows::HandheldParkMapControl(-1);
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::nextOption)
@@ -962,6 +965,9 @@ namespace OpenRCT2::Ui::Handheld
         {
             auto indices=_sceneryTool ? ConstructionAdjust::SceneryRows(_constructionAdjust.focus.tab)
                 : ConstructionAdjust::TerrainRows(_constructionAdjust.focus.tab);
+            _constructionAdjust.move(0, indices.size());
+            if (_constructionAdjust.palette && !ConstructionAdjust::PickerAction(_constructionAdjust, _sceneryTool))
+                _constructionAdjust.palette = false;
             if (_constructionAdjust.palette)
             {
                 _constructionAdjust.colourChoice=MoveColourGrid(_constructionAdjust.colourChoice,72,frame.navigateX,frame.navigateY);
@@ -1508,6 +1514,8 @@ namespace OpenRCT2::Ui::Handheld
                     case Action::slopeUp:
                         if (Designs::Active())
                             Designs::SetScenery(action == Action::slopeUp);
+                        else if (StaffPatrol::Active())
+                            StaffPatrol::ResizeBrush(action == Action::slopeUp ? 1 : -1);
                         else if (Paths::IsConnected())
                             Paths::SlopeConnected(action == Action::slopeUp ? 1 : -1);
                         else if (Paths::IsActive())

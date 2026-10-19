@@ -179,7 +179,7 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
     inline ManagementPresentation Awards(size_t selected)
     {
         ManagementPresentation model;
-        model.breadcrumb = "Overview / Native awards";
+        model.breadcrumb = "Overview / Awards";
         model.title = "Current park awards";
         model.selected = selected;
         for (const auto& award : getGameState().park.currentAwards)
@@ -188,22 +188,22 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
                     std::string(AwardIsPositive(award.type) ? "Positive: " : "Negative: ")
                     + PlainText(FormatStringIDLegacy(AwardGetText(award.type), nullptr), true));
         if (model.rows.empty())
-            model.status = "No active native awards";
+            model.status = "No active awards";
         else
-            model.status = "Read-only native active awards";
+            model.status = "Current awards";
         model.rows.push_back("Return to Overview");
         return model;
     }
     inline ManagementPresentation History(bool guests, size_t selected)
     {
         ManagementPresentation model;
-        model.breadcrumb = "Overview / Native history";
+        model.breadcrumb = "Overview / History";
         model.title = guests ? "Guests in park history" : "Park rating history";
         model.stats = { { guests ? "Guests in park" : "Current rating",
                           std::to_string(guests ? getGameState().park.numGuestsInPark : getGameState().park.rating) } };
         model.rows = { guests ? "Show park rating" : "Show guests in park", "Return to Overview" };
         model.selected = selected;
-        model.status = "Native weekly samples; missing samples stay blank";
+        model.status = "Weekly history; gaps mean no record";
         return model;
     }
     inline void DrawHistory(Drawing::RenderTarget& rt, bool guests)

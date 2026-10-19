@@ -4,6 +4,7 @@
  *****************************************************************************/
 
 #include "ControllerInput.h"
+#include <array>
 
 #include <SDL.h>
 #include <algorithm>
@@ -23,6 +24,32 @@ namespace OpenRCT2::Ui::Handheld
         return enabled;
     }
 
+    std::optional<Action> ButtonAction(uint8_t button)
+    {
+        const bool swapped=std::getenv("OPENRCT2_HANDHELD_SWAP_AB") != nullptr
+            && std::string_view(std::getenv("OPENRCT2_HANDHELD_SWAP_AB")) == "1";
+        switch(button) {
+            case SDL_CONTROLLER_BUTTON_A: return swapped?Action::back:Action::confirm;
+            case SDL_CONTROLLER_BUTTON_B: return swapped?Action::confirm:Action::back;
+            case SDL_CONTROLLER_BUTTON_X: return Action::contextPrimary;
+            case SDL_CONTROLLER_BUTTON_Y: return Action::contextSecondary;
+            case SDL_CONTROLLER_BUTTON_LEFTSHOULDER: return Action::previousOption;
+            case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER: return Action::nextOption;
+            case SDL_CONTROLLER_BUTTON_LEFTSTICK: return Action::cameraMode;
+            case SDL_CONTROLLER_BUTTON_START: return Action::openMenu;
+            case SDL_CONTROLLER_BUTTON_BACK: return Action::openBuild;
+            default: return {};
+        }
+    }
+    std::string_view ActionKey(Action action)
+    {
+        for(const auto& [button,label]:std::array<std::pair<uint8_t,std::string_view>,8>{{
+            {SDL_CONTROLLER_BUTTON_A,"A"},{SDL_CONTROLLER_BUTTON_B,"B"},{SDL_CONTROLLER_BUTTON_X,"X"},
+            {SDL_CONTROLLER_BUTTON_Y,"Y"},{SDL_CONTROLLER_BUTTON_LEFTSHOULDER,"L1"},
+            {SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,"R1"},{SDL_CONTROLLER_BUTTON_START,"START"},{SDL_CONTROLLER_BUTTON_BACK,"SELECT"}}})
+            if(ButtonAction(button)==action)return label;
+        return action==Action::slopeDown?"L2":action==Action::slopeUp?"R2":"";
+    }
     ControllerInput::~ControllerInput()
     {
         if (_controller != nullptr)
@@ -95,46 +122,8 @@ namespace OpenRCT2::Ui::Handheld
             case SDL_CONTROLLERBUTTONDOWN:
                 if (_armed && event.cbutton.which == _instance)
                 {
-                    switch (event.cbutton.button)
-                    {
-                        case SDL_CONTROLLER_BUTTON_A:
-                            _actions.push_back(
-                                std::getenv("OPENRCT2_HANDHELD_SWAP_AB") != nullptr
-                                        && std::string_view(std::getenv("OPENRCT2_HANDHELD_SWAP_AB")) == "1"
-                                    ? Action::back
-                                    : Action::confirm);
-                            break;
-                        case SDL_CONTROLLER_BUTTON_B:
-                            _actions.push_back(
-                                std::getenv("OPENRCT2_HANDHELD_SWAP_AB") != nullptr
-                                        && std::string_view(std::getenv("OPENRCT2_HANDHELD_SWAP_AB")) == "1"
-                                    ? Action::confirm
-                                    : Action::back);
-                            break;
-                        case SDL_CONTROLLER_BUTTON_X:
-                            _actions.push_back(Action::contextPrimary);
-                            break;
-                        case SDL_CONTROLLER_BUTTON_Y:
-                            _actions.push_back(Action::contextSecondary);
-                            break;
-                        case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
-                            _actions.push_back(Action::previousOption);
-                            break;
-                        case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:
-                            _actions.push_back(Action::nextOption);
-                            break;
-                        case SDL_CONTROLLER_BUTTON_LEFTSTICK:
-                            _actions.push_back(Action::cameraMode);
-                            break;
-                        case SDL_CONTROLLER_BUTTON_START:
-                            _actions.push_back(Action::openMenu);
-                            break;
-                        case SDL_CONTROLLER_BUTTON_BACK:
-                            _actions.push_back(Action::openBuild);
-                            break;
-                        default:
-                            break;
-                    }
+                    if (const auto action = ButtonAction(event.cbutton.button))
+                        _actions.push_back(*action);
                 }
                 return true;
             case SDL_CONTROLLERBUTTONUP:

@@ -85,7 +85,7 @@ namespace OpenRCT2::Ui::Handheld::FinanceInformation
     {
         ledger.Clamp();
         ManagementPresentation model;
-        model.breadcrumb = "Finances / Native expenditure ledger";
+        model.breadcrumb = "Finances / Ledger";
         model.title = Period(ledger.month);
         model.selected = selected;
         for (auto id : kCategories)
@@ -132,8 +132,8 @@ namespace OpenRCT2::Ui::Handheld::FinanceInformation
         model.rows = { "Next financial graph", "Older sample", "Newer sample", "Back to Finances" };
         const bool hasData = std::any_of(Series(graph), Series(graph) + 64, [](auto v) { return v != kMoney64Undefined; });
         model.status = getGameState().park.flags.has(ParkFlag::noMoney) ? "No-money park; financial values not applicable"
-            : hasData                                                   ? "Native weekly records; Left/Right selects sample"
-                                                                        : "Waiting for native weekly history";
+            : hasData                                                   ? "Left/Right selects week"
+                                                                        : "Waiting for weekly history";
         return model;
     }
     inline void DrawHistory(Drawing::RenderTarget& rt, size_t graph,

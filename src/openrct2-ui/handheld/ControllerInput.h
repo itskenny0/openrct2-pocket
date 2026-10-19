@@ -8,6 +8,8 @@
 #include <SDL_gamecontroller.h>
 #include <cstdint>
 #include <vector>
+#include <optional>
+#include <string_view>
 
 union SDL_Event;
 
@@ -30,6 +32,9 @@ namespace OpenRCT2::Ui::Handheld
         slopeUp,
         cameraMode,
     };
+
+    std::optional<Action> ButtonAction(uint8_t button);
+    std::string_view ActionKey(Action action);
 
     struct Frame
     {

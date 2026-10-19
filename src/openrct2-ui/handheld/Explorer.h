@@ -31,6 +31,7 @@ namespace OpenRCT2::Ui::Handheld
     void UpdateExplorer(ControllerInput& input);
     void HandleExplorerInput(ControllerInput& input, const Frame& frame);
     void EndTerrain();
+    std::optional<CoordsXY> CurrentTerrainTile();
     bool BeginStaffPatrol(const StaffManagement::Target& employee);
     bool BeginPeepPlacement(const PeepPlacement::Target&);
     void BeginTerrain(bool raise);

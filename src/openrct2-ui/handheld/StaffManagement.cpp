@@ -3,6 +3,7 @@
 
 #include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2/Context.h>
+#include <openrct2/drawing/Drawing.Sprite.h>
 #include <openrct2/GameState.h>
 #include <openrct2/actions/peep/StaffFireAction.h>
 #include <openrct2/actions/peep/StaffHireNewAction.h>
@@ -24,6 +25,17 @@
 
 namespace OpenRCT2::Ui::Handheld::StaffManagement
 {
+    void DrawSpritePreview(Drawing::RenderTarget& rt, ScreenCoordsXY pos, StaffType role, std::optional<ObjectEntryIndex> costume)
+    {
+        auto* object = costume ? GetContext()->GetObjectManager().GetLoadedObject<PeepAnimationsObject>(*costume)
+            : findPeepAnimationsObjectForType(static_cast<AnimationPeepType>(EnumValue(role)+1));
+        if (!object) return;
+        const auto& animation=object->GetPeepAnimation(PeepAnimationGroup::normal);
+        if(animation.frameOffsets.empty())return;
+        auto image=ImageId(animation.baseImage+1+animation.frameOffsets.front()*4);
+        if(role!=StaffType::entertainer)image=ImageId(image.GetIndex(),StaffGetColour(role),StaffGetColour(role));
+        GfxDrawSprite(rt,image,pos);
+    }
     static std::unordered_map<uint16_t, uint64_t> gRemovedStaff;
     void Invalidate(EntityId id)
     {

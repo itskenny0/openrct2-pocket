@@ -78,7 +78,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
     static bool browserReturn{};
     bool BrowserReturn() { return browserReturn; }
     void SetBrowserReturn(bool value) { browserReturn=value; }
-    std::optional<PickerEntry> FileEntry(const std::string& path, std::optional<ObjectEntryDescriptor> vehicle)
+    std::optional<PickerEntry> FileEntry(const std::string& path, std::optional<ObjectEntryDescriptor> vehicle, int width, int height, Direction orientation)
     {
                 const auto identity = FileBrowsing::Capture(std::filesystem::u8path(path));
                 if (!identity) return {};
@@ -104,7 +104,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
                 const auto index = GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(
                     td->trackAndVehicle.vehicleObject);
                 PickerEntry entry{ { ObjectType::ride, index, path }, std::filesystem::path(path).stem().string(), ZoomLevel{ 3 } };
-                entry.drawPreview = [td, image, identity](Drawing::RenderTarget& rt) {
+                entry.drawPreview = [td, image, identity, width, height, orientation](Drawing::RenderTarget& rt) {
                     if (gLegacyScene != LegacyScene::playing || !Eligible(*td) || !FileBrowsing::Current(*identity))
                         return;
                     if (image->pixels.empty())
@@ -117,18 +117,22 @@ namespace OpenRCT2::Ui::Handheld::Designs
                         auto previous = std::move(getGameState().rides[id.ToUnderlying()]);
                         auto pixels = std::make_unique<TrackDesignPreviewBuffer>();
                         TrackDesignDrawPreview(*td, *pixels, false);
-                        image->pixels.assign(pixels->begin(), pixels->begin() + kTrackPreviewImageSize);
+                        image->pixels.assign(pixels->begin(), pixels->end());
                         getGameState().rides[id.ToUnderlying()] = std::move(previous);
                     }
-                    G1Element sprite{};
-                    sprite.offset = reinterpret_cast<uint8_t*>(image->pixels.data());
-                    sprite.width = 370;
-                    sprite.height = 217;
-                    sprite.flags = { G1Flag::hasTransparency };
-                    GfxSetG1Element(SPR_TEMP_TRACK_LIST, &sprite);
-                    DrawingEngineInvalidateImage(SPR_TEMP_TRACK_LIST);
-                    rt.zoom_level = ZoomLevel{ 3 };
-                    GfxDrawSprite(rt, ImageId(SPR_TEMP_TRACK_LIST), { 48, 112 });
+                    // Sample the real native four-orientation image into this viewport.
+                    // Respect dirty render-target clipping; never write outside the target.
+                    const int scale = std::min(width * 1000 / 370, height * 1000 / 217);
+                    const int w = std::max(1, 370 * scale / 1000), h = std::max(1, 217 * scale / 1000);
+                    const int left = (width - w) / 2, top = (height - h) / 2;
+                    for (int y = std::max(top, rt.y); y < std::min(top + h, rt.y + rt.height); ++y)
+                        for (int x = std::max(left, rt.x); x < std::min(left + w, rt.x + rt.width); ++x)
+                        {
+                            const auto colour = image->pixels[(orientation & 3) * kTrackPreviewImageSize
+                                + (y - top) * 217 / h * 370 + (x - left) * 370 / w];
+                            if (colour != static_cast<Drawing::PaletteIndex>(0))
+                                rt.bits[(y - rt.y) * rt.LineStride() + x - rt.x] = colour;
+                        }
                 };
                 return entry;
     }
@@ -288,6 +292,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
         ClearPreview();
         scenery = value;
     }
+    bool IncludesScenery() { return scenery; }
     std::string SceneryNotice()
     {
         if (!design || design->sceneryElements.empty())

@@ -153,13 +153,18 @@ namespace OpenRCT2::Ui::Handheld::StaffPatrol
         if (row == 3)
             settings.height = std::clamp(settings.height + delta, 1, 64);
     }
+    inline void ResizeBrush(int delta)
+    {
+        const auto size = std::clamp(std::max(settings.width, settings.height) + delta, 1, 64);
+        settings.width = settings.height = size;
+    }
     inline void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos)
     {
         const auto* staff = target ? StaffManagement::Resolve(*target) : nullptr;
         DrawConstructionOverlay(
             rt, pos, "Staff patrol", staff ? staff->getName() : "Employee unavailable",
             settings.remove ? "Remove patrol tiles" : "Add patrol tiles",
-            std::to_string(settings.width) + " x " + std::to_string(settings.height) + " tiles",
+            std::to_string(settings.width) + " x " + std::to_string(settings.height) + " / L2- R2+",
             target ? std::to_string(Snapshot(*target).size()) + " patrol tiles" : "No employee");
     }
     inline ManagementPresentation Presentation(const Draft& draft, size_t selected)

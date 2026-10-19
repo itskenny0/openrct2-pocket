@@ -29,7 +29,7 @@ namespace OpenRCT2::Ui::Handheld::RideTabs
         const std::vector<std::string_view> order = tab == overview
             ? std::vector<std::string_view>{"Open...", "Close...", "Test...", "Test unavailable",
                 "Admission price...", "Price unavailable", "Locate", "Entrances / exits...", "Place entrance / exit..."}
-            : tab == operations ? std::vector<std::string_view>{"Operations...", "Maintenance...", "Vehicles...", "Dispatch..."}
+            : tab == operations ? std::vector<std::string_view>{"Operations...", "Vehicles...", "Dispatch...", "Maintenance..."}
             : tab == settings ? std::vector<std::string_view>{"Rename...", "Appearance...", "Music...", "Save design...", "Demolish...", "Back to roster"}
             : std::vector<std::string_view>{};
         for (auto label : order)

@@ -19,6 +19,8 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
         TileCoordsXY size{};
         uint8_t rotation = 255;
         bool rides{};
+        bool details{};
+        std::optional<MapSubjects::Target> subject;
         int mode{}, filter{};
         std::optional<GuestManagement::Filter> guestFilter;
         int zoom = 1;
@@ -50,6 +52,7 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
         }
         void Move(int x, int y)
         {
+            if (x || y) subject.reset();
             focus += CoordsXY{ y * 32, x * 32 }.rotate(-GetCurrentRotation());
             Clamp();
         }
@@ -97,43 +100,11 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
     inline void Draw(Drawing::RenderTarget& rt, const State& state)
     {
         Concept::Box(rt, { 8, 8 }, { 496, 348 });
-        DrawModernText(rt, { 20, 24 }, "{GOLD}Park map", {}, 150, true);
-        DrawModernText(
-            rt, { 20, 53 },
-            state.mode == 2       ? "Guests / terrain"
-                : state.mode == 3 ? "Staff / terrain"
-                : state.rides     ? "Rides / paths"
-                                  : "Terrain / ownership",
-            {}, 150);
-        DrawModernText(
-            rt, { 20, 77 }, "Tile " + std::to_string(state.focus.x / 32) + ", " + std::to_string(state.focus.y / 32), {}, 150);
-        DrawModernText(rt, { 20, 99 }, "Map " + std::to_string(state.size.x) + " x " + std::to_string(state.size.y), {}, 150);
-        DrawModernText(rt, { 20, 121 }, "Rotation " + std::to_string(state.rotation + 1), {}, 150);
-        DrawModernText(
-            rt, { 20, 143 }, state.zoom == 1 ? "Zoom: whole park" : "Zoom: " + std::to_string(state.zoom) + "x", {}, 150);
-        const auto* surface = MapGetSurfaceElementAt(state.focus);
-        const auto ownership = !surface                                       ? "No surface"
-            : surface->hasOwnership(OwnershipFlag::landOwned)                 ? "Land owned"
-            : surface->hasOwnership(OwnershipFlag::constructionRightsOwned)   ? "Rights owned"
-            : surface->hasOwnership(OwnershipFlag::landForSale)               ? "Land for sale"
-            : surface->hasOwnership(OwnershipFlag::constructionRightsForSale) ? "Rights for sale"
-                                                                              : "Land unavailable";
-        DrawModernText(rt, { 20, 173 }, ownership, {}, 150);
-        DrawModernText(rt, { 20, state.mode >= 2 ? 218 : 204 }, "{GOLD}Legend", {}, 150, true);
-        std::vector<std::string> legend = state.rides
-            ? std::vector<std::string>{ "Rides: brown", "Shops: bright colours", "Paths: light grey", "Water: blue" }
-            : std::vector<std::string>{ "Native surface colours", "Paths: grey", "Water: blue", "Unowned: dim edge",
-                                        "White box: viewport" };
-        if (state.mode >= 2)
-        {
-            legend[0] = state.mode == 2 ? "Guests: native pink" : "Staff: native green";
-            DrawModernText(rt, { 20, 193 }, MapSubjects::FilterName(state.mode, state.filter, state.guestFilter), {}, 150);
-        }
-        for (size_t i = 0; i < legend.size(); ++i)
-            DrawModernText(rt, { 20, (state.mode >= 2 ? 243 : 229) + static_cast<int>(i) * 22 }, legend[i], {}, 150);
-        const ScreenCoordsXY origin{ 180, 48 };
-        constexpr int width = 312, height = 284;
-        Concept::Box(rt, origin - ScreenCoordsXY{ 2, 2 }, { width + 4, height + 4 });
+        DrawModernText(rt, {20,23}, "{GOLD}Park map", {}, 120, true);
+        DrawTabs(rt, {150,10}, 342, {"Terrain","Rides","Guests","Staff"}, state.mode);
+        const ScreenCoordsXY origin{20,44};
+        constexpr int width = 472, height = 304;
+        Concept::Box(rt, origin - ScreenCoordsXY{2,2}, {width+4,height+4});
         const auto focus = Windows::NativeMiniMapCoords(state.focus);
         // Fit the native raster at overview; zoom crops around the selected native tile.
         const int denominator = std::max(1, state.extent);
@@ -199,8 +170,34 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
         const auto gold = static_cast<Drawing::PaletteIndex>(PocketPalette::selection);
         GfxDrawLine(rt, { marker - ScreenCoordsXY{ 5, 0 }, marker + ScreenCoordsXY{ 5, 0 } }, gold);
         GfxDrawLine(rt, { marker - ScreenCoordsXY{ 0, 5 }, marker + ScreenCoordsXY{ 0, 5 } }, gold);
-        DrawModernText(rt, { 186, 24 }, state.ready ? "Gold cross: selected tile" : "Updating native map...", {}, 300);
-        Concept::Box(rt, { 8, 359 }, { 496, 25 });
-        DrawModernText(rt, { 16, 369 }, "D-pad Tiles  A Locate  X Rotate  Y Map  L/R Zoom  Sel Subjects  B Back", {}, 480);
+        const auto* surface = MapGetSurfaceElementAt(state.focus);
+        const auto ownership = !surface ? "No surface"
+            : surface->hasOwnership(OwnershipFlag::landOwned) ? "Land owned"
+            : surface->hasOwnership(OwnershipFlag::constructionRightsOwned) ? "Rights owned"
+            : surface->hasOwnership(OwnershipFlag::landForSale) ? "Land for sale"
+            : surface->hasOwnership(OwnershipFlag::constructionRightsForSale) ? "Rights for sale" : "Land unavailable";
+        Concept::Box(rt,{24,262},{180,82});
+        DrawModernEllipsised(rt,{32,274},164,"{WHITE}"+std::string(ownership));
+        const std::array<std::pair<int,std::string>,3> legend = state.rides
+            ? std::array<std::pair<int,std::string>,3>{{{61,"Rides"},{14,"Paths"},{195,"Water"}}}
+            : std::array<std::pair<int,std::string>,3>{{{state.mode==3?138:state.mode==2?172:98,
+                state.mode==3?"Staff":state.mode==2?"Guests":"Land"},{14,"Paths"},{195,"Water"}}};
+        for (size_t i=0;i<legend.size();++i) {
+            Fill(rt,{32,292+static_cast<int>(i)*15},{9,9},static_cast<Drawing::PaletteIndex>(legend[i].first));
+            DrawModernText(rt,{47,293+static_cast<int>(i)*15},legend[i].second,{},148);
+        }
+        if (state.subject) {
+            Concept::Box(rt,{210,316},{278,28});
+            DrawModernEllipsised(rt,{218,326},260,MapSubjects::Name(*state.subject));
+        }
+        if (state.details) {
+            Concept::Box(rt,{24,50},{230,104});
+            DrawModernText(rt,{34,63},"Tile "+std::to_string(state.focus.x/32)+", "+std::to_string(state.focus.y/32),{},210);
+            DrawModernText(rt,{34,85},"Map "+std::to_string(state.size.x)+" x "+std::to_string(state.size.y),{},210);
+            DrawModernText(rt,{34,107},"Rotation "+std::to_string(state.rotation+1)+" / Zoom "+std::to_string(state.zoom),{},210);
+            DrawModernEllipsised(rt,{34,129},210,MapSubjects::FilterName(state.mode,state.filter,state.guestFilter));
+        }
+        DrawFooter(rt,{512,384},{{"D-pad","Move"},{"A","Locate"},{"Y","Map"},{"SEL","Subjects"},{"R2","Details"},{"B","Back"},
+            {"X","Rotate",HintPriority::guide},{"L1/R1","Zoom",HintPriority::guide}});
     }
 } // namespace OpenRCT2::Ui::Handheld::ParkMap

@@ -31,6 +31,7 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         summary
     };
     void Invalidate(EntityId id);
+    void DrawSpritePreview(Drawing::RenderTarget&, ScreenCoordsXY, StaffType, std::optional<ObjectEntryIndex> costume = {});
     bool Supported(StaffType type);
     std::string RoleName(StaffType type);
     std::vector<std::pair<ObjectEntryIndex, std::string>> Costumes();
