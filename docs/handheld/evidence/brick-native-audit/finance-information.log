@@ -1,0 +1,18 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+WARNING[/workspace/scratch/45453a909f98/source/src/openrct2-ui/drawing/engines/HardwareDisplayDrawingEngine.cpp:115 (Resize)]: HWDisplayDrawingEngine::Resize error: Parameter 'renderer' is invalid
+WARNING[/workspace/scratch/45453a909f98/source/src/openrct2-ui/drawing/engines/HardwareDisplayDrawingEngine.cpp:115 (Resize)]: HWDisplayDrawingEngine::Resize error: Parameter 'renderer' is invalid
+An assertion failed, please report this to the OpenRCT2 developers.
+Version: OpenRCT2, v0.5.5 (5d410ca)
+GfxGetG1Element called on headless instance
+An assertion failed, please report this to the OpenRCT2 developers.
+Version: OpenRCT2, v0.5.5 (5d410ca)
+GfxGetG1Element called on headless instance
+An assertion failed, please report this to the OpenRCT2 developers.
+Version: OpenRCT2, v0.5.5 (5d410ca)
+GfxGetG1Element called on headless instance
+An assertion failed, please report this to the OpenRCT2 developers.
+Version: OpenRCT2, v0.5.5 (5d410ca)
+GfxGetG1Element called on headless instance
+INFO: Handheld controller: Virtual Controller (instance 0)
+Native finance histories and expenditure actions/calendar/bounds/controller/cancellation/save passed

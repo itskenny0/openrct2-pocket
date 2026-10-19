@@ -590,4 +590,13 @@ Deferred. Physical-device tasks remain unverified despite passing desktop fixtur
 - Source finding: Native news history and target-aware management routes already exist; ordinary-play discoverability and handoff still need improvement.
 - Verification: Park Y and dashboard X open native news; current event ribbon hides during construction. Native subjects/category targets reach ride, guest/staff, research, finance, marketing, park and awards screens with caller-aware Back. Informational/stale events remain safe. Native dismissal archives the current item. See RC4-REAL-PLAY.md.
 
-Inventory: **56 entries**; 2 Confirmed, 19 Unverified, 34 Fixed, 1 Deferred.
+## BF-01 — Secondary menus still expose engineering language and parameter forms
+
+- Severity: Major usability issue (review judgment)
+- Status: Confirmed from current presenters and representative native captures; proposed changes not implemented.
+- Scope: All 139 declared Pocket menu states, shared tabbed presenters and active tool overlays audited. Not every state/value combination was interactively played on a physical Brick.
+- Findings: Saved-design descriptors/policy reports, coordinate-first entrance/exit management, generic multi-screen value editors, map metadata, technical research catalog, repeated help and free-change reviews.
+- Next step: Follow prioritized BF01–BF10 findings in BRICK-NATIVE-MENU-AUDIT.md. Keep current slate-green design, visual catalogs, native simulation/actions, advanced functionality and single-row footer. Paths remain deferred.
+- Evidence: Current source and existing captures/rc4/, captures/handheld-flow-rc3/, captures/footer-brick-rc1/. Historical images are not new runtime verification.
+
+Inventory: **57 entries**; 3 Confirmed, 19 Unverified, 34 Fixed, 1 Deferred.
