@@ -943,7 +943,10 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 return Invalid("Unsupported ride status");
             if (!ride->supportsStatus(*draft.status))
                 return Invalid("Testing unavailable for this ride");
-            if (*draft.status == ride->status)
+            // Native RideSetStatusAction uses Close on an already-closed crashed ride
+            // to clear the crash flag. Do not block that recovery action here.
+            if (*draft.status == ride->status
+                && !(*draft.status == RideStatus::closed && ride->flags.has(RideFlag::crashed)))
                 return Invalid("Ride already has this status");
             GameActions::RideSetStatusAction action(draft.target.id, *draft.status);
             action.SetCallback(std::move(callback));
