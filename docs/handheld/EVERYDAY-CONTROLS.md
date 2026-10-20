@@ -30,6 +30,6 @@ Captures are real 512x384 software-rendered native frames using supplied RCT2 gr
 
 Host dependencies were extracted into a private workspace prefix. The ARM compiler and TrimUI SDK archives match their pinned SHA-256 values. The existing package supplies the matching ICU76/zstd and target runtime; libzip 1.11.3 headers were generated using its native cross configuration. No system or device libraries are replaced.
 
-ARM packaging and final executable integrity/QEMU checks are tracked in the delivery checkpoint. Until that checkpoint is recorded, this document does not claim an installable package.
+The installable AArch64 update, final executable integrity/QEMU checks, exact checksum and installation instructions are recorded in [EVERYDAY-CONTROLS-DELIVERY.md](EVERYDAY-CONTROLS-DELIVERY.md). Physical-device verification remains separate.
 
 No physical Brick is connected. Real device display, controls, audio, suspend, SD-card saves and dense-park performance still need hardware verification. Ground following preserves native connection geometry; it does not construct terrain ramps across incompatible cliffs. The original affected Brick save was not supplied for comparison.
