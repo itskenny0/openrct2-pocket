@@ -8,6 +8,7 @@
  *****************************************************************************/
 
 #include <iterator>
+#include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
@@ -200,6 +201,9 @@ namespace OpenRCT2::Ui::Windows
 
     WindowBase* SavePromptOpen()
     {
+        if (Handheld::IsEnabled() && gLegacyScene == LegacyScene::playing
+            && (gSavePromptMode == PromptMode::quit || gSavePromptMode == PromptMode::saveBeforeQuit))
+            return HandheldQuitOpen();
         PromptMode prompt_mode = gSavePromptMode;
         const bool isQuitRequest = prompt_mode == PromptMode::quit;
         if (isQuitRequest)

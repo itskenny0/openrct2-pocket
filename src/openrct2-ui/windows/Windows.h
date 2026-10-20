@@ -57,6 +57,7 @@ namespace OpenRCT2::Ui::Windows
     void ScenarioSelectHandheldConfirm();
     void ScenarioSelectHandheldToggleLocking();
     void HandheldMenuOpen();
+    WindowBase* HandheldQuitOpen();
     void HandheldBuildOpen();
     void HandheldLoadOpen();
     void HandheldMenuBack();

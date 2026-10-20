@@ -810,6 +810,13 @@ namespace OpenRCT2::Ui::Handheld
             }
             if (_sceneryTool)
             {
+                const auto pathHit = GetMapCoordinatesFromPos(Centre(),
+                    { ViewportInteractionItem::footpath, ViewportInteractionItem::terrain });
+                const auto* path = pathHit.Element ? pathHit.Element->asPath() : nullptr;
+                SceneryTools::SetPathTarget(path && !path->isGhost()
+                    ? std::optional<CoordsXYZ>{CoordsXYZ{pathHit.Loc, path->getBaseZ()}} : std::nullopt);
+                if (path && !path->isGhost() && (SceneryTools::Current().category == SceneryTools::Category::additions
+                    || SceneryTools::Current().category == SceneryTools::Category::banners)) coords = pathHit.Loc;
                 constexpr ViewportInteractionItems pickTypes = { ViewportInteractionItem::scenery,
                     ViewportInteractionItem::wall, ViewportInteractionItem::largeScenery,
                     ViewportInteractionItem::banner, ViewportInteractionItem::pathAddition };
@@ -936,7 +943,6 @@ namespace OpenRCT2::Ui::Handheld
         {
             if (action == Action::quit)
             {
-                EndTerrain();
                 ContextQuit();
                 input.suspend();
                 return;

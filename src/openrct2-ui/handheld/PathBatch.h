@@ -7,6 +7,8 @@
 #include <openrct2/actions/GameActionRunner.h>
 #include <openrct2/actions/footpath/FootpathPlaceAction.h>
 #include <openrct2/world/Footpath.h>
+#include <openrct2/world/Map.h>
+#include <openrct2/world/tile_element/SurfaceElement.h>
 
 namespace OpenRCT2::Ui::Handheld::Paths
 {
@@ -20,6 +22,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
     {
     public:
         BuildMode mode{ BuildMode::single };
+        bool followsGround{ true };
         std::optional<CoordsXYZ> start;
         std::optional<CoordsXY> end;
         BatchMaterial material;
@@ -55,13 +58,24 @@ namespace OpenRCT2::Ui::Handheld::Paths
             end = destination; material = settings; cash = state.park.cash; paused = gGamePaused; tick = state.currentTicks;
             cached = true; ++validationCount;
             selection = {}; valid.clear(); quote = {};
+            slopes.clear();
             if (!end) { fail("Move destination onto the park"); return; }
             selection = SelectTiles(mode, *start, *end);
             if (!selection.error.empty()) { fail(selection.error); return; }
             GameActions::Result firstError;
-            for (const auto& tile : selection.tiles)
+            for (auto& tile : selection.tiles)
             {
-                auto action = makeAction(tile);
+                FootpathSlope slope{ FootpathSlopeType::flat, 0 };
+                if (followsGround)
+                {
+                    const auto* surface = MapGetSurfaceElementAt(CoordsXY(tile));
+                    if (!surface) { fail("Move selection onto valid land"); return; }
+                    const auto ground = FootpathGetOnTerrainPlacement(*surface);
+                    tile.z = ground.baseZ;
+                    slope = ground.slope;
+                }
+                slopes.push_back(slope);
+                auto action = makeAction(tile, slope);
                 const auto result = GameActions::Query(&action, state);
                 valid.push_back(result.error == GameActions::Status::ok);
                 if (result.error == GameActions::Status::ok) quote.cost += result.cost;
@@ -88,6 +102,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
             if (!review) { review = true; reviewedCost = quote.cost; return quote; }
             review = false; busy = true; completed = 0; spent = 0; notice.clear();
             pending = selection.tiles;
+            pendingSlopes = slopes;
             executingState = &getGameState();
             placeNext();
             return quote;
@@ -98,15 +113,16 @@ namespace OpenRCT2::Ui::Handheld::Paths
         money64 cash{}, reviewedCost{};
         uint8_t paused{};
         std::vector<CoordsXYZ> pending;
+        std::vector<FootpathSlope> slopes, pendingSlopes;
         const GameState_t* executingState{};
         static GameActions::Result error(const std::string& message)
         {
             GameActions::Result r; r.error = GameActions::Status::invalidParameters; r.errorMessage = message; return r;
         }
         void fail(const std::string& message) { quote = error(message); }
-        GameActions::FootpathPlaceAction makeAction(CoordsXYZ tile) const
+        GameActions::FootpathPlaceAction makeAction(CoordsXYZ tile, FootpathSlope slope) const
         {
-            return GameActions::FootpathPlaceAction(tile, { FootpathSlopeType::flat, 0 }, material.surface,
+            return GameActions::FootpathPlaceAction(tile, slope, material.surface,
                 material.railings, kInvalidDirection, material.flags);
         }
         void stop(const GameActions::Result& result)
@@ -120,7 +136,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
         void placeNext()
         {
             if (executingState != &getGameState()) { stop(error("Park changed; remaining tiles cancelled")); return; }
-            auto action = makeAction(pending[completed]);
+            auto action = makeAction(pending[completed], pendingSlopes[completed]);
             action.SetCallback([this](const auto*, const GameActions::Result* result) {
                 if (result->error != GameActions::Status::ok) { stop(*result); return; }
                 spent += result->cost; ++completed;

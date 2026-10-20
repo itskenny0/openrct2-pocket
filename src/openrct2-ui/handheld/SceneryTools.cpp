@@ -350,7 +350,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         DrawStrongText(rt,position+ScreenCoordsXY{80,48},s.mode==Mode::place ? "Place" : s.mode==Mode::recolour ? "Recolour" : "Remove",72);
         DrawModernEllipsised(rt,position+ScreenCoordsXY{80,72},72,ScatterActive() ? "{WHITE}Scatter" : "{MUTED}Single");
         DrawModernEllipsised(rt,position+ScreenCoordsXY{12,116},140,"{WHITE}"+Name(s));
-        DrawModernEllipsised(rt,position+ScreenCoordsXY{12,140},140,s.category==Category::additions ? "{MUTED}Native path edges"
+        DrawModernEllipsised(rt,position+ScreenCoordsXY{12,140},140,s.category==Category::additions ? "{MUTED}Attach to path edge"
             : "{MUTED}Direction "+std::to_string(s.direction+1)+(s.category==Category::small ? " / Q"+std::to_string(s.quadrant+1) : ""));
         DrawModernEllipsised(rt,position+ScreenCoordsXY{12,160},140,ScatterActive() ? "{WHITE}"+ScatterStatus()
             : s.height ? "{MUTED}Height "+std::to_string(s.height) : "{MUTED}Automatic height");
@@ -409,14 +409,25 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     {
         auto z = s.height;
         if ((s.category == Category::banners || s.category == Category::additions) && z == 0)
+        {
+            const PathElement* selected = nullptr;
+            const auto* surface = MapGetSurfaceElementAt(tile);
+            const auto wantedZ = s.pathHeight.value_or(surface ? surface->getBaseZ() : 0);
             for (const auto* path : TileElementsView<PathElement>(tile))
                 if (!path->isGhost())
                 {
-                    z = path->getBaseZ();
-                    if (s.category == Category::banners && path->isSloped() && path->getSlopeDirection() == s.direction)
-                        z += kPathHeightStep;
-                    break;
+                    if (s.pathHeight && path->getBaseZ() != wantedZ) continue;
+                    if (!selected || std::abs(path->getBaseZ() - wantedZ) < std::abs(selected->getBaseZ() - wantedZ))
+                        selected = path;
                 }
+            if (selected)
+            {
+                z = selected->getBaseZ();
+                if (s.category == Category::banners && selected->isSloped() && selected->getSlopeDirection() == s.direction)
+                    z += kPathHeightStep;
+            }
+            else if (s.pathHeight) z = *s.pathHeight; // Native query reports a stale/missing path.
+        }
         const CoordsXYZD loc{ tile, z, s.direction };
         const auto& c = s.colours;
         switch (s.category)
@@ -876,6 +887,10 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
             return r;
         auto a = Placement(*tile, s);
         return GameActions::Execute(a.get(), getGameState());
+    }
+    void SetPathTarget(const std::optional<CoordsXYZ>& target)
+    {
+        current.pathHeight = target ? std::optional<int32_t>{target->z} : std::nullopt;
     }
     void UpdatePreview(std::optional<CoordsXY> tile)
     {

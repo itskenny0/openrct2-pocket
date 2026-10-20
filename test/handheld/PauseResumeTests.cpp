@@ -35,7 +35,7 @@ int main(int argc,char** argv)
   for(bool back:{false,true})for(int initial:std::array<int,5>{0,GAME_PAUSED_NORMAL,GAME_PAUSED_MODAL,GAME_PAUSED_NORMAL|GAME_PAUSED_MODAL,GAME_PAUSED_NORMAL|GAME_PAUSED_SAVING_TRACK}) {
    gGamePaused=initial;W::HandheldMenuOpen();
    if(back)W::HandheldMenuBack();else W::HandheldMenuConfirm();
-   Check(gGamePaused==(initial&~GAME_PAUSED_NORMAL),"Resume left the normal pause set or cleared an engine pause reason");
+   Check(gGamePaused==(back ? initial : (initial&~GAME_PAUSED_NORMAL)),"Back changed prior pause or Resume cleared an engine pause reason");
    WindowCullDead();
   }
   for (bool back : { false, true })
@@ -73,7 +73,7 @@ int main(int argc,char** argv)
   Check(!(gGamePaused&GAME_PAUSED_NORMAL),"Loaded park could not resume");
   std::cout<<"PASS paused native save/reload and explicit Resume\n";
   std::cout<<"PASS Build/Paths back hierarchy and focused queue return\n";
-  std::cout<<"PASS Resume/B clear only normal pause, preserve engine reasons and avoid reintroducing pause on cleanup\n";
+  std::cout<<"PASS Resume clears normal pause; Back preserves prior pause; both preserve engine reasons\n";
   return 0;
  }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

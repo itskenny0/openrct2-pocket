@@ -72,6 +72,7 @@
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/PlatformEnvironment.h>
 #include <openrct2/actions/GameActionRunner.h>
+#include <openrct2/actions/general/GameSetSpeedAction.h>
 #include <openrct2/actions/park/ParkSetResearchFundingAction.h>
 #include <openrct2/actions/peep/StaffHireNewAction.h>
 #include <openrct2/actions/ride/RideSetStatusAction.h>
@@ -230,7 +231,8 @@ namespace OpenRCT2::Ui::Windows
         saveReview,
         overwrite,
         discard,
-        exit
+        exit,
+        quitChoice
     };
 
     Handheld::ManagementPresentation HandheldDashboardPresentation(size_t selected)
@@ -268,6 +270,9 @@ namespace OpenRCT2::Ui::Windows
         ObjectEntryIndex _customObject = kObjectEntryIndexNull;
         ride_type_t _customType = kRideTypeNull;
         bool _exitAfterSave{};
+        bool _quitStandalone{}, _quitSaving{};
+        Page _quitCaller = Page::park;
+        size_t _quitFocus{};
         size_t _slot{};
         Handheld::FileBrowsing::State _files;
         std::optional<Handheld::FileBrowsing::Identity> _loadFile;
@@ -1197,9 +1202,10 @@ namespace OpenRCT2::Ui::Windows
     private:
         void layout()
         {
-            const auto size = Handheld::OverlaySize(std::min<size_t>(8, rows().size()));
+            auto size = Handheld::OverlaySize(std::min<size_t>(8, rows().size()));
+            if (_page == Page::park || _page == Page::quitChoice || _page == Page::exit) size.height += 16;
             // Confirmation text needs room; normal tools leave the centre cursor exposed.
-            const ScreenSize target{ _page == Page::overwrite || _page == Page::discard || _page == Page::exit ? 330
+            const ScreenSize target{ _page == Page::overwrite || _page == Page::discard || _page == Page::exit || _page == Page::quitChoice ? 330
                                                                                                                : size.width,
                                      size.height };
             const ScreenSize bounds = (choiceCards() || _page == Page::staffPatrolClear || _page == Page::rightsConfirm
@@ -1517,6 +1523,37 @@ namespace OpenRCT2::Ui::Windows
                     if (Handheld::SceneryTools::BeginStyle(*_signTarget, style)) result.push_back(style);
             return result;
         }
+        std::string simulationChoice(uint8_t speed) const
+        {
+            const bool paused = (gGamePaused & ~(_pausedHere ? GAME_PAUSED_NORMAL : 0)) != 0;
+            const bool current = speed == 0 ? paused : !paused && gGameSpeed == speed;
+            return std::string(current ? "Current: " : "") + (speed == 0 ? "Paused" : std::to_string(1u << (speed - 1)) + "x");
+        }
+        void chooseSimulation(uint8_t speed)
+        {
+            if (speed != 0)
+            {
+                GameActions::GameSetSpeedAction action(speed);
+                const auto result = GameActions::Execute(&action, getGameState());
+                if (result.error != GameActions::Status::ok)
+                {
+                    _status = result.getErrorMessage(); invalidate(); return;
+                }
+            }
+            const bool normalPause = gGamePaused & GAME_PAUSED_NORMAL;
+            if (normalPause != (speed == 0)) PauseToggle();
+            _pausedHere = false;
+            close();
+        }
+        void cancelQuit()
+        {
+            _quitSaving = false;
+            _exitAfterSave = false;
+            if (_quitStandalone) { close(); return; }
+            page(_quitCaller);
+            _focus = {};
+            _focus.move(static_cast<int>(_quitFocus), rows().size());
+        }
         std::vector<std::string> rows() const
         {
             if (_leaveAction)
@@ -1525,7 +1562,10 @@ namespace OpenRCT2::Ui::Windows
             {
                 case Page::park:
                     return { "Resume park",   "Build",     "Park dashboard",      "Save park",
-                             "Save and exit", "Load park", "Exit without saving", "Controls..." };
+                             "Save and quit", "Load park", "Quit...", "Controls...",
+                             simulationChoice(0), simulationChoice(1), simulationChoice(2), simulationChoice(3) };
+                case Page::quitChoice:
+                    return { "Save and quit", "Quit without saving...", "Cancel" };
                 case Page::controls:
                     return { "Park", "Build", "Menus" };
                 case Page::dashboard:
@@ -1794,7 +1834,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::discard:
                     return { "Load and discard current changes", "Cancel" };
                 case Page::exit:
-                    return { "Exit WITHOUT saving", "Cancel" };
+                    return { "Quit without saving", "Cancel" };
             }
             return {};
         }
@@ -1932,6 +1972,17 @@ namespace OpenRCT2::Ui::Windows
                 PauseToggle();
             _pausedHere = false;
             close();
+        }
+        void openQuit(bool standalone)
+        {
+            if (_page == Page::quitChoice || _page == Page::exit || _quitSaving) return;
+            if (guardLeave([this, standalone] { openQuit(standalone); })) return;
+            _quitStandalone = standalone;
+            _quitCaller = _page;
+            _quitFocus = _focus.index();
+            page(Page::quitChoice);
+            _focus = {};
+            _focus.move(2, 3);
         }
         bool canConnectAccessPoint() const
         {
@@ -3031,6 +3082,8 @@ namespace OpenRCT2::Ui::Windows
             switch (_page)
             {
                 case Page::controls:
+                    page(Page::park);
+                    _focus.move(7, rows().size());
                     break;
                 case Page::researchCatalog:
                     page(Page::research); break;
@@ -3371,13 +3424,21 @@ namespace OpenRCT2::Ui::Windows
                     page(_fileLoad ? Page::parkFiles : Page::load);
                     break;
                 case Page::exit:
-                    page(Page::park);
+                    page(Page::quitChoice);
+                    _focus = {}; _focus.move(1, 3);
+                    break;
+                case Page::quitChoice:
+                    cancelQuit();
+                    break;
+                case Page::save:
+                    if (_quitSaving) { page(Page::quitChoice); _quitSaving = false; }
+                    else page(Page::park);
                     break;
                 case Page::build:
                     close();
                     break;
                 case Page::park:
-                    resumePark();
+                    close(); // Back restores the pause state that existed before this menu.
                     break;
                 default:
                     if (gLegacyScene == LegacyScene::playing)
@@ -3694,10 +3755,13 @@ namespace OpenRCT2::Ui::Windows
                             page(Page::load);
                             break;
                         case 6:
-                            page(Page::exit);
+                            openQuit(false);
                             break;
                         case 7:
                             page(Page::controls);
+                            break;
+                        case 8: case 9: case 10: case 11:
+                            chooseSimulation(static_cast<uint8_t>(choice - 8));
                             break;
                     }
                     break;
@@ -5903,6 +5967,11 @@ namespace OpenRCT2::Ui::Windows
                     else
                         page(_fileLoad ? Page::parkFiles : Page::load);
                     break;
+                case Page::quitChoice:
+                    if (choice == 0) { _exitAfterSave = true; _quitSaving = true; page(Page::save); }
+                    else if (choice == 1) page(Page::exit);
+                    else cancelQuit();
+                    break;
                 case Page::exit:
                     if (choice == 0)
                     {
@@ -5911,7 +5980,7 @@ namespace OpenRCT2::Ui::Windows
                         GetContext()->Finish();
                     }
                     else
-                        page(Page::park);
+                    { page(Page::quitChoice); _focus = {}; _focus.move(1, 3); }
                     break;
             }
         }
@@ -6497,7 +6566,7 @@ namespace OpenRCT2::Ui::Windows
                     title = "BUILD";
                     break;
                 case Page::save:
-                    title = _exitAfterSave ? "SAVE AND EXIT" : "SAVE PARK";
+                    title = _exitAfterSave ? "SAVE AND QUIT" : "SAVE PARK";
                     break;
                 case Page::load:
                     title = "LOAD PARK";
@@ -6507,6 +6576,9 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::discard:
                     title = "DISCARD UNSAVED CHANGES?";
+                    break;
+                case Page::quitChoice:
+                    title = "QUIT GAME";
                     break;
                 case Page::exit:
                     title = "EXIT WITHOUT SAVING?";
@@ -6532,9 +6604,14 @@ namespace OpenRCT2::Ui::Windows
                     model.status = Handheld::Paths::PlacementName();
             }
             if (_page == Page::park)
+            {
                 model.icons = { Handheld::PanelIcon::play, Handheld::PanelIcon::terrain, Handheld::PanelIcon::folder,
                                 Handheld::PanelIcon::save, Handheld::PanelIcon::exit,    Handheld::PanelIcon::folder,
                                 Handheld::PanelIcon::exit };
+                if (model.status.empty()) model.status = "Simulation: " + std::string(
+                    (gGamePaused & ~(_pausedHere ? GAME_PAUSED_NORMAL : 0)) != 0 ? "Paused"
+                    : (std::to_string(1u << (gGameSpeed - 1)) + "x"));
+            }
             else if (_page == Page::build)
             {
                 model.icons = { Handheld::PanelIcon::raise, Handheld::PanelIcon::lower, Handheld::PanelIcon::path,
@@ -6630,6 +6707,13 @@ namespace OpenRCT2::Ui::Windows
     void HandheldMenuOpen()
     {
         OpenPanel();
+    }
+    WindowBase* HandheldQuitOpen()
+    {
+        const bool standalone = GetWindowManager()->FindByClass(WindowClass::handheldMenu) == nullptr;
+        auto* window = OpenPanel();
+        if (window) window->openQuit(standalone);
+        return window;
     }
     void HandheldBuildOpen()
     {
@@ -7063,3 +7147,4 @@ namespace OpenRCT2::Ui::Windows
         return false;
     }
 } // namespace OpenRCT2::Ui::Windows
+

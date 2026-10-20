@@ -194,6 +194,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
         const auto next = (static_cast<int>(batch.mode) + delta % 3 + 3) % 3;
         if (batch.mode == BuildMode::single && next != 0) singleGeometry = SingleGeometry{fixedHeight,fixedSlope};
         batch.reset(); batch.mode = static_cast<BuildMode>(next); removing = false;
+        batch.followsGround = !fixedHeight;
         if (batch.mode != BuildMode::single) fixedSlope = FootpathSlope{FootpathSlopeType::flat,0};
         else if (singleGeometry)
         {
@@ -506,6 +507,9 @@ namespace OpenRCT2::Ui::Handheld::Paths
         ClearPreview();
         if (BatchActive()) { batch.start.reset(); batch.end.reset(); batch.invalidate(); }
         fixedHeight.reset();
+        heightPlane = false;
+        batch.followsGround = true;
+        if (singleGeometry) singleGeometry = SingleGeometry{};
         if (BatchActive()) fixedSlope=FootpathSlope{FootpathSlopeType::flat,0};
         else fixedSlope.reset();
     }
@@ -515,6 +519,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
             return false;
         ClearPreview();
         fixedHeight = z;
+        batch.followsGround = false;
         if (batch.start) { batch.start->z = z; batch.invalidate(); }
         fixedSlope = FootpathSlope{ FootpathSlopeType::flat, 0 };
         return true;
@@ -529,6 +534,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
             return false;
         ClearPreview();
         fixedHeight = next;
+        batch.followsGround = false;
         if (batch.start) { batch.start->z = next; batch.invalidate(); }
         RefocusHeight();
         if (!fixedSlope)
@@ -573,9 +579,9 @@ namespace OpenRCT2::Ui::Handheld::Paths
         if (removing)
             return "Remove selected path";
         if (!fixedHeight)
-            return "Ground / auto slope";
+            return "Follows ground";
         const auto selectedSlope = fixedSlope.value_or(slope);
-        return "Height " + std::to_string(*fixedHeight / kCoordsZStep) + " / "
+        return "Level " + std::to_string(*fixedHeight / kCoordsZStep) + " / "
             + (selectedSlope.type == FootpathSlopeType::sloped ? std::string("Rise ") + directions[selectedSlope.direction & 3]
                                                                : "Flat");
     }
@@ -699,7 +705,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
             {
                 GameActions::Result result;
                 const auto selectedSlope = fixedSlope.value_or(slope);
-                if (!target || !available || selectedSlope.type != FootpathSlopeType::flat)
+                if (!target || !available || (!batch.followsGround && selectedSlope.type != FootpathSlopeType::flat))
                 {
                     result.error = GameActions::Status::invalidParameters;
                     result.errorMessage = "Choose a flat start; Single supports slopes";
@@ -710,7 +716,17 @@ namespace OpenRCT2::Ui::Handheld::Paths
                 {
                     ClearPreview(); batch.notice.clear();
                     batch.start = CoordsXYZ{ CoordsXY(*target), fixedHeight.value_or(target->z) };
-                    fixedHeight = batch.start->z;
+                    // A ground anchor selects an area, not an elevation plane.
+                    // Keep ground following after completion/cancel and on other terrain.
+                    if (targetIsPath && !fixedHeight)
+                    {
+                        const auto* surface = MapGetSurfaceElementAt(CoordsXY(*target));
+                        if (surface && FootpathGetOnTerrainPlacement(*surface).baseZ != target->z)
+                        {
+                            fixedHeight = target->z;
+                            batch.followsGround = false;
+                        }
+                    }
                     fixedSlope = FootpathSlope{ FootpathSlopeType::flat, 0 };
                     batch.invalidate(); batch.update(TargetTile(), Material(), true);
                 }
@@ -966,7 +982,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
             const auto dims=std::to_string(batch.selection.width)+" x "+std::to_string(batch.selection.height)
                 +" / "+std::to_string(batch.selection.width*batch.selection.height)+" tiles";
             DrawStrongText(rt,p+ScreenCoordsXY{12,124},"{WHITE}"+(batch.start ? dims : "Choose a start tile"),192);
-            DrawModernText(rt,p+ScreenCoordsXY{12,146},"{MUTED}Height "+std::to_string(fixedHeight.value_or(target ? target->z : 0)/kCoordsZStep));
+            DrawModernText(rt,p+ScreenCoordsXY{12,146},"{MUTED}" + (batch.followsGround ? std::string("Follows ground") : PlacementName()));
             if (review)
             {
                 DrawStrongText(rt,p+ScreenCoordsXY{12,169},"{CAUTION}Build this selection?",192);

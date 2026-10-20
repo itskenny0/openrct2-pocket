@@ -1,3 +1,5 @@
+> Follow-up: the complete controller quit routing, pause/speed controls and path fixes are now implemented and native-tested in [EVERYDAY-CONTROLS.md](EVERYDAY-CONTROLS.md). The source-only limits below describe the earlier 81bc3bb checkpoint.
+
 # Pocket quit prompt correction — source checkpoint
 
 Scope: the two confirmed Pocket exits in `src/openrct2-ui/handheld/Menu.cpp` only.
@@ -48,3 +50,4 @@ not changed.
 - Implement and validate Paused / 1x / 2x / 4x with pause ownership semantics.
 - Complete focused player-facing information, native runtime/controller tests,
   AArch64 packaging, durable deliverables and runtime screenshots.
+

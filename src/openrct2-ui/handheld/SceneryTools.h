@@ -31,6 +31,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         Direction direction = 3;
         uint8_t quadrant{};
         int32_t height{}; // zero = native automatic ground/path height
+        std::optional<int32_t> pathHeight; // visible real path selected by the controller reticle
         std::array<Drawing::Colour, 3> colours{ Drawing::Colour::bordeauxRed, Drawing::Colour::yellow,
                                                 Drawing::Colour::darkBrown };
         Mode mode{};
@@ -104,6 +105,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     GameActions::Result SetText(const Target& target, const std::string& text, bool execute);
     GameActions::Result Place(std::optional<CoordsXY> tile, const Settings& settings, bool execute);
     void UpdatePreview(std::optional<CoordsXY> tile);
+    void SetPathTarget(const std::optional<CoordsXYZ>& target);
     void ClearPreview();
     void RemovePreviewTemporarily();
     void RestorePreview();

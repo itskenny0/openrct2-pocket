@@ -160,9 +160,10 @@ int main(int argc, char** argv)
         const auto fullQuote=P::Action(false);state.park.cash=fullQuote.cost/2;state.currentTicks+=8;
         Check(P::Action(false).error==GameActions::Status::insufficientFunds,"Whole-selection affordability missing");
         press(H::Action::confirm);flush();Check(!path(960,1088),"Unaffordable fill partially built");state.park.cash=blockedCash;
-        // Incompatible terrain is rejected by native clearance; flat elevated spans remain native eligible.
+        // An intentional level span still uses native clearance on incompatible terrain.
         begin(P::BuildMode::line);target(640,1248);press(H::Action::confirm);target(768,1248);
         auto* ridge=MapGetSurfaceElementAt(CoordsXY{704,1248});const auto oldBase=ridge->getBaseZ();
+        Check(P::SetPlacementHeight(oldBase),"Intentional level span unavailable");
         ridge->setBaseZ(oldBase+8);ridge->setClearanceZ(oldBase+8);state.currentTicks+=8;
         Check(P::Action(false).error!=GameActions::Status::ok,"Native uneven-terrain rejection bypassed");
         press(H::Action::confirm);Check(!path(640,1248),"Uneven selection partially built");ridge->setBaseZ(oldBase);ridge->setClearanceZ(oldBase);

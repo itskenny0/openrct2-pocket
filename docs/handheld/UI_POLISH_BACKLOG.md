@@ -1,3 +1,5 @@
+> 2026-10-20 update: [EVERYDAY-CONTROLS.md](EVERYDAY-CONTROLS.md) records the native-tested ground-height/Line/Fill correction, selected-path additions, controller quit routing and direct simulation controls. Historical deferred path findings below remain as original evidence; physical Brick retesting remains open.
+
 # Persistent UI polish backlog
 
 This is the authoritative repository backlog for final UI refinement. Historical
