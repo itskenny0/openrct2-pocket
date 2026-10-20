@@ -1823,7 +1823,10 @@ namespace OpenRCT2::Ui::Windows
             if (_exitAfterSave)
             {
                 close();
-                ContextQuit();
+                // Saving succeeded and Pocket already owns the exit decision.
+                // Quit() would reopen the desktop save prompt; Finish() lets the
+                // native game loop return through its normal cleanup instead.
+                GetContext()->Finish();
                 return;
             }
             page(Page::park);
@@ -5904,7 +5907,8 @@ namespace OpenRCT2::Ui::Windows
                     if (choice == 0)
                     {
                         close();
-                        ContextQuit();
+                        // The deliberate Pocket discard confirmation is final.
+                        GetContext()->Finish();
                     }
                     else
                         page(Page::park);
