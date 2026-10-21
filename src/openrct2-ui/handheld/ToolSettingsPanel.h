@@ -74,8 +74,11 @@ namespace OpenRCT2::Ui::Handheld
             if(row==selected) model.selected=i;
             model.rowEnabled.push_back(scenery?ConstructionAdjust::SceneryEnabled(row):ConstructionAdjust::TerrainEnabled(row));
         }
-        DrawManagementContent(rt,{8,8},{280,340},model);
-        DrawSurface(rt,{296,8},{208,340});
+        // The groups belong to the whole settings sheet. One continuous surface
+        // keeps their shared tab strip inside its frame, above both columns.
+        DrawSurface(rt,{8,8},{496,340});
+        DrawManagementContent(rt,{8,8},{280,340},model,true,false);
+        Fill(rt,{294,110},{1,222},Theme::edge);
         DrawHeadingText(rt,{308,38},scenery?"Selected object":"Brush footprint",184);
         if(scenery)
         {

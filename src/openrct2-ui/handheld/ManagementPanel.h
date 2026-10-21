@@ -73,7 +73,7 @@ namespace OpenRCT2::Ui::Handheld
         return {columns, rowHeight, rowStart, statColumns, statHeight, capacity};
     }
     inline void DrawManagementContent(
-        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const ManagementPresentation& model, bool focused = true)
+        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const ManagementPresentation& model, bool focused = true, bool drawSurface = true)
     {
         if (model.confirmation || model.contentSized)
         {
@@ -92,7 +92,7 @@ namespace OpenRCT2::Ui::Handheld
         const int offset=ListOffset(selectedItem/columns,totalRows,listHeight,rowHeight);
         const size_t first=toolbar+static_cast<size_t>(offset/rowHeight)*columns;
         const size_t end=std::min(model.rows.size(),toolbar+static_cast<size_t>((offset+listHeight+rowHeight-1)/rowHeight)*columns);
-        DrawSurface(rt, p, size);
+        if (drawSurface) DrawSurface(rt, p, size);
         DrawSectionLabel(rt, p + ScreenCoordsXY{12, 13}, width - 24 - (model.headerStatus.empty() ? 0 : 138), model.breadcrumb);
         if (!model.headerStatus.empty()
             && (model.headerInk == "{POSITIVE}" || model.headerInk == "{CAUTION}" || model.headerInk == "{DANGER}"))
