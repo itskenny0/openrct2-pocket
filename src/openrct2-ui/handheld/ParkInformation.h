@@ -218,7 +218,7 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
             for (auto value : getGameState().park.guestsInParkHistory)
                 if (value != kGuestsInParkHistoryUndefined)
                     props.max = std::max(props.max, value);
-            props.darkBackground = true;
+            props.darkBackground = PocketPalette::style == PocketPalette::Style::slate;
             props.lineCol = ColourWithFlags{ Drawing::Colour::grey };
             props.RecalculateLayout({ { 64, 124 }, { 476, 236 } }, 4, kGuestsInParkHistorySize);
             Graph::DrawGuestGraph(rt, props);
@@ -230,7 +230,7 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
             props.min = 0;
             props.max = 1000;
             props.hoverIdx = -1;
-            props.darkBackground = true;
+            props.darkBackground = PocketPalette::style == PocketPalette::Style::slate;
             props.lineCol = ColourWithFlags{ Drawing::Colour::grey };
             props.RecalculateLayout({ { 64, 124 }, { 476, 236 } }, 4, kParkRatingHistorySize);
             Graph::DrawRatingGraph(rt, props);

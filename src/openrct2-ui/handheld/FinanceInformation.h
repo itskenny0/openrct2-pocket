@@ -161,7 +161,7 @@ namespace OpenRCT2::Ui::Handheld::FinanceInformation
         const auto limit = std::max(10.00_GBP, ((magnitude + oom - 1) / oom) * oom);
         props.min = graph == 2 || !negative ? 0 : -limit;
         props.max = positive || !negative ? limit : 0;
-        props.darkBackground = true;
+        props.darkBackground = PocketPalette::style == PocketPalette::Style::slate;
         props.breakOnMissing = true;
         props.lineCol = ColourWithFlags{ Drawing::Colour::grey };
         props.RecalculateLayout(bounds, 5, 64);

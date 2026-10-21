@@ -118,7 +118,7 @@ namespace OpenRCT2::Ui::Handheld
             // light theme's ink polarity instead of forcing white on ivory.
             const char* nativeInk = PocketPalette::style == PocketPalette::Style::daylight
                 ? (ink == Ink::dark ? "{WHITE}" : ink == Ink::destructive ? "{RED}"
-                    : ink == Ink::positive ? "{GREEN}" : "{BLACK}")
+                    : "{BLACK}")
                 : (ink == Ink::dark ? "{BLACK}" : ink == Ink::gold ? "{YELLOW}" : "{WHITE}");
             text = nativeInk + text;
             if (maxWidth > 0)

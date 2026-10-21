@@ -28,6 +28,26 @@ namespace OpenRCT2::Ui::Handheld
         else if (x < 0 && slot % columns > 0) --slot;
         return cards[slot].action;
     }
+    inline void DrawChoiceCard(Drawing::RenderTarget& rt, ScreenCoordsXY cell, ScreenSize size,
+        const ChoiceCard& card, bool focused)
+    {
+        const int press = ButtonPressOffset(focused);
+        cell.y += press;
+        size.height -= press;
+        DrawCard(rt, cell, size, focused, true);
+        Drawing::RenderTarget inside;
+        if (!ClipRenderTarget(inside, rt, cell + ScreenCoordsXY{ 3, 3 }, size.width - 6, size.height - 6)) return;
+        // Reserve two complete 16px label lines, including glyph descenders.
+        // Dense 4-row Build cards need less art/text gap than large categories.
+        const bool twoLines = TextWidth(card.label, true) > size.width - 14;
+        const int artSize = std::clamp(size.height - (twoLines ? 38 : 34), 20, 38);
+        const auto icon = ScreenCoordsXY{ (size.width - artSize) / 2 - 3, 1 };
+        if (card.sprite)
+            DrawNativeMenuArt(inside, icon, { artSize, artSize }, { card.sprite }, focused);
+        else DrawIcon(inside, icon + ScreenCoordsXY{ artSize / 2 - 8, artSize / 2 - 8 }, card.icon, focused);
+        DrawWrappedLabel(inside, {4, artSize + 2}, size.width - 14,
+            std::string(focused ? "{BLACK}" : "{WHITE}") + card.label, 2);
+    }
     inline void DrawChoiceCards(Drawing::RenderTarget& rt, ScreenSize screen, const std::string& title,
         const std::vector<ChoiceCard>& cards, size_t selected, size_t columns, const std::string& back = "Back")
     {
@@ -45,18 +65,7 @@ namespace OpenRCT2::Ui::Handheld
                 40 + static_cast<int>(i / columns) * pitch};
             const auto& card = cards[i];
             const bool focused = selected == card.action;
-            const int press = ButtonPressOffset(focused);
-            cell.y += press;
-            DrawCard(rt, cell, {cellWidth - 6, pitch - 6 - press}, focused, true);
-            const int artSize = std::clamp(pitch - 40, 20, 38);
-            const auto icon = cell + ScreenCoordsXY{(cellWidth - 6 - artSize) / 2, 4};
-            if (card.sprite)
-            {
-                DrawNativeMenuArt(rt, icon, { artSize, artSize }, { card.sprite }, focused);
-            }
-            else DrawIcon(rt, icon + ScreenCoordsXY{ artSize / 2 - 8, artSize / 2 - 8 }, card.icon, focused);
-            DrawWrappedLabel(rt, cell + ScreenCoordsXY{7, artSize + 8}, cellWidth - 20,
-                std::string(focused ? "{BLACK}" : "{WHITE}") + card.label, 2);
+            DrawChoiceCard(rt, cell, {cellWidth - 6, pitch - 6}, card, focused);
         }
         const auto found = std::find_if(cards.begin(), cards.end(), [&](const auto& c) {return c.action == selected;});
         if (found != cards.end())

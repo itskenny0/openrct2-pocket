@@ -6010,7 +6010,6 @@ namespace OpenRCT2::Ui::Windows
             if(_page==Page::staffUniform && _staffTarget) {
                 auto model=staffPresentation();model.breadcrumb="Staff / Uniform colour";
                 Handheld::DrawManagementContent(rt,{8,36},{248,312},model);
-                Handheld::DrawModernText(rt,{18,82},"All "+Handheld::StaffManagement::RoleName(_staffTarget->type)+" uniforms",{},228);
                 Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Colour"},{"A","Apply to role"},{"B","Cancel"}});return;
             }
             if(_page==Page::accessManage || _page==Page::accessPoint){drawAccessSelection(rt);return;}
@@ -6259,7 +6258,8 @@ namespace OpenRCT2::Ui::Windows
                 model.breadcrumb = _page == Page::saveName ? "Save As / Filename" : "Scenery / Search";
                 model.title = _nameEntry.text.empty() ? (_page == Page::saveName ? "Enter park filename" : "All eligible objects") : _nameEntry.text;
                 model.status = _status.empty() ? "Done applies / B cancels" : _status;
-                Handheld::DrawManagementPanel(rt,{ContextGetWidth(),ContextGetHeight()},model);
+                Handheld::DrawManagementContent(rt,{8,8},{ContextGetWidth()-16,Handheld::Layout::ContentHeight({ContextGetWidth(),ContextGetHeight()})},model);
+                Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Choose"},{"A","Type"},{"B","Back"}});
                 return;
             }
             if (_page == Page::parkMap) { Handheld::ParkMap::Draw(rt, _parkMap); return; }

@@ -121,3 +121,11 @@ fallback now follows the light theme's ink polarity, including white selected
 text on teal. A native rendering regression draws `£0.00` on both backgrounds
 and checks readable glyph pixels, covering the actual engine fallback rather
 than only the custom ASCII font. Slate's previous fallback is unchanged.
+
+## Accepted Daylight layout follow-up
+
+See [DAYLIGHT-LAYOUT-POLISH.md](DAYLIGHT-LAYOUT-POLISH.md) for the focused
+post-review fixes: bounded two-line Build labels, readable narrow tabs,
+uniform heading, guest warnings, unavailable actions, native graph/currency
+contrast, full keyboard labels and contained construction hints. The accepted
+palette/artwork and stable branch are preserved.

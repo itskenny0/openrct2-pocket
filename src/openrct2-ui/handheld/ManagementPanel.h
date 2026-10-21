@@ -63,7 +63,7 @@ namespace OpenRCT2::Ui::Handheld
     {
         const int columns = model.actionGrid ? (size.width >= 360 ? 2 : 1) : static_cast<int>(std::max<size_t>(1, model.columns));
         const int statColumns = model.summaryMetrics && !model.stats.empty() ? (model.metricColumns ? model.metricColumns : size.width >= 440 ? 3 : 2) : 1;
-        const int statHeight = model.summaryMetrics ? model.metricHeight : 24;
+        const int statHeight = model.summaryMetrics ? std::max(model.metricHeight, model.meterDirections.empty() ? 0 : 66) : 24;
         const int statRows = (static_cast<int>(model.stats.size()) + statColumns - 1) / statColumns;
         const int rowStart = 64 + (model.tabs.empty() ? 0 : 34) + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16
             + model.reservedHeight + (model.graph.empty() ? 0 : 110) + (model.rows.empty() ? 0 : 11) + (model.toolbarCount ? 36 : 0);

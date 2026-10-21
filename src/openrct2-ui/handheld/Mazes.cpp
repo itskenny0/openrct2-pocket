@@ -445,7 +445,7 @@ namespace OpenRCT2::Ui::Handheld::Mazes
                 : Picking() ? "{MUTED}A Select maze cell"
                 : placed    ? "{WHITE}B Return to ride"
                             : "{MUTED}L2/R2 Height");
-        DrawModernText(rt, p + ScreenCoordsXY{ 10, 178 }, "{WHITE}SEL Camera | START Ride");
+        DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, 178 }, 144, "{WHITE}SELECT Camera");
         DrawActionStrip(rt, screen);
         std::vector<ControlHint> hints{ { "A",
                                           camera          ? "Build mode"

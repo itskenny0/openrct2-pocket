@@ -1675,7 +1675,7 @@ namespace OpenRCT2::Ui::Handheld
                 else if (_areaTool)
                 {
                     AreaTools::DrawOverlay(rt,Concept::kOrigin);
-                    DrawModernText(rt,Concept::kOrigin+ScreenCoordsXY{12,260},"{WHITE}L2/R2 Operation");
+                    DrawModernEllipsised(rt,Concept::kOrigin+ScreenCoordsXY{12,154},140,"{MUTED}L2/R2 Operation");
                 }
                 else if (_sceneryClearTool)
                     SceneryClear::DrawOverlay(rt, Concept::kOrigin);

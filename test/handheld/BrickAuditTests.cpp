@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Native initialized scenario fixture; construction and editing use real actions.
 #include <SDL.h>
+#include <openrct2-ui/handheld/ChoiceCards.h>
 #include <thread>
 #include <openrct2-ui/handheld/GuestManagement.h>
 #include <openrct2-ui/handheld/StaffPatrol.h>
@@ -110,6 +111,44 @@ int main(int argc, char** argv)
             Image image;image.Width=512;image.Height=384;image.Depth=8;image.Stride=rt.LineStride();image.Palette=Drawing::gPalette;
             const auto* bytes=reinterpret_cast<uint8_t*>(rt.bits);image.Pixels.assign(bytes,bytes+rt.LineStride()*rt.height);
             Imaging::WriteToFile((std::filesystem::path(folder)/name).string(),image,ImageFormat::png);engine.EndDraw();};
+
+        // Render compact two-line cards against a sentinel to detect drawing
+        // outside the button, including selected and pressed states.
+        {
+            Drawing::X8DrawingEngine engine(context->GetUiContext());engine.Resize(180,100);engine.BeginDraw();
+            auto& rt=*engine.getRT();
+            for(bool focused:{false,true}) for(bool pressed:{false,true})
+            for(const char* label:{"Remove scenery","Shops & facilities","Land & rights"}) {
+                std::fill_n(rt.bits,rt.LineStride()*rt.height,static_cast<Drawing::PaletteIndex>(255));
+                H::MenuFeel feel;feel.Observe("card",0);if(pressed)feel.Press();H::MenuFeelScope motion(feel);
+                H::DrawChoiceCard(rt,{20,20},{112,57},{0,label,"",H::PanelIcon::remove},focused);
+                int secondLineInk=0;
+                for(int y=0;y<rt.height;++y)for(int x=0;x<rt.width;++x) {
+                    const auto pixel=static_cast<uint8_t>(rt.bits[y*rt.LineStride()+x]);
+                    if(x<20||x>=132||y<20||y>=77)Check(pixel==255,"Choice card drew outside its bounds");
+                    if(x>=28&&x<124&&y>=60&&y<74 && pixel==(focused?H::PocketPalette::dark:H::PocketPalette::primary))++secondLineInk;
+                }
+                if(std::string(label)!="Land & rights") Check(secondLineInk>=8,"Compact card lost its second label line");
+            }
+            engine.EndDraw();
+        }
+        // Visit every Build card through controller navigation, without executing it.
+        W::HandheldBuildOpen();
+        int buildIndex=0;
+        for(int row=0;row<4;++row){
+            for(int col=0;col<(row==3?2:4);++col){
+                const auto filename="00-build-"+std::to_string(buildIndex++)+".png";capture(filename.c_str());
+                H::Frame frame;frame.navigateX=1;H::HandleExplorerInput(input,frame);
+            }
+            H::Frame frame;frame.navigateY=1;H::HandleExplorerInput(input,frame);
+            for(int i=0;i<3;++i){H::Frame left;left.navigateX=-1;H::HandleExplorerInput(input,left);}
+        }
+        closeMenu();
+        auto move=[&](int x,int y){H::Frame frame;frame.navigateX=x;frame.navigateY=y;H::HandleExplorerInput(input,frame);};
+        W::HandheldBuildOpen();move(1,0);move(1,0);press(H::Action::confirm);
+        capture("00-path-categories.png");closeMenu();
+        W::HandheldBuildOpen();move(0,1);move(0,1);move(1,0);move(1,0);press(H::Action::confirm);
+        capture("00-scenery-categories.png");closeMenu();
 
         auto load=[&](const char* name,ride_type_t type){auto* o=objects.LoadObject(name);Check(o,"Ride object missing");const auto i=objects.GetLoadedObjectEntryIndex(o);
             ResearchInsertRideEntry(i,true);RideEntrySetInvented(i);RideTypeSetInvented(type);return i;};
