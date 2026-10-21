@@ -10,6 +10,7 @@
 #include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/MenuThemes.h>
+#include <openrct2-ui/handheld/ModernText.h>
 #include <openrct2-ui/handheld/PathBatch.h>
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/windows/Windows.h>
@@ -110,16 +111,35 @@ int main(int argc, char** argv)
         WindowGetMain()->savedViewPos = viewport->viewPos;
         auto menu = [&] { return wm->FindByClass(WindowClass::handheldMenu); };
         auto noDesktop = [&] { Check(!wm->FindByClass(WindowClass::savePrompt), "Desktop quit prompt opened"); };
+        // Currency's non-ASCII symbol takes the native font fallback. It must
+        // remain readable on ivory cards and teal selections in the light theme.
+        {
+            Drawing::X8DrawingEngine engine(context->GetUiContext());engine.Resize(80,24);engine.BeginDraw();
+            auto& rt=*engine.getRT();Drawing::UpdatePaletteEffects();
+            const auto original=H::PocketPalette::style;H::PocketPalette::SetStyle(H::PocketPalette::Style::daylight);
+            for(bool selected:{false,true}) {
+                std::fill_n(rt.bits,rt.LineStride()*rt.height,static_cast<Drawing::PaletteIndex>(selected?194:225));
+                H::DrawModernText(rt,{2,6},std::string(selected?"{BLACK}":"{WHITE}")+"£0.00");
+                int readablePixels=0;
+                for(int y=0;y<rt.height;++y)for(int x=0;x<rt.width;++x) {
+                    const auto colour=Drawing::gPalette[static_cast<uint8_t>(rt.bits[y*rt.LineStride()+x])];
+                    const int brightness=colour.red+colour.green+colour.blue;
+                    if(selected?brightness>600:brightness<240)++readablePixels;
+                }
+                Check(readablePixels>=8,"Native currency fallback lost text contrast");
+            }
+            H::PocketPalette::SetStyle(original);engine.EndDraw();
+        }
         // Real virtual-controller theme selection retains focus, pause and cash.
         gGamePaused=0;const auto themeCash=state.park.cash;
-        W::HandheldMenuOpen();nav(12);capture("00a-midway-choice.png");
+        W::HandheldMenuOpen();nav(12);capture("00a-daylight-choice.png");
         const auto originalTheme=H::PocketPalette::style;
         press(H::Action::confirm);
         Check(H::PocketPalette::style!=originalTheme,"Theme action did not switch");
         capture("00b-slate-choice.png");
         press(H::Action::confirm); // same focused row switches back
         Check(H::PocketPalette::style==originalTheme,"Theme focus or round trip lost");
-        capture("00c-midway-restored.png");
+        capture("00c-daylight-restored.png");
         H::MenuThemes::Settings reloaded;
         reloaded.Load(context->GetPlatformEnvironment().GetDirectoryPath(DirBase::user));
         Check(H::PocketPalette::style==originalTheme,"Theme preference did not survive reload");

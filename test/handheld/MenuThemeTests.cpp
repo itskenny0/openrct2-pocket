@@ -9,17 +9,17 @@ int main()
     const auto profile=std::filesystem::temp_directory_path()/"pocket-menu-theme-test";
     std::filesystem::remove_all(profile);
     MenuThemes::Settings setting;setting.Load(profile);
-    Check(PocketPalette::style==PocketPalette::Style::midway);
+    Check(PocketPalette::style==PocketPalette::Style::daylight);
     Check(setting.Toggle());
     Check(PocketPalette::style==PocketPalette::Style::slate && PocketPalette::panel==12);
     MenuThemes::Settings reload;reload.Load(profile);
     Check(PocketPalette::style==PocketPalette::Style::slate);
     Check(reload.Toggle());
     MenuThemes::Settings again;again.Load(profile);
-    Check(PocketPalette::style==PocketPalette::Style::midway);
+    Check(PocketPalette::style==PocketPalette::Style::daylight);
     std::ofstream(profile/"pocket-theme.cfg")<<"future-theme\n";
     MenuThemes::Settings unknown;unknown.Load(profile);
-    Check(PocketPalette::style==PocketPalette::Style::midway);
+    Check(PocketPalette::style==PocketPalette::Style::daylight);
     std::ofstream(profile/"pocket-theme.cfg.pending")<<"another writer";
     Check(!unknown.Toggle());
     Check(PocketPalette::style==PocketPalette::Style::slate); // still usable this session

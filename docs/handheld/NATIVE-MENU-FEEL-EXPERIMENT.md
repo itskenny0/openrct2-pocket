@@ -90,3 +90,34 @@ Validation for this follow-up:
 
 This remains a visual experiment, not an installed Brick update. No new ARM/
 QEMU or physical-device testing is claimed. The stable branch is unchanged.
+
+## Daylight follow-up
+
+Following visual review, the active alternate theme is now **Daylight**, replacing
+the purple Midway trial. Midway remains in source history at `1df16b4`.
+Daylight is this experimental branch's default; **Slate** remains selectable
+through the same pause-menu row, with the same saved-preference behavior.
+An old `midway` preference falls back to Daylight as an unrecognized theme.
+
+Daylight uses light blue-gray panels (20), ivory raised buttons (225), teal
+selection (194), dark main text (10), muted text (13), and small burnt-orange
+accents (180). Selected button text uses light ink (21) against teal. Semantic
+failure, caution and disabled inks are adjusted for a light background. Both
+themes use separate glyph caches. All native sprites, tab animation, button
+feedback, controller mappings and focus behavior are preserved. The global
+world palette and native object colors are unchanged.
+
+Validation: native x86-64 application rebuilt; nine standalone checks and the
+four native runtime regression drivers passed. SDL virtual-controller testing
+switched Daylight to Slate and back, restored focus, reloaded the saved
+preference, and verified unchanged pause ownership and cash. Actual 512x384
+park rendering was captured for pause, Build and ride menus, with a nine-second
+motion recording. This remains a visual preview, with no new ARM/QEMU or
+physical Brick test, and no changes to the stable branch or installed package.
+
+The light-theme capture exposed a native-font fallback issue: currency symbols
+and other non-ASCII text kept a forced white prefix on ivory surfaces. The
+fallback now follows the light theme's ink polarity, including white selected
+text on teal. A native rendering regression draws `£0.00` on both backgrounds
+and checks readable glyph pixels, covering the actual engine fallback rather
+than only the custom ASCII font. Slate's previous fallback is unchanged.

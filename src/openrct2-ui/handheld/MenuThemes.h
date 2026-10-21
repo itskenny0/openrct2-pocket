@@ -8,7 +8,7 @@
 namespace OpenRCT2::Ui::Handheld::MenuThemes
 {
     // A separate optional preference, kept outside parks and the native config.
-    // Unknown/missing preferences use this experiment's Midway default.
+    // Unknown/missing preferences use this experiment's Daylight default.
     class Settings
     {
         std::filesystem::path _file;
@@ -20,12 +20,12 @@ namespace OpenRCT2::Ui::Handheld::MenuThemes
             _loaded=true; _file=profile/"pocket-theme.cfg";
             std::ifstream in(_file);
             std::string name; std::getline(in,name);
-            PocketPalette::SetStyle(name=="slate"?PocketPalette::Style::slate:PocketPalette::Style::midway);
+            PocketPalette::SetStyle(name=="slate"?PocketPalette::Style::slate:PocketPalette::Style::daylight);
         }
         bool Toggle()
         {
             using namespace PocketPalette;
-            SetStyle(style==Style::midway?Style::slate:Style::midway);
+            SetStyle(style==Style::daylight?Style::slate:Style::daylight);
             std::error_code error;
             std::filesystem::create_directories(_file.parent_path(),error);
             if(error) return false;
@@ -34,7 +34,7 @@ namespace OpenRCT2::Ui::Handheld::MenuThemes
             if(status.type()!=std::filesystem::file_type::not_found || (error && error!=std::errc::no_such_file_or_directory)) return false;
             error.clear();
             std::ofstream out(pending,std::ios::trunc);
-            out<<(style==Style::midway?"midway\n":"slate\n");out.close();
+            out<<(style==Style::daylight?"daylight\n":"slate\n");out.close();
             bool success=bool(out);
             if(success){std::filesystem::rename(pending,_file,error);success=!error;}
             if(!success)std::filesystem::remove(pending,error);
@@ -44,6 +44,6 @@ namespace OpenRCT2::Ui::Handheld::MenuThemes
     inline Settings settings;
     inline std::string Choice()
     {
-        return PocketPalette::style==PocketPalette::Style::midway?"Theme: Midway":"Theme: Slate";
+        return PocketPalette::style==PocketPalette::Style::daylight?"Theme: Daylight":"Theme: Slate";
     }
 }

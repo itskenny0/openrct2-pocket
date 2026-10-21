@@ -37,7 +37,7 @@ namespace OpenRCT2::Ui::Handheld
             std::array<Drawing::PaletteIndex, 16> colours{};
         };
         static std::array<std::array<std::array<Ramp, 256>, 8>, 2> ramps;
-        auto& ramp = ramps[PocketPalette::style == PocketPalette::Style::midway ? 1 : 0][static_cast<size_t>(ink)][static_cast<uint8_t>(background)];
+        auto& ramp = ramps[PocketPalette::style == PocketPalette::Style::daylight ? 1 : 0][static_cast<size_t>(ink)][static_cast<uint8_t>(background)];
         if (!ramp.ready)
         {
             const auto* palette = GfxGetG1Palette(SPR_GAME_DEFAULT_PALETTE);
@@ -114,7 +114,13 @@ namespace OpenRCT2::Ui::Handheld
         // Localised names and native error formatting keep the complete engine fallback.
         if (std::any_of(text.begin(), text.end(), [](unsigned char c) { return c < 32 || c >= 127 || c == '{'; }))
         {
-            text = (ink == Ink::dark ? "{BLACK}" : ink == Ink::gold ? "{YELLOW}" : "{WHITE}") + text;
+            // Localised currency and names use native glyphs too. Match the
+            // light theme's ink polarity instead of forcing white on ivory.
+            const char* nativeInk = PocketPalette::style == PocketPalette::Style::daylight
+                ? (ink == Ink::dark ? "{WHITE}" : ink == Ink::destructive ? "{RED}"
+                    : ink == Ink::positive ? "{GREEN}" : "{BLACK}")
+                : (ink == Ink::dark ? "{BLACK}" : ink == Ink::gold ? "{YELLOW}" : "{WHITE}");
+            text = nativeInk + text;
             if (maxWidth > 0)
                 drawTextEllipsised(rt, pos, maxWidth, text, paint);
             else
