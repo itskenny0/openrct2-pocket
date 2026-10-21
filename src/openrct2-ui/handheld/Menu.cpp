@@ -21,6 +21,7 @@
 #include "MarketingManagement.h"
 #include "Mazes.h"
 #include "Panel.h"
+#include "MenuThemes.h"
 #include "ParkOverview.h"
 #include "ParkMap.h"
 #include "ParkInformation.h"
@@ -1564,7 +1565,7 @@ namespace OpenRCT2::Ui::Windows
                 case Page::park:
                     return { "Resume park",   "Build",     "Park dashboard",      "Save park",
                              "Save and quit", "Load park", "Quit...", "Controls...",
-                             simulationChoice(0), simulationChoice(1), simulationChoice(2), simulationChoice(3) };
+                             simulationChoice(0), simulationChoice(1), simulationChoice(2), simulationChoice(3), Handheld::MenuThemes::Choice() };
                 case Page::quitChoice:
                     return { "Save and quit", "Quit without saving...", "Cancel" };
                 case Page::controls:
@@ -3763,6 +3764,12 @@ namespace OpenRCT2::Ui::Windows
                             break;
                         case 7:
                             page(Page::controls);
+                            break;
+                        case 12:
+                            Handheld::MenuThemes::settings.Load(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user));
+                            _status = Handheld::MenuThemes::settings.Toggle()
+                                ? "Theme changed" : "Theme changed for this session; preference could not be saved";
+                            invalidate();
                             break;
                         case 8: case 9: case 10: case 11:
                             chooseSimulation(static_cast<uint8_t>(choice - 8));
@@ -5995,6 +6002,8 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
+            Handheld::MenuThemes::settings.Load(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user));
+            Handheld::Theme::Refresh();
             _menuFeel.Observe(scrollKey(), _focus.index() + (_dashboard.index() << 16));
             Handheld::MenuFeelScope buttonMotion(_menuFeel);
             Handheld::ListScrollScope listMotion(_scrollViews[scrollKey()]);

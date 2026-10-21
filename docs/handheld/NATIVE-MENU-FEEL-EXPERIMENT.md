@@ -50,3 +50,43 @@ verification has been performed for this trial. The stable installed package and
 `handheld/modern-ui-paths` branch are unchanged. Preview downloads are visual
 review artifacts, not an installable device update. Motion, icon size and contrast
 still need judgment on the actual 2x-scaled Brick display before integration.
+
+## Midway / Slate theme trial
+
+The same experiment now has a theme choice at the end of the pause menu.
+A switches between Midway and Slate in place; B returns through the existing
+menu flow. Midway is the experiment default. Slate retains the original colors
+alongside the accepted native artwork and motion. Earlier actions keep their
+indices and bindings. Selecting a theme preserves focus, pause ownership, cash,
+park state and the current tool.
+
+Midway uses native palette entries: purple panel 154, raised button 156,
+lavender selection 164, turquoise focus 199, pale text 165 and yellow accent 55.
+The original indexed palette makes the purple more saturated than a muted RGB
+plum. These are real native colors, not a recolored screenshot; world graphics,
+object colors and global palette entries are unchanged.
+
+The preference is stored separately as `pocket-theme.cfg` in the existing user
+profile. It is outside park saves and the native configuration. Missing or
+unknown names use Midway. Complete preference writes are staged and renamed;
+a failed write retains the previous preference and the active theme remains
+usable for the session with an explicit status message. Text antialiasing caches
+are separate per theme to avoid stale text colors after switching.
+
+Validation for this follow-up:
+
+- Native x86-64 application rebuilt successfully.
+- All nine standalone tests passed, including new preference persistence,
+  unknown-name fallback and failed-write preservation checks.
+- EverydayControlsTests, PathCursorTests, RideFlowTests and BrickAuditTests
+  passed with Midway; captures include native park graphics at 512x384.
+- Actual SDL virtual-controller navigation selected the theme, switched back
+  using the retained focus, reloaded the preference, and returned with original
+  simulation state and money. Both themes retain the single-row footer.
+- RideFlowTests also passed with a saved Slate preference. Its stat panel and
+  text pixels match the earlier Slate native-menu-feel capture exactly, checking
+  the original colors and text rendering after introducing theme selection.
+- A nine-second native motion recording shows the Midway Build and ride tabs.
+
+This remains a visual experiment, not an installed Brick update. No new ARM/
+QEMU or physical-device testing is claimed. The stable branch is unchanged.

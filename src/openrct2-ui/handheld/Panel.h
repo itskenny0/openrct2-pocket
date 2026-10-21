@@ -26,15 +26,27 @@ namespace OpenRCT2::Ui::Handheld
     // The palette has no continuous RGB navy ramp, so combine ink blue with slate edges.
     namespace Theme
     {
-        inline constexpr Drawing::PaletteIndex ink = static_cast<Drawing::PaletteIndex>(PocketPalette::panel);
-        inline constexpr Drawing::PaletteIndex body = static_cast<Drawing::PaletteIndex>(10);
-        inline constexpr Drawing::PaletteIndex raised = static_cast<Drawing::PaletteIndex>(13);
-        inline constexpr Drawing::PaletteIndex edge = static_cast<Drawing::PaletteIndex>(14);
-        inline constexpr Drawing::PaletteIndex highlight = static_cast<Drawing::PaletteIndex>(17);
-        inline constexpr Drawing::PaletteIndex gold = static_cast<Drawing::PaletteIndex>(PocketPalette::selection);
-        inline constexpr Drawing::PaletteIndex goldLight = static_cast<Drawing::PaletteIndex>(20);
-        inline constexpr Drawing::PaletteIndex goldShadow = static_cast<Drawing::PaletteIndex>(16);
-        inline constexpr Drawing::PaletteIndex text = static_cast<Drawing::PaletteIndex>(20);
+        inline Drawing::PaletteIndex ink = static_cast<Drawing::PaletteIndex>(PocketPalette::panel);
+        inline Drawing::PaletteIndex body = static_cast<Drawing::PaletteIndex>(PocketPalette::body);
+        inline Drawing::PaletteIndex raised = static_cast<Drawing::PaletteIndex>(PocketPalette::raised);
+        inline Drawing::PaletteIndex edge = static_cast<Drawing::PaletteIndex>(PocketPalette::edge);
+        inline Drawing::PaletteIndex highlight = static_cast<Drawing::PaletteIndex>(PocketPalette::highlight);
+        inline Drawing::PaletteIndex gold = static_cast<Drawing::PaletteIndex>(PocketPalette::selection);
+        inline Drawing::PaletteIndex goldLight = static_cast<Drawing::PaletteIndex>(PocketPalette::selectionLight);
+        inline Drawing::PaletteIndex goldShadow = static_cast<Drawing::PaletteIndex>(PocketPalette::shadow);
+        inline Drawing::PaletteIndex text = static_cast<Drawing::PaletteIndex>(PocketPalette::secondary);
+        inline void Refresh()
+        {
+            ink = static_cast<Drawing::PaletteIndex>(PocketPalette::panel);
+            body = static_cast<Drawing::PaletteIndex>(PocketPalette::body);
+            raised = static_cast<Drawing::PaletteIndex>(PocketPalette::raised);
+            edge = static_cast<Drawing::PaletteIndex>(PocketPalette::edge);
+            highlight = static_cast<Drawing::PaletteIndex>(PocketPalette::highlight);
+            gold = static_cast<Drawing::PaletteIndex>(PocketPalette::selection);
+            goldLight = static_cast<Drawing::PaletteIndex>(PocketPalette::selectionLight);
+            goldShadow = static_cast<Drawing::PaletteIndex>(PocketPalette::shadow);
+            text = static_cast<Drawing::PaletteIndex>(PocketPalette::secondary);
+        }
     } // namespace Theme
 
     inline void Fill(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, Drawing::PaletteIndex colour)

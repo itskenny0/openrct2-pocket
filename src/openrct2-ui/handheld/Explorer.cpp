@@ -18,6 +18,8 @@
 #include "Hud.h"
 #include "Mazes.h"
 #include "Panel.h"
+#include "MenuThemes.h"
+#include <openrct2/PlatformEnvironment.h>
 #include "Paths.h"
 #include "RideAccess.h"
 #include "RightsTools.h"
@@ -1554,6 +1556,8 @@ namespace OpenRCT2::Ui::Handheld
 
     void DrawExplorer(Drawing::RenderTarget& rt)
     {
+        MenuThemes::settings.Load(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user));
+        Theme::Refresh();
         if (!IsEnabled() || !CanExplore())
             return;
         using namespace Drawing;

@@ -36,8 +36,8 @@ namespace OpenRCT2::Ui::Handheld
             bool ready{};
             std::array<Drawing::PaletteIndex, 16> colours{};
         };
-        static std::array<std::array<Ramp, 256>, 8> ramps;
-        auto& ramp = ramps[static_cast<size_t>(ink)][static_cast<uint8_t>(background)];
+        static std::array<std::array<std::array<Ramp, 256>, 8>, 2> ramps;
+        auto& ramp = ramps[PocketPalette::style == PocketPalette::Style::midway ? 1 : 0][static_cast<size_t>(ink)][static_cast<uint8_t>(background)];
         if (!ramp.ready)
         {
             const auto* palette = GfxGetG1Palette(SPR_GAME_DEFAULT_PALETTE);
@@ -51,7 +51,7 @@ namespace OpenRCT2::Ui::Handheld
                 : ink == Ink::positive ? PocketPalette::positive
                 : ink == Ink::muted                      ? PocketPalette::secondary
                 : ink == Ink::dark                       ? PocketPalette::dark
-                : ink == Ink::gold                       ? PocketPalette::selection
+                : ink == Ink::gold                       ? PocketPalette::accent
                                                          : PocketPalette::primary;
             const auto fg = palette->palette[foreground - palette->startIndex];
             for (int a = 0; a < 16; ++a)

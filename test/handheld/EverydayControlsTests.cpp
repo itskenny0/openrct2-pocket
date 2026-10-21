@@ -9,6 +9,7 @@
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/handheld/Explorer.h>
+#include <openrct2-ui/handheld/MenuThemes.h>
 #include <openrct2-ui/handheld/PathBatch.h>
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/windows/Windows.h>
@@ -109,6 +110,21 @@ int main(int argc, char** argv)
         WindowGetMain()->savedViewPos = viewport->viewPos;
         auto menu = [&] { return wm->FindByClass(WindowClass::handheldMenu); };
         auto noDesktop = [&] { Check(!wm->FindByClass(WindowClass::savePrompt), "Desktop quit prompt opened"); };
+        // Real virtual-controller theme selection retains focus, pause and cash.
+        gGamePaused=0;const auto themeCash=state.park.cash;
+        W::HandheldMenuOpen();nav(12);capture("00a-midway-choice.png");
+        const auto originalTheme=H::PocketPalette::style;
+        press(H::Action::confirm);
+        Check(H::PocketPalette::style!=originalTheme,"Theme action did not switch");
+        capture("00b-slate-choice.png");
+        press(H::Action::confirm); // same focused row switches back
+        Check(H::PocketPalette::style==originalTheme,"Theme focus or round trip lost");
+        capture("00c-midway-restored.png");
+        H::MenuThemes::Settings reloaded;
+        reloaded.Load(context->GetPlatformEnvironment().GetDirectoryPath(DirBase::user));
+        Check(H::PocketPalette::style==originalTheme,"Theme preference did not survive reload");
+        press(H::Action::back);
+        Check(gGamePaused==0 && state.park.cash==themeCash,"Theme altered simulation or money");
         // B preserves the state before entry, including external native reasons.
         for (int initial : std::array<int, 4>{0, GAME_PAUSED_NORMAL, GAME_PAUSED_MODAL, GAME_PAUSED_NORMAL | GAME_PAUSED_MODAL}) {
             gGamePaused = initial; W::HandheldMenuOpen(); press(H::Action::back);
