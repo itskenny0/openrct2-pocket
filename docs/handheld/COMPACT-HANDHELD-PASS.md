@@ -73,3 +73,25 @@ remain unverified. This pass does not produce an AArch64 package or perform
 ARM/QEMU checks. Dense real parks, translations/mod objects and every simulation
 state have not all been played; this report does not certify every page as
 fully polished.
+
+## Verified results
+
+Native GUI build: PASS. Nine native initialized suites: PASS — FriendlyUiTests,
+DesignSubstitutionTests, SceneryPathParityTests, SelectedTrackEditingTests,
+BrickAuditTests, RideFlowTests, EverydayControlsTests, ManagementUxTests and
+PeopleUxTests. These retain real native placement/accounting, ghost cleanup,
+lamps, cancellation/failures/partial outcomes, save/reload, quit/speed handling,
+coaster editing and management regression coverage. EverydayControlsTests
+includes mapped SDL virtual-controller events; other journeys use production
+controller dispatch frames.
+
+The exact FriendlyUiTests binary also passed with the saved Slate theme. All
+nine standalone CTest checks and whitespace validation passed. Representative
+captures show open and connected station track, non-station track, each short
+settings group and the saved-design check. Captures are real 512x384 engine
+frames with original graphics, not mockups or physical-device photographs.
+
+Source implementation checkpoint:
+`6c9ecd3aa4b93a377abea98b392b0ee27ad0680b`. The following verification note changes
+no executable source. See the saved screenshot/verification bundle for logs and
+image context.
