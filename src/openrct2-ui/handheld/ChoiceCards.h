@@ -41,20 +41,21 @@ namespace OpenRCT2::Ui::Handheld
         const int cellWidth = (width - 18) / static_cast<int>(columns);
         for (size_t i = 0; i < cards.size(); ++i)
         {
-            const auto cell = p + ScreenCoordsXY{10 + static_cast<int>(i % columns) * cellWidth,
+            auto cell = p + ScreenCoordsXY{10 + static_cast<int>(i % columns) * cellWidth,
                 40 + static_cast<int>(i / columns) * pitch};
             const auto& card = cards[i];
             const bool focused = selected == card.action;
-            DrawCard(rt, cell, {cellWidth - 6, pitch - 6}, focused);
-            const auto icon = cell + ScreenCoordsXY{(cellWidth - 30) / 2, 6};
+            const int press = ButtonPressOffset(focused);
+            cell.y += press;
+            DrawCard(rt, cell, {cellWidth - 6, pitch - 6 - press}, focused, true);
+            const int artSize = std::clamp(pitch - 40, 20, 38);
+            const auto icon = cell + ScreenCoordsXY{(cellWidth - 6 - artSize) / 2, 4};
             if (card.sprite)
             {
-                Drawing::RenderTarget clipped;
-                if (ClipRenderTarget(clipped, rt, icon, 26, 26))
-                    GfxDrawSprite(clipped, ImageId(card.sprite), {0, 0});
+                DrawNativeMenuArt(rt, icon, { artSize, artSize }, { card.sprite }, focused);
             }
-            else DrawIcon(rt, icon, card.icon, focused);
-            DrawWrappedLabel(rt, cell + ScreenCoordsXY{7, 28}, cellWidth - 20,
+            else DrawIcon(rt, icon + ScreenCoordsXY{ artSize / 2 - 8, artSize / 2 - 8 }, card.icon, focused);
+            DrawWrappedLabel(rt, cell + ScreenCoordsXY{7, artSize + 8}, cellWidth - 20,
                 std::string(focused ? "{BLACK}" : "{WHITE}") + card.label, 2);
         }
         const auto found = std::find_if(cards.begin(), cards.end(), [&](const auto& c) {return c.action == selected;});

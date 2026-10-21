@@ -3,6 +3,7 @@
 #include "ConceptStyle.h"
 #include "ModernText.h"
 #include "ListScroll.h"
+#include "NativeMenuArt.h"
 
 #include <array>
 #include <cmath>
@@ -43,10 +44,10 @@ namespace OpenRCT2::Ui::Handheld
     }
 
     // Five-pixel rounded corners and quiet single-line edges, at native resolution.
-    inline void DrawCard(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, bool selected = false)
+    inline void DrawCard(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, bool selected = false, bool button = false)
     {
-        const auto edge = selected ? Theme::goldShadow : Theme::edge;
-        const auto face = selected ? Theme::gold : Theme::ink;
+        const auto edge = selected ? static_cast<Drawing::PaletteIndex>(PocketPalette::positive) : Theme::edge;
+        const auto face = selected ? Theme::gold : button ? Theme::raised : Theme::ink;
         Fill(rt, pos + ScreenCoordsXY{ 5, 0 }, { size.width - 10, size.height }, edge);
         Fill(rt, pos + ScreenCoordsXY{ 2, 2 }, { size.width - 4, size.height - 4 }, edge);
         Fill(rt, pos + ScreenCoordsXY{ 0, 5 }, { size.width, size.height - 10 }, edge);
@@ -54,6 +55,14 @@ namespace OpenRCT2::Ui::Handheld
         Fill(rt, pos + ScreenCoordsXY{ 3, 3 }, { size.width - 6, size.height - 6 }, face);
         Fill(rt, pos + ScreenCoordsXY{ 1, 5 }, { size.width - 2, size.height - 10 }, face);
         Fill(rt, pos + ScreenCoordsXY{ 5, 1 }, { size.width - 10, 1 }, selected ? Theme::goldLight : Theme::highlight);
+        if (button)
+            Fill(rt, pos + ScreenCoordsXY{ 5, size.height - 2 }, { size.width - 10, 1 }, Theme::goldShadow);
+        if (selected && activeMenuFeel)
+        {
+            const int accentWidth = std::max(2, (size.width - 10) * activeMenuFeel->FocusPercent() / 100);
+            Fill(rt, pos + ScreenCoordsXY{ (size.width - accentWidth) / 2, size.height - 2 },
+                { accentWidth, 1 }, static_cast<Drawing::PaletteIndex>(PocketPalette::positive));
+        }
 
     }
 
@@ -85,6 +94,26 @@ namespace OpenRCT2::Ui::Handheld
     {
         if (icon == PanelIcon::none)
             return;
+        NativeMenuArt art;
+        switch (icon)
+        {
+            case PanelIcon::play: art = { SPR_TAB_RIDE_0, 16 }; break;
+            case PanelIcon::terrain: art = { SPR_G2_TAB_LAND }; break;
+            case PanelIcon::save: art = { SPR_FLOPPY }; break;
+            case PanelIcon::exit: art = { SPR_MENU_EXIT }; break;
+            case PanelIcon::folder: art = { SPR_G2_FOLDER }; break;
+            case PanelIcon::back: art = { SPR_PREVIOUS }; break;
+            case PanelIcon::raise: art = { SPR_G2_ARROW_UP }; break;
+            case PanelIcon::lower: art = { SPR_G2_ARROW_DOWN }; break;
+            case PanelIcon::path: art = { SPR_G2_BUTTON_FOOTPATH }; break;
+            case PanelIcon::remove: art = { SPR_DEMOLISH }; break;
+            case PanelIcon::tree: art = { SPR_G2_BUTTON_TREES }; break;
+            case PanelIcon::largeScenery: art = { SPR_G2_BUTTON_LARGE_SCENERY }; break;
+            case PanelIcon::walls: art = { SPR_G2_BUTTON_WALLS }; break;
+            case PanelIcon::furniture: art = { SPR_G2_BUTTON_PATH_ADDITIONS }; break;
+            default: break;
+        }
+        if (DrawNativeMenuArt(rt, pos + ScreenCoordsXY{ -4, -4 }, { 24, 24 }, art, selected)) return;
         if (icon == PanelIcon::largeScenery || icon == PanelIcon::walls || icon == PanelIcon::furniture)
         {
             const auto sprite = icon == PanelIcon::largeScenery ? SPR_G2_BUTTON_LARGE_SCENERY
@@ -144,17 +173,16 @@ namespace OpenRCT2::Ui::Handheld
     inline void DrawIconRow(
         Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t width, const std::string& label, bool selected, PanelIcon icon)
     {
-        if (selected)
-            DrawCard(rt, pos, { width, 28 }, true);
-        else
-            Fill(rt, pos + ScreenCoordsXY{ 5, 27 }, { width - 10, 1 }, Theme::raised);
-        if (icon == PanelIcon::terrain)
-            GfxDrawSprite(rt, ImageId(SPR_G2_TAB_LAND), pos + ScreenCoordsXY{ 3, 0 });
-        else
-            DrawIcon(rt, pos + ScreenCoordsXY{ 8, 6 }, icon, selected);
+        const int press = ButtonPressOffset(selected);
+        pos.y += press;
+        DrawCard(rt, pos, { width, 28 - press }, selected, true);
+        const auto art = ActionArt(label);
+        const bool native = DrawNativeMenuArt(rt, pos + ScreenCoordsXY{ 5, 2 }, { 26, 24 }, art, selected);
+        if (!native) DrawIcon(rt, pos + ScreenCoordsXY{ 8, 6 }, icon, selected);
+        const bool illustrated = native || icon != PanelIcon::none;
         DrawModernEllipsised(
-            rt, pos + ScreenCoordsXY{ icon == PanelIcon::none ? 12 : 39, 9 },
-            width - (icon == PanelIcon::none ? 26 : 53), (selected ? "{BLACK}" : "{WHITE}") + label,
+            rt, pos + ScreenCoordsXY{ illustrated ? 39 : 12, 9 },
+            width - (illustrated ? 53 : 26), (selected ? "{BLACK}" : "{WHITE}") + label,
             { Drawing::Colour::white });
         if (selected)
             DrawModernText(rt, pos + ScreenCoordsXY{ width - 11, 9 }, "{BLACK}>", { Drawing::Colour::white });
@@ -271,16 +299,18 @@ namespace OpenRCT2::Ui::Handheld
         Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& title, const std::string& subtitle,
         bool focused, bool enabled = true, PanelIcon icon = PanelIcon::none, bool destructive = false)
     {
-        Fill(rt, p, size, focused ? Theme::gold : Theme::ink);
-        if (focused)
-            Fill(rt, p, {3, size.height}, Theme::text);
-        else
-            Fill(rt, p + ScreenCoordsXY{0, size.height - 1}, {size.width, 1}, Theme::raised);
+        const int press = ButtonPressOffset(focused);
+        p.y += press;
+        size.height -= press;
+        if (enabled) DrawCard(rt, p, size, focused, true);
+        else Fill(rt, p, size, Theme::ink);
         const auto colour = focused ? "{BLACK}" : enabled ? destructive ? "{DANGER}" : "{WHITE}" : "{DISABLED}";
         if (destructive)
             Fill(rt, p, { 3, size.height }, static_cast<Drawing::PaletteIndex>(PocketPalette::destructive));
-        const int inset = icon == PanelIcon::none ? 10 : 36;
-        DrawIcon(rt, p + ScreenCoordsXY{9, 8}, icon, focused);
+        const bool native = DrawNativeMenuArt(rt, p + ScreenCoordsXY{ 5, (size.height - 24) / 2 },
+            { 26, 24 }, ActionArt(title), focused && enabled);
+        const int inset = native || icon != PanelIcon::none ? 36 : 10;
+        if (!native) DrawIcon(rt, p + ScreenCoordsXY{9, 8}, icon, focused);
         DrawStrongText(
             rt, p + ScreenCoordsXY{ inset, subtitle.empty() || size.height < 34 ? (size.height - 12) / 2 + 3 : 8 },
             std::string(colour) + title, size.width - inset - 22);
@@ -320,9 +350,11 @@ namespace OpenRCT2::Ui::Handheld
         for (size_t i = 0; i < labels.size(); ++i)
         {
             const auto tabPos = pos + ScreenCoordsXY{ static_cast<int32_t>(i) * tabWidth, 0 };
-            DrawCard(rt, tabPos, { tabWidth - 3, 28 }, i == selected);
+            DrawCard(rt, tabPos, { tabWidth - 3, 28 }, i == selected, true);
+            const bool native = DrawNativeMenuArt(rt, tabPos + ScreenCoordsXY{ 4, 2 }, { 28, 24 }, TabArt(labels[i]), i == selected);
+            const int inset = native ? 36 : 9;
             DrawModernEllipsised(
-                rt, tabPos + ScreenCoordsXY{ 9, 9 }, tabWidth - 21, (i == selected ? "{BLACK}" : "{WHITE}") + labels[i],
+                rt, tabPos + ScreenCoordsXY{ inset, 9 }, tabWidth - inset - 9, (i == selected ? "{BLACK}" : "{WHITE}") + labels[i],
                 { Drawing::Colour::white });
         }
     }

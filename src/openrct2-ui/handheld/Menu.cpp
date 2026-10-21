@@ -536,6 +536,7 @@ namespace OpenRCT2::Ui::Windows
         size_t _ridesInspectFocus{};
         bool _rideFromPark{};
         std::map<std::string,Handheld::ListScroll> _scrollViews;
+        Handheld::MenuFeel _menuFeel;
         std::string scrollKey() const
         {
             return std::to_string(static_cast<int>(_page))+":"+std::to_string(_rideTabs.tab)+":"+
@@ -2264,6 +2265,8 @@ namespace OpenRCT2::Ui::Windows
         }
         void onUpdate() override
         {
+            _menuFeel.Observe(scrollKey(), _focus.index() + (_dashboard.index() << 16));
+            if (_menuFeel.NeedsDraw()) invalidate();
             if(_scrollViews[scrollKey()].moving())invalidate();
             if (_page == Page::sceneryPicker) { refreshPicker(); invalidate(); }
             if (_page == Page::parkMap) { _parkMap.Update(); invalidate(); }
@@ -3552,6 +3555,7 @@ namespace OpenRCT2::Ui::Windows
                 page(Page::ridesRoster);
                 return;
             }
+            _menuFeel.Press();
             auto choice = _focus.index();
             if(_page==Page::guestRoster) choice=choice<3 ? _guestRoster.size()+choice : choice==_guestRoster.size()+3 ? _guestRoster.size()+3 : choice-3;
             auto actionPage=_page;
@@ -5991,6 +5995,8 @@ namespace OpenRCT2::Ui::Windows
         }
         void onDraw(RenderTarget& rt) override
         {
+            _menuFeel.Observe(scrollKey(), _focus.index() + (_dashboard.index() << 16));
+            Handheld::MenuFeelScope buttonMotion(_menuFeel);
             Handheld::ListScrollScope listMotion(_scrollViews[scrollKey()]);
             if(_page==Page::staffUniform && _staffTarget) {
                 auto model=staffPresentation();model.breadcrumb="Staff / Uniform colour";

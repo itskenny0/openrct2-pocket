@@ -162,13 +162,8 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
             }
             static constexpr std::array sprites{SPR_G2_TAB_LAND, SPR_TAB_RIDE_0, SPR_TAB_GUESTS_0,
                 SPR_TAB_STAFF_OPTIONS_0, SPR_TAB_FINANCES_SUMMARY_0, SPR_TAB_FINANCES_RESEARCH_0, SPR_TAB_FINANCES_MARKETING_0};
-            if (const auto* sprite = GfxGetG1Element(sprites[i]); sprite && sprite->width > 0)
-            {
-                Drawing::RenderTarget iconTarget;
-                if (ClipRenderTarget(iconTarget, rt, rail + ScreenCoordsXY{8, y + 2}, 26, 32))
-                    GfxDrawSprite(iconTarget, ImageId(sprites[i]), {0, 0});
-            }
-            else
+            static constexpr std::array<uint8_t, 7> frames{ 1, 16, 8, 7, 8, 8, 19 };
+            if (!DrawNativeMenuArt(rt, rail + ScreenCoordsXY{ 7, y + 2 }, { 28, 32 }, { sprites[i], frames[i] }, focused))
                 DrawCategoryMark(rt, rail + ScreenCoordsXY{12, y + 7}, i, focused);
             DrawModernEllipsised(
                 rt, rail + ScreenCoordsXY{ 39, y + 13 }, railWidth - 45,
