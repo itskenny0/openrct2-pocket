@@ -1,5 +1,8 @@
 # Native handheld UI integration
 
+Current secondary-tool polish and verification: [FRIENDLY-TOOLS-PASS.md](FRIENDLY-TOOLS-PASS.md). Daylight/Slate and the existing ordinary-play fixes are preserved; physical Brick acceptance and a matching AArch64 package remain separate delivery work.
+
+
 Integrated into `handheld/modern-ui-paths` following acceptance on 2026-10-20.
 
 Accepted source: `5746fa4cf472666912b837e018622b946303abce` from

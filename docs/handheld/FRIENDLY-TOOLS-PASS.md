@@ -79,3 +79,24 @@ new AArch64 package and has not been physically tested on TrimUI Brick/NextUI.
 Device readability, crisp 2x presentation, input/motion timing, performance,
 audio and suspend remain hardware acceptance work. The installed binary changes
 only when a matching device build is delivered and installed.
+
+## Navigation follow-up
+
+The follow-up to `6b5256cd1eb3757f4135699542296e3cc7841705` guards disabled
+landscape controls against both A and Left/Right. Material buttons open the
+existing native visual catalog; Apply and B return to the correct caller, with
+settings focus restored. Direct park-tool catalog entry retains its original
+return. Brush diagrams retain rectangular proportions for larger footprints.
+Track readouts and saved-design details only advertise A when the focused row
+has an action; design screens use the shared single-row controller footer.
+
+The native GUI was rebuilt. FriendlyUiTests, SelectedTrackEditingTests,
+DesignSubstitutionTests and BrickAuditTests were rerun after this follow-up.
+FriendlyUiTests now checks disabled water-shape input, the visual material
+handoff and caller/focus restoration. Three saved-Slate suites passed for the
+first checkpoint (FriendlyUiTests, BrickAuditTests, PeopleUxTests); the final
+FriendlyUiTests binary was also run using the saved Slate preference.
+
+All nine standalone CTest checks passed: controller input, launcher, save
+preservation, file browsing, named saves, footer bounds, continuous scrolling,
+menu motion and theme persistence. Whitespace validation passed.

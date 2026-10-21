@@ -1,5 +1,8 @@
 > 2026-10-20 update: [EVERYDAY-CONTROLS.md](EVERYDAY-CONTROLS.md) records the native-tested ground-height/Line/Fill correction, selected-path additions, controller quit routing and direct simulation controls. Historical deferred path findings below remain as original evidence; physical Brick retesting remains open.
 
+Current secondary-tool polish and verification: [FRIENDLY-TOOLS-PASS.md](FRIENDLY-TOOLS-PASS.md). Daylight/Slate and the existing ordinary-play fixes are preserved; physical Brick acceptance and a matching AArch64 package remain separate delivery work.
+
+
 # Persistent UI polish backlog
 
 This is the authoritative repository backlog for final UI refinement. Historical

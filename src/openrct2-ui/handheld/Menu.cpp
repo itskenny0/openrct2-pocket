@@ -1195,7 +1195,11 @@ namespace OpenRCT2::Ui::Windows
             else if (x && _page == Page::rightsOptions)
                 Handheld::RightsTools::Configure(_focus.index(), x);
             else if (x && _page == Page::areaOptions)
-                Handheld::AreaTools::Configure(_focus.index(), x);
+            {
+                if(Handheld::ConstructionAdjust::TerrainEnabled(_focus.index()))
+                    Handheld::AreaTools::Configure(_focus.index(), x);
+                else _status="Fixed or unavailable for this tool";
+            }
             else if (x && _page == Page::sceneryClearOptions)
                 Handheld::SceneryClear::Configure(_focus.index(), x);
             else if (x && _page == Page::sceneryStyleEditor && _focus.index() == 0 && _signStyle)
@@ -1474,7 +1478,7 @@ namespace OpenRCT2::Ui::Windows
                 || next==Page::ridesMaintenance || next==Page::ridesAppearance || next==Page::ridesMusic
                 || next==Page::shopAppearance || next==Page::designOptions || next==Page::designInspect
                 || next==Page::designWarnings || next==Page::designVehicles
-                || next==Page::trackBlock;
+                || next==Page::trackBlock || next==Page::areaOptions || next==Page::sceneryOptions;
             if (const auto count = rows().size(); restorePage && count && _pageRows.count(next))
                 _focus.move(static_cast<int>(std::min(_pageRows.at(next), count - 1)), count);
             if (next == Page::ridesPrice && _ridesDraft && _ridesDraft->setting
@@ -2046,9 +2050,10 @@ namespace OpenRCT2::Ui::Windows
         {
             page(Page::pathOptions);
         }
-        bool _terrainMaterialEdge{}, _sceneryPickerDirect{}, _pathSurfaceDirect{};
-        void openTerrainMaterialPicker(bool edge)
+        bool _terrainMaterialEdge{}, _terrainMaterialFromSettings{}, _sceneryPickerDirect{}, _pathSurfaceDirect{};
+        void openTerrainMaterialPicker(bool edge, bool fromSettings=false)
         {
+            _terrainMaterialFromSettings=fromSettings;
             _terrainMaterialEdge=edge;
             page(Page::terrainMaterialPicker);
             const auto entries=Handheld::TerrainMaterials::Entries(edge);
@@ -3046,7 +3051,10 @@ namespace OpenRCT2::Ui::Windows
                     DrawSurface(rt,{264,272},{240,76});
                     DrawWrappedLabel(rt,{276,288},216,model.rows[model.selected],3);
                 }
-                DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Choose"},{"A","Select"},{"B",connections?"Piece":"Pieces"}});
+                std::vector<ControlHint> hints{{"D-pad",connections?"Read":"Choose"}};
+                if(!connections || model.selected+2>=model.rows.size()) hints.push_back({"A","Select"});
+                hints.push_back({"B",connections?"Piece":"Pieces"});
+                DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},hints);
             }
         }
         void move(int32_t direction)
@@ -3244,7 +3252,8 @@ namespace OpenRCT2::Ui::Windows
                     page(Page::shop);
                     break;
                 case Page::terrainMaterialPicker:
-                    close();break;
+                    if(_terrainMaterialFromSettings) page(Page::areaOptions); else close();
+                    break;
                 case Page::pathSurfacePicker:
                     if (_pathSurfaceDirect) close();
                     else page(Page::pathOptions);
@@ -3730,7 +3739,10 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::terrainMaterialPicker:
-                    if (_picker.selected() && Handheld::TerrainMaterials::Select(_terrainMaterialEdge,_picker.selected()->identity)) close();
+                    if (_picker.selected() && Handheld::TerrainMaterials::Select(_terrainMaterialEdge,_picker.selected()->identity))
+                    {
+                        if(_terrainMaterialFromSettings) page(Page::areaOptions); else close();
+                    }
                     else {refreshPicker();_status="Material changed; select again";invalidate();}
                     break;
                 case Page::pathSurfacePicker:
@@ -4060,8 +4072,13 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::areaOptions:
-                    if (choice == 0)
-                        close();
+                    if (choice == 0) close();
+                    else if (!Handheld::ConstructionAdjust::TerrainEnabled(choice))
+                    {
+                        _status="Fixed or unavailable for this tool";
+                        invalidate();
+                    }
+                    else if (choice==5 || choice==6) openTerrainMaterialPicker(choice==6,true);
                     else
                     {
                         Handheld::AreaTools::Configure(choice);
@@ -6218,8 +6235,11 @@ namespace OpenRCT2::Ui::Windows
                 }
                 if (!_status.empty()) model.status=_status;
                 Handheld::DrawManagementContent(rt,{8,8},{496,348},model);
-                Handheld::Concept::Box(rt,{8,359},{496,25});
-                Handheld::DrawModernText(rt,{16,369},"D-pad Select / detail   A Choose   B Back",{},480);return;
+                std::vector<Handheld::ControlHint> hints{{"D-pad","Read"}};
+                if(_page==Page::designWarnings) hints.push_back({"Left/Right","Detail"});
+                if(_page==Page::designConfirm || model.selected+2>=model.rows.size()) hints.push_back({"A","Select"});
+                hints.push_back({"B","Back"});
+                Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},hints);return;
             }
             if(_page==Page::parkInspect || _page==Page::designInspect)
             {

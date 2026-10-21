@@ -1723,7 +1723,8 @@ namespace OpenRCT2::Ui::Handheld
                     : SceneryTools::Current().mode==SceneryTools::Mode::recolour ? "Paint" : "Place",
                     _constructionAdjust.active && ConstructionAdjust::PickerAction(_constructionAdjust,_sceneryTool),
                     _constructionAdjust.palette,
-                    _sceneryTool && _constructionAdjust.focus.tab==0 && _constructionAdjust.row==2);
+                    _sceneryTool && _constructionAdjust.focus.tab==0 && _constructionAdjust.row==2
+                        && ConstructionAdjust::SceneryEnabled(6));
             else if (_treeTool)
                 DrawTreeFooter(rt, { ContextGetWidth(), height });
             else if (_colourRide)

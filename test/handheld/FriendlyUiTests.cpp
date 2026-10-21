@@ -121,6 +121,13 @@ int main(int argc, char** argv)
         Check(H::AreaTools::settings.width==2 && H::AreaTools::settings.height==2,"Brush editor changed elevation instead of footprint");
         capture("01-landscape-adjust.png");
         press(H::Action::contextPrimary);W::HandheldMenuMove(3);capture("02-landscape-settings.png");
+        H::AreaTools::settings.operation=H::AreaTools::Operation::waterRaise;
+        W::HandheldMenuMove(1);const auto selection=H::AreaTools::settings.selection;
+        move(1,0);press(H::Action::confirm);
+        Check(H::AreaTools::settings.selection==selection,"Disabled water shape responded to input");
+        W::HandheldMenuMove(1);press(H::Action::confirm);Check(W::HandheldObjectPickerIsOpen(),"Landscape material did not open visual catalog");
+        press(H::Action::back);move(-1,0);
+        Check(H::AreaTools::settings.surface!=kObjectEntryIndexNull,"Material picker Back lost selected setting");
         press(H::Action::back);Check(!wm->FindByClass(WindowClass::handheldMenu),"Landscape settings lost caller");
         press(H::Action::back);H::EndTerrain();closeMenu();
 

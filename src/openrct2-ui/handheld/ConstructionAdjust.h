@@ -58,7 +58,8 @@ namespace OpenRCT2::Ui::Handheld::ConstructionAdjust
     }
     inline void DrawBrushFootprint(Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, int width, int depth)
     {
-        const int columns=std::min(width,8), rows=std::min(depth,8);
+        const int scale=std::max(1,(std::max(width,depth)+7)/8);
+        const int columns=(width+scale-1)/scale, rows=(depth+scale-1)/scale;
         const int cell=std::max(2,std::min(size.width/columns,size.height/rows));
         p += ScreenCoordsXY{(size.width-columns*cell)/2,(size.height-rows*cell)/2};
         for(int y=0;y<rows;++y) for(int x=0;x<columns;++x)
