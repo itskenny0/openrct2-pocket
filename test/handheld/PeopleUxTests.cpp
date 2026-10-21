@@ -130,6 +130,9 @@ int main(int argc, char** argv)
         W::HandheldMenuMove(-1);press(H::Action::confirm);GameActions::ProcessQueue(state);
         Check(S::Roster().size()==1&&state.park.cash==initialCash,"Native hire cost/duplicate protection changed");
         Check(sm().tabs.size()==4,"Hire did not open employee workspace");const auto employee=S::Roster().front();capture("03-employee-overview.png");
+        for(int i=0;i<3;++i)press(H::Action::nextOption);
+        capture("03a-employee-details.png");
+        for(int i=0;i<3;++i)press(H::Action::previousOption);
         press(H::Action::nextOption);const auto baseline=S::Resolve(employee)->staffOrders;press(H::Action::confirm);
         Check(S::Resolve(employee)->staffOrders==baseline,"Duties draft changed native orders");Check(sm().headerStatus=="Unsaved duties"&&sm().headerInk=="{CAUTION}","Duty draft not visibly unsaved");capture("04-employee-duties.png");
         const auto dutyFocus = sm().selected;

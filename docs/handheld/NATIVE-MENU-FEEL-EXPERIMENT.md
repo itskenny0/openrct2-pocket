@@ -129,3 +129,11 @@ post-review fixes: bounded two-line Build labels, readable narrow tabs,
 uniform heading, guest warnings, unavailable actions, native graph/currency
 contrast, full keyboard labels and contained construction hints. The accepted
 palette/artwork and stable branch are preserved.
+
+
+## Native sprite coverage follow-up
+
+[NATIVE-SPRITE-COVERAGE-PASS.md](NATIVE-SPRITE-COVERAGE-PASS.md) records added
+native staff/guest/ride/park/finance/research artwork, section-aware tab icons,
+full-label space checks, roster-name isolation and native navigation validation.
+The accepted palette and existing control routes remain unchanged.

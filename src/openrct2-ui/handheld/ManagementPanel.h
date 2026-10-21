@@ -103,7 +103,7 @@ namespace OpenRCT2::Ui::Handheld
                                                         : PocketPalette::caution));
         if (!model.headerStatus.empty()) DrawStrongText(rt,p+ScreenCoordsXY{width-138,13},model.headerInk+model.headerStatus,126);
         const int contentTop = model.tabs.empty() ? 64 : 98;
-        if (!model.tabs.empty()) DrawTabs(rt,p+ScreenCoordsXY{10,62},width-20,model.tabs,model.selectedTab);
+        if (!model.tabs.empty()) DrawTabs(rt,p+ScreenCoordsXY{10,62},width-20,model.tabs,model.selectedTab,model.breadcrumb);
         DrawHeadingText(rt, p + ScreenCoordsXY{12, 29},
             std::string(model.destructive ? "{DANGER}" : model.confirmation ? "{GOLD}" : "{WHITE}") + model.title, width - 24);
         Fill(rt, p + ScreenCoordsXY{12, 55}, {width - 24, 1}, Theme::edge);
@@ -218,7 +218,7 @@ namespace OpenRCT2::Ui::Handheld
                 DrawActionRow(
                     listRt, ScreenCoordsXY{ x, y }, { cellWidth - 4, rowHeight - 2 }, model.rows[i],
                     i < model.rowDetails.size() ? model.rowDetails[i] : "", focused && i == model.selected, enabled,
-                    PanelIcon::none, model.destructive && i == 0);
+                    PanelIcon::none, model.destructive && i == 0, !model.rosterCards && !model.denseRoster);
         }
         }
         // Feedback and overflow have independent lines, so failures never hide pagination.

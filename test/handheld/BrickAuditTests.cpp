@@ -112,6 +112,35 @@ int main(int argc, char** argv)
             const auto* bytes=reinterpret_cast<uint8_t*>(rt.bits);image.Pixels.assign(bytes,bytes+rt.LineStride()*rt.height);
             Imaging::WriteToFile((std::filesystem::path(folder)/name).string(),image,ImageFormat::png);engine.EndDraw();};
 
+        // These are loaded native sprite families, not generated artwork.
+        // Check every animation frame, plus real text rendering when an icon
+        // would otherwise consume the space needed for the full action label.
+        {
+            for(const auto art:{H::TabArt("Thoughts"),H::TabArt("Patrol"),H::TabArt("Details","Park / Guests"),
+                H::TabArt("Overview","Park / Finances"),H::TabArt("Objectives"),H::TabArt("Project"),
+                H::ActionArt("Pick up..."),H::ActionArt("Tracking: On..."),H::ActionArt("Maintenance..."),
+                H::ActionArt("Sweep paths  On"),H::ActionArt("Park news..."),H::ActionArt("Read objectives")})
+            {
+                Check(art.sprite!=0,"Native menu sprite mapping missing");
+                for(uint8_t frame=0;frame<art.frames;++frame) {
+                    const auto* sprite=GfxGetG1Element(art.sprite+frame);
+                    Check(sprite && sprite->width>0 && sprite->height>0,"Native menu animation frame missing");
+                }
+            }
+            Drawing::X8DrawingEngine engine(context->GetUiContext());engine.Resize(280,80);engine.BeginDraw();
+            auto& rt=*engine.getRT();H::Theme::Refresh();
+            H::Fill(rt,{0,0},{280,80},H::Theme::raised);
+            H::DrawActionRow(rt,{20,20},{190,28},"Place entrance / exit...","",false);
+            std::vector<Drawing::PaletteIndex> label;
+            const int textWidth=H::TextWidth("Place entrance / exit...",true);
+            for(int y=28;y<44;++y)for(int x=30;x<30+textWidth;++x)label.push_back(rt.bits[y*rt.LineStride()+x]);
+            H::Fill(rt,{0,0},{280,80},H::Theme::raised);
+            H::DrawStrongText(rt,{30,31},"{WHITE}Place entrance / exit...");
+            size_t pixel=0;
+            for(int y=28;y<44;++y)for(int x=30;x<30+textWidth;++x)
+                Check(label[pixel++]==rt.bits[y*rt.LineStride()+x],"Native artwork shortened or moved a full action label");
+            engine.EndDraw();
+        }
         // Render compact two-line cards against a sentinel to detect drawing
         // outside the button, including selected and pressed states.
         {

@@ -189,9 +189,10 @@ namespace OpenRCT2::Ui::Handheld
         pos.y += press;
         DrawCard(rt, pos, { width, 28 - press }, selected, true);
         const auto art = ActionArt(label);
-        const bool native = DrawNativeMenuArt(rt, pos + ScreenCoordsXY{ 5, 2 }, { 26, 24 }, art, selected);
-        if (!native) DrawIcon(rt, pos + ScreenCoordsXY{ 8, 6 }, icon, selected);
-        const bool illustrated = native || icon != PanelIcon::none;
+        const bool roomForArt = TextWidth(label) + 53 <= width;
+        const bool native = roomForArt && DrawNativeMenuArt(rt, pos + ScreenCoordsXY{ 5, 2 }, { 26, 24 }, art, selected);
+        if (!native && roomForArt) DrawIcon(rt, pos + ScreenCoordsXY{ 8, 6 }, icon, selected);
+        const bool illustrated = native || (roomForArt && icon != PanelIcon::none);
         DrawModernEllipsised(
             rt, pos + ScreenCoordsXY{ illustrated ? 39 : 12, 9 },
             width - (illustrated ? 53 : 26), (selected ? "{BLACK}" : "{WHITE}") + label,
@@ -309,7 +310,7 @@ namespace OpenRCT2::Ui::Handheld
 
     inline void DrawActionRow(
         Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& title, const std::string& subtitle,
-        bool focused, bool enabled = true, PanelIcon icon = PanelIcon::none, bool destructive = false)
+        bool focused, bool enabled = true, PanelIcon icon = PanelIcon::none, bool destructive = false, bool allowNativeArt = true)
     {
         const int press = ButtonPressOffset(focused);
         p.y += press;
@@ -319,10 +320,11 @@ namespace OpenRCT2::Ui::Handheld
         const auto colour = !enabled ? "{DISABLED}" : focused ? "{BLACK}" : destructive ? "{DANGER}" : "{WHITE}";
         if (destructive)
             Fill(rt, p, { 3, size.height }, static_cast<Drawing::PaletteIndex>(PocketPalette::destructive));
-        const bool native = DrawNativeMenuArt(rt, p + ScreenCoordsXY{ 5, (size.height - 24) / 2 },
+        const bool roomForArt = allowNativeArt && TextWidth(title, true) + 58 <= size.width;
+        const bool native = roomForArt && DrawNativeMenuArt(rt, p + ScreenCoordsXY{ 5, (size.height - 24) / 2 },
             { 26, 24 }, ActionArt(title), focused && enabled);
-        const int inset = native || icon != PanelIcon::none ? 36 : 10;
-        if (!native) DrawIcon(rt, p + ScreenCoordsXY{9, 8}, icon, focused);
+        const int inset = native || (roomForArt && icon != PanelIcon::none) ? 36 : 10;
+        if (!native && roomForArt) DrawIcon(rt, p + ScreenCoordsXY{9, 8}, icon, focused);
         DrawStrongText(
             rt, p + ScreenCoordsXY{ inset, subtitle.empty() || size.height < 34 ? (size.height - 12) / 2 + 3 : 8 },
             std::string(colour) + title, size.width - inset - 22);
@@ -354,7 +356,7 @@ namespace OpenRCT2::Ui::Handheld
     }
 
     inline void DrawTabs(
-        Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t width, const std::vector<std::string>& labels, size_t selected)
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t width, const std::vector<std::string>& labels, size_t selected, std::string_view context = {})
     {
         if (labels.empty())
             return;
@@ -364,7 +366,7 @@ namespace OpenRCT2::Ui::Handheld
             const auto tabPos = pos + ScreenCoordsXY{ static_cast<int32_t>(i) * tabWidth, 0 };
             DrawCard(rt, tabPos, { tabWidth - 3, 28 }, i == selected, true);
             const bool showArt = TextWidth(labels[i]) + 45 <= tabWidth;
-            const bool native = showArt && DrawNativeMenuArt(rt, tabPos + ScreenCoordsXY{ 4, 2 }, { 28, 24 }, TabArt(labels[i]), i == selected);
+            const bool native = showArt && DrawNativeMenuArt(rt, tabPos + ScreenCoordsXY{ 4, 2 }, { 28, 24 }, TabArt(labels[i], context), i == selected);
             const int inset = native ? 36 : 9;
             DrawModernEllipsised(
                 rt, tabPos + ScreenCoordsXY{ inset, 9 }, tabWidth - inset - 9, (i == selected ? "{BLACK}" : "{WHITE}") + labels[i],
