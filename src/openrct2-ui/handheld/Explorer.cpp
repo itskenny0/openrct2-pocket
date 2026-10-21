@@ -665,6 +665,8 @@ namespace OpenRCT2::Ui::Handheld
             for (const auto action : frame.actions)
             {
                 if ((action==Action::previousOption || action==Action::nextOption)
+                    && Windows::HandheldToolSettingsPage(action==Action::previousOption ? -1 : 1)) {}
+                else if ((action==Action::previousOption || action==Action::nextOption)
                     && Windows::HandheldTrackSelectionMove(action==Action::previousOption ? -1 : 1,0)) {}
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::openBuild)
                     Windows::HandheldParkMapSubjects();

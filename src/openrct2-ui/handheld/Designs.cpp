@@ -229,9 +229,9 @@ namespace OpenRCT2::Ui::Handheld::Designs
         std::vector<std::string> lines{VehicleNotice(), HeightNotice(), SceneryNotice()};
         if (!lastError.empty()) lines.insert(lines.begin(),"Rejected: "+lastError);
         if (scenery && sceneryOmitted) lines.push_back("Scenery omitted: "+std::to_string(sceneryOmitted));
-        if (scenery && sceneryWarning) lines.push_back("This design will be placed without scenery");
         lines.push_back("Vehicle limits may change train settings");
-        lines.push_back("Some scenery may remain if placement fails");
+        if(scenery && !sceneryWarning && !design->sceneryElements.empty())
+            lines.push_back("Some scenery may remain if placement fails");
         return lines;
     }
     bool Active()

@@ -125,7 +125,7 @@ int main(int argc, char** argv)
         W::HandheldMenuMove(1);const auto selection=H::AreaTools::settings.selection;
         move(1,0);press(H::Action::confirm);
         Check(H::AreaTools::settings.selection==selection,"Disabled water shape responded to input");
-        W::HandheldMenuMove(1);press(H::Action::confirm);Check(W::HandheldObjectPickerIsOpen(),"Landscape material did not open visual catalog");
+        press(H::Action::nextOption);press(H::Action::confirm);Check(W::HandheldObjectPickerIsOpen(),"Landscape Paint group did not open visual catalog");
         press(H::Action::back);move(-1,0);
         Check(H::AreaTools::settings.surface!=kObjectEntryIndexNull,"Material picker Back lost selected setting");
         press(H::Action::back);Check(!wm->FindByClass(WindowClass::handheldMenu),"Landscape settings lost caller");
@@ -146,6 +146,15 @@ int main(int argc, char** argv)
         press(H::Action::confirm);press(H::Action::nextOption);capture("04-scenery-colour.png");
         press(H::Action::nextOption);press(H::Action::nextOption);move(1,0);move(0,1);move(1,0);
         capture("05-scatter-adjust.png");press(H::Action::contextPrimary);W::HandheldMenuMove(18);capture("06-scenery-settings.png");
+        const auto density=S::Current().scatterDensity;const auto scatterSize=S::Current().scatterSize;
+        press(H::Action::previousOption);move(0,2);capture("06a-scenery-tools.png");
+        press(H::Action::nextOption);move(1,0);
+        Check(S::Current().scatterSize==scatterSize && S::Current().scatterDensity!=density,"Shoulder group switch lost field focus or changed brush size");
+        const auto newDensity=S::Current().scatterDensity;
+        move(0,8);move(1,0); // Clamp at read-only last-error row, never leak into another group.
+        Check(S::Current().scatterDensity==newDensity,"Group boundary adjusted hidden controls");
+        press(H::Action::previousOption);press(H::Action::nextOption);move(0,-1);move(-1,0);
+        Check(S::Current().scatterDensity==density,"Group focus did not restore after returning");
         press(H::Action::back);Check(H::IsSceneryToolActive(),"Scenery settings lost tool");
         Check(state.park.cash==cash,"Tool configuration spent money");H::EndTerrain();closeMenu();
 
@@ -168,13 +177,33 @@ int main(int argc, char** argv)
             Check(it!=m.rows.end(),"Track action missing");W::HandheldMenuMove(static_cast<int>(it-m.rows.begin())-static_cast<int>(m.selected));};
         select("Inspect connections / station...");press(H::Action::confirm);capture("09-track-connections.png");
         auto m=W::HandheldRidesPresentation();
-        Check(std::find(m.rows.begin(),m.rows.end(),"Entrance: Needs building")!=m.rows.end(),"Station access status missing");
+        Check(m.rows.size()==2,"Connection readouts still consume action focus");
+        move(1,0);Check(W::HandheldRidesPresentation().selected==1,"Right did not select the right connection action");
+        move(-1,0);Check(W::HandheldRidesPresentation().selected==0,"Left did not select the left connection action");
+        Check(std::find(m.stats.begin(),m.stats.end(),std::pair<std::string,std::string>{"Entrance","Needs building"})!=m.stats.end(),"Station access status missing");
         select("Technical details...");press(H::Action::confirm);capture("10-track-technical.png");
         m=W::HandheldRidesPresentation();Check(m.rows[m.selected]=="Hide technical details","Technical toggle lost focus");
         press(H::Action::confirm);m=W::HandheldRidesPresentation();Check(m.rows[m.selected]=="Technical details...","Hide toggle lost focus");
         press(H::Action::back);Check(W::HandheldRidesPresentation().rows[W::HandheldRidesPresentation().selected]=="Inspect connections / station...","B lost track caller focus");
         Check(H::TrackEditing::Context(station)==before && state.park.cash==trackCash,"Connection inspection changed track or cash");
         closeMenu();
+
+        Check(C::ResumeFrom(target,std::pair{station.origin,station.type}),"Connected fixture resume failed");
+        Check(C::Select(TrackElemType::flat) && C::Action(true).error==GameActions::Status::ok,"Connected straight failed");
+        GameActions::ProcessQueue(state);H::EndTerrain();
+        for(bool stationView:{true,false})
+        {
+            const auto blocks=H::TrackEditing::Blocks(target);
+            const auto it=std::find_if(blocks.begin(),blocks.end(),[&](const auto& b){return b.type==(stationView?TrackElemType::endStation:TrackElemType::flat);});
+            Check(it!=blocks.end(),"Connected fixture block missing");
+            W::HandheldRideOpen(target.id);FocusRideTabAction("Edit track...");press(H::Action::confirm);
+            W::HandheldMenuMove(static_cast<int>(it-blocks.begin()));press(H::Action::confirm);
+            select("Inspect connections / station...");press(H::Action::confirm);
+            m=W::HandheldRidesPresentation();
+            Check(std::find(m.stats.begin(),m.stats.end(),std::pair<std::string,std::string>{stationView?"Ahead":"Behind","open end"})==m.stats.end(),"Connected track shown as open end");
+            Check(m.rows.size()==2,"Connected readout introduced scrolling actions");
+            capture(stationView?"11-track-connected.png":"12-track-no-station.png");closeMenu();
+        }
 
         TrackDesign td{};td.trackAndVehicle.rtdIndex=RIDE_TYPE_CORKSCREW_ROLLER_COASTER;
         td.trackAndVehicle.vehicleObject=coaster->GetDescriptor();

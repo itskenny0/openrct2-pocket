@@ -4,6 +4,18 @@
 
 namespace OpenRCT2::Ui::Handheld
 {
+    inline std::vector<std::vector<size_t>> ToolSettingGroups(bool scenery)
+    {
+        return scenery ? std::vector<std::vector<size_t>>{{0,1,2,3},{4,5,6},{7,8,9},{10,11,12,13,14,15},{16,17,18,19}}
+            : std::vector<std::vector<size_t>>{{0,1,2,3,4},{5,6,7,8}};
+    }
+    inline size_t ToolSettingGroup(bool scenery,size_t row)
+    {
+        const auto groups=ToolSettingGroups(scenery);
+        for(size_t i=0;i<groups.size();++i)
+            if(std::find(groups[i].begin(),groups[i].end(),row)!=groups[i].end()) return i;
+        return 0;
+    }
     inline std::string ToolSettingHelp(bool scenery, size_t row)
     {
         if (scenery)
@@ -27,7 +39,7 @@ namespace OpenRCT2::Ui::Handheld
                 "Find objects by name in the catalog.",
                 "Scatter small scenery over an area. Review the batch before paying.",
                 "Set the square area for scattering, measured in tiles.",
-                "Sparse, medium or dense. Space and placement rules determine how many fit.",
+                "Sets spacing between scattered objects. Placement rules still apply.",
                 "The most recent placement error is shown here." };
             return row<help.size()?help[row]:"";
         }
@@ -50,28 +62,38 @@ namespace OpenRCT2::Ui::Handheld
         ManagementPresentation model;
         model.breadcrumb=scenery?"Build / Scenery":"Build / Landscape";
         model.title=scenery?"Scenery settings":"Landscape settings";
-        model.rows=rows; model.selected=selected; model.rowHeight=30;
-        for(size_t i=0;i<rows.size();++i)
-            model.rowEnabled.push_back(scenery?ConstructionAdjust::SceneryEnabled(i):ConstructionAdjust::TerrainEnabled(i));
+        const auto group=ToolSettingGroup(scenery,selected);
+        const auto indices=ToolSettingGroups(scenery)[group];
+        const auto tabs=scenery?std::vector<std::string>{"Place","Height","Colour","Tools","Scatter"}
+            :std::vector<std::string>{"Brush","Paint"};
+        model.reservedHeight=34; model.rowHeight=30;
+        for(size_t i=0;i<indices.size();++i)
+        {
+            const auto row=indices[i];
+            model.rows.push_back(rows[row]);
+            if(row==selected) model.selected=i;
+            model.rowEnabled.push_back(scenery?ConstructionAdjust::SceneryEnabled(row):ConstructionAdjust::TerrainEnabled(row));
+        }
         DrawManagementContent(rt,{8,8},{280,340},model);
         DrawSurface(rt,{296,8},{208,340});
-        DrawHeadingText(rt,{308,24},scenery?"Selected object":"Brush footprint",184);
+        DrawHeadingText(rt,{308,38},scenery?"Selected object":"Brush footprint",184);
         if(scenery)
         {
-            DrawWrappedLabel(rt,{308,56},184,SceneryTools::Name(SceneryTools::Current()),3);
-            SceneryTools::DrawPreview(rt,{308,104},{184,72});
-            DrawWrappedLabel(rt,{308,186},184,SceneryTools::HeightName(),2);
+            DrawWrappedLabel(rt,{308,124},184,SceneryTools::Name(SceneryTools::Current()),2);
+            SceneryTools::DrawPreview(rt,{308,164},{184,56});
+            DrawWrappedLabel(rt,{308,224},184,SceneryTools::HeightName(),1);
         }
         else
         {
-            ConstructionAdjust::DrawBrushFootprint(rt,{316,64},{168,100},AreaTools::settings.width,AreaTools::settings.height);
-            DrawWrappedLabel(rt,{308,186},184,AreaTools::SizeName(AreaTools::settings),2);
+            ConstructionAdjust::DrawBrushFootprint(rt,{316,122},{168,88},AreaTools::settings.width,AreaTools::settings.height);
+            DrawWrappedLabel(rt,{308,224},184,AreaTools::SizeName(AreaTools::settings),2);
         }
-        const bool enabled=selected<model.rowEnabled.size() && model.rowEnabled[selected];
-        DrawWrappedLabel(rt,{308,226},184,scenery && selected==19 ? rows[selected] : enabled?ToolSettingHelp(scenery,selected)
+        const bool enabled=model.rowEnabled[model.selected];
+        DrawWrappedLabel(rt,{308,254},184,scenery && selected==19 ? rows[selected] : enabled?ToolSettingHelp(scenery,selected)
             : scenery?"This option is fixed or does not apply to the selected object."
-                     :"This option is fixed or does not apply to this tool.",5);
-        DrawWrappedLabel(rt,{308,312},184,status,2);
-        DrawFooter(rt,screen,{{"D-pad","Choose / adjust"},{"A","Select"},{"B","Back"}});
+                     :"This option is fixed or does not apply to this tool.",4);
+        DrawModernEllipsised(rt,{308,328},184,status);
+        DrawTabs(rt,{18,70},476,tabs,group,"Build / Tools");
+        DrawFooter(rt,screen,{{"D-pad","Adjust"},{"L1/R1","Group"},{"A","Select"},{"B","Back"}});
     }
 }

@@ -179,7 +179,7 @@ int main(int argc, char** argv)
             "Clearing search lost native group membership");
         H::BeginScenery();
         W::HandheldSceneryOptionsOpen();
-        W::HandheldConstructionMove(0, 12);
+        W::HandheldMenuMove(-100); W::HandheldMenuMove(12);
         H::ControllerInput controller;
         H::Frame confirm;
         confirm.actions = { H::Action::confirm, H::Action::confirm };
@@ -227,7 +227,7 @@ int main(int argc, char** argv)
         auto target = targetAt(tile, S::Category::banners);
         H::BeginScenery();
         W::HandheldSceneryOptionsOpen();
-        W::HandheldConstructionMove(0, 14);
+        W::HandheldMenuMove(-100); W::HandheldMenuMove(14);
         capture("landscaping-03-eyedropper-options.png", true);
         H::HandleMenuInput(controller, confirm);
         Check(S::Current().mode == S::Mode::pick && !Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu),
@@ -282,7 +282,7 @@ int main(int argc, char** argv)
             "Search accepted stale descriptor or changed selection");
         Check(!S::SetSearch(std::string(33,'X')) && S::Search()=="rct2.footpath_banner.bn1","Search accepted unbounded input");
         Check(S::SetSearch(""),"Search clear failed");
-        H::BeginScenery();W::HandheldSceneryOptionsOpen();W::HandheldConstructionMove(0,15);H::HandleMenuInput(controller,confirm);
+        H::BeginScenery();W::HandheldSceneryOptionsOpen();W::HandheldMenuMove(-100); W::HandheldMenuMove(15);H::HandleMenuInput(controller,confirm);
         capture("landscaping-04-native-search-keyboard.png",true);
         size_t keyFocus=0;
         const auto keys=H::TextEntry{}.Keys();
@@ -314,7 +314,7 @@ int main(int argc, char** argv)
             "Search/preview/selection mutated native accounting or missed placement handoff");
         H::EndTerrain();
         S::SelectCategory(S::Category::small); Check(S::Select(smallObject),"Scatter object missing"); S::Configure(6);
-        H::BeginScenery(); W::HandheldSceneryOptionsOpen(); W::HandheldConstructionMove(0,16);
+        H::BeginScenery(); W::HandheldSceneryOptionsOpen(); W::HandheldMenuMove(-100); W::HandheldMenuMove(16);
         H::HandleMenuInput(controller,confirm);
         W::HandheldConstructionMove(0,2); H::HandleMenuInput(controller,confirm); // medium density, size 1: two native attempts
         capture("landscaping-08-scatter-options.png",true);
@@ -350,7 +350,7 @@ int main(int argc, char** argv)
         capture("landscaping-11-scatter-partial-result.png",false);
         const auto nativeFailure=S::Options().back();
         Check(nativeFailure!="Last error: none","Partial scatter lost native failure reason");
-        W::HandheldSceneryOptionsOpen(); W::HandheldConstructionMove(0,19);
+        W::HandheldSceneryOptionsOpen(); W::HandheldMenuMove(-100); W::HandheldMenuMove(19);
         Check(S::Options().back()==nativeFailure,"Menu ghost cleanup erased completed native batch failure");
         capture("landscaping-12-scatter-native-error.png",true);
         Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
@@ -367,7 +367,7 @@ int main(int argc, char** argv)
         A::settings={}; A::settings.operation=A::Operation::paint; A::settings.width=A::settings.height=2;
         A::settings.surface=objects.GetLoadedObjectEntryIndex(grid); A::settings.edge=objects.GetLoadedObjectEntryIndex(stucco);
         A::ResetColours(); H::BeginAreaTools(); terrainPanel=true;
-        W::HandheldAreaOptionsOpen(); W::HandheldConstructionMove(0,7);
+        W::HandheldAreaOptionsOpen(); W::HandheldMenuMove(-100); W::HandheldMenuMove(7);
         const auto beforePalette=A::settings.surfaceColour;
         H::HandleMenuInput(controller,confirm);
         Check(A::settings.surfaceColour!=beforePalette && A::SurfaceColourSupported(A::settings.surface),"Controller native palette selection failed");
@@ -418,7 +418,7 @@ int main(int argc, char** argv)
         MapGetSurfaceElementAt(paintTile)->setOwnership({OwnershipFlag::landOwned});
         A::settings.surface=objects.GetLoadedObjectEntryIndex(objects.LoadObject("rct2.terrain_surface.grass"));
         A::settings.edge=objects.GetLoadedObjectEntryIndex(objects.LoadObject("rct2.terrain_edge.rock"));
-        W::HandheldAreaOptionsOpen(); W::HandheldConstructionMove(0,8);
+        W::HandheldAreaOptionsOpen(); W::HandheldMenuMove(-100); W::HandheldMenuMove(8);
         const auto fixedColours=A::settings; H::HandleMenuInput(controller,confirm);
         Check(A::settings==fixedColours,"Controller unsupported colour changed native selection");
         capture("landscaping-19-terrain-unsupported-colour.png",true);

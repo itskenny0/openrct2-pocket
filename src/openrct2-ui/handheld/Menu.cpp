@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "AreaTools.h"
 #include "ToolSettingsPanel.h"
+#include "CompactTools.h"
 #include "Currency.h"
 #include "CustomTracks.h"
 #include "Dashboard.h"
@@ -262,6 +263,7 @@ namespace OpenRCT2::Ui::Windows
         Handheld::ListFocus _focus;
         Page _page = Page::park;
         std::map<Page, size_t> _pageRows;
+        std::array<std::array<size_t,5>,2> _toolGroupRows{};
         Handheld::ObjectPicker _picker;
         bool _pausedHere{};
         size_t _buildFocus{}, _pathModeFocus{};
@@ -678,8 +680,16 @@ namespace OpenRCT2::Ui::Windows
                     {
                         model.title = "TRACK CONNECTIONS";
                         model.stats.clear();
-                        model.rows = Handheld::TrackEditing::Inspection(*_trackBlock, _trackTechnical);
-                        model.rowReadOnly=std::vector<bool>(model.rows.size()-2,true);
+                        model.rows = _trackTechnical ? Handheld::TrackEditing::Inspection(*_trackBlock, true)
+                            : std::vector<std::string>{"Technical details...","Back to piece"};
+                        if(_trackTechnical) model.rowReadOnly=std::vector<bool>(model.rows.size()-2,true);
+                        else for(const auto& line:Handheld::TrackEditing::Inspection(*_trackBlock))
+                        {
+                            const auto colon=line.find(": ");
+                            if(colon!=std::string::npos && (line.starts_with("Ahead:") || line.starts_with("Behind:")
+                                || line.starts_with("Entrance:") || line.starts_with("Exit:")))
+                                model.stats.emplace_back(line.substr(0,colon),line.substr(colon+2));
+                        }
                         model.status = _status;
                     }
                     if (current == Page::trackRemoveConfirm || current == Page::trackSpeedConfirm || current == Page::trackReplaceConfirm)
@@ -1123,8 +1133,34 @@ namespace OpenRCT2::Ui::Windows
                 || _page == Page::sceneryConfirm || _page == Page::sceneryGroups || _page == Page::sceneryStyle
                 || _page == Page::sceneryStyleEditor || _page == Page::sceneryStyleConfirm || _page == Page::sceneryClearOptions || _page == Page::sceneryClearConfirm;
         }
+        bool toolSettingsPage(int direction)
+        {
+            if(_page!=Page::areaOptions && _page!=Page::sceneryOptions) return false;
+            const bool scenery=_page==Page::sceneryOptions;
+            const auto groups=Handheld::ToolSettingGroups(scenery);
+            const auto group=Handheld::ToolSettingGroup(scenery,_focus.index());
+            _toolGroupRows[scenery][group]=_focus.index();
+            const auto next=(static_cast<int>(group)+direction+groups.size())%groups.size();
+            const auto saved=_toolGroupRows[scenery][next];
+            const auto row=std::find(groups[next].begin(),groups[next].end(),saved)!=groups[next].end()?saved:groups[next].front();
+            _focus.move(static_cast<int>(row)-static_cast<int>(_focus.index()),rows().size());
+            _status.clear();invalidate();return true;
+        }
         void constructionMove(int x, int y)
         {
+            if(_page==Page::designWarnings && !_designTechnical)
+            {
+                _focus.move(x?x:y,rows().size());invalidate();return;
+            }
+            if(y && (_page==Page::areaOptions || _page==Page::sceneryOptions))
+            {
+                const bool scenery=_page==Page::sceneryOptions;
+                const auto indices=Handheld::ToolSettingGroups(scenery)[Handheld::ToolSettingGroup(scenery,_focus.index())];
+                const auto slot=std::find(indices.begin(),indices.end(),_focus.index())-indices.begin();
+                const auto next=std::clamp<int>(static_cast<int>(slot)+y,0,static_cast<int>(indices.size())-1);
+                _focus.move(static_cast<int>(indices[next])-static_cast<int>(_focus.index()),rows().size());
+                _status.clear();invalidate();return;
+            }
             if (_page == Page::controls) {
                 _focus.move(x ? x : y,3);invalidate();return;
             }
@@ -1816,6 +1852,7 @@ namespace OpenRCT2::Ui::Windows
                     result.push_back("Cancel / back");return result;
                 }
                 case Page::designWarnings: {
+                    if(!_designTechnical) return {"Technical details...","Back to options"};
                     auto result=_designDetailsFromFile ? std::vector<std::string>{} : Handheld::Designs::WarningLines();
                     if (const auto* td=_designDetailsFromFile ? _designMetadata.get() : Handheld::Designs::Draft()) {auto detail=Handheld::DesignAvailability::Lines(*td, _designTechnical);result.insert(result.end(),detail.begin(),detail.end());}
                     result.push_back(_designTechnical ? "Hide technical details" : "Technical details...");
@@ -2949,6 +2986,10 @@ namespace OpenRCT2::Ui::Windows
         }
         bool trackSelectionMove(int x, int y)
         {
+            if(_page==Page::trackContext && !_trackTechnical)
+            {
+                _focus.move(x?x:y,rows().size());invalidate();return true;
+            }
             if (_page != Page::trackBlocks) return false;
             if (x && _focus.index() < _trackBlocks.size())
             {
@@ -3019,6 +3060,11 @@ namespace OpenRCT2::Ui::Windows
                 }
             }
             using namespace Handheld;
+            if(_page==Page::trackContext && !_trackTechnical && block && TrackEditing::Valid(*block))
+            {
+                DrawTrackConnections(rt,*block,_focus.index(),_status);
+                return;
+            }
             if (_page == Page::trackBlocks) {
                 Concept::Box(rt,{8,36},{216,242});
                 Concept::Heading(rt,{18,48},"Select track");
@@ -6216,6 +6262,36 @@ namespace OpenRCT2::Ui::Windows
                     {{"D-pad","Choose / adjust"},{"A","Select"},{"B","Placement"}});
                 return;
             }
+            if(_page==Page::designWarnings && !_designTechnical)
+            {
+                const auto* td=_designDetailsFromFile?_designMetadata.get():Handheld::Designs::Draft();
+                std::string vehicle="Vehicle unavailable", state="Choose another vehicle", scenery="Design unavailable";
+                const Object* vehicleObject=nullptr;
+                bool sceneryCanRemain=false;
+                if(td)
+                {
+                    const auto descriptor=_designDetailsFromFile?_designChoice.value_or(td->trackAndVehicle.vehicleObject):td->trackAndVehicle.vehicleObject;
+                    const auto* object=GetContext()->GetObjectManager().GetLoadedObject(descriptor);
+                    if(object) vehicle=object->GetName();
+                    vehicleObject=object;
+                    state="Vehicle: "+Handheld::DesignAvailability::State(descriptor);
+                    const auto availability=Handheld::DesignAvailability::Lines(*td);
+                    const bool missing=std::any_of(availability.begin(),availability.end(),[](const auto& row){return row.starts_with("Missing scenery:");});
+                    for(const auto& line:availability)
+                        if(line=="Ride type: unavailable" || line=="No loaded station style for placement") state=line;
+                    sceneryCanRemain=!td->sceneryElements.empty() && !missing
+                        && (_designDetailsFromFile || Handheld::Designs::IncludesScenery());
+                    scenery=td->sceneryElements.empty()?"No scenery in this design"
+                        :!_designDetailsFromFile && !Handheld::Designs::IncludesScenery()?"Scenery is switched off"
+                        :missing?"Missing objects: ALL design scenery will be left out"
+                        :"Scenery included; see Details for individual objects";
+                    if(!_designDetailsFromFile)
+                        for(const auto& line:Handheld::Designs::WarningLines())
+                            if(line.starts_with("Scenery omitted:")) scenery=line;
+                }
+                Handheld::DrawDesignCheck(rt,vehicle,state,scenery,_status.empty()?(_designDetailsFromFile?std::string{}:Handheld::Designs::LastError()):_status,_focus.index(),vehicleObject,sceneryCanRemain);
+                return;
+            }
             if (_page==Page::designVehicles || _page==Page::designWarnings || _page==Page::designConfirm) {
                 Handheld::ManagementPresentation model;
                 model.breadcrumb="Designs / Options";
@@ -7036,6 +7112,7 @@ namespace OpenRCT2::Ui::Windows
     std::string HandheldNewsText(const std::string& text){return Handheld::ParkInformation::PlainText(text);}
     void HandheldNewsOpen(){HandheldDashboardOpen();auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);if(w)static_cast<HandheldMenuWindow*>(w)->openNews(true);}
     bool HandheldDashboardNews(){auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);return w&&static_cast<HandheldMenuWindow*>(w)->dashboardNews();}
+    bool HandheldToolSettingsPage(int direction){auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);return w&&static_cast<HandheldMenuWindow*>(w)->toolSettingsPage(direction);}
     bool HandheldTrackSelectionMove(int x,int y){auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);return w&&static_cast<HandheldMenuWindow*>(w)->trackSelectionMove(x,y);}
     bool HandheldObjectPickerGroup(){auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);return w&&static_cast<HandheldMenuWindow*>(w)->pickerGroup();}
     bool HandheldFinancesIsOpen()

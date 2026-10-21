@@ -1,5 +1,7 @@
 # Friendly tools and secondary-screen polish
 
+Follow-up: [Compact handheld pass](COMPACT-HANDHELD-PASS.md) replaces the remaining report-style connection/design views and groups extended tool settings.
+
 Continues published `7114678ade4766b34b2b0b0ace95ee135522524a` on
 `handheld/modern-ui-paths`. The accepted Daylight/Slate themes, native sprites,
 continuous lists, controller bindings, catalogs, ordinary coaster construction,
