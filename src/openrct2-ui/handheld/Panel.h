@@ -833,7 +833,20 @@ namespace OpenRCT2::Ui::Handheld
         for (size_t i = 0; i < rows.size() && i < 8; ++i)
             DrawActionRow(rt, p + ScreenCoordsXY{8, positions[i]}, {width - 16, i == 0 ? 30 : 27},
                 i == 0 ? "Return to building" : rows[i], "", selected == i);
-        DrawFooter(rt, screen, { { "D-pad", "Choose" }, { "A", "Apply" }, { "B", "Tool" } });
+        const std::array<const char*,8> connectedHelp{
+            "Continue from the current path end.","Turn the next section before building.",
+            "Build uphill from the current end.","Build downhill from the current end.",
+            "Make the next section level.","Pick another path end. Existing paths stay.",
+            "Choose the path or queue surface.","Review removing the last new section."};
+        const std::array<const char*,7> groundHelp{
+            "Return to the park with this preview.","Each tile follows its own terrain. Works with Single, Line and Fill.",
+            "Use a fixed elevation above the current preview.","Lower the fixed elevation. Follow ground restores automatic height.",
+            "Change the slope for a single section. Line and Fill use level tiles.",
+            "Turn the uphill end of a single sloping section.","Choose the path or queue surface."};
+        DrawSurface(rt,{screen.width-236,screen.height-132},{228,88});
+        DrawWrappedLabel(rt,{screen.width-224,screen.height-120},204,
+            connected?connectedHelp[std::min(selected,connectedHelp.size()-1)]:groundHelp[std::min(selected,groundHelp.size()-1)],4);
+        DrawFooter(rt, screen, { { "D-pad", "Choose" }, { "A", "Select" }, { "B", "Build" } });
     }
 
     inline void DrawMapFocus(Drawing::RenderTarget& rt, ScreenCoordsXY centre)

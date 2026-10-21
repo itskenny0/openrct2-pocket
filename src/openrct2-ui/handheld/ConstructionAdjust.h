@@ -50,9 +50,19 @@ namespace OpenRCT2::Ui::Handheld::ConstructionAdjust
         const auto& s=Current();
         if (row == static_cast<size_t>(-1)) return false;
         if (row==2) return CanRotate();
-        if (row==3 || row>=16) return s.category==Category::small;
+        if (row==3 || (row>=16 && row<=18)) return s.category==Category::small;
+        if (row>=4 && row<=6) return s.category!=Category::additions;
+        if (row==19) return false;
         if (row>=7 && row<=9) return Channels(s.category,s.object)[row-7];
         return true;
+    }
+    inline void DrawBrushFootprint(Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, int width, int depth)
+    {
+        const int columns=std::min(width,8), rows=std::min(depth,8);
+        const int cell=std::max(2,std::min(size.width/columns,size.height/rows));
+        p += ScreenCoordsXY{(size.width-columns*cell)/2,(size.height-rows*cell)/2};
+        for(int y=0;y<rows;++y) for(int x=0;x<columns;++x)
+            Fill(rt,p+ScreenCoordsXY{x*cell,y*cell},{cell-1,cell-1},Theme::gold);
     }
     inline std::vector<size_t> TerrainRows(size_t group)
     {
@@ -144,7 +154,6 @@ namespace OpenRCT2::Ui::Handheld::ConstructionAdjust
                 continue;
             }
             auto label = row == static_cast<size_t>(-1) ? "No adjustable colours" : options[row];
-            if(scenery && row==18) label="Density: "+std::to_string(static_cast<int>(SceneryTools::Current().scatterDensity)+1)+" / 3";
             const auto cell=pos+ScreenCoordsXY{8,(scenery ? 148 : 120)+static_cast<int>(i)*30};
             const bool colour=ColourRow(scenery,row) && (scenery ? SceneryEnabled(row) : TerrainEnabled(row));
             if (colour)
@@ -158,12 +167,18 @@ namespace OpenRCT2::Ui::Handheld::ConstructionAdjust
             else DrawActionRow(rt,cell,{208,28},label,"",i==selectedRow,
                 scenery ? SceneryEnabled(row) : TerrainEnabled(row));
         }
+        if (!scenery && state.focus.tab==0)
+        {
+            DrawBrushFootprint(rt,pos+ScreenCoordsXY{12,214},{64,28},AreaTools::settings.width,AreaTools::settings.height);
+            DrawModernEllipsised(rt,pos+ScreenCoordsXY{86,224},126,"{MUTED}"+AreaTools::SizeName(AreaTools::settings));
+        }
         DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 12, 250 }, 200,
             indices[selectedRow] == static_cast<size_t>(-1) ? "{MUTED}Choose another object to recolour"
+                : scenery && indices[selectedRow]==6 ? "{MUTED}Left/Right: Height / A: Ground"
                 : ColourRow(scenery,indices[selectedRow]) ? "{MUTED}A Colour picker" : "{MUTED}Left/Right: Change value");
         DrawCommand(rt,pos+ScreenCoordsXY{12,266},24,"X","More settings");
     }
-    inline void Footer(Drawing::RenderTarget& rt, ScreenSize screen, bool adjusting, bool scenery, const std::string& apply="Apply", bool material=false, bool palette=false)
+    inline void Footer(Drawing::RenderTarget& rt, ScreenSize screen, bool adjusting, bool scenery, const std::string& apply="Apply", bool material=false, bool palette=false, bool groundReset=false)
     {
         DrawActionStrip(rt, screen);
         if(adjusting)
@@ -175,7 +190,7 @@ namespace OpenRCT2::Ui::Handheld::ConstructionAdjust
             }
             DrawFooter(
                 rt, screen,
-                { { "D-pad", "Adjust" }, { "A", material ? "Select" : "Build" }, { "L/R", "Group" }, { "B", "Build" } });
+                { { "D-pad", "Adjust" }, { "A", groundReset ? "Ground" : material ? "Select" : "Build" }, { "L/R", "Group" }, { "B", "Build" } });
         }
         else
         {

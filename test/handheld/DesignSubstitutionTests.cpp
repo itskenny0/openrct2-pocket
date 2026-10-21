@@ -151,7 +151,7 @@ int main(int argc, char** argv)
         const auto flag=_trackDesignPlaceStateSceneryUnavailable;
         Check(!TrackDesignResolveScenery(optional),"Missing optional scenery resolved");
         lines=A::Lines(td);
-        Check(lines.back().find("ALL scenery")!=std::string::npos,"Native all-scenery fallback not explicit");
+        Check(std::any_of(lines.begin(),lines.end(),[](const auto& line){return line.find("ALL design scenery")!=std::string::npos;}),"Native all-scenery fallback not explicit");
         Check(_trackDesignPlaceStateSceneryUnavailable==flag,"Read-only resolver changed native placement flag");
         Check(state.park.cash==cash && GetNextFreeRideId()==free && state.scenarioRand==seed
             && RideEntryIsInvented(index),"Inspection changed real park/accounting/research/RNG");

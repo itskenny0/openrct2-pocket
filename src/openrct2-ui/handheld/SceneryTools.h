@@ -62,6 +62,9 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     std::vector<Group> Groups(Category category);
     bool SetGroup(ObjectEntryIndex group);
     std::string GroupName();
+    std::string HeightName();
+    std::string DensityName();
+    void DrawPreview(Drawing::RenderTarget& rt, ScreenCoordsXY position, ScreenSize size);
     const std::string& Search();
     bool SetSearch(const std::string& value);
     enum class Style

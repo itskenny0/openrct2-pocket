@@ -282,8 +282,8 @@ namespace OpenRCT2::Ui::Handheld::Designs
     }
     std::string HeightNotice()
     {
-        return heightOffset ? "Manual height " + std::string(*heightOffset >= 0 ? "+" : "") + std::to_string(*heightOffset / 8)
-                            : "Automatic height";
+        return heightOffset ? "Ground offset " + std::string(*heightOffset >= 0 ? "+" : "") + std::to_string(*heightOffset / kCoordsZStep) + " levels"
+                            : "Fits to ground";
     }
     void SetScenery(bool value)
     {

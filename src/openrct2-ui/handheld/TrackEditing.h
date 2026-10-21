@@ -60,8 +60,7 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
     inline std::string Label(const Block& block)
     {
         auto name = CustomTracks::PieceName(block.type);
-        return name + " / " + std::to_string(block.origin.x / 32) + "," + std::to_string(block.origin.y / 32) + " Z"
-            + std::to_string(block.origin.z / 8);
+        return name;
     }
     inline bool Valid(const Block& block)
     {
@@ -152,16 +151,22 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
         const auto [entrances, exits] = AccessRemoval(block);
         return "Deletes access here: " + std::to_string(entrances) + " entrance / " + std::to_string(exits) + " exit";
     }
-    inline std::vector<std::string> Inspection(const Block& block)
+    inline std::vector<std::string> Inspection(const Block& block, bool technical = false)
     {
         if (!Valid(block)) return { "Selected block no longer exists", "Back to block" };
         const auto& ted = TrackMetadata::GetTrackElementDescriptor(block.type);
         const auto& c = ted.sequenceData.sequences[0].clearance;
         const auto xy = CoordsXY(block.origin) + CoordsXY{ c.x, c.y }.rotate(block.origin.direction);
         auto previous = Previous(block);
-        std::vector<std::string> rows{ "Direction: " + std::to_string(block.origin.direction),
-            previous ? "Previous: " + Label(*previous) : "Previous: disconnected end",
-            "Native sequences: " + std::to_string(ted.sequenceData.numSequences) };
+        std::vector<std::string> rows{
+            previous ? "Behind: " + Label(*previous) : "Behind: open end" };
+        if (technical)
+        {
+            rows.push_back("Tile: " + std::to_string(block.origin.x / 32) + ", " + std::to_string(block.origin.y / 32));
+            rows.push_back("Level: " + std::to_string(block.origin.z / kCoordsZStep));
+            rows.push_back("Direction index: " + std::to_string(block.origin.direction));
+            rows.push_back("Native sequences: " + std::to_string(ted.sequenceData.numSequences));
+        }
         for (auto* e : TileElementsView<TrackElement>(xy))
             if (!e->isGhost() && e->getRideIndex() == block.ride.id && e->getTrackType() == block.type
                 && e->getSequenceIndex() == 0 && e->getDirection() == block.origin.direction
@@ -171,8 +176,8 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
                 int32_t z{}, direction{};
                 const bool connected = trackBlockGetNext(&input, &next, &z, &direction)
                     && TrackIsConnectedByShape(input.element, next.element);
-                rows.push_back(connected ? "Next: " + CustomTracks::PieceName(next.element->asTrack()->getTrackType())
-                                         : "Next: disconnected end");
+                rows.push_back(connected ? "Ahead: " + CustomTracks::PieceName(next.element->asTrack()->getTrackType())
+                                         : "Ahead: open end");
                 if (block.type == TrackElemType::beginStation || block.type == TrackElemType::middleStation
                     || block.type == TrackElemType::endStation)
                 {
@@ -183,21 +188,23 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
                         const auto& station = ride->getStation(index);
                         rows.push_back(block.type == TrackElemType::beginStation ? "Station piece: Begin"
                             : block.type == TrackElemType::middleStation ? "Station piece: Middle" : "Station piece: End");
-                        rows.push_back("Station " + std::to_string(index.ToUnderlying() + 1) + " / length " + std::to_string(station.length));
-                        auto access = [](const auto& loc) {
-                            return loc.isNull() ? std::string("Missing") : std::to_string(loc.x) + "," + std::to_string(loc.y)
+                        rows.push_back("Station " + std::to_string(index.ToUnderlying() + 1));
+                        auto access = [technical](const auto& loc) {
+                            if (loc.isNull()) return std::string("Needs building");
+                            return !technical ? std::string("Built") : std::to_string(loc.x) + "," + std::to_string(loc.y)
                                 + " Z" + std::to_string(loc.z) + " D" + std::to_string(loc.direction);
                         };
                         rows.push_back("Entrance: " + access(station.entrance));
                         rows.push_back("Exit: " + access(station.exit));
                         rows.push_back(AccessRemovalLabel(block));
-                        rows.push_back("Removal may split / renumber station");
-                        rows.push_back("Check native access after rebuilding");
+                        rows.push_back("Removal may split the station");
+                        rows.push_back("Check rebuilt entrance and exit");
                     }
                 }
                 break;
             }
-        rows.push_back("Back to block");
+        rows.push_back(technical ? "Hide technical details" : "Technical details...");
+        rows.push_back("Back to piece");
         return rows;
     }
     inline bool CanReplace(const Block& block)

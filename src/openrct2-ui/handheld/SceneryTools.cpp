@@ -294,21 +294,43 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                 return FmtString(FormatStringID(Windows::ColourDropDownIndexToName(i))).WithoutFormatTokens();
         return "Special colour";
     }
+    std::string HeightName()
+    {
+        if (current.category == Category::additions) return "Follows selected path";
+        return current.height ? "Fixed level " + std::to_string(current.height / kCoordsZStep) : "Follows ground";
+    }
+    std::string DensityName()
+    {
+        static constexpr std::array names{ "Sparse", "Medium", "Dense" };
+        return names[static_cast<size_t>(current.scatterDensity) % names.size()];
+    }
+    void DrawPreview(Drawing::RenderTarget& rt, ScreenCoordsXY position, ScreenSize size)
+    {
+        if(const auto* object=GetContext()->GetObjectManager().GetLoadedObject(Type(current.category),current.object))
+        {
+            Drawing::RenderTarget preview;
+            if(ClipRenderTarget(preview,rt,position,size.width,size.height))
+            {
+                preview.zoom_level=ZoomLevel{1};
+                object->DrawPreview(preview,preview.zoom_level.ApplyTo(size.width),preview.zoom_level.ApplyTo(size.height));
+            }
+        }
+    }
     std::vector<std::string> Options()
     {
         const auto ch = Channels(current.category, current.object);
         return { "Resume",
                  "Choose object...",
                  current.category == Category::additions ? "Orientation: path edges"
-                                                         : "Direction / edge: " + std::to_string(current.direction + 1),
-                 current.category != Category::small ? "Quadrant: not applicable"
-                                                     : "Quadrant: " + std::to_string(current.quadrant + 1),
+                                                         : "Turn: " + std::to_string(current.direction + 1) + " / 4",
+                 current.category != Category::small ? "Tile corner: automatic"
+                                                     : "Tile corner: " + std::to_string(current.quadrant + 1) + " / 4",
                  "Raise placement height",
                  "Lower placement height",
-                 current.height ? "Height: " + std::to_string(current.height) + " / reset auto" : "Height: automatic",
-                 ch[0] ? "Primary: " + ColourName(current.colours[0]) : "Primary: unavailable",
-                 ch[1] ? "Secondary: " + ColourName(current.colours[1]) : "Secondary: unavailable",
-                 ch[2] ? "Tertiary: " + ColourName(current.colours[2]) : "Tertiary: unavailable",
+                 HeightName(),
+                 ch[0] ? "Main colour: " + ColourName(current.colours[0]) : "Main colour: fixed",
+                 ch[1] ? "Colour 2: " + ColourName(current.colours[1]) : "Colour 2: fixed",
+                 ch[2] ? "Colour 3: " + ColourName(current.colours[2]) : "Colour 3: fixed",
                  current.mode == Mode::place          ? "Mode: Place"
                      : current.mode == Mode::recolour ? "Mode: Recolour"
                      : current.mode == Mode::remove   ? "Mode: Remove"
@@ -319,9 +341,8 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                  "Pick placed object...",
                  search.empty() ? "Search objects..." : "Search: " + search,
                  current.category != Category::small ? "Scatter: small scenery only" : current.scatter ? "Scatter: enabled" : "Scatter: disabled",
-                 "Scatter size: " + std::to_string(current.scatterSize) + " x " + std::to_string(current.scatterSize),
-                 "Scatter density: " + std::to_string(static_cast<int>(current.scatterDensity)+1) + " / attempts "
-                    + std::to_string(SceneryScatterQuantity(current.scatterSize,current.scatterDensity)),
+                 "Scatter area: " + std::to_string(current.scatterSize) + " x " + std::to_string(current.scatterSize) + " tiles",
+                 "Density: " + DensityName(),
                  scatterOutcome && !scatterOutcome->failure.empty()
                     ? "Last error: " + FmtString(scatterOutcome->failure).WithoutFormatTokens() : "Last error: none" };
     }
@@ -351,9 +372,9 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         DrawModernEllipsised(rt,position+ScreenCoordsXY{80,72},72,ScatterActive() ? "{WHITE}Scatter" : "{MUTED}Single");
         DrawModernEllipsised(rt,position+ScreenCoordsXY{12,116},140,"{WHITE}"+Name(s));
         DrawModernEllipsised(rt,position+ScreenCoordsXY{12,140},140,s.category==Category::additions ? "{MUTED}Attach to path edge"
-            : "{MUTED}Direction "+std::to_string(s.direction+1)+(s.category==Category::small ? " / Q"+std::to_string(s.quadrant+1) : ""));
+            : "{MUTED}Turn "+std::to_string(s.direction+1)+" / 4");
         DrawModernEllipsised(rt,position+ScreenCoordsXY{12,160},140,ScatterActive() ? "{WHITE}"+ScatterStatus()
-            : s.height ? "{MUTED}Height "+std::to_string(s.height) : "{MUTED}Automatic height");
+            : "{MUTED}" + HeightName());
         DrawModernText(rt,position+ScreenCoordsXY{12,186},"{WHITE}L2/R2 Height");
         DrawModernText(rt,position+ScreenCoordsXY{12,207},"{WHITE}Y Adjust | X Camera");
     }

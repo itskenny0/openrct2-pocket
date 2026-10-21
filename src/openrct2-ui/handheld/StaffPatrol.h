@@ -139,8 +139,8 @@ namespace OpenRCT2::Ui::Handheld::StaffPatrol
     {
         return { "Resume patrol",
                  settings.remove ? "Mode: Remove" : "Mode: Add",
-                 "Width: " + std::to_string(settings.width),
-                 "Height: " + std::to_string(settings.height),
+                 "Brush width: " + std::to_string(settings.width) + " tiles",
+                 "Brush depth: " + std::to_string(settings.height) + " tiles",
                  "Clear patrol...",
                  "Return to employee" };
     }

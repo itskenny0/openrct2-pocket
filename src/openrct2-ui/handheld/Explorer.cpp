@@ -1004,7 +1004,7 @@ namespace OpenRCT2::Ui::Handheld
                 if(!enabled) _terrainStatus="Unavailable for this object or operation";
                 else
                 {
-                    if(_sceneryTool) SceneryTools::Configure(row,frame.navigateX);
+                    if(_sceneryTool) SceneryTools::Configure(row==6 ? (frame.navigateX>0 ? 4 : 5) : row,frame.navigateX);
                     else AreaTools::Configure(row,frame.navigateX);
                     _terrainStatus.clear();_scatterFeedback=false;
                 }
@@ -1014,7 +1014,12 @@ namespace OpenRCT2::Ui::Handheld
                 if(action==Action::back || action==Action::contextSecondary) _constructionAdjust.active=false;
                 else if(action==Action::confirm)
                 {
-                    if (enabled && ConstructionAdjust::ColourRow(_sceneryTool,row))
+                    if (enabled && _sceneryTool && row==6)
+                    {
+                        SceneryTools::Configure(6);
+                        _terrainStatus.clear();
+                    }
+                    else if (enabled && ConstructionAdjust::ColourRow(_sceneryTool,row))
                     {
                         _constructionAdjust.colourChoice=ConstructionAdjust::ColourIndex(ConstructionAdjust::CurrentColour(_sceneryTool,row));
                         _constructionAdjust.palette=true;
@@ -1717,7 +1722,8 @@ namespace OpenRCT2::Ui::Handheld
                     : SceneryTools::Current().mode==SceneryTools::Mode::remove ? "Remove"
                     : SceneryTools::Current().mode==SceneryTools::Mode::recolour ? "Paint" : "Place",
                     _constructionAdjust.active && ConstructionAdjust::PickerAction(_constructionAdjust,_sceneryTool),
-                    _constructionAdjust.palette);
+                    _constructionAdjust.palette,
+                    _sceneryTool && _constructionAdjust.focus.tab==0 && _constructionAdjust.row==2);
             else if (_treeTool)
                 DrawTreeFooter(rt, { ContextGetWidth(), height });
             else if (_colourRide)

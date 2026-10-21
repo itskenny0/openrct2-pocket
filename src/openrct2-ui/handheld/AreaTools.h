@@ -154,13 +154,13 @@ namespace OpenRCT2::Ui::Handheld::AreaTools
     {
         return { "Resume",
                  operations[static_cast<size_t>(settings.operation)],
-                 "Width: " + std::to_string(settings.width),
-                 "Height: " + std::to_string(settings.height),
+                 "Brush width: " + std::to_string(settings.width) + " tiles",
+                 "Brush depth: " + std::to_string(settings.height) + " tiles",
                  "Selection: " + SelectionName(settings),
                  "Surface: " + StyleName(ObjectType::terrainSurface, settings.surface),
-                 "Edge: " + StyleName(ObjectType::terrainEdge, settings.edge),
-                 SurfaceColourSupported(settings.surface) ? "Surface colour: "+ColourName(settings.surfaceColour) : "Surface colour: unavailable",
-                 EdgeColourSupported(settings.edge) ? "Edge colour: "+ColourName(settings.edgeColour) : "Edge colour: unavailable" };
+                 "Cliff face: " + StyleName(ObjectType::terrainEdge, settings.edge),
+                 SurfaceColourSupported(settings.surface) ? "Surface colour: "+ColourName(settings.surfaceColour) : "Surface colour: fixed",
+                 EdgeColourSupported(settings.edge) ? "Cliff colour: "+ColourName(settings.edgeColour) : "Cliff colour: fixed" };
     }
     inline void Configure(size_t row, int delta = 1)
     {

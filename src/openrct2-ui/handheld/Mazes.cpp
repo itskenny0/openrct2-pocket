@@ -431,7 +431,7 @@ namespace OpenRCT2::Ui::Handheld::Mazes
         static const char* directions[]{ "West", "South", "East", "North" };
         DrawModernText(rt, p + ScreenCoordsXY{ 10, 86 }, "{WHITE}Direction " + std::string(directions[direction]));
         DrawModernText(
-            rt, p + ScreenCoordsXY{ 10, 108 }, "{WHITE}Height " + (cursor ? std::to_string(cursor->z / 8) : "Unavailable"));
+            rt, p + ScreenCoordsXY{ 10, 108 }, "{WHITE}Level " + (cursor ? std::to_string(cursor->z / kCoordsZStep) : "Unavailable"));
         DrawModernText(
             rt, p + ScreenCoordsXY{ 10, 132 },
             camera          ? "{WHITE}D-pad Pan / X Rotate"

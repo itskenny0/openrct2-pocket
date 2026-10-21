@@ -125,8 +125,8 @@ namespace OpenRCT2::Ui::Handheld::RightsTools
     }
     inline std::vector<std::string> Options()
     {
-        return { "Resume", Kind(settings.construction), "Width: " + std::to_string(settings.width),
-                 "Height: " + std::to_string(settings.height) };
+        return { "Resume", Kind(settings.construction), "Area width: " + std::to_string(settings.width) + " tiles",
+                 "Area depth: " + std::to_string(settings.height) + " tiles" };
     }
     inline void Configure(size_t row, int delta = 1)
     {

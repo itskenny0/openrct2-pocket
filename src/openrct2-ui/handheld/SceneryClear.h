@@ -24,8 +24,8 @@ namespace OpenRCT2::Ui::Handheld::SceneryClear
                                                        "Path furniture" };
     inline std::vector<std::string> Options()
     {
-        std::vector<std::string> rows{ "Resume", "Width: " + std::to_string(settings.width),
-                                       "Height: " + std::to_string(settings.height) };
+        std::vector<std::string> rows{ "Resume", "Brush width: " + std::to_string(settings.width) + " tiles",
+                                       "Brush depth: " + std::to_string(settings.height) + " tiles" };
         for (size_t i = 0; i < names.size(); ++i)
             rows.push_back(
                 std::string(names[i]) + (settings.items.has(static_cast<GameActions::ClearableItem>(i)) ? ": On" : ": Off"));
@@ -43,9 +43,9 @@ namespace OpenRCT2::Ui::Handheld::SceneryClear
     inline void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY origin)
     {
         DrawConstructionOverlay(
-            rt, origin, "Clear area", "Native categories", "Review first",
+            rt, origin, "Clear area", "Choose what to remove", "Review before clearing",
             std::to_string(settings.width) + " x " + std::to_string(settings.height) + " tiles",
-            "Whole objects / native skips");
+            "Removes whole objects");
     }
     struct Snapshot
     {
@@ -165,11 +165,11 @@ namespace OpenRCT2::Ui::Handheld::SceneryClear
         model.title = "Clear selected categories?";
         model.confirmation = true;
         model.selected = selected;
-        model.rows = { "Clear native area", "Cancel" };
+        model.rows = { "Clear selected area", "Cancel" };
         model.stats = { { "Area", std::to_string(d.settings.width) + " x " + std::to_string(d.settings.height) },
                         { "Elements", std::to_string(d.baseline.targets) },
                         { "Cost / refund", FormatMoney(d.cost) } };
-        model.status = status.empty() ? "Whole objects; native skips" : status;
+        model.status = status.empty() ? "Whole objects are removed; protected items stay" : status;
         return model;
     }
 } // namespace OpenRCT2::Ui::Handheld::SceneryClear

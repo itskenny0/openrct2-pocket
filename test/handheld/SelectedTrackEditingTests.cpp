@@ -107,7 +107,11 @@ int main(int argc, char** argv)
         auto cash = state.park.cash;
         auto info = E::Inspection(station);
         Check(!E::Previous(station), "No-predecessor fixture connected unexpectedly");
-        Check(std::find(info.begin(), info.end(), "Previous: disconnected end") != info.end(), "Missing native endpoint detail");
+        Check(std::find(info.begin(), info.end(), "Behind: open end") != info.end(), "Missing native endpoint detail");
+        Check(std::none_of(info.begin(),info.end(),[](const auto& row){return row.starts_with("Tile:") || row.starts_with("Native sequences:");}),
+            "Ordinary inspection exposed diagnostic geometry");
+        const auto technical=E::Inspection(station,true);
+        Check(std::any_of(technical.begin(),technical.end(),[](const auto& row){return row.starts_with("Tile:");}),"Advanced geometry unavailable");
         Check(std::any_of(info.begin(), info.end(), [](const auto& row) { return row.find("Station 1") == 0; }), "Missing native station identity");
         Check(E::Change(station, {}).error == GameActions::Status::ok && E::Context(station) == baseline
             && state.park.cash == cash, "Inspection/query mutated native state");

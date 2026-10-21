@@ -40,6 +40,7 @@ namespace OpenRCT2::Ui::Handheld
         std::vector<int> meters; // Native normalized values; -1 means no meter.
         std::vector<std::string> rowDetails;
         std::vector<bool> rowEnabled;
+        std::vector<bool> rowReadOnly; // Informational rows keep focus for reading, without action chrome.
         std::vector<std::string> tabs;
         size_t selectedTab{};
         std::string headerStatus;
@@ -196,6 +197,13 @@ namespace OpenRCT2::Ui::Handheld
                 if (focused && i == model.selected) Fill(listRt, ScreenCoordsXY{x, y}, {cellWidth - 2, rowHeight - 2}, Theme::gold);
                 DrawModernEllipsised(listRt, ScreenCoordsXY{x + 3, y + 6}, cellWidth - 6,
                     std::string(focused && i == model.selected ? "{BLACK}" : "{WHITE}") + model.rows[i]);
+            }
+            else if (i < model.rowReadOnly.size() && model.rowReadOnly[i])
+            {
+                const bool selected=focused && i==model.selected;
+                Fill(listRt,{x,y},{cellWidth-4,rowHeight-2},selected?Theme::gold:Theme::ink);
+                DrawModernEllipsised(listRt,{x+8,y+7},cellWidth-20,
+                    std::string(selected?"{BLACK}":"{WHITE}")+model.rows[i]);
             }
             else if (i < model.rowValues.size())
             {
