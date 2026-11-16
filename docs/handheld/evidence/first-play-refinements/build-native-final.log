@@ -1,0 +1,5 @@
+[0/2] Re-checking globbed directories...
+[1/4] Building CXX object CMakeFiles/libopenrct2.dir/src/openrct2/Version.cpp.o
+[2/4] Linking CXX static library libopenrct2.a
+[3/4] Linking CXX executable openrct2-cli
+[4/4] Linking CXX executable openrct2

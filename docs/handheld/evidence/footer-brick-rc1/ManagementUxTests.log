@@ -1,0 +1,9 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+Building object index (2504 items)
+Finished building object index in 0.05 seconds.
+Building track design index (0 items)
+Finished building track design index in 0.00 seconds.
+Building scenario index (0 items)
+Finished building scenario index in 0.00 seconds.
+PASS ManagementUxTests: finance values/graphs/loan/cancel, native research drafts/cost/catalog, marketing targets/duration/cost, park/context return, disabled states, save/reload

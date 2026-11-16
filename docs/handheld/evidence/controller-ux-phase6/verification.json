@@ -1,0 +1,113 @@
+{
+  "baseline_commit": "cc9c291470e2edf659063eef6f0b8a6c9770a00a",
+  "baseline_tree": "6c28bdc26bb7a2c7c06c38c8cf5d0fc61c1a6fbe",
+  "build": {
+    "architecture": "Linux x86-64",
+    "profile": "Release; scripting; HTTP/network/OpenGL/TTF/FLAC/Vorbis/Discord/IPO disabled",
+    "compiler": "GCC 13.3; SDL 2.30; ICU 74.2",
+    "engine": "Clean native Phase 7 archive reused; native source unchanged; affected GUI rebuilt, GUI and CLI targets pass",
+    "workaround": "Build-local ScenarioPatcher.cpp picosha2 GCC stringop-overflow warning demotion; no engine source change",
+    "physical_Brick": false,
+    "new_AArch64_binary": false,
+    "binary_sha256": {
+      "openrct2": "f45b5174c9cfe64edc7df97978677b34539cfedd20e465215e97e2d708061a41",
+      "openrct2-cli": "d418d4506ca88ab1ba74c5e5c1d17189000a72f89c9d15526cc99935ca854461",
+      "libopenrct2.a": "c6b8ab432028de93bbcb6377523488a8611f9c9989ffcad82e6c1dda662fa94d"
+    }
+  },
+  "tests": {
+    "ManagementUxTests": 0,
+    "PathBatchTests": 0,
+    "preservation": {
+      "PathActionsTests": 0,
+      "PathScenarioUsabilityTests": 0,
+      "SceneryPathParityTests": 0,
+      "PauseResumeTests": 0,
+      "PresentationLifecycleTests": 0,
+      "AccessShortcutTests": 0,
+      "RideAccessRelocationTests": 0,
+      "ConstructionTests": 0,
+      "UiRedesignTests": 0,
+      "ConstructionUxTests": 0,
+      "RideFlowTests": 0,
+      "PeopleUxTests": 0
+    },
+    "standalone_ctest": {
+      "passed": 5,
+      "failed": 0
+    },
+    "python_runner_compile": true
+  },
+  "source_sha256": {
+    "scripts/handheld/verify-ui-redesign.py": "733d121f8561b68ea276dc3dec3613080bf315850970e27c5ba403afc4d2bdb6",
+    "src/openrct2-ui/handheld/Dashboard.h": "5904796f10e166c79bceb7482b0c23da3559c66a4004b005f35d6b948ba7975e",
+    "src/openrct2-ui/handheld/Explorer.cpp": "e66cc57bbcccd109cd468cbdf252a346e6203987dd84b5ad92b0b437bdd5897a",
+    "src/openrct2-ui/handheld/Explorer.h": "4e922c5421ef95be165c5bb3c5cc66d82de2db8d7b810496c53f4ae3d4a3d592",
+    "src/openrct2-ui/handheld/FinanceInformation.h": "8b6b5556a2aca2f15d8fc6e3c5314730a42d72e57cbfa049a94755ef5488b88d",
+    "src/openrct2-ui/handheld/Finances.cpp": "338249ed59b2ccb8746001b71bfdd9eac4a0d699f83be9c9a1cf2e0b3b84c2dc",
+    "src/openrct2-ui/handheld/Finances.h": "02518a3f59be38bd9cd00e469df60b87413f512065f3c6feb81cc6886e1fb69c",
+    "src/openrct2-ui/handheld/ManagementPanel.h": "d0cf54e68e515ae873e31ef7690deffc69531a171047deaa836ece81f5871151",
+    "src/openrct2-ui/handheld/MarketingManagement.cpp": "9dbdc213a092c0230e6112baa6c717305af1ccc07210ff6d42f63340e8024288",
+    "src/openrct2-ui/handheld/Menu.cpp": "bc14678a6f50b9db9aa1a4dc944d9303709169b89be13cb00ca064d913b7f3af",
+    "src/openrct2-ui/handheld/ResearchManagement.cpp": "8f5220d9ae0030a2b2e85e69e8fb43a882de13f00f9572e677688e8683b939be",
+    "src/openrct2-ui/handheld/ResearchManagement.h": "5d81e9d0753522e7598b459da6b52b1db72e9541b008d7fc2e5cc03abba00dc6",
+    "src/openrct2-ui/handheld/ParkManagementTabs.h": "155f0ff385486012bbb72734afe77d0651c3e4d5b03a63d73a500e8975819c9e",
+    "test/handheld/ManagementUxTests.cpp": "94fbaa1ebcc3ca6df4e861d3b7b5b91ac27a3c41a2a3de53d67157547a951d8a"
+  },
+  "phase7_source_preserved": {
+    "src/openrct2-ui/handheld/Paths.cpp": true,
+    "src/openrct2-ui/handheld/Paths.h": true,
+    "src/openrct2-ui/handheld/PathBatch.h": true,
+    "src/openrct2-ui/handheld/PathSelection.h": true
+  },
+  "captures": {
+    "source": "Desktop offscreen native X8 fixture; original private G1 + official objects; no mocks",
+    "logical_dimensions": [
+      512,
+      384
+    ],
+    "individual_count": 23,
+    "fixture_records": "Native financial history/ledger/research and ride records seeded for deterministic tests; not mature live-park records",
+    "physical_hardware_validation": false,
+    "publication": "User explicitly authorized Phase 6 and completed Phase 7 runtime PNG publication; original raw assets/archives excluded",
+    "sha256": {
+      "01-finance-overview.png": "3bb6e966aa465ef08bdefc1c93dc7ba609d7bffb15dba4e21c2b0086c9aa69c7",
+      "02-finance-ledger.png": "1e18db66f61f725cbfb4e44aacbd2d5bd9a3e722b52e6d34b452931dee1d4e4f",
+      "03-finance-history.png": "ad593efcb64c8170698e746f9c36889ec4b5a52a185836fc46598283a19f1e13",
+      "04-finance-profit-history.png": "5c062d2256a61f279003d5307cdcd9194135a0e915537a1d1746cf9ea997c390",
+      "05-finance-controls.png": "bb6eaaab2cd45f58db09dfad82977d7ce200c4cb4d72b7d233597e13e34bb371",
+      "06-finance-loan-draft.png": "594bdf55085060274499bb6526ae688e334c96274ffba02cd2635d86833bedea",
+      "07-finance-review.png": "c97a71db43ff6676e086e1150aacdbdb65d35bf0c5078a0734bce7f1f58a8a0a",
+      "08-finance-unavailable.png": "dc77ca0b8e7320baa7733cf0049f99e01aca25efb6551cf24c507325e13c18bb",
+      "09-park-administration.png": "0eff4b587d593c1f35df92014d926036b9772d823355e5618ae68c6336e47f01",
+      "10-park-objectives.png": "8dff6855bfbecf32c182c9e5ccfc7ac0369894ea8295b3a68d41bea5fff743f9",
+      "11-park-records.png": "835819e1f2d23881e44c1393ff50487290c2b68646b74a9a7c604983faa1a379",
+      "12-park-native-history.png": "1333e1b89588bc6c7f5f1a6c9b6380705c28c60e657f8626f7a6e09e37ca7ac2",
+      "13-research-project.png": "6c921034efb3aecbcbaa0268ce6e0ad949e815f3d9cb686f7f448fac1a2cdcaa",
+      "14-research-settings.png": "95d2fc49bfc4bc679a0d069a9418da27eb4e3dfb6af09dfd7542894eda8b8b8f",
+      "15-research-draft.png": "19bd16db82b33f550cb7ff8f7890dee19836c8828903fd9f2745432f0e534acc",
+      "16-research-review.png": "5a35bf5e597a9f7247c10d93aab6d36e75f9e40f371a8866109a14ac0e7ee900",
+      "17-research-catalog.png": "41456749af2068a28b3fce44413d2a281675d49f35c74328c73299c504258607",
+      "18-marketing-empty.png": "de606ffa8ff779165f2591ffaa434c4177f1724a0922438d4f91055ec3b70b37",
+      "19-marketing-types.png": "176b7ebf9b5d155be03d5605062bc34a9215b263b1078952b5c1ed5f615313ea",
+      "20-campaign-editor.png": "25c8d9e22bf0a53190a6877ccb36386ef5800ecd9fd2550e41df10692cf3ab05",
+      "21-campaign-targets.png": "4b6326a8d858b044d924ee95238c934834b67c6cd8ac60d296ca5b3c36db7baa",
+      "22-campaign-review.png": "162b3ecc6e296584e162d07d2cc1035b436412eb93e55c34530783c3df81f392",
+      "23-marketing-active.png": "bb7f9587978587083a4c75a910421c8139baad87fcb0cb24f1036a52b51026bb",
+      "contact-sheet.png": "c75b363cdebf2f667c83776dcf9e2a9250906d3bb9bc264704217e5c6f5055da"
+    }
+  },
+  "limitations": [
+    "Physical Brick/NextUI, crowded live parks, translated labels and hardware performance unverified",
+    "Prior optional Phase 5 bright-sand diagnostic remains untriaged",
+    "Phase 7 batch actions remain explicitly sequential, not atomic; unchanged"
+  ],
+  "backlog": {
+    "entries": 32,
+    "Confirmed": 3,
+    "Unverified": 22,
+    "Fixed": 7,
+    "Deferred": 0
+  },
+  "log_normalization": "Trailing whitespace and line endings normalized; result content preserved"
+}

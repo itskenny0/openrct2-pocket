@@ -1,0 +1,12 @@
+{
+  "native_release_build": "PASS",
+  "native_drivers": 16,
+  "native_drivers_passed": 16,
+  "standalone_checks": 7,
+  "standalone_passed": 7,
+  "extra_checks": [
+    "direct saved-design controller height/auto/rotation/scenery/vehicle cancel",
+    "native export scenery selection restoration and cash invariants"
+  ],
+  "physical_brick_tested": false
+}

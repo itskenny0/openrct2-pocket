@@ -131,6 +131,31 @@ int main()
         press(SDL_CONTROLLER_BUTTON_BACK, false);
         input.update(true, 1490);
 
+        press(SDL_CONTROLLER_BUTTON_LEFTSTICK, true);
+        frame = input.update(true, 1491);
+        Check(frame.actions.size() == 1 && frame.actions[0] == Action::cameraMode, "L3 emits camera context action");
+        press(SDL_CONTROLLER_BUTTON_LEFTSTICK, false);
+        input.update(true, 1492);
+        auto trigger = [&](SDL_GameControllerAxis axis, int value) {
+            Check(SDL_JoystickSetVirtualAxis(joystick, axis, value) == 0, "set virtual trigger");
+            SDL_JoystickUpdate();
+            Pump(input);
+        };
+        trigger(SDL_CONTROLLER_AXIS_TRIGGERLEFT, 32767);
+        frame = input.update(true, 1493);
+        Check(frame.actions.size() == 1 && frame.actions[0] == Action::slopeDown, "L2 emits native slope down");
+        Check(input.update(true, 1494).actions.empty(), "Held trigger cannot repeat slope");
+        input.suspend();
+        trigger(SDL_CONTROLLER_AXIS_TRIGGERRIGHT, 32767);
+        Check(input.update(true, 1495).actions.empty(), "Held triggers cannot spill after modal handoff");
+        trigger(SDL_CONTROLLER_AXIS_TRIGGERLEFT, -32768);
+        trigger(SDL_CONTROLLER_AXIS_TRIGGERRIGHT, -32768);
+        input.update(true, 1496);
+        trigger(SDL_CONTROLLER_AXIS_TRIGGERRIGHT, 32767);
+        frame = input.update(true, 1497);
+        Check(frame.actions.size() == 1 && frame.actions[0] == Action::slopeUp, "R2 rearms slope up after release");
+        trigger(SDL_CONTROLLER_AXIS_TRIGGERRIGHT, -32768);
+        input.update(true, 1498);
         press(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, true);
         SDL_JoystickDetachVirtual(index);
         Pump(input);

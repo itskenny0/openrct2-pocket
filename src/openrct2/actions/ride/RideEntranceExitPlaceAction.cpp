@@ -56,7 +56,7 @@ namespace OpenRCT2::GameActions
     {
         GameAction::Serialise(stream);
 
-        stream << DS_TAG(_loc) << DS_TAG(_direction) << DS_TAG(_rideIndex) << DS_TAG(_stationNum) << DS_TAG(_isExit);
+        stream << DS_TAG(_loc) << DS_TAG(_direction) << DS_TAG(_rideIndex) << DS_TAG(_stationNum) << DS_TAG(_isExit) << DS_TAG(_pureGhost);
     }
 
     Result RideEntranceExitPlaceAction::Query(GameState_t& gameState, Park::ParkData& park) const
@@ -64,6 +64,7 @@ namespace OpenRCT2::GameActions
         const auto errorTitle = _isExit ? STR_CANT_BUILD_MOVE_EXIT_FOR_THIS_RIDE_ATTRACTION
                                         : STR_CANT_BUILD_MOVE_ENTRANCE_FOR_THIS_RIDE_ATTRACTION;
 
+        if (_pureGhost && !GetFlags().has(CommandFlag::ghost))return Result(Status::invalidParameters,kStringIdNone,kStringIdNone);
         auto ride = GetRide(_rideIndex);
         if (ride == nullptr)
         {
@@ -90,7 +91,7 @@ namespace OpenRCT2::GameActions
         const auto& station = ride->getStation(_stationNum);
         const auto location = _isExit ? station.exit : station.entrance;
 
-        if (!location.isNull())
+        if (!location.isNull() && !_pureGhost)
         {
             auto rideEntranceExitRemove = RideEntranceExitRemoveAction(location.toCoordsXY(), _rideIndex, _stationNum, _isExit);
             rideEntranceExitRemove.SetFlags(GetFlags());
@@ -150,6 +151,7 @@ namespace OpenRCT2::GameActions
         // When in known station num mode rideIndex is known and z is unknown
         const auto errorTitle = _isExit ? STR_CANT_BUILD_MOVE_EXIT_FOR_THIS_RIDE_ATTRACTION
                                         : STR_CANT_BUILD_MOVE_ENTRANCE_FOR_THIS_RIDE_ATTRACTION;
+        if (_pureGhost && !GetFlags().has(CommandFlag::ghost))return Result(Status::invalidParameters,kStringIdNone,kStringIdNone);
         auto ride = GetRide(_rideIndex);
         if (ride == nullptr)
         {
@@ -165,7 +167,7 @@ namespace OpenRCT2::GameActions
 
         auto& station = ride->getStation(_stationNum);
         const auto location = _isExit ? station.exit : station.entrance;
-        if (!location.isNull())
+        if (!location.isNull() && !_pureGhost)
         {
             auto rideEntranceExitRemove = RideEntranceExitRemoveAction(location.toCoordsXY(), _rideIndex, _stationNum, _isExit);
             rideEntranceExitRemove.SetFlags(GetFlags());
@@ -210,6 +212,10 @@ namespace OpenRCT2::GameActions
         entranceElement->setRideIndex(_rideIndex);
         entranceElement->setGhost(GetFlags().has(CommandFlag::ghost));
 
+        if (_pureGhost) {
+            MapInvalidateTileFull(_loc);
+            return res;
+        }
         if (_isExit)
         {
             station.exit = TileCoordsXYZD(CoordsXYZD{ _loc, z, entranceElement->getDirection() });

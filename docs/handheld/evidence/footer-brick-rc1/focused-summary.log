@@ -1,0 +1,2 @@
+PeopleUxTests {'exit': 0, 'stage': 'runtime'}
+PauseResumeTests {'exit': 0, 'stage': 'runtime'}

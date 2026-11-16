@@ -49,6 +49,8 @@
 #include "peep/StaffSetNameAction.h"
 #include "peep/StaffSetOrdersAction.h"
 #include "peep/StaffSetPatrolAreaAction.h"
+#include "ride/FlatRideEntrancePlaceAction.h"
+#include "ride/FlatRidePlaceAction.h"
 #include "ride/MazePlaceTrackAction.h"
 #include "ride/MazeSetTrackAction.h"
 #include "ride/RideCreateAction.h"
@@ -64,6 +66,7 @@
 #include "ride/RideSetStatusAction.h"
 #include "ride/RideSetVehicleAction.h"
 #include "ride/RideSetVisibilityAction.h"
+#include "ride/ShopPlaceAction.h"
 #include "scenery/BannerPlaceAction.h"
 #include "scenery/BannerRemoveAction.h"
 #include "scenery/BannerSetColourAction.h"
@@ -90,6 +93,8 @@
 #include "terraform/WaterLowerAction.h"
 #include "terraform/WaterRaiseAction.h"
 #include "terraform/WaterSetHeightAction.h"
+#include "track/SavedTrackDesignPlaceAction.h"
+#include "track/SequentialTrackPlaceAction.h"
 #include "track/TrackDesignAction.h"
 #include "track/TrackPlaceAction.h"
 #include "track/TrackRemoveAction.h"
@@ -157,6 +162,11 @@ namespace OpenRCT2::GameActions
         REGISTER_ACTION(PlayerKickAction);
         REGISTER_ACTION(PlayerSetGroupAction);
         REGISTER_ACTION(RideCreateAction);
+        REGISTER_ACTION(ShopPlaceAction);
+        REGISTER_ACTION(FlatRidePlaceAction);
+        REGISTER_ACTION(FlatRideEntrancePlaceAction);
+        REGISTER_ACTION(SavedTrackDesignPlaceAction);
+        REGISTER_ACTION(SequentialTrackPlaceAction);
         REGISTER_ACTION(RideDemolishAction);
         REGISTER_ACTION(RideEntranceExitPlaceAction);
         REGISTER_ACTION(RideEntranceExitRemoveAction);

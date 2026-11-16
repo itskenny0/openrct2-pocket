@@ -238,7 +238,8 @@ namespace OpenRCT2::GameActions
                             edgeCost += 100;
 
                             surfaceElement->setEdgeObjectIndex(_edgeStyle);
-                            surfaceElement->setPrimaryEdgeColour(_edgeColour1);
+                            if (edgeObject->flags.has(TerrainEdgeFlag::hasPrimaryColour))
+                                surfaceElement->setPrimaryEdgeColour(_edgeColour1);
                             MapInvalidateTileFull(coords);
                         }
                     }

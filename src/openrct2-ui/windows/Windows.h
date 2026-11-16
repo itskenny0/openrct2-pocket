@@ -55,7 +55,12 @@ namespace OpenRCT2::Ui::Windows
     void ScenarioSelectHandheldMove(int32_t direction);
     void ScenarioSelectHandheldTab(int32_t direction);
     void ScenarioSelectHandheldConfirm();
+    void ScenarioSelectHandheldToggleLocking();
     void HandheldMenuOpen();
+    WindowBase* HandheldQuitOpen();
+    void HandheldBuildOpen();
+    void HandheldLoadOpen();
+    void HandheldMenuBack();
     void HandheldMenuMove(int32_t direction);
     void HandheldMenuConfirm();
     constexpr int32_t kTabBarHeight = 43;
@@ -412,3 +417,5 @@ namespace OpenRCT2::Ui::Windows
     WindowBase* WaterOpen();
     void ToggleWaterWindow();
 } // namespace OpenRCT2::Ui::Windows
+
+namespace OpenRCT2::Ui::Windows { void HandheldTrackPiecePickerOpen(); }

@@ -100,6 +100,11 @@ namespace OpenRCT2
         setGameSpeed,
         setRestrictedScenery,
         setRideVisibility,
+        placeShop,
+        placeFlatRide,
+        placeFlatRideEntrance,
+        placeSavedTrackDesign,
+        placeSequentialTrack,
         count,
     };
-}
+} // namespace OpenRCT2

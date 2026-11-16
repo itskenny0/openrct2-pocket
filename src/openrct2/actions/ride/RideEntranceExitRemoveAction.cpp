@@ -44,7 +44,7 @@ namespace OpenRCT2::GameActions
     {
         GameAction::Serialise(stream);
 
-        stream << DS_TAG(_loc) << DS_TAG(_rideIndex) << DS_TAG(_stationNum) << DS_TAG(_isExit);
+        stream << DS_TAG(_loc) << DS_TAG(_rideIndex) << DS_TAG(_stationNum) << DS_TAG(_isExit) << DS_TAG(_pureGhost);
     }
 
     static TileElement* FindEntranceElement(
@@ -68,6 +68,7 @@ namespace OpenRCT2::GameActions
 
     Result RideEntranceExitRemoveAction::Query(GameState_t& gameState, Park::ParkData& park) const
     {
+        if (_pureGhost && !GetFlags().has(CommandFlag::ghost))return Result(Status::invalidParameters,kStringIdNone,kStringIdNone);
         auto ride = GetRide(_rideIndex);
         if (ride == nullptr)
         {
@@ -111,6 +112,12 @@ namespace OpenRCT2::GameActions
 
     Result RideEntranceExitRemoveAction::Execute(GameState_t& gameState, Park::ParkData& park) const
     {
+        if (_pureGhost) {
+            if(!GetFlags().has(CommandFlag::ghost))return Result(Status::invalidParameters,kStringIdNone,kStringIdNone);
+            auto* element=FindEntranceElement(_loc,_rideIndex,_stationNum,_isExit?EntranceType::rideExit:EntranceType::rideEntrance);
+            if(!element || !element->isGhost())return Result(Status::invalidParameters,kStringIdNone,kStringIdNone);
+            TileElementRemove(element);MapInvalidateTileFull(_loc);return Result();
+        }
         auto ride = GetRide(_rideIndex);
         if (ride == nullptr)
         {
@@ -147,6 +154,10 @@ namespace OpenRCT2::GameActions
         res.position.y = _loc.y + 16;
         res.position.z = TileElementHeight(res.position);
 
+        if (_pureGhost) {
+            if(!isGhost || !entranceElement->isGhost())return Result(Status::invalidParameters,kStringIdNone,kStringIdNone);
+            TileElementRemove(entranceElement);MapInvalidateTileFull(_loc);return res;
+        }
         FootpathQueueChainReset();
         MazeEntranceHedgeReplacement({ _loc, entranceElement });
         FootpathRemoveEdgesAt(_loc, entranceElement);

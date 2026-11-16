@@ -8,7 +8,22 @@
  *****************************************************************************/
 
 #include "WindowManager.h"
+#include "handheld/WindowVisibility.h"
 
+#include "handheld/Explorer.h"
+#include "handheld/CustomTracks.h"
+#include "handheld/FlatRides.h"
+#include "handheld/GuestManagement.h"
+#include "handheld/GuestFollow.h"
+#include "handheld/MarketingManagement.h"
+#include "handheld/Paths.h"
+#include "handheld/RideManagement.h"
+#include "handheld/SceneryTools.h"
+#include "handheld/AreaTools.h"
+#include "handheld/Shops.h"
+#include "handheld/AccessPreview.h"
+#include "handheld/Mazes.h"
+#include "handheld/Trees.h"
 #include "interface/Chat.h"
 #include "interface/FileBrowser.h"
 #include "interface/Theme.h"
@@ -182,6 +197,11 @@ public:
             case WindowView::parkRating:
                 return ParkRatingOpen();
             case WindowView::parkObjective:
+                if (Handheld::IsEnabled())
+                {
+                    HandheldObjectivesOpen();
+                    return FindByClass(WindowClass::handheldMenu);
+                }
                 return ParkObjectiveOpen();
             case WindowView::parkGuests:
                 return ParkGuestsOpen();
@@ -198,9 +218,11 @@ public:
             case WindowView::networkPassword:
                 return NetworkStatusOpenPassword();
             case WindowView::changelog:
-                return ChangelogOpen(WindowView::changelog);
             case WindowView::newVersionInfo:
-                return ChangelogOpen(WindowView::newVersionInfo);
+                // Release notes are a desktop window with no controller focus; the Pak ships its own notes.
+                if (Handheld::IsEnabled())
+                    return nullptr;
+                return ChangelogOpen(view);
             case WindowView::contributors:
                 return ChangelogOpen(WindowView::contributors);
             case WindowView::financeMarketing:
@@ -353,6 +375,7 @@ public:
             {
                 std::string message = intent->GetStringExtra(INTENT_EXTRA_MESSAGE);
                 CloseCallback callback = intent->GetCloseCallbackExtra(INTENT_EXTRA_CALLBACK);
+                Handheld::EndTerrain();
                 return ProgressWindowOpen(message, callback);
             }
 
@@ -405,6 +428,10 @@ public:
         switch (intent.GetAction())
         {
             case INTENT_ACTION_MAP:
+                Handheld::SceneryTools::ResetScatter();
+                Handheld::AreaTools::ResetPaint();
+                Handheld::GuestFollow::Stop();
+                Handheld::EndTerrain();
                 WindowMapReset();
                 break;
 
@@ -568,6 +595,25 @@ public:
                 break;
             }
 
+            case INTENT_ACTION_SUSPEND_SHOP_PREVIEW:
+                Handheld::CustomTracks::RemovePreviewTemporarily();
+                // Native whole-tick scope also excludes provisional access elements.
+                Handheld::Mazes::RemovePreviewTemporarily();
+                Handheld::AccessPreview::Suspend();
+                Handheld::Shops::RemovePreviewTemporarily();
+                Handheld::FlatRides::RemovePreviewTemporarily();
+                break;
+            case INTENT_ACTION_RESUME_SHOP_PREVIEW:
+                Handheld::CustomTracks::RestorePreview();
+                Handheld::Shops::RestorePreview();
+                Handheld::FlatRides::RestorePreview();
+                Handheld::AccessPreview::Restore();
+                Handheld::Mazes::RestorePreview();
+                break;
+            case INTENT_ACTION_PREPARE_PEEP_SAVE:
+                if (Handheld::PeepPlacement::Active())
+                    Handheld::EndTerrain();
+                break;
             case INTENT_ACTION_REMOVE_PROVISIONAL_ELEMENTS:
                 ProvisionalElementsRemove();
                 break;
@@ -575,6 +621,7 @@ public:
                 ProvisionalElementsRestore();
                 break;
             case INTENT_ACTION_REMOVE_PROVISIONAL_FOOTPATH:
+                Handheld::Paths::ClearPreview();
                 FootpathRemoveProvisional();
                 break;
             case INTENT_ACTION_REMOVE_PROVISIONAL_TRACK_PIECE:
@@ -856,6 +903,9 @@ public:
         std::unique_ptr<WindowBase>&& wp, WindowClass cls, ScreenCoordsXY pos, ScreenSize windowSize,
         WindowFlags flags) override
     {
+        if (Handheld::IsEnabled() && Handheld::IsDesktopChrome(cls))
+            flags.set(WindowFlag::hidden);
+
         windowSize.height += wp->getTitleBarDiffTarget();
 
         if (flags.has(WindowFlag::autoPosition))
@@ -1048,12 +1098,29 @@ public:
      */
     void CloseByNumber(WindowClass cls, WindowNumber number) override
     {
+        if (cls == WindowClass::ride)
+        {
+            Handheld::MarketingManagement::RideRemoved(RideId::FromUnderlying(number));
+            Handheld::RideManagement::Invalidate(RideId::FromUnderlying(number));
+        }
         CloseByCondition([cls, number](WindowBase* w) -> bool { return w->classification == cls && w->number == number; });
     }
 
     // TODO: Refactor this to use variant once the new window class is done.
     void CloseByNumber(WindowClass cls, EntityId number) override
     {
+        if (cls == WindowClass::peep)
+        {
+            Handheld::GuestFollow::Invalidate(number);
+            if (const auto& target = Handheld::PeepPlacement::target)
+            {
+                const auto id = target->guest ? target->guest->id : target->staff->id;
+                if (id == number)
+                    Handheld::EndTerrain();
+            }
+            HandheldStaffRemoved(number);
+            Handheld::GuestManagement::Invalidate(number);
+        }
         CloseByNumber(cls, static_cast<WindowNumber>(number.ToUnderlying()));
     }
 
@@ -1101,6 +1168,9 @@ public:
      */
     void CloseAllExceptFlags(WindowFlags flags) override
     {
+        // WindowInitAll resets the native UI on park load; pre-load Pocket drafts must not survive.
+        if (flags.isEmpty())
+            Handheld::RideManagement::InvalidateAll();
         CloseByCondition([flags](WindowBase* w) -> bool { return !w->flags.hasAny(flags); });
     }
 
@@ -1123,6 +1193,11 @@ public:
      */
     void CloseConstructionWindows() override
     {
+        Handheld::Paths::ClearPreview();
+        Handheld::Trees::ClearPreview();
+        Handheld::SceneryTools::ClearPreview();
+        Handheld::Shops::ClearPreview();
+        Handheld::FlatRides::ClearPreview();
         CloseByClass(WindowClass::rideConstruction);
         CloseByClass(WindowClass::footpath);
         CloseByClass(WindowClass::trackDesignList);
@@ -1131,6 +1206,11 @@ public:
 
     void Cleanup() override
     {
+        Handheld::SceneryTools::ResetScatter();
+        Handheld::AreaTools::ResetPaint();
+        Handheld::GuestFollow::Stop();
+        // Release native tool ghosts while the context and loaded objects still exist.
+        Handheld::EndTerrain();
         CloseByCondition([](WindowBase* w) { return true; });
         WindowCullDead();
     }
@@ -1188,7 +1268,7 @@ public:
         for (auto it = gWindowList.rbegin(); it != gWindowList.rend(); it++)
         {
             auto& w = *it;
-            if (w->flags.has(WindowFlag::dead))
+            if (w->flags.hasAny(WindowFlag::dead, WindowFlag::hidden))
                 continue;
 
             if (screenCoords.x < w->windowPos.x || screenCoords.x >= w->windowPos.x + w->width

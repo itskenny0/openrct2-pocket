@@ -85,7 +85,8 @@ namespace OpenRCT2::GameActions
 
             auto currentTile = CoordsXYZ{ firstTile.x, firstTile.y, firstTile.z } + currentTileRotatedOffset;
 
-            if (gLegacyScene != LegacyScene::scenarioEditor && !gameState.cheats.sandboxMode)
+            if (gLegacyScene != LegacyScene::scenarioEditor && !GetFlags().has(CommandFlag::ghost)
+                && !gameState.cheats.sandboxMode)
             {
                 if (park.flags.has(ParkFlag::forbidTreeRemoval))
                 {
@@ -108,15 +109,18 @@ namespace OpenRCT2::GameActions
             {
                 return Result(Status::invalidParameters, STR_CANT_REMOVE_THIS, STR_OFF_EDGE_OF_MAP);
             }
-            // Prevent duplicate costs when using the clear scenery tool that overlaps multiple large
-            // scenery tile elements.
-            if (flags.has(CommandFlag::trackDesign))
+        }
+        // Account for all native sequences once, only after footprint validation.
+        // Repeatedly marking one sequence within the loop made multi-tile queries
+        // free even though execution charged the native removal price.
+        if (flags.has(CommandFlag::trackDesign))
+        {
+            calculate_cost = !tileElement->asLargeScenery()->isAccounted();
+            for (const auto& tile : sceneryEntry->tiles)
             {
-                if (tileElement->asLargeScenery()->isAccounted())
-                    calculate_cost = false;
-
-                // Sets the flag to prevent this being counted in additional calls
-                tileElement->asLargeScenery()->setIsAccounted(true);
+                const auto offset = CoordsXYZ{ CoordsXY{ tile.offset }.rotate(_loc.direction), tile.offset.z };
+                if (auto* element = FindLargeSceneryElement(firstTile + offset, tile.index))
+                    element->asLargeScenery()->setIsAccounted(true);
             }
         }
 
@@ -164,7 +168,8 @@ namespace OpenRCT2::GameActions
 
             auto currentTile = CoordsXYZ{ firstTile.x, firstTile.y, firstTile.z } + rotatedCurrentTile;
 
-            if (gLegacyScene != LegacyScene::scenarioEditor && !gameState.cheats.sandboxMode)
+            if (gLegacyScene != LegacyScene::scenarioEditor && !GetFlags().has(CommandFlag::ghost)
+                && !gameState.cheats.sandboxMode)
             {
                 if (!MapIsLocationOwned({ currentTile.x, currentTile.y, currentTile.z }))
                 {

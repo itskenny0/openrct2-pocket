@@ -1,0 +1,16 @@
+{
+  "build-phase2/openrct2": "fe8fd8e09a1f87edeb0b9861590b9f57dbba323250996a7571fa5a8dbdf692f3",
+  "build-phase2/openrct2-cli": "7b013ee9eb929ed998123e05cc4b29e378bfde7dcbefbd832626608eb710f5f2",
+  "build-phase2/libopenrct2.a": "33c6440052fa4e830d9d2ee92f2b094e35abbb42637a80b847f24db46a84a5a2",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase2/confirmation.png": "b9ee03fd7dfe0a53df36128a375c11e9818361881a535d20e2a15f93c654c421",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase2/connected-adjust.png": "94f7867a34fb291dca5813d0fa610eacf5490846cc23c86f3f3b5f5fcb283022",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase2/contact-sheet.png": "a7d1b4ab0e658ce7075447a7570a46fdebbfbcca9bf0bcc194efcbb2798bc990",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase2/path-adjust.png": "64e11dfd03310d6207514b896de975082d1cf7c2bd569728a166311f0b816f96",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase2/path-build.png": "dfef9f9a61d9b1bf90f1d4121af61c9f9195ea0ae291a5824146d1d4dff8508a",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase2/path-elevation.png": "ba1056bf515b070d89e3a8675329edd9cd11d60adb8aaa554cb63feb5f3f00aa",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase2/path-surface-picker.png": "04a84095dadea0285ac49ae2a0408abdeeb03f4ebcc964eb1e97bded135d6fd5",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase2/ride-operations.png": "2ddf7f5d5e307de141aae893946ab7ebd267d3300fa2bf679caeddb609f43936",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase2/ride-overview.png": "e2b4b3a340eb0025251fece8a3eea4ad7c961dfc5ae19a7f5acd1f29bc64f7da",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase2/ride-settings.png": "a71c5d9589c4ad85a592cc3e64fca71e86d39109b2a93550eb8b53b658632a1c",
+  "openrct2-pocket/docs/handheld/captures/controller-ux-phase2/ride-statistics.png": "fd26e3b639df42d830fb1a28df433c6a93ea4c533cbcfd767a0e5926d643fbcb"
+}

@@ -56,7 +56,7 @@ namespace OpenRCT2::GameActions
         {
             return Result(Status::invalidParameters, STR_CANT_REMOVE_THIS, STR_OFF_EDGE_OF_MAP);
         }
-        if (!MapCanBuildAt({ _loc.x, _loc.y, _loc.z - 16 }))
+        if (!GetFlags().has(CommandFlag::ghost) && !MapCanBuildAt({ _loc.x, _loc.y, _loc.z - 16 }))
         {
             return Result(Status::notOwned, STR_CANT_REMOVE_THIS, STR_LAND_NOT_OWNED_BY_PARK);
         }
@@ -143,7 +143,7 @@ namespace OpenRCT2::GameActions
         {
             if (bannerElement->getBaseZ() != _loc.z)
                 continue;
-            if (bannerElement->isGhost() && !GetFlags().has(CommandFlag::ghost))
+            if (bannerElement->isGhost() != GetFlags().has(CommandFlag::ghost))
                 continue;
             if (bannerElement->getPosition() != _loc.direction)
                 continue;

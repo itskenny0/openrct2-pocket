@@ -1,0 +1,3 @@
+brick-build/openrct2:     ELF 64-bit LSB executable, ARM aarch64, version 1 (GNU/Linux), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 3.10.108, with debug_info, not stripped
+brick-build/openrct2-cli: ELF 64-bit LSB executable, ARM aarch64, version 1 (GNU/Linux), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 3.10.108, with debug_info, not stripped
+brick-build/input-map:    ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 3.10.108, with debug_info, not stripped

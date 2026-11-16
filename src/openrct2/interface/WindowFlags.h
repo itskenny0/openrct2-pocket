@@ -40,6 +40,8 @@ namespace OpenRCT2
         higherContrastOnPress,
         noTitleBar,
         noSnapping,
+        /** A retained native window that neither paints, occludes nor receives hit tests. */
+        hidden,
 
         // *ONLY* create only flags below
         autoPosition,

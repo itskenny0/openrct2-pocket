@@ -1,0 +1,44 @@
+{
+  "baselineCommit": "30d55f8f782c7bb16fbfb817ab9ec7d078a98651",
+  "baselineTree": "653d3473e7316459050fb467aea898603d6e0c1d",
+  "uiObjectsChecked": 160,
+  "staleObjects": [],
+  "sourceSha256": {
+    "scripts/handheld/verify-ui-redesign.py": "fac6766b9b788b43cd8fe53f4f4a86cf538fe6044d8e54c298665a78a380b64e",
+    "src/openrct2-ui/handheld/Dashboard.h": "df6cbda42fbc2bd14ea4725a409709075d5143766278fd9ad1af0a6dc13b6641",
+    "src/openrct2-ui/handheld/Explorer.cpp": "926700b34ed2a08de4499da1fb55aa38f4b24b987f7e7b41abdb88b2f11469fa",
+    "src/openrct2-ui/handheld/Explorer.h": "8a35a0a0d086267d461574c2e6a3fc90a6c1e46983aa2b346891bdc70f8bcbcf",
+    "src/openrct2-ui/handheld/ManagementPanel.h": "754eca624cebad855382f636f082ee2193b23d983d049f7512c13346f2f1c3e3",
+    "src/openrct2-ui/handheld/Menu.cpp": "747533ff8720d8270e0e133db035185062aec60bf052ff27a003f3b3498f67a6",
+    "src/openrct2-ui/handheld/ModernText.h": "d409605cad8c0b413aaf8a72754c6a94c4701c5bda9dbed51a548adfdacb4e78",
+    "src/openrct2-ui/handheld/Panel.h": "24f1377fedfb56b6848afc04544bf61313405b4f211d92453b479cbc507169f8",
+    "src/openrct2-ui/handheld/ParkOverview.cpp": "20ef55d14b31765de441207c2fd1c0251b7dff1f68a76267e227a8e2c2a53953",
+    "src/openrct2-ui/handheld/Paths.cpp": "263e6924c7e4ef751cab8e5d007204b107e9a7b339fcdbeb1fd66ab5ca2c5f35",
+    "src/openrct2-ui/handheld/PocketSansHeadingData.h": "c527097e23b632830bec4e6dddd20606f8be56cefeb0620af0fbef5c2b0cd7d2",
+    "src/openrct2-ui/handheld/RideManagement.cpp": "312efc42d1399bd2da8ba3b25224d4a982aec6b60d5bd7006e53b672c1e1e585",
+    "test/handheld/PresentationLifecycleTests.cpp": "ec11916d268bb0b38a2070f3a629ed64261fab2e7578cf537a3be67a0d3720f8",
+    "test/handheld/UiRedesignTests.cpp": "21546b7a55ff1fb925306637ac6f1a3fa244eaa2248f943400216b143e17f095",
+    "tools/handheld/generate_font.py": "2308ce5e8899fa2783efba545c6a233497f8404fbba07feab0bcf153e2a6e3da"
+  },
+  "executablesSha256": {
+    "openrct2": "58d5ce468e35b126230661388da8499c7145a0b5239c52f4dc499802e8136701",
+    "openrct2-cli": "0a19f08b70a81188f0da54171ead90b6b8bb8298b71a9fc86c770add6e0f884c"
+  },
+  "captureSha256": {
+    "access-path-shortcut.png": "d5b60c9792b389bd7003392ea9fb80a6afe6a12ac03bb35469836b816b2260db",
+    "connected-endpoint.png": "b4d9297f08fa57af85a8058ce1f1cdca5ee9ed4df46778fe81bfef32d0820017",
+    "connected-queue-overlay.png": "fcc5215e485858bb5b9c466fdedf5f068779fb986949f0a29774e4cd061ebf41",
+    "connected-settings.png": "72377d068ec56834490831f06c2268e3b44c9164a47492c16a778de03d04894a",
+    "contact.png": "a03da3a6b72fbf41d54bcd02b070cb39dfe6b62fd1b9694bab00a1478ec42f12",
+    "dashboard-content.png": "2f710ffb8e4bcc3b7a352104bfcd28dd6af26a928172345e8cc01634f6012932",
+    "dashboard-overview.png": "90416e03bcb421e5d8f9fbe8c10eeed50c185c44f0b362eb598a9525984a8725",
+    "path-live.png": "3451c5c0029f7d53c0db6798c9eb57c3ccf7098dad73106cf5e47ca0f7580cd0",
+    "path-settings.png": "417336cf993ba968aefc11f4e4f69d75dedb147f704e3bdcc0ff13793e202dd8",
+    "ride-demolition-review.png": "7d3afca6353a220d97fa2f6a979f852a6b8b9072cc9b4d497257d7c6fba40bac",
+    "ride-detail-page2.png": "c914c0f3d80830cc0995f53d9fbf66cfc54c4e0d4fc320ff4ffaf498f5e80812",
+    "ride-detail.png": "9ed1bbf627263d2fc414800d4076eec369dfe188c07d29c13a9a38e3f0742973",
+    "ride-disabled-action.png": "d82710b63e13dc360fa92f7df0009a84e2e1600a90872b2f2c457443ec3db53f",
+    "ride-roster.png": "9174766d7d42c8542e9291bf96bb0e6bc0ec361ae7e77872e78bf54a73379d60",
+    "ride-statistics.png": "5a8debfe8dc76145fd6131beaeff6bfb9118e5b9abac5b769677fb8662f4d309"
+  }
+}

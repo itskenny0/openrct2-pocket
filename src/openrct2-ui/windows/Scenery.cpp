@@ -63,6 +63,7 @@
 #include <openrct2/world/Map.h>
 #include <openrct2/world/MapSelection.h>
 #include <openrct2/world/Scenery.h>
+#include <openrct2/world/SceneryScatter.h>
 #include <openrct2/world/tile_element/BannerElement.h>
 #include <openrct2/world/tile_element/LargeSceneryElement.h>
 #include <openrct2/world/tile_element/PathElement.h>
@@ -1793,16 +1794,9 @@ namespace OpenRCT2::Ui::Windows
             gMapSelectFlags.set(MapSelectFlag::enable);
             if (gWindowSceneryScatterEnabled)
             {
-                uint16_t cluster_size = (gWindowSceneryScatterSize - 1) * kCoordsXYStep;
-                gMapSelectPositionA.x = mapTile.x - cluster_size / 2;
-                gMapSelectPositionA.y = mapTile.y - cluster_size / 2;
-                gMapSelectPositionB.x = mapTile.x + cluster_size / 2;
-                gMapSelectPositionB.y = mapTile.y + cluster_size / 2;
-                if (gWindowSceneryScatterSize % 2 == 0)
-                {
-                    gMapSelectPositionB.x += kCoordsXYStep;
-                    gMapSelectPositionB.y += kCoordsXYStep;
-                }
+                const auto bounds = SceneryScatterBounds(mapTile, gWindowSceneryScatterSize);
+                gMapSelectPositionA = bounds.first;
+                gMapSelectPositionB = bounds.second;
             }
             else
             {
@@ -2917,20 +2911,7 @@ namespace OpenRCT2::Ui::Windows
 
             if (isCluster)
             {
-                switch (gWindowSceneryScatterDensity)
-                {
-                    case ScatterToolDensity::lowDensity:
-                        quantity = gWindowSceneryScatterSize;
-                        break;
-
-                    case ScatterToolDensity::mediumDensity:
-                        quantity = gWindowSceneryScatterSize * 2;
-                        break;
-
-                    case ScatterToolDensity::highDensity:
-                        quantity = gWindowSceneryScatterSize * 3;
-                        break;
-                }
+                quantity = SceneryScatterQuantity(gWindowSceneryScatterSize, gWindowSceneryScatterDensity);
             }
 
             bool forceError = true;
@@ -2944,25 +2925,10 @@ namespace OpenRCT2::Ui::Windows
 
                 if (isCluster)
                 {
-                    if (!sceneryEntry->flags.has(SmallSceneryFlag::occupiesFullTile))
-                    {
-                        quadrant = UtilRand() & 3;
-                    }
-
-                    int16_t grid_x_offset = (UtilRand() % gWindowSceneryScatterSize) - (gWindowSceneryScatterSize / 2);
-                    int16_t grid_y_offset = (UtilRand() % gWindowSceneryScatterSize) - (gWindowSceneryScatterSize / 2);
-                    if (gWindowSceneryScatterSize % 2 == 0)
-                    {
-                        grid_x_offset += 1;
-                        grid_y_offset += 1;
-                    }
-                    cur_grid_x += grid_x_offset * kCoordsXYStep;
-                    cur_grid_y += grid_y_offset * kCoordsXYStep;
-
-                    if (!sceneryEntry->flags.has(SmallSceneryFlag::isRotatable))
-                    {
-                        gSceneryPlaceRotation = (gSceneryPlaceRotation + 1) & 3;
-                    }
+                    const auto proposal = SceneryScatterProposal(
+                        gridPos, gWindowSceneryScatterSize, *sceneryEntry, quadrant, gSceneryPlaceRotation);
+                    cur_grid_x = proposal.x;
+                    cur_grid_y = proposal.y;
                 }
 
                 uint8_t zAttemptRange = 1;

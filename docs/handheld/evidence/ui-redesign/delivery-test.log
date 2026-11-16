@@ -1,0 +1,13 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+Building object index (2504 items)
+Finished building object index in 0.55 seconds.
+Building track design index (0 items)
+Finished building track design index in 0.00 seconds.
+Building scenario index (0 items)
+Finished building scenario index in 0.00 seconds.
+WARNING[/workspace/scratch/d2d0a4acf14b/openrct2-pocket/src/openrct2-ui/drawing/engines/HardwareDisplayDrawingEngine.cpp:115 (Resize)]: HWDisplayDrawingEngine::Resize error: Parameter 'renderer' is invalid
+WARNING[/workspace/scratch/d2d0a4acf14b/openrct2-pocket/src/openrct2-ui/drawing/engines/HardwareDisplayDrawingEngine.cpp:115 (Resize)]: HWDisplayDrawingEngine::Resize error: Parameter 'renderer' is invalid
+PASS dashboard right-to-enter, grid axes, shoulder paging, Back and section focus retention
+PASS native entrance/exit point shortcuts start connected queue/normal paths without changing access/cash
+PASS ordinary path settings, native surface grid and cancel preserve tool/mode/cash

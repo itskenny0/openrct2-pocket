@@ -1,0 +1,5 @@
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+track design index out of date
+Building track design index (5 items)
+Finished building track design index in 0.03 seconds.
+Native five-family construction / native stations-straights-multitile-turns / query-repeat-cost-refund / unsupported geometry / selected-block-refund-gap / brake-baseline-bounds / ghosts-resume-save passed

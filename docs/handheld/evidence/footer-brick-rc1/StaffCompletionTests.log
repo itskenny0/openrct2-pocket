@@ -1,0 +1,9 @@
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+Building object index (2504 items)
+Finished building object index in 0.04 seconds.
+Building track design index (0 items)
+Finished building track design index in 0.00 seconds.
+Building scenario index (0 items)
+Finished building scenario index in 0.00 seconds.
+ERROR[/workspace/scratch/3dd26b9bb351/repo/src/openrct2/actions/peep/StaffSetCostumeAction.cpp:70 (Query)]: Invalid entertainer costume 65535
+Native all staff roles / loaded costumes / invalid-role-object / query-stale-repeat / wages-no-money / patrol-name-uniform-filter-dismissal-save passed

@@ -99,6 +99,7 @@ namespace OpenRCT2
         editorStatusLine = 141,
         handheldFocus = 142,
         handheldMenu = 143,
+        handheldHud = 144,
 
         // Only used for colour schemes
         staff = 220,

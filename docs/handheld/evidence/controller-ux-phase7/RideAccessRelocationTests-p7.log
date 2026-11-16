@@ -1,0 +1,18 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+INFO: Handheld controller: Virtual Controller (instance 0)
+INFO: Handheld controller: Virtual Controller (instance 1)
+INFO: Handheld controller: Virtual Controller (instance 2)
+INFO: Handheld controller: Virtual Controller (instance 3)
+INFO: Handheld controller: Virtual Controller (instance 4)
+INFO: Handheld controller: Virtual Controller (instance 5)
+PASS family 33 entrance inspection/ghost/nested autosave/cancel/serialized stale descriptor/quote/one Apply/native move/remove/accounting/gap recovery
+PASS family 33 exit inspection/ghost/nested autosave/cancel/serialized stale descriptor/quote/one Apply/native move/remove/accounting/gap recovery
+PASS family 20 entrance inspection/ghost/nested autosave/cancel/serialized stale descriptor/quote/one Apply/native move/remove/accounting/gap recovery
+PASS family 20 exit inspection/ghost/nested autosave/cancel/serialized stale descriptor/quote/one Apply/native move/remove/accounting/gap recovery
+PASS family 6 entrance inspection/ghost/nested autosave/cancel/serialized stale descriptor/quote/one Apply/native move/remove/accounting/gap recovery
+PASS family 6 exit inspection/ghost/nested autosave/cancel/serialized stale descriptor/quote/one Apply/native move/remove/accounting/gap recovery
+PASS changed target preserves source through guarded action; direct native Execute demonstrates sequential gap and native recovery
+Unable to open '/workspace/scratch/d2d0a4acf14b/p7-profile-RideAccessRelocationTests/absent.park'
+PASS native Open eligibility, final .park map/cash/access round-trip and stale-load identity
+PASS old-window completion isolation, early load preservation, successful-load pending queue cleanup and pre-unload

@@ -1,0 +1,24 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+Building object index (2504 items)
+Finished building object index in 0.09 seconds.
+Building track design index (0 items)
+Finished building track design index in 0.00 seconds.
+Building scenario index (0 items)
+Finished building scenario index in 0.00 seconds.
+WARNING[/workspace/scratch/45453a909f98/source/src/openrct2-ui/drawing/engines/HardwareDisplayDrawingEngine.cpp:115 (Resize)]: HWDisplayDrawingEngine::Resize error: Parameter 'renderer' is invalid
+WARNING[/workspace/scratch/45453a909f98/source/src/openrct2-ui/drawing/engines/HardwareDisplayDrawingEngine.cpp:115 (Resize)]: HWDisplayDrawingEngine::Resize error: Parameter 'renderer' is invalid
+An assertion failed, please report this to the OpenRCT2 developers.
+Version: OpenRCT2, v0.5.5 (5d410ca)
+GfxGetG1Element called on headless instance
+An assertion failed, please report this to the OpenRCT2 developers.
+Version: OpenRCT2, v0.5.5 (5d410ca)
+GfxGetG1Element called on headless instance
+An assertion failed, please report this to the OpenRCT2 developers.
+Version: OpenRCT2, v0.5.5 (5d410ca)
+GfxGetG1Element called on headless instance
+An assertion failed, please report this to the OpenRCT2 developers.
+Version: OpenRCT2, v0.5.5 (5d410ca)
+GfxGetG1Element called on headless instance
+INFO: Handheld controller: Virtual Controller (instance 0)
+Native map raster/bounds/rotation/resize/save and SDL navigation/locate passed

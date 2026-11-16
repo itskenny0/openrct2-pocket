@@ -50,7 +50,8 @@ namespace OpenRCT2::GameActions
             return Result(Status::invalidParameters, STR_CANT_REMOVE_THIS, STR_OFF_EDGE_OF_MAP);
         }
 
-        if (!(gLegacyScene == LegacyScene::scenarioEditor || gameState.cheats.sandboxMode) && !MapIsLocationOwned(_loc))
+        if (!GetFlags().has(CommandFlag::ghost)
+            && !(gLegacyScene == LegacyScene::scenarioEditor || gameState.cheats.sandboxMode) && !MapIsLocationOwned(_loc))
         {
             return Result(Status::disallowed, STR_CANT_REMOVE_THIS, STR_LAND_NOT_OWNED_BY_PARK);
         }
@@ -105,6 +106,7 @@ namespace OpenRCT2::GameActions
         }
 
         pathElement->setAddition(0);
+        pathElement->setAdditionIsGhost(false);
         MapInvalidateTileFull(_loc);
 
         auto res = Result();

@@ -1,3 +1,8 @@
+> Current Brick release-candidate build and packaging: see
+> `packaging/handheld/nextui/BUILD.md` and
+> `docs/handheld/CONTROLLER-FOOTER-BRICK-RC1.md`. The baseline/prototype recipes
+> below are retained as historical development instructions.
+
 # Build and test instructions
 
 Read `VALIDATION.md` before using an artifact. The x86_64 executable is for Linux development, not the TrimUI Brick or macOS. The ARM toolchain file and PortMaster launcher are unverified staging templates.

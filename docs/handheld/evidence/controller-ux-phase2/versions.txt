@@ -1,0 +1,16 @@
+openrct2
+OpenRCT2, pocket-menu-native-0.2-46 (4e56194 on handheld/modern-ui-paths)
+Linux (AArch64)
+Network version: Multiplayer disabled
+Plugin API version: 124
+Current park file version: 63
+Minimum park file version: 57
+Breakpad support disabled
+openrct2-cli
+OpenRCT2, pocket-menu-native-0.2-46 (4e56194 on handheld/modern-ui-paths)
+Linux (AArch64)
+Network version: Multiplayer disabled
+Plugin API version: 124
+Current park file version: 63
+Minimum park file version: 57
+Breakpad support disabled

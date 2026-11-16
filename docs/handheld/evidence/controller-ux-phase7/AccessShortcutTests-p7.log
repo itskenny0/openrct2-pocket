@@ -1,0 +1,4 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+PASS native entrance commit then first-action missing-exit recovery
+PASS first-action quick ride / inspection / access handoffs; cancel and navigation preserve exact map/cash/station; Close routing and stale identity guard

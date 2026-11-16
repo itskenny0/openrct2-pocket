@@ -1,0 +1,44 @@
+/workspace/scratch/3dd26b9bb351/repo/src/openrct2-ui/handheld/SceneryTools.cpp: In function ‘Configure’:
+/workspace/scratch/3dd26b9bb351/repo/src/openrct2-ui/handheld/SceneryTools.cpp:370:32: warning: ‘MEM[(union _Storage *)&previewHeight]._M_value’ may be used uninitialized [-Wmaybe-uninitialized]
+  370 |                 current.height = *previewHeight;
+      |                                ^
+/workspace/scratch/3dd26b9bb351/repo/src/openrct2-ui/handheld/SceneryTools.cpp:363:20: note: ‘MEM[(union _Storage *)&previewHeight]._M_value’ was declared here
+  363 |         const auto previewHeight = ghost && requested && requested->settings == current
+      |                    ^
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+Building object index (2504 items)
+Finished building object index in 0.05 seconds.
+Building track design index (0 items)
+Finished building track design index in 0.00 seconds.
+Building scenario index (0 items)
+Finished building scenario index in 0.00 seconds.
+Pocket native HUD / dates / cash / guests / pause-speed / no-money / park-menu safe areas passed
+Native water raise/lower / exact cash / single tile / clearance / ownership / funds / pause / save/reload checks passed
+ERROR[/workspace/scratch/3dd26b9bb351/repo/src/openrct2/actions/terraform/SurfaceSetStyleAction.cpp:86 (Query)]: Invalid surface style 2
+Native surface paint / exact cash / loaded cycle / no-op / invalid target / ownership / funds / pause / height-edge-water / save-reload checks passed
+Native scenery removal / exact target-cash / unsupported-stale hits / ghost protection / ownership-funds-pause-tree rules / neighbours / save-reload checks passed
+Native tree placement / availability-research-restrictions / one tree-exact cash / ground-neighbours / invalid-ownership-clearance-funds-pause / save-reload checks passed
+Native tree ghost / unchanged-target-selection / nested suspension / invalid-research-ownership-funds-pause / menu-tool exit / exact real placement-cash / autosave-manual-save-reload checks passed
+Native shops / eligibility-grid-selection-cancel-input / ghost-rotation-provisional-save / exact cash-real placement-open-reload passed
+ERROR[/workspace/scratch/3dd26b9bb351/repo/src/openrct2/actions/ride/RideSetPriceAction.cpp:68 (Query)]: Attempting to set an invalid price for rideIndex 2
+ERROR[/workspace/scratch/3dd26b9bb351/repo/src/openrct2/actions/ride/RideSetPriceAction.cpp:68 (Query)]: Attempting to set an invalid price for rideIndex 2
+Native shop management / targeting-status-price-common-price-bounds / cancellation-input / exact refund / stale-pause / save-reload passed
+ERROR[/workspace/scratch/3dd26b9bb351/repo/src/openrct2/actions/park/ParkSetEntranceFeeAction.cpp:56 (Query)]: Invalid park entrance fee 9991
+ERROR[/workspace/scratch/3dd26b9bb351/repo/src/openrct2/actions/park/ParkSetEntranceFeeAction.cpp:56 (Query)]: Invalid park entrance fee -1
+Native finances / ledger-currency / bounded loan-exact cash-debt-repay / admission-restrictions / cancel-input-pause-no-money / save-reload passed
+Native staff / auto-hire-roster-orders / exact native wages-no-money / cancel-input-stale-dismiss / save-reload passed
+ERROR[/workspace/scratch/3dd26b9bb351/repo/src/openrct2/actions/park/ParkSetResearchFundingAction.cpp:48 (Query)]: Invalid research funding amount 4
+Native Research / bounded-stale-drafts / cancel-focus-input / no-money-exact-recurring-cost / progression-picker-unlock / save-reload passed
+Native Marketing / eligibility-target-pages / bounded-stale-drafts / cancel-input-queue / exact cost-no-money-pause / native vouchers-weekly-expiration / save-reload passed
+Native Guests / full-roster-needs-thoughts-items-money / focus-resume-input-locate / departed-reused-target / readonly-save-reload passed
+Native Rides roster / information / locate / status-prerequisites / price-restrictions-accounting / cancel-stale-focus / save-reload passed
+Native Overview / summary-objective-outcomes / default-focus-admission-link / native-status-zero-cash / cancel-stale-input / save-reload passed
+Native ride access / optional-recovery-input-focus / queue association-connectivity / exact path cash / opening-cancel / stale-save-reload passed
+Native mode Operations / duration-rotations-swings-laps-speed-launch-circuits / bounds-pause-cancel-stale / zero cash-ledger / Test-Open prerequisites / save-reload passed
+Native Appearance / indexed track-vehicle-entrance / query-cancel-repeat-bounds / zero cash / serialization passed
+Native Vehicles/Dispatch / station-object bounds-clamping / flags-cancel-stale / pause-zero-cash / Test-Open rejection / save-reload passed
+Native Music / toggle-style-query-cancel-repeat-bounds / zero cash / persistence fixture passed
+Native Refurbishment / native-query-cancel-repeat / age-reliability-retained-ride / exact cost passed
+Native ride depth / settings-bounds-stale / queried demolition-exact-cash / save-reload passed
+Native flat rides / eligibility-picker / footprint-rotation-ghost / exact cash / entrance-exit-resume / native-open-roster / input-save-reload passed
+Native ghost lifecycle / cash / preview save safety / path place / queue / raised slope / height persistence / save / reload / remove / ownership / pause and research checks passed

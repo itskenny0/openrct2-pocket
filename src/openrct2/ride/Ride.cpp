@@ -8,6 +8,7 @@
  *****************************************************************************/
 
 #include "Ride.h"
+#include "RideIdentity.h"
 
 #include "../Cheats.h"
 #include "../Context.h"
@@ -191,6 +192,7 @@ namespace OpenRCT2
         auto result = &gameState.rides[idx];
         assert(result->id == RideId::GetNull());
 
+        RideAllocationChanged(index);
         // Initialize the ride to all the defaults.
         *result = Ride{};
 
@@ -223,6 +225,7 @@ namespace OpenRCT2
         assert(gameState.rides[idx].type != kRideTypeNull);
 
         auto& ride = gameState.rides[idx];
+        RideAllocationChanged(id);
         RideReset(ride);
 
         // Shrink maximum ride size.
@@ -3695,6 +3698,10 @@ namespace OpenRCT2
      */
     void Ride::constructMissingEntranceOrExit() const
     {
+        // Handheld management reports native validation errors without entering mouse-driven construction.
+        // This also prevents a read-only status query from queuing RideModify's repeated-close action.
+        if (Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            return;
         auto* w = WindowGetMain();
         if (w == nullptr)
             return;
@@ -3754,6 +3761,8 @@ namespace OpenRCT2
      */
     static void RideScrollToTrackError(const CoordsXYE& trackElement)
     {
+        if (Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu))
+            return;
         if (trackElement.element == nullptr)
             return;
 

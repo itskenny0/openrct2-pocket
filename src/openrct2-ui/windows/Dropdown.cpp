@@ -636,6 +636,11 @@ namespace OpenRCT2::Ui::Windows
     };
     static_assert(kColourTooltips.size() == kColourNumTotal);
 
+    StringId ColourDropDownIndexToName(uint8_t ddidx)
+    {
+        return ddidx < kColourTooltips.size() ? static_cast<StringId>(kColourTooltips[ddidx]) : kStringIdNone;
+    }
+
     Colour ColourDropDownIndexToColour(uint8_t ddidx)
     {
         return kColoursDropdownOrder[ddidx];

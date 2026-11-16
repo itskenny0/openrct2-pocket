@@ -56,7 +56,8 @@ namespace OpenRCT2::Graph
     }
 
     template<typename T, T TkNoValue>
-    static void DrawMonths(RenderTarget& rt, const T* series, int32_t count, const ScreenRect& bounds, const int32_t xStep)
+    static void DrawMonths(
+        RenderTarget& rt, const T* series, int32_t count, const ScreenRect& bounds, const int32_t xStep, bool darkBackground)
     {
         auto& date = GetDate();
         int32_t currentMonth = date.GetMonth();
@@ -70,9 +71,18 @@ namespace OpenRCT2::Graph
                 // Draw month text
                 auto ft = Formatter();
                 ft.Add<StringId>(DateGameShortMonthNames[DateGetMonth((yearOver32 / 4) + MONTH_COUNT)]);
-                drawText(
-                    rt, screenCoords - ScreenCoordsXY{ 0, 14 }, STR_GRAPH_LABEL, ft,
-                    { FontStyle::small, TextAlignment::centre });
+                if (darkBackground)
+                {
+                    const auto label = FormatStringIDLegacy(STR_GRAPH_LABEL, ft.Data());
+                    drawText(
+                        rt, screenCoords - ScreenCoordsXY{ 0, 14 },
+                        "{WHITE}" + FmtString(std::string_view{ label }).WithoutFormatTokens(),
+                        { FontStyle::small, TextAlignment::centre });
+                }
+                else
+                    drawText(
+                        rt, screenCoords - ScreenCoordsXY{ 0, 14 }, STR_GRAPH_LABEL, ft,
+                        { FontStyle::small, TextAlignment::centre });
                 // Draw month tick mark
                 Rectangle::fill(
                     rt, { screenCoords - ScreenCoordsXY{ 0, 4 }, screenCoords - ScreenCoordsXY{ 0, 1 } }, PaletteIndex::pi10);
@@ -112,7 +122,7 @@ namespace OpenRCT2::Graph
     template<typename T, T TkNoValue, bool TbackgroundLine>
     static void DrawLine(
         RenderTarget& rt, const T* series, const int32_t count, const ScreenRect& bounds, const int32_t xStep, const T minValue,
-        const T maxValue)
+        const T maxValue, const bool breakOnMissing)
     {
         const T screenRange = bounds.getHeight();
         const T valueRange = maxValue - minValue;
@@ -161,6 +171,8 @@ namespace OpenRCT2::Graph
                 lastCoords = coords;
                 lastCoordsValid = true;
             }
+            else if (breakOnMissing)
+                lastCoordsValid = false;
             coords.x += xStep;
         }
     }
@@ -169,9 +181,9 @@ namespace OpenRCT2::Graph
     static void DrawGraph(RenderTarget& rt, const GraphProperties<T>& p, const FmtString& labelFmt, const FmtString& tooltipFmt)
     {
         DrawYLabels<T>(rt, p.internalBounds, p.min, p.max, p.numYLabels, p.yLabelStepPx, p.lineCol, labelFmt);
-        DrawMonths<T, TkNoValue>(rt, p.series, p.numPoints, p.internalBounds, p.xStepPx);
-        DrawLine<T, TkNoValue, true>(rt, p.series, p.numPoints, p.internalBounds, p.xStepPx, p.min, p.max);
-        DrawLine<T, TkNoValue, false>(rt, p.series, p.numPoints, p.internalBounds, p.xStepPx, p.min, p.max);
+        DrawMonths<T, TkNoValue>(rt, p.series, p.numPoints, p.internalBounds, p.xStepPx, p.darkBackground);
+        DrawLine<T, TkNoValue, true>(rt, p.series, p.numPoints, p.internalBounds, p.xStepPx, p.min, p.max, p.breakOnMissing);
+        DrawLine<T, TkNoValue, false>(rt, p.series, p.numPoints, p.internalBounds, p.xStepPx, p.min, p.max, p.breakOnMissing);
         if (p.hoverIdx >= 0 && p.hoverIdx < p.numPoints)
         {
             const T value = p.series[p.hoverIdx];
@@ -188,16 +200,19 @@ namespace OpenRCT2::Graph
 
     void DrawFinanceGraph(RenderTarget& rt, const GraphProperties<money64>& p)
     {
-        DrawGraph<money64, kMoney64Undefined>(rt, p, "{BLACK}{CURRENCY2DP}", "{CURRENCY2DP}");
+        DrawGraph<money64, kMoney64Undefined>(
+            rt, p, p.darkBackground ? "{WHITE}{CURRENCY2DP}" : "{BLACK}{CURRENCY2DP}", "{CURRENCY2DP}");
     }
 
     void DrawRatingGraph(RenderTarget& rt, const GraphProperties<uint16_t>& p)
     {
-        DrawGraph<uint16_t, kParkRatingHistoryUndefined>(rt, p, "{BLACK}{COMMA32}", "{COMMA32}");
+        DrawGraph<uint16_t, kParkRatingHistoryUndefined>(
+            rt, p, p.darkBackground ? "{WHITE}{COMMA32}" : "{BLACK}{COMMA32}", "{COMMA32}");
     }
 
     void DrawGuestGraph(RenderTarget& rt, const GraphProperties<uint32_t>& p)
     {
-        DrawGraph<uint32_t, kGuestsInParkHistoryUndefined>(rt, p, "{BLACK}{COMMA32}", "{COMMA32}");
+        DrawGraph<uint32_t, kGuestsInParkHistoryUndefined>(
+            rt, p, p.darkBackground ? "{WHITE}{COMMA32}" : "{BLACK}{COMMA32}", "{COMMA32}");
     }
 } // namespace OpenRCT2::Graph

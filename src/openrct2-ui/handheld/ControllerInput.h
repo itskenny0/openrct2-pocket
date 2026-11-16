@@ -8,6 +8,8 @@
 #include <SDL_gamecontroller.h>
 #include <cstdint>
 #include <vector>
+#include <optional>
+#include <string_view>
 
 union SDL_Event;
 
@@ -26,7 +28,13 @@ namespace OpenRCT2::Ui::Handheld
         openMenu,
         openBuild,
         quit,
+        slopeDown,
+        slopeUp,
+        cameraMode,
     };
+
+    std::optional<Action> ButtonAction(uint8_t button);
+    std::string_view ActionKey(Action action);
 
     struct Frame
     {
@@ -57,6 +65,7 @@ namespace OpenRCT2::Ui::Handheld
         bool _scan{ true };
         bool _armed{};
         bool _quitHeld{};
+        bool _leftTrigger{}, _rightTrigger{};
         uint32_t _lastTick{};
         float _panX{};
         float _panY{};

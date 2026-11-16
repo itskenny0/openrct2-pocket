@@ -17,6 +17,7 @@
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/ride/Construction.h>
 #include <openrct2-ui/windows/Windows.h>
+#include <openrct2-ui/handheld/NativeTrackThumbnail.h>
 #include <openrct2/Cheats.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
@@ -2666,7 +2667,8 @@ namespace OpenRCT2::Ui::Windows
             auto res = GameActions::Execute(&rideEntranceExitPlaceAction, getGameState());
         }
 
-        void DrawTrackPiece(
+    public:
+        static void DrawTrackPiece(
             Drawing::RenderTarget& rt, RideId rideIndex, TrackElemType trackType, int32_t trackDirection,
             SelectedLiftAndInverted liftHillAndInvertedState, int32_t widgetWidth, int32_t widgetHeight)
         {
@@ -2707,7 +2709,7 @@ namespace OpenRCT2::Ui::Windows
             DrawTrackPieceHelper(rt, rideIndex, trackType, trackDirection, liftHillAndInvertedState, { 4096, 4096 }, 1024);
         }
 
-        void DrawTrackPieceHelper(
+        static void DrawTrackPieceHelper(
             Drawing::RenderTarget& rt, RideId rideIndex, TrackElemType trackType, int32_t trackDirection,
             SelectedLiftAndInverted liftHillAndInvertedState, const CoordsXY& originCoords, int32_t originZ)
         {
@@ -2799,6 +2801,9 @@ namespace OpenRCT2::Ui::Windows
             PaintSessionFree(session);
         }
     };
+
+    void DrawNativeTrackThumbnail(Drawing::RenderTarget& rt, RideId ride, TrackElemType type, Direction direction, SelectedLiftAndInverted flags)
+    { auto clipped=rt; RideConstructionWindow::DrawTrackPiece(clipped,ride,type,direction,flags,rt.width,rt.height); }
 
     static void WindowRideConstructionUpdateDisabledPieces(ride_type_t rideType)
     {

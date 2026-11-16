@@ -1,0 +1,337 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Native station/actions with public object metadata; no operating coaster is fabricated.
+#include <openrct2-ui/handheld/CustomTracks.h>
+#include <openrct2-ui/handheld/FlatRides.h>
+static void TestVehicleDispatch(IContext& context, const std::string& profile, RideId flat, bool realUi)
+{
+    namespace R = Ui::Handheld::RideManagement;
+    namespace C = Ui::Handheld::CustomTracks;
+    auto& state = getGameState();
+    Require(R::VehicleSettings(*GetRide(flat)).empty(), "Fixed flat vehicles exposed editable counts");
+    namespace F = Ui::Handheld::FlatRides;
+    const auto dodgIndex = context.GetObjectManager().GetLoadedObjectEntryIndex(
+        context.GetObjectManager().LoadObject("rct2.ride.dodg1"));
+    Require(F::Begin(dodgIndex), "Native dodgems creation failed");
+    GameActions::ProcessQueue(state);
+    Require(F::Action(CoordsXY{ 128, 640 }, true).error == GameActions::Status::ok, "Native dodgems placement failed");
+    GameActions::ProcessQueue(state);
+    const auto dodgTarget = *F::Target();
+    F::End();
+    const auto dodgSettings = R::VehicleSettings(*GetRide(dodgTarget.id));
+    Require(
+        dodgSettings.size() == 1 && dodgSettings[0].vehicle == GameActions::RideSetVehicleType::numTrains
+            && dodgSettings[0].values.back() == 12,
+        "Native flat vehicle count bounds wrong");
+    const bool noMoney = state.park.flags.has(ParkFlag::noMoney);
+    state.park.flags.set(ParkFlag::noMoney); // Restriction fixture; native count action owns behavior.
+    auto countDraft = *R::BeginSetting(dodgTarget, dodgSettings[0]);
+    const auto flatCash = state.park.cash;
+    R::AdjustPrice(countDraft, countDraft.value == 12 ? -1 : 1);
+    Require(R::Action(countDraft, true).error == GameActions::Status::ok, "Native flat count action failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        GetRide(dodgTarget.id)->numTrains == countDraft.value && state.park.cash == flatCash,
+        "Native flat vehicle count/accounting differs");
+    state.park.flags.set(ParkFlag::noMoney, noMoney);
+    auto* object = context.GetObjectManager().LoadObject("rct2.ride.ptct1");
+    Require(object, "Public wooden vehicle metadata missing");
+    const auto index = context.GetObjectManager().GetLoadedObjectEntryIndex(object);
+    ResearchInsertRideEntry(index, true);
+    RideEntrySetInvented(index);
+    RideTypeSetInvented(RIDE_TYPE_WOODEN_ROLLER_COASTER);
+    Require(C::Begin(index), "Native station fixture creation failed");
+    GameActions::ProcessQueue(state);
+    C::Update(CoordsXY{ 704, 704 });
+    Require(C::Action(false).error == GameActions::Status::ok, "Native station fixture query failed");
+    Require(C::Action(true).error == GameActions::Status::ok, "Native station fixture placement failed");
+    GameActions::ProcessQueue(state);
+    const auto target = *C::Target();
+    C::End();
+    // Loaded alternative vehicles are filtered by native research, not loaded on player request.
+    auto* alternate = context.GetObjectManager().LoadObject("rct2.ride.ptct2");
+    Require(alternate, "Alternative wooden vehicle metadata missing");
+    const auto alternateIndex = context.GetObjectManager().GetLoadedObjectEntryIndex(alternate);
+    ResearchInsertRideEntry(alternateIndex, false);
+    std::vector<ObjectEntryIndex> invented;
+    for (ObjectEntryIndex i = 0; i < kMaxRideObjects; ++i)
+        if (RideEntryIsInvented(i))
+            invented.push_back(i);
+    SetEveryRideEntryNotInvented();
+    for (auto i : invented)
+        if (i != alternateIndex)
+            RideEntrySetInvented(i);
+    auto hasAlternative = [&] {
+        for (const auto& setting : R::VehicleSettings(*GetRide(target.id)))
+            if (setting.vehicle == GameActions::RideSetVehicleType::rideEntry
+                && std::find(setting.values.begin(), setting.values.end(), alternateIndex) != setting.values.end())
+                return true;
+        return false;
+    };
+    Require(!hasAlternative(), "Unresearched alternative vehicle exposed");
+    RideEntrySetInvented(alternateIndex);
+    Require(hasAlternative(), "Researched loaded vehicle missing");
+    const auto vehicleOptions = R::VehicleSettings(*GetRide(target.id));
+    const auto objectSetting = *std::find_if(vehicleOptions.begin(), vehicleOptions.end(), [](const auto& s) {
+        return s.vehicle == GameActions::RideSetVehicleType::rideEntry;
+    });
+    auto objectDraft = *R::BeginSetting(target, objectSetting);
+    while (objectDraft.value != alternateIndex)
+        R::AdjustPrice(objectDraft, 1);
+    const auto objectCash = state.park.cash;
+    Require(
+        R::Presentation(R::View::confirmation, 1, {}, target, objectDraft).rows[1] == "Cancel",
+        "Vehicle object confirmation not Cancel-first");
+    Require(GetRide(target.id)->subtype == index && state.park.cash == objectCash, "Vehicle review mutated ride");
+    SetEveryRideEntryNotInvented();
+    for (auto i : invented)
+        if (i != alternateIndex)
+            RideEntrySetInvented(i);
+    Require(R::Action(objectDraft, true).error != GameActions::Status::ok, "Lost research not rejected");
+    RideEntrySetInvented(alternateIndex);
+    Require(R::Action(objectDraft, true).error == GameActions::Status::ok, "Vehicle object action failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        GetRide(target.id)->subtype == alternateIndex && state.park.cash == objectCash && !R::Resolve(target),
+        "Native object change/accounting/stale identity differs");
+    const auto changedTarget = *R::Identify(target.id);
+    auto returnDraft = *R::BeginSetting(changedTarget, R::VehicleSettings(*GetRide(target.id)).front());
+    while (returnDraft.value != index)
+        R::AdjustPrice(returnDraft, -1);
+    Require(R::Action(returnDraft, true).error == GameActions::Status::ok, "Return vehicle action failed");
+    GameActions::ProcessQueue(state);
+    const auto reverseOptions = R::VehicleSettings(*GetRide(target.id));
+    const auto reverse = std::find_if(reverseOptions.begin(), reverseOptions.end(), [](const auto& s) {
+        return s.vehicle == GameActions::RideSetVehicleType::trainsReversed;
+    });
+    Require(reverse != reverseOptions.end(), "Native reversed trains missing");
+    auto reverseDraft = *R::BeginSetting(target, *reverse);
+    R::AdjustPrice(reverseDraft, 1);
+    const auto reversePaused = gGamePaused;
+    gGamePaused = 1;
+    Require(R::Action(reverseDraft, true).error == GameActions::Status::ok, "Paused reversed action rejected");
+    GameActions::ProcessQueue(state);
+    gGamePaused = reversePaused;
+    Require(
+        GetRide(target.id)->flags.has(RideFlag::reversedTrains) && state.park.cash == objectCash,
+        "Native reverse/accounting differs");
+    Require(R::Action(reverseDraft, true).error != GameActions::Status::ok, "Repeated reverse accepted");
+    auto* ride = GetRide(target.id);
+    Require(ride && ride->numStations == 1, "Native station absent");
+    GameActions::RideSetVehicleAction minimum(
+        target.id, GameActions::RideSetVehicleType::numCarsPerTrain, ride->getRideEntry()->min_cars_in_train);
+    Require(GameActions::Execute(&minimum, state).error == GameActions::Status::ok, "Native initial cars failed");
+    GameActions::ProcessQueue(state);
+    const auto cash = state.park.cash;
+    const auto settings = R::VehicleSettings(*ride);
+    const auto cars = std::find_if(settings.begin(), settings.end(), [](const auto& s) {
+        return s.vehicle == GameActions::RideSetVehicleType::numCarsPerTrain;
+    });
+    Require(cars != settings.end(), "Coaster cars setting missing");
+    auto draft = *R::BeginSetting(target, *cars);
+    for (int n = 0; n < 300; ++n)
+        R::AdjustPrice(draft, 1);
+    Require(draft.value == cars->values.back(), "Native object upper bound wrong");
+    Require(draft.effectiveVehicles[1] <= draft.value, "Station clamping not shown honestly");
+    Require(ride->proposedNumCarsPerTrain != draft.value && state.park.cash == cash, "Draft mutated ride/cash");
+    GameActions::RideSetVehicleAction native(target.id, *cars->vehicle, draft.value);
+    const auto q = GameActions::Query(&native, state);
+    const auto pocket = R::Action(draft, false);
+    Require(q.error == pocket.error && q.cost == pocket.cost, "Vehicle query differs from native");
+    auto invalid = draft;
+    invalid.value = 0;
+    Require(R::Action(invalid, true).error != GameActions::Status::ok, "Invalid vehicle draft accepted");
+    const auto paused = gGamePaused;
+    gGamePaused = 1; // Restriction fixture: native vehicle action explicitly allows pause.
+    Require(R::Action(draft, true).error == GameActions::Status::ok, "Paused native vehicle action rejected");
+    GameActions::ProcessQueue(state);
+    gGamePaused = paused;
+    Require(
+        ride->proposedNumCarsPerTrain == draft.value && ride->numCarsPerTrain == draft.effectiveVehicles[1]
+            && ride->numTrains == draft.effectiveVehicles[0] && state.park.cash == cash,
+        "Native clamping/accounting differs");
+    Require(R::Action(draft, true).error != GameActions::Status::ok, "Repeated vehicle draft accepted");
+    draft = *R::BeginSetting(target, R::VehicleSettings(*ride).back());
+    for (int n = 0; n < 300; ++n)
+        R::AdjustPrice(draft, -1);
+    Require(draft.value == draft.setting->values.front(), "Vehicle lower bound wrong");
+    // Dispatch updates preserve every unrelated flag, and cancellation never executes an action.
+    const auto beforeFlags = ride->departFlags;
+    const auto dispatch = R::DispatchSettings(*ride);
+    Require(dispatch.size() >= 3, "Native coaster dispatch options missing");
+    for (const auto& setting : dispatch)
+    {
+        auto edit = *R::BeginSetting(target, setting);
+        R::AdjustPrice(edit, edit.value == setting.values.back() ? -1 : 1);
+        const auto review = R::Presentation(R::View::confirmation, 1, {}, target, edit);
+        Require(review.selected == 1 && review.rows[1] == "Cancel", "Dispatch confirmation not Cancel-first");
+        Require(ride->departFlags == beforeFlags && state.park.cash == cash, "Review/cancel mutated native state");
+    }
+    auto edit = *R::BeginSetting(target, dispatch[0]);
+    R::AdjustPrice(edit, edit.value == edit.setting->values.back() ? -1 : 1);
+    GameActions::RideSetSettingAction departure(target.id, GameActions::RideSetSetting::departure, edit.value);
+    Require(R::Action(edit, false).error == GameActions::Query(&departure, state).error, "Departure query differs");
+    Require(R::Action(edit, true).error == GameActions::Status::ok, "Native dispatch execution failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        ride->departFlags == edit.value
+            && (ride->departFlags & ~RIDE_DEPART_WAIT_FOR_LOAD) == (beforeFlags & ~RIDE_DEPART_WAIT_FOR_LOAD)
+            && state.park.cash == cash,
+        "Dispatch damaged other flags/cash");
+    Require(R::Action(edit, true).error != GameActions::Status::ok, "Stale dispatch draft accepted");
+    for (auto status : { RideStatus::testing, RideStatus::open })
+    {
+        auto statusDraft = *R::Begin(target, status);
+        GameActions::RideSetStatusAction action(target.id, status);
+        Require(
+            R::Action(statusDraft, false).error == GameActions::Query(&action, state).error
+                && R::Action(statusDraft, false).error != GameActions::Status::ok,
+            "Incomplete coaster bypassed native Test/Open");
+    }
+    const auto dodgOperations = R::Settings(*GetRide(dodgTarget.id));
+    const auto duration = std::find_if(dodgOperations.begin(), dodgOperations.end(), [](const auto& s) {
+        return s.key == GameActions::RideSetSetting::operation;
+    });
+    Require(duration != dodgOperations.end(), "Placed Dodgems duration absent");
+    auto durationDraft = *R::BeginSetting(dodgTarget, *duration);
+    R::AdjustPrice(durationDraft, 1);
+    Require(R::Action(durationDraft, true).error == GameActions::Status::ok, "Placed Dodgems duration failed");
+    GameActions::ProcessQueue(state);
+    const auto operationSettings = R::Settings(*ride);
+    const auto circuits = std::find_if(operationSettings.begin(), operationSettings.end(), [](const auto& s) {
+        return s.key == GameActions::RideSetSetting::numCircuits;
+    });
+    Require(circuits != operationSettings.end(), "Native station circuit capability absent");
+    auto circuitDraft = *R::BeginSetting(target, *circuits);
+    R::AdjustPrice(circuitDraft, 1);
+    Require(R::Action(circuitDraft, true).error == GameActions::Status::ok, "Native station circuits action failed");
+    GameActions::ProcessQueue(state);
+    const auto circuitCount = ride->numCircuits;
+    const auto proposed = ride->proposedNumCarsPerTrain;
+    const auto effective = ride->numCarsPerTrain;
+    const auto flagsValue = ride->departFlags;
+    auto stale = *R::BeginSetting(target, R::DispatchSettings(*ride).front());
+    R::AdjustPrice(stale, stale.value == stale.setting->values.back() ? -1 : 1);
+    SaveFlags flags{};
+    flags.set(SaveFlag::exportObjects);
+    // Real native station/vehicle colours; no render or operating coaster is fabricated.
+    auto appearance = R::AppearanceSettings(*ride);
+    Require(!appearance.empty(), "Native appearance settings absent");
+    std::vector<R::Setting> colours;
+    for (const auto& item : appearance)
+        if (item.appearance != GameActions::RideSetAppearanceType::vehicleColourScheme)
+            colours.push_back(item);
+    for (const auto& item : colours)
+    {
+        auto appearanceEdit = *R::BeginSetting(target, item);
+        if (appearanceEdit.setting->values.size() < 2)
+            continue;
+        R::AdjustPrice(appearanceEdit, appearanceEdit.value == appearanceEdit.setting->values.back() ? -1 : 1);
+        GameActions::RideSetAppearanceAction nativeAppearance(
+            target.id, *appearanceEdit.setting->appearance, appearanceEdit.value, appearanceEdit.setting->index);
+        const auto appearanceQuery = GameActions::Query(&nativeAppearance, state);
+        const auto appearancePocket = R::Action(appearanceEdit, false);
+        Require(
+            appearanceQuery.error == appearancePocket.error && appearanceQuery.cost == appearancePocket.cost
+                && state.park.cash == cash,
+            "Appearance query differs/spends");
+        Require(R::Action(appearanceEdit, true).error == GameActions::Status::ok, "Native appearance update failed");
+        GameActions::ProcessQueue(state);
+        Require(R::Action(appearanceEdit, true).error != GameActions::Status::ok, "Repeated appearance accepted");
+        auto current = R::AppearanceSettings(*ride);
+        const auto changed = std::find_if(current.begin(), current.end(), [&](const auto& s) {
+            return s.appearance == appearanceEdit.setting->appearance && s.index == appearanceEdit.setting->index;
+        });
+        Require(
+            changed != current.end() && changed->current == appearanceEdit.value && state.park.cash == cash,
+            "Native appearance value/accounting differs");
+    }
+    const auto stationTile = ride->getStation(StationIndex::FromUnderlying(0)).start;
+    const auto stationInfo = R::Presentation(R::View::stations, 0, {}, target);
+    Require(
+        !stationInfo.bodyLines.empty() && stationInfo.bodyLines.front().find("Station 1 / queue ") == 0,
+        "Placed native station summary missing");
+    auto* paintTrack = *TileElementsView<TrackElement>(stationTile).begin();
+    Require(paintTrack && paintTrack->getRideIndex() == target.id, "Paint station track absent");
+    InteractionInfo paintInfo{};
+    paintInfo.Loc = stationTile;
+    paintInfo.Element = reinterpret_cast<TileElement*>(paintTrack);
+    const auto paintTarget = R::CapturePaint(target, paintInfo);
+    Require(paintTarget.has_value() && !R::CapturePaint(dodgTarget, paintInfo), "Paint ride targeting differs");
+    const uint8_t paintScheme = (paintTarget->baseline + 1) % kNumRideColourSchemes;
+    Require(
+        R::Paint(*paintTarget, paintScheme, false).error == GameActions::Status::ok
+            && paintTrack->getColourScheme() == paintTarget->baseline && state.park.cash == cash,
+        "Paint query changed track/cash");
+    Require(R::Paint(*paintTarget, paintScheme, true).error == GameActions::Status::ok, "Native track painting failed");
+    GameActions::ProcessQueue(state);
+    Require(
+        paintTrack->getColourScheme() == paintScheme && state.park.cash == cash
+            && R::Paint(*paintTarget, paintScheme, true).error != GameActions::Status::ok,
+        "Paint repeat/accounting differs");
+    auto nativeScheme = GameActions::RideSetAppearanceAction(
+        target.id, GameActions::RideSetAppearanceType::vehicleColourScheme,
+        static_cast<uint16_t>(VehicleColourSettings::perTrain), 0);
+    Require(
+        GameActions::Execute(&nativeScheme, state).error == GameActions::Status::ok,
+        "Native random-colour scheme fixture failed");
+    GameActions::ProcessQueue(state);
+    const auto randomDraft = R::BeginRandomColours(target);
+    Require(randomDraft.has_value(), "Native multi-vehicle random colours absent");
+    const auto beforeRandom = R::AppearanceSettings(*ride);
+    Require(
+        R::Action(*randomDraft, false).error == GameActions::Status::ok && state.park.cash == cash,
+        "Random colour query failed/spends");
+    const auto afterQueryRandom = R::AppearanceSettings(*ride);
+    for (size_t i = 0; i < beforeRandom.size(); ++i)
+        Require(beforeRandom[i].current == afterQueryRandom[i].current, "Random cancellation changed colours");
+    Require(R::Action(*randomDraft, true).error == GameActions::Status::ok, "Native random colours failed");
+    GameActions::ProcessQueue(state);
+    const auto randomApplied = R::AppearanceSettings(*ride);
+    for (const auto& [setting, value] : randomDraft->randomColours)
+    {
+        const auto foundRandom = std::find_if(randomApplied.begin(), randomApplied.end(), [&](const auto& s) {
+            return s.appearance == setting.appearance && s.index == setting.index;
+        });
+        Require(foundRandom != randomApplied.end() && foundRandom->current == value, "Random proposed colour not applied");
+    }
+    Require(
+        state.park.cash == cash && R::Action(*randomDraft, true).error != GameActions::Status::ok,
+        "Random colours charged money or accepted repeated draft");
+    const auto savedAppearance = R::AppearanceSettings(*ride);
+    auto badAppearance = *R::BeginSetting(target, savedAppearance.front());
+    badAppearance.value = 255;
+    Require(R::Action(badAppearance, true).error != GameActions::Status::ok, "Invalid appearance accepted");
+    const auto save = profile + "/vehicles-dispatch.park";
+    Require(ScenarioSave(state, save, flags) && context.LoadParkFromFile(save), "Vehicle/dispatch save/reload failed");
+    ride = GetRide(target.id);
+    auto* reloadedTrack = *TileElementsView<TrackElement>(stationTile).begin();
+    Require(reloadedTrack && reloadedTrack->getColourScheme() == paintScheme, "Native painted scheme not serialized");
+    const auto reloadedAppearance = R::AppearanceSettings(*ride);
+    Require(savedAppearance.size() == reloadedAppearance.size(), "Appearance serialization size differs");
+    for (size_t i = 0; i < savedAppearance.size(); ++i)
+        Require(savedAppearance[i].current == reloadedAppearance[i].current, "Native appearance not serialized");
+    std::cout << "Native Appearance / indexed track-vehicle-entrance / query-cancel-repeat-bounds / zero cash / serialization "
+                 "passed\n";
+    Require(
+        GetRide(dodgTarget.id) && GetRide(dodgTarget.id)->numTrains == countDraft.value
+            && GetRide(dodgTarget.id)->operationOption == durationDraft.value,
+        "Placed Dodgems duration/vehicle count not serialized");
+    Require(
+        ride && ride->flags.has(RideFlag::reversedTrains) && ride->subtype == index && ride->proposedNumCarsPerTrain == proposed
+            && ride->numCarsPerTrain == effective && ride->departFlags == flagsValue && ride->numCircuits == circuitCount
+            && state.park.cash == cash,
+        "Native configuration serialization differs");
+    if (!realUi)
+        R::InvalidateAll(); // DummyWindowManager deliberately omits WindowInitAll UI callbacks.
+    Require(R::Action(stale, true).error != GameActions::Status::ok, "Pre-load vehicle identity accepted");
+    const auto fresh = *R::Identify(target.id);
+    const auto remove = *R::BeginDemolition(fresh);
+    Require(R::Action(remove, true).error == GameActions::Status::ok, "Station fixture cleanup failed");
+    GameActions::ProcessQueue(state);
+    const auto dodgFresh = *R::Identify(dodgTarget.id);
+    const auto dodgRemove = *R::BeginDemolition(dodgFresh);
+    Require(R::Action(dodgRemove, true).error == GameActions::Status::ok, "Dodgems fixture cleanup failed");
+    GameActions::ProcessQueue(state);
+    std::cout << "Native Vehicles/Dispatch / station-object bounds-clamping / flags-cancel-stale / pause-zero-cash / Test-Open "
+                 "rejection / save-reload passed\n";
+}

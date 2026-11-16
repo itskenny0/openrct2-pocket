@@ -1,0 +1,951 @@
+// SPDX-License-Identifier: GPL-3.0-only
+#include "SceneryTools.h"
+
+#include "ConstructionPanel.h"
+#include "Currency.h"
+#include "TextEntry.h"
+
+#include <algorithm>
+#include <openrct2/core/String.hpp>
+#include <openrct2-ui/interface/Dropdown.h>
+#include <openrct2/GameState.h>
+#include <openrct2/actions/footpath/FootpathAdditionPlaceAction.h>
+#include <openrct2/actions/footpath/FootpathAdditionRemoveAction.h>
+#include <openrct2/actions/scenery/BannerPlaceAction.h>
+#include <openrct2/actions/scenery/BannerRemoveAction.h>
+#include <openrct2/actions/scenery/BannerSetColourAction.h>
+#include <openrct2/actions/scenery/BannerSetNameAction.h>
+#include <openrct2/actions/scenery/BannerSetStyleAction.h>
+#include <openrct2/actions/scenery/LargeSceneryPlaceAction.h>
+#include <openrct2/actions/scenery/LargeSceneryRemoveAction.h>
+#include <openrct2/actions/scenery/LargeScenerySetColourAction.h>
+#include <openrct2/actions/scenery/SignSetNameAction.h>
+#include <openrct2/actions/scenery/SignSetStyleAction.h>
+#include <openrct2/actions/scenery/SmallSceneryPlaceAction.h>
+#include <openrct2/actions/scenery/SmallSceneryRemoveAction.h>
+#include <openrct2/actions/scenery/SmallScenerySetColourAction.h>
+#include <openrct2/actions/scenery/WallPlaceAction.h>
+#include <openrct2/actions/scenery/WallRemoveAction.h>
+#include <openrct2/actions/scenery/WallSetColourAction.h>
+#include <openrct2/drawing/Colour.h>
+#include <openrct2/localisation/Formatting.h>
+#include <openrct2/management/Research.h>
+#include <openrct2/object/BannerObject.h>
+#include <openrct2/object/LargeSceneryObject.h>
+#include <openrct2/object/ObjectEntryManager.h>
+#include <openrct2/object/ObjectLimits.h>
+#include <openrct2/object/SceneryGroupObject.h>
+#include <openrct2/object/SmallSceneryObject.h>
+#include <openrct2/object/WallObject.h>
+#include <openrct2/world/Banner.h>
+#include <openrct2/world/Map.h>
+#include <openrct2/world/SceneryScatter.h>
+#include <openrct2/network/Network.h>
+#include <openrct2/world/TileElementsView.h>
+#include <openrct2/world/tile_element/BannerElement.h>
+#include <openrct2/world/tile_element/LargeSceneryElement.h>
+#include <openrct2/world/tile_element/PathElement.h>
+#include <openrct2/world/tile_element/SmallSceneryElement.h>
+#include <openrct2/world/tile_element/SurfaceElement.h>
+#include <openrct2/world/tile_element/WallElement.h>
+namespace OpenRCT2::Ui::Handheld::SceneryTools
+{
+    static Settings current;
+    static std::string search;
+    static ObjectEntryIndex groupFilter = kObjectEntryIndexNull;
+    static std::optional<CoordsXY> lastTile;
+    struct Request
+    {
+        CoordsXY tile;
+        Settings settings;
+        bool operator==(const Request&) const = default;
+    };
+    static std::optional<Request> requested;
+    struct ScatterDraft
+    {
+        Request key;
+        std::string descriptor;
+        std::vector<Request> proposals;
+        bool reviewed{};
+        money64 quote{};
+    };
+    struct ScatterOutcome
+    {
+        size_t total{}, completed{}, placed{};
+        money64 cost{};
+        std::string failure;
+    };
+    static std::optional<ScatterDraft> scatterDraft;
+    static std::shared_ptr<ScatterOutcome> scatterOutcome;
+    bool ScatterActive() { return current.scatter && current.category == Category::small && current.mode == Mode::place; }
+    bool ScatterReviewed() { return scatterDraft && scatterDraft->reviewed; }
+    std::string ScatterStatus()
+    {
+        if (scatterOutcome)
+        {
+            const auto& o = *scatterOutcome;
+            return std::to_string(o.placed) + "/" + std::to_string(o.total)
+                + (o.completed < o.total ? " pending" : " placed / " + FormatMoney(o.cost))
+                ;
+        }
+        return ScatterReviewed() ? "A Apply / B Cancel" : "A Review batch";
+    }
+    std::pair<CoordsXY, CoordsXY> ScatterBounds(CoordsXY centre) { return SceneryScatterBounds(centre,current.scatterSize); }
+    void ResetScatter() { ClearPreview(); scatterOutcome.reset(); current.scatter = false; }
+
+    static std::optional<Target> ghost;
+    static uint32_t suspended{};
+    static ObjectType Type(Category c)
+    {
+        if (c == Category::additions)
+            return ObjectType::pathAdditions;
+        return c == Category::small ? ObjectType::smallScenery
+            : c == Category::large  ? ObjectType::largeScenery
+            : c == Category::walls  ? ObjectType::walls
+                                    : ObjectType::banners;
+    }
+    static uint8_t SceneryType(Category c)
+    {
+        if (c == Category::additions)
+            return SCENERY_TYPE_PATH_ITEM;
+        return c == Category::small ? SCENERY_TYPE_SMALL
+            : c == Category::large  ? SCENERY_TYPE_LARGE
+            : c == Category::walls  ? SCENERY_TYPE_WALL
+                                    : SCENERY_TYPE_BANNER;
+    }
+    static GameActions::Result Invalid(const char* message)
+    {
+        GameActions::Result r;
+        r.error = GameActions::Status::invalidParameters;
+        r.errorMessage = message;
+        return r;
+    }
+    bool Eligible(Category c, ObjectEntryIndex i)
+    {
+        return GetContext()->GetObjectManager().GetLoadedObject(Type(c), i) && IsSceneryAvailableToBuild({ SceneryType(c), i });
+    }
+    std::string CategoryName(Category c)
+    {
+        if (c == Category::additions)
+            return "Path furniture";
+        return c == Category::small ? "Small scenery / trees"
+            : c == Category::large  ? "Large scenery"
+            : c == Category::walls  ? "Walls / fences"
+                                    : "Banners / signs";
+    }
+    std::vector<std::string> Categories()
+    {
+        return { "Small scenery / trees", "Large scenery",  "Walls / fences",
+                 "Banners / signs",       "Path furniture", "Clear area...", "Back to build" };
+    }
+    std::string Name(const Settings& s)
+    {
+        const auto* o = GetContext()->GetObjectManager().GetLoadedObject(Type(s.category), s.object);
+        return o ? o->GetName() : "No objects available";
+    }
+    const std::string& Search() { return search; }
+    bool SetSearch(const std::string& value)
+    {
+        if (TextEntry{value}.Length() > TextEntry::limit) return false;
+        ClearPreview();
+        search = value;
+        return true;
+    }
+    static bool MatchesSearch(const Object& object)
+    {
+        if (search.empty()) return true;
+        return String::contains(object.GetName(),search,true)
+            || String::contains(object.GetIdentifier(),search,true)
+            || String::contains(object.GetFileName(),search,true)
+            || std::ranges::any_of(object.GetAuthors(),[](const auto& author) { return String::contains(author,search,true); });
+    }
+    std::vector<PickerEntry> Entries(Category c)
+    {
+        std::vector<PickerEntry> result;
+        const auto count = c == Category::additions ? kMaxPathAdditionObjects
+            : c == Category::small                  ? kMaxSmallSceneryObjects
+            : c == Category::large                  ? kMaxLargeSceneryObjects
+            : c == Category::walls                  ? kMaxWallSceneryObjects
+                                                    : kMaxBannerObjects;
+        for (ObjectEntryIndex i = 0; i < count; ++i)
+            if (Eligible(c, i)
+                && (groupFilter == kObjectEntryIndexNull
+                    || (SceneryGroupIsInvented(groupFilter)
+                        && ObjectEntryManager::GetObjectEntry<SceneryGroupEntry>(groupFilter)
+                        && std::ranges::find(
+                               ObjectEntryManager::GetObjectEntry<SceneryGroupEntry>(groupFilter)->SceneryEntries,
+                               ScenerySelection{ SceneryType(c), i })
+                            != ObjectEntryManager::GetObjectEntry<SceneryGroupEntry>(groupFilter)->SceneryEntries.end())))
+            {
+                const auto* object = GetContext()->GetObjectManager().GetLoadedObject(Type(c),i);
+                if (MatchesSearch(*object)) result.push_back({ { Type(c), i, std::string(object->GetIdentifier()) }, object->GetName() });
+            }
+        return result;
+    }
+    std::vector<Group> Groups(Category c)
+    {
+        std::vector<Group> result{ { kObjectEntryIndexNull, "All available objects" } };
+        for (ObjectEntryIndex i = 0; i < kMaxSceneryGroupObjects; ++i)
+        {
+            const auto* entry = ObjectEntryManager::GetObjectEntry<SceneryGroupEntry>(i);
+            const auto* object = GetContext()->GetObjectManager().GetLoadedObject(ObjectType::sceneryGroup, i);
+            if (!entry || !object || !SceneryGroupIsInvented(i))
+                continue;
+            if (std::ranges::any_of(entry->SceneryEntries, [c](auto selection) {
+                    return selection.SceneryType == SceneryType(c) && Eligible(c, selection.EntryIndex);
+                }))
+                result.push_back({ i, object->GetName() });
+        }
+        return result;
+    }
+    bool SetGroup(ObjectEntryIndex group)
+    {
+        const auto groups = Groups(current.category);
+        if (std::ranges::none_of(groups, [group](const auto& g) { return g.index == group; }))
+            return false;
+        ClearPreview();
+        groupFilter = group;
+        const auto entries = Entries(current.category);
+        if (std::ranges::none_of(entries, [](const auto& e) { return e.identity.index == current.object; }))
+            current.object = entries.empty() ? kObjectEntryIndexNull : entries.front().identity.index;
+        return true;
+    }
+    std::string GroupName()
+    {
+        for (const auto& g : Groups(current.category))
+            if (g.index == groupFilter)
+                return g.name;
+        return "Group unavailable";
+    }
+    bool CanRotate()
+    {
+        if(current.category==Category::additions) return false;
+        if(current.category!=Category::small) return true;
+        const auto* e=ObjectEntryManager::GetObjectEntry<SmallSceneryEntry>(current.object);
+        return e && e->flags.has(SmallSceneryFlag::isRotatable);
+    }
+    std::array<bool, 3> Channels(Category c, ObjectEntryIndex i)
+    {
+        if (c == Category::small)
+        {
+            const auto* e = ObjectEntryManager::GetObjectEntry<SmallSceneryEntry>(i);
+            if (e)
+                return { e->flags.hasAny(SmallSceneryFlag::hasPrimaryColour, SmallSceneryFlag::hasGlass),
+                         e->flags.has(SmallSceneryFlag::hasSecondaryColour),
+                         e->flags.has(SmallSceneryFlag::hasTertiaryColour) };
+        }
+        if (c == Category::large)
+        {
+            const auto* e = ObjectEntryManager::GetObjectEntry<LargeSceneryEntry>(i);
+            if (e)
+                return { e->flags.has(LargeSceneryFlag::hasPrimaryColour), e->flags.has(LargeSceneryFlag::hasSecondaryColour),
+                         e->flags.has(LargeSceneryFlag::hasTertiaryColour) };
+        }
+        if (c == Category::walls)
+        {
+            const auto* e = ObjectEntryManager::GetObjectEntry<WallSceneryEntry>(i);
+            if (e)
+                return { e->flags.hasAny(WallSceneryFlag::hasPrimaryColour, WallSceneryFlag::hasGlass)
+                             && !e->flags2.has(WallSceneryFlag2::disablePrimaryColour),
+                         e->flags.has(WallSceneryFlag::hasSecondaryColour), e->flags.has(WallSceneryFlag::hasTertiaryColour) };
+        }
+        if (c == Category::banners)
+        {
+            const auto* e = ObjectEntryManager::GetObjectEntry<BannerSceneryEntry>(i);
+            if (e)
+                return { e->flags.has(BannerEntryFlag::hasPrimaryColour), false, false };
+        }
+        return {};
+    }
+    const Settings& Current()
+    {
+        return current;
+    }
+    void SelectCategory(Category c)
+    {
+        ClearPreview();
+        current.category = c;
+        search.clear();
+        groupFilter = kObjectEntryIndexNull;
+        current.object = kObjectEntryIndexNull;
+        current.mode = Mode::place;
+        const auto list = Entries(c);
+        if (!list.empty())
+            current.object = list.front().identity.index;
+    }
+    bool Select(ObjectEntryIndex i, const std::string& expectedDescriptor)
+    {
+        if (!expectedDescriptor.empty())
+        {
+            const auto entries = Entries(current.category);
+            if (std::ranges::none_of(entries,[&](const auto& e) {
+                return e.identity.index == i && e.identity.key == expectedDescriptor; })) return false;
+        }
+        if (!Eligible(current.category, i))
+            return false;
+        ClearPreview();
+        current.object = i;
+        return true;
+    }
+    static std::string ColourName(Drawing::Colour c)
+    {
+        for (uint8_t i = 0; i < 72; ++i)
+            if (Windows::ColourDropDownIndexToColour(i) == c)
+                return FmtString(FormatStringID(Windows::ColourDropDownIndexToName(i))).WithoutFormatTokens();
+        return "Special colour";
+    }
+    std::string HeightName()
+    {
+        if (current.category == Category::additions) return "Follows selected path";
+        return current.height ? "Fixed level " + std::to_string(current.height / kCoordsZStep) : "Follows ground";
+    }
+    std::string DensityName()
+    {
+        static constexpr std::array names{ "Sparse", "Medium", "Dense" };
+        return names[static_cast<size_t>(current.scatterDensity) % names.size()];
+    }
+    void DrawPreview(Drawing::RenderTarget& rt, ScreenCoordsXY position, ScreenSize size)
+    {
+        if(const auto* object=GetContext()->GetObjectManager().GetLoadedObject(Type(current.category),current.object))
+        {
+            Drawing::RenderTarget preview;
+            if(ClipRenderTarget(preview,rt,position,size.width,size.height))
+            {
+                preview.zoom_level=ZoomLevel{1};
+                object->DrawPreview(preview,preview.zoom_level.ApplyTo(size.width),preview.zoom_level.ApplyTo(size.height));
+            }
+        }
+    }
+    std::vector<std::string> Options()
+    {
+        const auto ch = Channels(current.category, current.object);
+        return { "Resume",
+                 "Choose object...",
+                 current.category == Category::additions ? "Orientation: path edges"
+                                                         : "Turn: " + std::to_string(current.direction + 1) + " / 4",
+                 current.category != Category::small ? "Tile corner: automatic"
+                                                     : "Tile corner: " + std::to_string(current.quadrant + 1) + " / 4",
+                 "Raise placement height",
+                 "Lower placement height",
+                 HeightName(),
+                 ch[0] ? "Main colour: " + ColourName(current.colours[0]) : "Main colour: fixed",
+                 ch[1] ? "Colour 2: " + ColourName(current.colours[1]) : "Colour 2: fixed",
+                 ch[2] ? "Colour 3: " + ColourName(current.colours[2]) : "Colour 3: fixed",
+                 current.mode == Mode::place          ? "Mode: Place"
+                     : current.mode == Mode::recolour ? "Mode: Recolour"
+                     : current.mode == Mode::remove   ? "Mode: Remove"
+                                                      : "Mode: Pick object",
+                 "Edit sign text...",
+                 "Filter scenery group...",
+                 "Edit sign style...",
+                 "Pick placed object...",
+                 search.empty() ? "Search objects..." : "Search: " + search,
+                 current.category != Category::small ? "Scatter: small scenery only" : current.scatter ? "Scatter: enabled" : "Scatter: disabled",
+                 "Scatter area: " + std::to_string(current.scatterSize) + " x " + std::to_string(current.scatterSize) + " tiles",
+                 "Density: " + DensityName(),
+                 scatterOutcome && !scatterOutcome->failure.empty()
+                    ? "Last error: " + FmtString(scatterOutcome->failure).WithoutFormatTokens() : "Last error: none" };
+    }
+    void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position, const std::optional<Target>& hovered)
+    {
+        const auto& s = Current();
+        if (s.mode == Mode::pick)
+        {
+            auto display = s;
+            if (hovered) { display.category = hovered->category; display.object = hovered->object; }
+            DrawConstructionOverlay(rt, position, "Pick scenery", hovered ? Name(display) : "Point at scenery",
+                "Pick placed object", "A Select / B Back", "No placement or charge");
+            return;
+        }
+        DrawSurface(rt,position,{164,228});
+        DrawHeadingText(rt,position+ScreenCoordsXY{12,12},"Scenery",140);
+        if(const auto* object=GetContext()->GetObjectManager().GetLoadedObject(Type(s.category),s.object))
+        {
+            Drawing::RenderTarget preview;
+            if(ClipRenderTarget(preview,rt,position+ScreenCoordsXY{12,42},60,62))
+            {
+                preview.zoom_level=ZoomLevel{2};
+                object->DrawPreview(preview,preview.zoom_level.ApplyTo(60),preview.zoom_level.ApplyTo(62));
+            }
+        }
+        DrawStrongText(rt,position+ScreenCoordsXY{80,48},s.mode==Mode::place ? "Place" : s.mode==Mode::recolour ? "Recolour" : "Remove",72);
+        DrawModernEllipsised(rt,position+ScreenCoordsXY{80,72},72,ScatterActive() ? "{WHITE}Scatter" : "{MUTED}Single");
+        DrawModernEllipsised(rt,position+ScreenCoordsXY{12,116},140,"{WHITE}"+Name(s));
+        DrawModernEllipsised(rt,position+ScreenCoordsXY{12,140},140,s.category==Category::additions ? "{MUTED}Attach to path edge"
+            : "{MUTED}Turn "+std::to_string(s.direction+1)+" / 4");
+        DrawModernEllipsised(rt,position+ScreenCoordsXY{12,160},140,ScatterActive() ? "{WHITE}"+ScatterStatus()
+            : "{MUTED}" + HeightName());
+        DrawModernText(rt,position+ScreenCoordsXY{12,186},"{WHITE}L2/R2 Height");
+        DrawModernText(rt,position+ScreenCoordsXY{12,207},"{WHITE}Y Adjust | X Camera");
+    }
+    static GameActions::Result Query(std::optional<CoordsXY> tile, const Settings& s);
+    void Configure(size_t row, int delta)
+    {
+        const auto previewHeight = ghost && requested && requested->settings == current
+            ? std::optional<int32_t>{ ghost->location.z } : std::nullopt;
+        ClearPreview();
+        if ((row == 4 || row == 5) && current.height == 0 && lastTile)
+        {
+            const auto native = Query(lastTile, current);
+            if (previewHeight)
+                current.height = *previewHeight;
+            else if (native.error == GameActions::Status::ok)
+                current.height = native.position.z;
+            else if (const auto* surface = MapGetSurfaceElementAt(*lastTile))
+                current.height = surface->getBaseZ();
+        }
+        if (row == 2 && current.category != Category::additions)
+            current.direction = (current.direction + delta + 4) % 4;
+        if (row == 3 && current.category == Category::small)
+            current.quadrant = (current.quadrant + delta + 4) % 4;
+        if (row == 4)
+            current.height = std::min(2040, current.height + 8);
+        if (row == 5)
+            current.height = std::max(0, current.height - 8);
+        if (row == 6)
+            current.height = 0;
+        if (row >= 7 && row <= 9 && Channels(current.category, current.object)[row - 7])
+        {
+            // Native enum values are not the ordered normal palette: silver and
+            // light water follow the two special entries. Cycle actual choices.
+            int index=0;
+            for (uint8_t i=0;i<Drawing::kColourNumNormal;++i)
+                if (Windows::ColourDropDownIndexToColour(i)==current.colours[row-7]) { index=i;break; }
+            current.colours[row-7]=Windows::ColourDropDownIndexToColour(
+                (index+delta%Drawing::kColourNumNormal+Drawing::kColourNumNormal)%Drawing::kColourNumNormal);
+        }
+        if (row == 16 && current.category == Category::small) current.scatter = !current.scatter;
+        if (row == 17) current.scatterSize = std::clamp<int>(current.scatterSize + delta, 1, 64);
+        if (row == 18) current.scatterDensity = static_cast<ScatterToolDensity>((static_cast<int>(current.scatterDensity)+delta+3)%3);
+        if (row == 10)
+            current.mode = static_cast<Mode>((static_cast<int>(current.mode) + delta + 4) % 4);
+    }
+    void BeginPick()
+    {
+        ClearPreview();
+        current.scatter = false;
+        current.mode = Mode::pick;
+    }
+    static std::unique_ptr<GameActions::GameAction> Placement(CoordsXY tile, const Settings& s)
+    {
+        auto z = s.height;
+        if ((s.category == Category::banners || s.category == Category::additions) && z == 0)
+        {
+            const PathElement* selected = nullptr;
+            const auto* surface = MapGetSurfaceElementAt(tile);
+            const auto wantedZ = s.pathHeight.value_or(surface ? surface->getBaseZ() : 0);
+            for (const auto* path : TileElementsView<PathElement>(tile))
+                if (!path->isGhost())
+                {
+                    if (s.pathHeight && path->getBaseZ() != wantedZ) continue;
+                    if (!selected || std::abs(path->getBaseZ() - wantedZ) < std::abs(selected->getBaseZ() - wantedZ))
+                        selected = path;
+                }
+            if (selected)
+            {
+                z = selected->getBaseZ();
+                if (s.category == Category::banners && selected->isSloped() && selected->getSlopeDirection() == s.direction)
+                    z += kPathHeightStep;
+            }
+            else if (s.pathHeight) z = *s.pathHeight; // Native query reports a stale/missing path.
+        }
+        const CoordsXYZD loc{ tile, z, s.direction };
+        const auto& c = s.colours;
+        switch (s.category)
+        {
+            case Category::additions:
+                return std::make_unique<GameActions::FootpathAdditionPlaceAction>(loc, s.object);
+            case Category::small:
+                return std::make_unique<GameActions::SmallSceneryPlaceAction>(loc, s.quadrant, s.object, c[0], c[1], c[2]);
+            case Category::large:
+                return std::make_unique<GameActions::LargeSceneryPlaceAction>(loc, s.object, c[0], c[1], c[2]);
+            case Category::walls:
+                return std::make_unique<GameActions::WallPlaceAction>(s.object, loc, s.direction, c[0], c[1], c[2]);
+            case Category::banners:
+                return std::make_unique<GameActions::BannerPlaceAction>(loc, s.object, c[0]);
+        }
+        return {};
+    }
+    static std::unique_ptr<GameActions::GameAction> Removal(const Target& t)
+    {
+        switch (t.category)
+        {
+            case Category::additions:
+                return std::make_unique<GameActions::FootpathAdditionRemoveAction>(t.location);
+            case Category::small:
+                return std::make_unique<GameActions::SmallSceneryRemoveAction>(t.location, t.part, t.object);
+            case Category::large:
+                return std::make_unique<GameActions::LargeSceneryRemoveAction>(t.location, t.part);
+            case Category::walls:
+                return std::make_unique<GameActions::WallRemoveAction>(t.location);
+            case Category::banners:
+                return std::make_unique<GameActions::BannerRemoveAction>(CoordsXYZD{ t.location, t.part });
+        }
+        return {};
+    }
+    static TileElement* Find(const Target& t, bool isGhost)
+    {
+        if (!MapIsLocationValid(t.location))
+            return nullptr;
+        if (t.category == Category::additions)
+        {
+            auto* path = MapGetFootpathElement(t.location);
+            return path && !path->isGhost() && path->hasAddition() && path->additionIsGhost() == isGhost
+                    && path->getAdditionEntryIndex() == t.object
+                ? reinterpret_cast<TileElement*>(path)
+                : nullptr;
+        }
+        for (auto* e : TileElementsView<TileElement>(t.location))
+        {
+            if (e->getBaseZ() != t.location.z || e->isGhost() != isGhost)
+                continue;
+            if (t.category == Category::small && e->getType() == TileElementType::smallScenery
+                && e->asSmallScenery()->getSceneryQuadrant() == t.part && e->asSmallScenery()->getEntryIndex() == t.object)
+                return e;
+            if (t.category == Category::large && e->getType() == TileElementType::largeScenery
+                && e->getDirection() == t.location.direction && e->asLargeScenery()->getSequenceIndex() == t.part
+                && e->asLargeScenery()->getEntryIndex() == t.object)
+                return e;
+            if (t.category == Category::walls && e->getType() == TileElementType::wall
+                && e->getDirection() == t.location.direction && e->asWall()->getEntryIndex() == t.object)
+                return e;
+            if (t.category == Category::banners && e->getType() == TileElementType::banner
+                && e->asBanner()->getPosition() == t.part && e->asBanner()->getIndex() == t.banner)
+                return e;
+        }
+        return nullptr;
+    }
+    std::optional<Target> Capture(const InteractionInfo& info)
+    {
+        const auto* e = info.Element;
+        if (!e || e->isGhost())
+            return {};
+        Target t{};
+        t.location = { info.Loc.x & ~31, info.Loc.y & ~31, e->getBaseZ(), e->getDirection() };
+        if (e->getType() == TileElementType::smallScenery)
+        {
+            t.category = Category::small;
+            const auto* s = e->asSmallScenery();
+            t.object = s->getEntryIndex();
+            t.part = s->getSceneryQuadrant();
+            t.colours = { s->getPrimaryColour(), s->getSecondaryColour(), s->getTertiaryColour() };
+        }
+        else if (e->getType() == TileElementType::largeScenery)
+        {
+            t.category = Category::large;
+            const auto* s = e->asLargeScenery();
+            t.object = s->getEntryIndex();
+            t.part = s->getSequenceIndex();
+            t.banner = s->getBannerIndex();
+            t.colours = { s->getPrimaryColour(), s->getSecondaryColour(), s->getTertiaryColour() };
+        }
+        else if (e->getType() == TileElementType::wall)
+        {
+            t.category = Category::walls;
+            const auto* s = e->asWall();
+            t.object = s->getEntryIndex();
+            t.banner = s->getBannerIndex();
+            t.colours = { s->getPrimaryColour(), s->getSecondaryColour(), s->getTertiaryColour() };
+        }
+        else if (e->getType() == TileElementType::path)
+        {
+            const auto* path = e->asPath();
+            if (!path->hasAddition() || path->additionIsGhost())
+                return {};
+            t.category = Category::additions;
+            t.object = path->getAdditionEntryIndex();
+        }
+        else if (e->getType() == TileElementType::banner)
+        {
+            t.category = Category::banners;
+            const auto* s = e->asBanner();
+            const auto* b = s->getBanner();
+            if (!b)
+                return {};
+            t.object = b->type;
+            t.part = s->getPosition();
+            t.banner = s->getIndex();
+            t.colours[0] = b->colour;
+        }
+        else
+            return {};
+        if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject(Type(t.category), t.object))
+            t.descriptor = object->GetIdentifier();
+        if (const auto* banner = GetBanner(t.banner))
+        {
+            t.text = banner->text;
+            t.bannerFlags = banner->flags.holder;
+            t.textColour = static_cast<uint8_t>(banner->textColour);
+            t.linkedRide = banner->rideIndex;
+        }
+        // Reject ambiguous native identities: normal small removal can match ghosts.
+        if (Find(t, false) != e || Find(t, true))
+            return {};
+        return t;
+    }
+    GameActions::Result Pick(const Target& t, bool execute)
+    {
+        auto* element = Find(t, false);
+        if (!element || Find(t, true)) return Invalid("Scenery target changed");
+        InteractionInfo hit{};
+        hit.Loc = t.location;
+        hit.Element = element;
+        const auto fresh = Capture(hit);
+        if (!fresh || *fresh != t) return Invalid("Scenery target changed");
+        if (!Eligible(t.category, t.object)) return Invalid("Object unavailable or not researched");
+        auto selected = current;
+        selected.category = t.category;
+        selected.object = t.object;
+        selected.mode = Mode::place;
+        // Pocket directions are native map directions, unlike desktop's camera-relative buttons.
+        selected.direction = t.category == Category::banners ? t.part : t.location.direction;
+        selected.quadrant = t.category == Category::small ? t.part : 0;
+        selected.height = t.location.z;
+        if (t.category == Category::banners) selected.height -= 2 * kCoordsZStep;
+        if (t.category == Category::large)
+        {
+            const auto* entry = ObjectEntryManager::GetObjectEntry<LargeSceneryEntry>(t.object);
+            if (!entry || t.part >= entry->tiles.size()) return Invalid("Large scenery sequence unavailable");
+            selected.height -= entry->tiles[t.part].offset.z;
+        }
+        const auto channels = Channels(t.category, t.object);
+        for (size_t i = 0; i < channels.size(); ++i)
+            if (channels[i]) selected.colours[i] = t.colours[i];
+        if (execute)
+        {
+            ClearPreview();
+            const auto entries = Entries(t.category);
+            if (current.category != t.category || std::ranges::none_of(entries,
+                [&](const auto& e) { return e.identity.index == t.object; }))
+            { groupFilter = kObjectEntryIndexNull; search.clear(); }
+            current = selected;
+        }
+        return {};
+    }
+    GameActions::Result Modify(const Target& t, Mode mode, const std::array<Drawing::Colour, 3>& proposed, bool execute)
+    {
+        auto* e = Find(t, false);
+        if (!e || Find(t, true))
+            return Invalid("Scenery target changed");
+        InteractionInfo hit{};
+        hit.Loc = t.location;
+        hit.Element = e;
+        const auto fresh = Capture(hit);
+        if (!fresh || fresh->colours != t.colours)
+            return Invalid("Scenery colours changed");
+        if (mode == Mode::remove)
+        {
+            auto a = Removal(t);
+            return execute ? GameActions::Execute(a.get(), getGameState()) : GameActions::Query(a.get(), getGameState());
+        }
+        auto c = t.colours;
+        const auto ch = Channels(t.category, t.object);
+        for (size_t i = 0; i < 3; ++i)
+            if (ch[i])
+                c[i] = proposed[i];
+        if (c == t.colours)
+            return Invalid("No supported colour change");
+        std::unique_ptr<GameActions::GameAction> a;
+        switch (t.category)
+        {
+            case Category::additions:
+                return Invalid("Path furniture has no colour channels");
+            case Category::small:
+                a = std::make_unique<GameActions::SmallScenerySetColourAction>(t.location, t.part, t.object, c[0], c[1], c[2]);
+                break;
+            case Category::large:
+                a = std::make_unique<GameActions::LargeScenerySetColourAction>(t.location, t.part, c[0], c[1], c[2]);
+                break;
+            case Category::walls:
+                a = std::make_unique<GameActions::WallSetColourAction>(t.location, c[0], c[1], c[2]);
+                break;
+            case Category::banners:
+                a = std::make_unique<GameActions::BannerSetColourAction>(CoordsXYZD{ t.location, t.part }, c[0]);
+                break;
+        }
+        return execute ? GameActions::Execute(a.get(), getGameState()) : GameActions::Query(a.get(), getGameState());
+    }
+    GameActions::Result SetText(const Target& t, const std::string& text, bool execute)
+    {
+        const auto* banner = GetBanner(t.banner);
+        if (!Find(t, false) || Find(t, true) || !banner || banner->text != t.text || text == t.text
+            || TextEntry{ text }.Length() > TextEntry::limit)
+            return Invalid("Sign changed or text unavailable");
+        std::unique_ptr<GameActions::GameAction> action;
+        if (t.category == Category::banners)
+            action = std::make_unique<GameActions::BannerSetNameAction>(t.banner, text);
+        else
+            action = std::make_unique<GameActions::SignSetNameAction>(t.banner, text);
+        return execute ? GameActions::Execute(action.get(), getGameState()) : GameActions::Query(action.get(), getGameState());
+    }
+    static bool Fresh(const Target& t)
+    {
+        auto* e = Find(t, false);
+        if (!e || Find(t, true))
+            return false;
+        InteractionInfo hit{};
+        hit.Loc = t.location;
+        hit.Element = e;
+        const auto fresh = Capture(hit);
+        return fresh && *fresh == t;
+    }
+    std::optional<StyleDraft> BeginStyle(const Target& t, Style style)
+    {
+        if (!Fresh(t) || t.banner == BannerIndex::GetNull())
+            return {};
+        const bool banner = t.category == Category::banners;
+        if (style == Style::noEntry && !banner)
+            return {};
+        const auto channels = Channels(t.category, t.object);
+        if (style == Style::mainColour && !channels[0])
+            return {};
+        if (style == Style::textColour && !banner && !channels[1])
+            return {};
+        uint8_t value = style == Style::noEntry ? !!(t.bannerFlags & 1)
+            : style == Style::textColour        ? (banner ? t.textColour : static_cast<uint8_t>(t.colours[1]))
+                                                : static_cast<uint8_t>(t.colours[0]);
+        return StyleDraft{ t, style, value };
+    }
+    void AdjustStyle(StyleDraft& d, int delta)
+    {
+        const int count = d.style == Style::noEntry                                  ? 2
+            : d.style == Style::textColour && d.target.category == Category::banners ? 14
+                                                                                     : 72;
+        d.value = (static_cast<int>(d.value) + delta % count + count) % count;
+    }
+    std::string StyleValue(const StyleDraft& d)
+    {
+        if (d.style == Style::noEntry)
+            return std::string("No entry: ") + (d.value ? "On" : "Off");
+        if (d.style == Style::textColour && d.target.category == Category::banners)
+        {
+            static constexpr const char* names[] = { "Black",     "Grey",       "White",      "Red",        "Green",
+                                                     "Yellow",    "Topaz",      "Celadon",    "Baby blue",  "Pale lavender",
+                                                     "Pale gold", "Light pink", "Pearl aqua", "Pale silver" };
+            return std::string("Text: ") + (d.value < 14 ? names[d.value] : "Invalid");
+        }
+        return std::string(d.style == Style::mainColour ? "Primary: " : "Text: ")
+            + ColourName(static_cast<Drawing::Colour>(d.value));
+    }
+    GameActions::Result ApplyStyle(const StyleDraft& d, bool execute)
+    {
+        const auto baseline = BeginStyle(d.target, d.style);
+        const int count = d.style == Style::noEntry                                  ? 2
+            : d.style == Style::textColour && d.target.category == Category::banners ? 14
+                                                                                     : 72;
+        if (!baseline || d.value >= count || baseline->value == d.value)
+            return Invalid("Sign changed or style unavailable");
+        std::unique_ptr<GameActions::GameAction> action;
+        if (d.target.category == Category::banners)
+            action = std::make_unique<GameActions::BannerSetStyleAction>(
+                d.style == Style::noEntry          ? GameActions::BannerSetStyleType::noEntry
+                    : d.style == Style::textColour ? GameActions::BannerSetStyleType::textColour
+                                                   : GameActions::BannerSetStyleType::primaryColour,
+                d.target.banner, d.value);
+        else
+            action = std::make_unique<GameActions::SignSetStyleAction>(
+                d.target.banner, d.style == Style::mainColour ? static_cast<Drawing::Colour>(d.value) : d.target.colours[0],
+                d.style == Style::textColour ? static_cast<Drawing::Colour>(d.value) : d.target.colours[1],
+                d.target.category == Category::large);
+        return execute ? GameActions::Execute(action.get(), getGameState()) : GameActions::Query(action.get(), getGameState());
+    }
+    static void RemoveGhost()
+    {
+        if (!ghost)
+            return;
+        const auto t = *ghost;
+        ghost.reset();
+        if (!Find(t, true))
+            return;
+        auto a = Removal(t);
+        a->SetFlags(
+            { GameActions::CommandFlag::ghost, GameActions::CommandFlag::noSpend,
+              GameActions::CommandFlag::allowDuringPaused });
+        GameActions::Execute(a.get(), getGameState());
+    }
+    void ClearPreview()
+    {
+        requested.reset();
+        scatterDraft.reset();
+        RemoveGhost();
+    }
+    static GameActions::Result Query(std::optional<CoordsXY> tile, const Settings& s)
+    {
+        const auto max = GetMapSizeMaxXY();
+        if (!tile || tile->x < 32 || tile->y < 32 || tile->x > max.x || tile->y > max.y || tile->x % 32 || tile->y % 32
+            || !MapGetSurfaceElementAt(*tile))
+            return Invalid("Move onto valid land");
+        if (!Eligible(s.category, s.object))
+            return Invalid("Scenery unavailable / unresearched");
+        if (s.direction > 3 || s.quadrant > 3 || s.height < 0 || s.height > 2040 || s.height % 8)
+            return Invalid("Invalid scenery geometry");
+        auto a = Placement(*tile, s);
+        return GameActions::Query(a.get(), getGameState());
+    }
+    static void CreateGhost(const Request& request)
+    {
+        auto a = Placement(request.tile, request.settings);
+        a->SetFlags(
+            { GameActions::CommandFlag::ghost, GameActions::CommandFlag::noSpend,
+              GameActions::CommandFlag::allowDuringPaused });
+        const auto r = GameActions::Execute(a.get(), getGameState());
+        if (r.error != GameActions::Status::ok)
+            return;
+        Target t{};
+        t.category = request.settings.category;
+        t.object = request.settings.object;
+        t.location = { request.tile, 0, request.settings.direction };
+        t.part = request.settings.quadrant;
+        if (t.category == Category::additions)
+            t.location = { request.tile, r.position.z, 0 };
+        if (t.category == Category::small)
+        {
+            const auto d = r.getData<GameActions::SmallSceneryPlaceActionResult>();
+            t.location.z = d.BaseHeight;
+            t.part = d.SceneryQuadrant;
+        }
+        if (t.category == Category::large)
+        {
+            t.location.z = r.getData<GameActions::LargeSceneryPlaceActionResult>().firstTileHeight;
+            t.part = 0;
+        }
+        if (t.category == Category::walls)
+            t.location.z = r.getData<GameActions::WallPlaceActionResult>().BaseHeight;
+        if (t.category == Category::banners)
+        {
+            t.banner = r.getData<GameActions::BannerPlaceActionResult>().bannerId;
+            t.part = request.settings.direction;
+            for (const auto* b : TileElementsView<BannerElement>(request.tile))
+                if (b->getIndex() == t.banner)
+                    t.location.z = b->getBaseZ();
+        }
+        ghost = t;
+    }
+    static GameActions::Result Scatter(std::optional<CoordsXY> tile, const Settings& s, bool execute)
+    {
+        const auto max = GetMapSizeMaxXY();
+        if (!tile || tile->x < 32 || tile->y < 32 || tile->x > max.x || tile->y > max.y || tile->x%32 || tile->y%32
+            || s.scatterSize < 1 || s.scatterSize > 64 || static_cast<int>(s.scatterDensity)>2 || s.category != Category::small
+            || !Eligible(s.category,s.object) || Network::GetMode()!=Network::Mode::none)
+            return Invalid("Scatter unavailable / check object, land or network mode");
+        if (execute && scatterOutcome && scatterOutcome->completed < scatterOutcome->total)
+            return Invalid("Native scatter actions pending");
+        const auto* object = GetContext()->GetObjectManager().GetLoadedObject(Type(s.category),s.object);
+        const std::string descriptor(object->GetIdentifier());
+        const Request key{*tile,s};
+        if (execute && scatterDraft && scatterDraft->descriptor != descriptor)
+            return Invalid("Scatter object changed / review again");
+        if (!scatterDraft || scatterDraft->key != key || scatterDraft->descriptor != descriptor)
+        {
+            scatterDraft = ScatterDraft{key,descriptor,{},false,0};
+            const auto* entry = ObjectEntryManager::GetObjectEntry<SmallSceneryEntry>(s.object);
+            auto direction=s.direction; auto quadrant=s.quadrant;
+            for (int i=0;i<SceneryScatterQuantity(s.scatterSize,s.scatterDensity);++i)
+            {
+                const auto location=SceneryScatterProposal(*tile,s.scatterSize,*entry,quadrant,direction);
+                auto proposed=s; proposed.direction=direction; proposed.quadrant=quadrant;
+                scatterDraft->proposals.push_back({location,proposed});
+            }
+        }
+        GameActions::Result result;
+        result.cost=0;
+        size_t available=0;
+        std::string failure;
+        for (const auto& p : scatterDraft->proposals)
+        {
+            const auto q=Query(p.tile,p.settings);
+            if (q.error==GameActions::Status::ok) { result.cost+=q.cost; ++available; }
+            else failure=q.getErrorMessage();
+        }
+        if (!available) return Invalid(failure.c_str());
+        if (!execute) return result; // Stable estimate; collisions between sampled proposals remain native partial failures.
+        if (!scatterDraft->reviewed || scatterDraft->quote!=result.cost)
+        {
+            scatterDraft->reviewed=true; scatterDraft->quote=result.cost; scatterOutcome.reset();
+            return result; // First released A reviews; only the next released A submits native actions.
+        }
+        scatterOutcome=std::make_shared<ScatterOutcome>();
+        const auto outcome=scatterOutcome;
+        outcome->total=scatterDraft->proposals.size();
+        const auto proposals=std::move(scatterDraft->proposals);
+        scatterDraft.reset();
+        for (const auto& p : proposals)
+        {
+            auto q=Query(p.tile,p.settings);
+            if (q.error!=GameActions::Status::ok)
+            {
+                ++outcome->completed; outcome->failure=q.getErrorMessage();
+                continue;
+            }
+            auto action=Placement(p.tile,p.settings);
+            action->SetCallback([outcome](const GameActions::GameAction*,const GameActions::Result* r) {
+                ++outcome->completed;
+                if (r->error==GameActions::Status::ok) { ++outcome->placed; outcome->cost+=r->cost; }
+                else outcome->failure=r->getErrorMessage();
+            });
+            GameActions::Execute(action.get(),getGameState());
+        }
+        return result;
+    }
+    GameActions::Result Place(std::optional<CoordsXY> tile, const Settings& s, bool execute)
+    {
+        const auto old = requested;
+        RemoveGhost();
+        if (s.scatter && s.category==Category::small && s.mode==Mode::place)
+        {
+            requested.reset();
+            return Scatter(tile,s,execute);
+        }
+        const auto r = Query(tile, s);
+        if (!execute)
+        {
+            if (old && suspended == 0 && r.error == GameActions::Status::ok)
+                CreateGhost(*old);
+            return r;
+        }
+        requested.reset();
+        if (r.error != GameActions::Status::ok)
+            return r;
+        auto a = Placement(*tile, s);
+        return GameActions::Execute(a.get(), getGameState());
+    }
+    void SetPathTarget(const std::optional<CoordsXYZ>& target)
+    {
+        current.pathHeight = target ? std::optional<int32_t>{target->z} : std::nullopt;
+    }
+    void UpdatePreview(std::optional<CoordsXY> tile)
+    {
+        lastTile = tile;
+        if (current.mode != Mode::place)
+        {
+            ClearPreview();
+            return;
+        }
+        // Remove own preview before ordinary query, important for banner occupancy.
+        RemoveGhost();
+        const auto r = Query(tile, current);
+        if (r.error != GameActions::Status::ok)
+        {
+            requested.reset();
+            return;
+        }
+        requested = Request{ *tile, current };
+        if (!suspended)
+            CreateGhost(*requested);
+    }
+    void RemovePreviewTemporarily()
+    {
+        ++suspended;
+        RemoveGhost();
+    }
+    void RestorePreview()
+    {
+        if (!suspended || --suspended || !requested)
+            return;
+        const auto r = *requested;
+        if (Query(r.tile, r.settings).error == GameActions::Status::ok)
+            CreateGhost(r);
+        else
+            requested.reset();
+    }
+} // namespace OpenRCT2::Ui::Handheld::SceneryTools

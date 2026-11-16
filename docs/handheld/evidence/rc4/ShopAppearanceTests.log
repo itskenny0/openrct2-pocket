@@ -1,0 +1,9 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+INFO: Handheld controller: Virtual Controller (instance 0)
+Burger Bar 1 channels 0
+Balloon Stall 1 channels 2
+Toilets 1 channels 0
+Cash Machine 1 channels 0
+Information Kiosk 1 channels 2
+ShopAppearanceTests native/SDL PASS

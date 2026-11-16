@@ -1,0 +1,15 @@
+{
+  "PauseResumeTests": 0,
+  "RideAccessRelocationTests": 0,
+  "MazeAccessPreviewTests": 0,
+  "AccessShortcutTests": 0,
+  "SceneryPathParityTests": 0,
+  "ConstructionTests": 0,
+  "PathActionsTests": 0,
+  "PresentationLifecycleTests": 0,
+  "MazeConstructionTests": 0,
+  "RideConstructionTests": 0,
+  "PathScenarioUsabilityTests": 0,
+  "OrdinaryPlayUiTests": 0,
+  "UiRedesignTests": 0
+}

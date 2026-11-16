@@ -1,0 +1,3 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+PASS ManagementUxTests: finance values/graphs/loan/cancel, native research drafts/cost/catalog, marketing targets/duration/cost, park/context return, disabled states, save/reload

@@ -1,0 +1,22 @@
+Rebuilding changed dependencies: 20
+CMakeFiles/openrct2.dir/src/openrct2-ui/ProvisionalElements.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/AccessPreview.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/WindowManager.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/UiContext.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/Finances.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/CustomTracks.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/Designs.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/FlatRides.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/MarketingManagement.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/GuestManagement.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/ParkOverview.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/Mazes.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/Explorer.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/ResearchManagement.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/Paths.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/RideAccess.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/input/InputManager.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/StaffManagement.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/RideManagement.cpp.o PASS
+CMakeFiles/openrct2.dir/src/openrct2-ui/handheld/Menu.cpp.o PASS
+PASS exact changed sources / AArch64 GUI and CLI

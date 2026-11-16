@@ -7,6 +7,7 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
+#include "NativeMap.h"
 #include <openrct2-ui/interface/ViewportQuery.h>
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/interface/Window.h>
@@ -245,6 +246,12 @@ namespace OpenRCT2::Ui::Windows
         u8string _ySpinnerCaption{};
 
     public:
+        static std::array<Drawing::PaletteIndex, 2> PocketTileColour(CoordsXY c, bool rides)
+        {
+            const auto colour = rides ? GetPixelColourRide(c) : GetPixelColourPeep(c);
+            return { colour.a, colour.b };
+        }
+        static TileCoordsXY PocketMapCoords(CoordsXY c) { return TransformToMapCoords(c); }
         void onOpen() override
         {
             setWidgets(window_map_widgets);
@@ -844,7 +851,7 @@ namespace OpenRCT2::Ui::Windows
                 _currentLine = 0;
         }
 
-        ColourPair GetPixelColourPeep(const CoordsXY& c)
+        static ColourPair GetPixelColourPeep(const CoordsXY& c)
         {
             auto* surfaceElement = MapGetSurfaceElementAt(c);
             if (surfaceElement == nullptr)
@@ -893,7 +900,7 @@ namespace OpenRCT2::Ui::Windows
             return colour;
         }
 
-        ColourPair GetPixelColourRide(const CoordsXY& c)
+        static ColourPair GetPixelColourRide(const CoordsXY& c)
         {
             ColourPair colourA{};                                // highlight colour
             ColourPair colourB = ColourPair(PaletteIndex::pi13); // surface colour (dark grey)
@@ -1158,7 +1165,7 @@ namespace OpenRCT2::Ui::Windows
             return { 0, 0 }; // unreachable
         }
 
-        MapCoordsXY TransformToMapCoords(CoordsXY c)
+        static MapCoordsXY TransformToMapCoords(CoordsXY c)
         {
             int32_t x = c.x, y = c.y;
 
@@ -1256,6 +1263,44 @@ namespace OpenRCT2::Ui::Windows
             _recalculateScrollbars = true;
         }
     };
+
+    std::array<Drawing::PaletteIndex, 2> NativeMiniMapTileColour(CoordsXY c, bool rides)
+    {
+        return MapWindow::PocketTileColour(c, rides);
+    }
+    TileCoordsXY NativeMiniMapCoords(CoordsXY c) { return MapWindow::PocketMapCoords(c); }
+
+    std::optional<std::array<ScreenCoordsXY, 2>> NativeMiniMapViewportBounds()
+    {
+        const auto* main = WindowGetMain();
+        if (!main || !main->viewport) return std::nullopt;
+        const auto* viewport = main->viewport;
+        auto offset = MiniMapOffsetFactors[GetCurrentRotation()];
+        offset.x *= getPracticalMapSize();
+        offset.y *= getPracticalMapSize();
+        const auto start = offset + ScreenCoordsXY{ viewport->viewPos.x / kCoordsXYStep,
+            viewport->viewPos.y / kCoordsXYHalfTile };
+        return std::array<ScreenCoordsXY, 2>{ start, start + ScreenCoordsXY{
+            viewport->ViewWidth() / kCoordsXYStep, viewport->ViewHeight() / kCoordsXYHalfTile } };
+    }
+
+    std::vector<NativeMiniMapMarker> NativeMiniMapPeepMarkers(bool employees, bool tracked, int role)
+    {
+        std::vector<NativeMiniMapMarker> result;
+        if (employees)
+        {
+            for (const auto* staff : EntityList<Staff>())
+                if (staff->x != kLocationNull && (role < 0 || EnumValue(staff->assignedStaffType) == role))
+                    result.push_back({ NativeMiniMapCoords({ staff->x, staff->y }), StaffMapColour, staff->id });
+        }
+        else
+        {
+            for (const auto* guest : EntityList<Guest>())
+                if (guest->x != kLocationNull && (!tracked || guest->peepFlags.has(PeepFlag::tracking)))
+                    result.push_back({ NativeMiniMapCoords({ guest->x, guest->y }), GuestMapColour, guest->id });
+        }
+        return result;
+    }
 
     WindowBase* MapOpen()
     {

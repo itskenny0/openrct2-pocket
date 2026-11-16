@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: GPL-3.0-only
+#pragma once
+#include "ObjectPicker.h"
+#include "RideManagement.h"
+
+#include <openrct2/ride/TrackDesign.h>
+namespace OpenRCT2::Ui::Handheld::Designs
+{
+    bool Eligible(const TrackDesign& design);
+    std::string UnavailableReason(const TrackDesign& design);
+    std::vector<PickerEntry> Entries();
+    std::optional<PickerEntry> FileEntry(const std::string& path, std::optional<ObjectEntryDescriptor> vehicle = {}, int width = 86, int height = 62, Direction orientation = 0);
+    bool BrowserReturn();
+    void SetBrowserReturn(bool value);
+    bool Begin(const std::string& path, std::optional<ObjectEntryDescriptor> vehicle = {});
+    const TrackDesign* Draft();
+    bool ChooseVehicle(const ObjectEntryDescriptor& vehicle);
+    std::string VehicleNotice();
+    std::vector<std::string> WarningLines();
+    std::string LastError();
+    uint32_t PlacementSceneryOmitted();
+    void End();
+    bool Active();
+    bool Busy();
+    const std::string& Selection();
+    Direction Orientation();
+    void Rotate();
+    bool Height(int direction);
+    void AutomaticHeight();
+    std::optional<int32_t> HeightOffset();
+    std::string HeightNotice();
+    void SetScenery(bool value);
+    std::string SceneryNotice();
+    bool IncludesScenery();
+    void ClearPreview();
+    void UpdatePreview(std::optional<CoordsXY> tile);
+    void RemovePreviewTemporarily();
+    void RestorePreview();
+    GameActions::Result Query(std::optional<CoordsXY> tile);
+    bool Review(std::optional<CoordsXY> tile);
+    bool HasReview();
+    void CancelReview();
+    GameActions::Result Confirm();
+    money64 ReviewCost();
+    std::optional<CoordsXYZD> ReviewLocation();
+    std::optional<RideManagement::Target> Completed();
+    void DrawPanel(Drawing::RenderTarget& rt, ScreenSize screen);
+} // namespace OpenRCT2::Ui::Handheld::Designs

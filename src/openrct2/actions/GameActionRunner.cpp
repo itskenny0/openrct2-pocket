@@ -58,6 +58,12 @@ namespace OpenRCT2::GameActions
     static std::multiset<QueuedGameAction> _actionQueue;
     static uint32_t _nextUniqueId = 0;
     static bool _suspended = false;
+    static bool _processingQueue = false;
+
+    bool IsProcessingQueue()
+    {
+        return _processingQueue;
+    }
 
     void SuspendQueue()
     {
@@ -88,12 +94,23 @@ namespace OpenRCT2::GameActions
 
     void ProcessQueue(GameState_t& gameState)
     {
-        if (_suspended)
+        if (_suspended || _processingQueue)
         {
             // Do nothing if suspended, this is usually the case between connect and map loads.
             return;
         }
 
+        struct ProcessingGuard
+        {
+            ProcessingGuard()
+            {
+                _processingQueue = true;
+            }
+            ~ProcessingGuard()
+            {
+                _processingQueue = false;
+            }
+        } guard;
         const uint32_t currentTick = gameState.currentTicks;
 
         while (_actionQueue.begin() != _actionQueue.end())

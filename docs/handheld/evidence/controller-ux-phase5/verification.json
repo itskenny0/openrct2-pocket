@@ -1,0 +1,273 @@
+{
+  "baseline_commit": "5adbfbeca421d2643e0005304b859e343a907417",
+  "baseline_tree": "a7b3514adf79342bd45b49085255b3363f32838e",
+  "build": {
+    "architecture": "AArch64",
+    "compiler": "GCC 16.2 / glibc 2.26 SDK",
+    "initial_affected_gui_translation_units": 25,
+    "targets": [
+      "openrct2",
+      "openrct2-cli"
+    ],
+    "engine": "Retained unchanged native archive; not a fresh engine rebuild",
+    "gui_sha256": "5490c6e3c34d694497c01ada5023e2ef679d7bf4b82b3a9c01f026db9d728ea7",
+    "cli_sha256": "7b013ee9eb929ed998123e05cc4b29e378bfde7dcbefbd832626608eb710f5f2"
+  },
+  "runtime": {
+    "runner": "QEMU AArch64 / offscreen SDL",
+    "viewport": "Actual native ViewportRender plus production UI",
+    "scenario": "Initialized native scenario fixture with real GameActions",
+    "private_assets": "User-supplied installed original Data/ObjData; never committed",
+    "public_peep_names_object": "rct2.peep_names.original explicitly loaded in fixture",
+    "physical_brick_test": false,
+    "interactive_desktop_session": false,
+    "2x_hardware_output": "Existing source/config inspected only"
+  },
+  "new_acceptance": {
+    "PeopleUxTests": 0,
+    "RideFlowTests": 0
+  },
+  "preservation": {
+    "PauseResumeTests": 0,
+    "RideAccessRelocationTests": 0,
+    "MazeAccessPreviewTests": 0,
+    "AccessShortcutTests": 0,
+    "SceneryPathParityTests": 0,
+    "ConstructionTests": 0,
+    "PathActionsTests": 0,
+    "PresentationLifecycleTests": 0,
+    "MazeConstructionTests": 0,
+    "RideConstructionTests": 0,
+    "PathScenarioUsabilityTests": 0,
+    "OrdinaryPlayUiTests": 0,
+    "UiRedesignTests": 0,
+    "ConstructionUxTests": 0,
+    "SelectedTrackEditingTests": 0,
+    "SeatRotationTests": 0,
+    "FamilyOperationTests": 0,
+    "StaffCompletionTests": 0,
+    "GuestCompletionTests": 0,
+    "GuestInformationTests": 0
+  },
+  "large_roster": {
+    "native_guests": 1024,
+    "snapshots": 50,
+    "observed_snapshot_time_ms_range": [
+      17,
+      30
+    ],
+    "not_frame_rate": true
+  },
+  "script_validation": [
+    "py_compile",
+    "help smoke check"
+  ],
+  "known_failures": {
+    "optional_bright_sand_capture": "Native repaint succeeds; subsequent offscreen viewport capture SIGSEGV. Root cause unknown. Opt-in POCKET_PEOPLE_BRIGHT_SAND=1; failure log preserved. Not claimed verified."
+  },
+  "screenshots": {
+    "01-staff-empty.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "833b51ba51c3108c2d8ae4b1f9a9bba184a11b2c8873b851a76abc5a03d9685e"
+    },
+    "02-hire-review.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "35493ed5c57e712cb17a5dd80092bb849b31fbf2cc43b762f8b1091dcca0995c"
+    },
+    "03-employee-overview.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "90394261cd06c7b1598d6d27ec10c7bcd0fce4b63abc3414d4648d1a9992143f"
+    },
+    "04-employee-duties.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "e849f4070a3c163d389a986ddf0c2b402bb5e85047aaa690054b664dd3d4313d"
+    },
+    "05-patrol-edit.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "6b85e95995cd165f00a1316677cb853b412e1cb0d6f2e0026462f806d840569c"
+    },
+    "06-dismissal-review.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "02818ceda1e55352b8c811b7197d7e03bf7b2165327b9b5a330aa1975ad84594"
+    },
+    "07-staff-roster.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "cbef5948777644d133d486f1b2d1abf6117622de34c5609420ad923324d0c4b3"
+    },
+    "08-staff-page.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "d3f1261527ba048dc3ce4cf0036f2665d9eb6ce527f6b6f539afaa37d673daf6"
+    },
+    "09-guest-overview.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "0eb5f2988f4d956c849278d274b49831619c339ddefee76a89342c8218e0a163"
+    },
+    "10-guest-needs.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "edf60be1ca14af522b52bd8aa64c8dbf2707bbbed02593b75df102715223d000"
+    },
+    "11-guest-thoughts.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "14eccc949c2cf97000051a4797cf8e96802a99a1fbd54afbd37904db895b5e7d"
+    },
+    "12-guest-details.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "005b2cbc5bb59d0d73e6f85ab7f15606f8a358e4a91a8525aec0950512a36566"
+    },
+    "13-guest-spending.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "b65419232f862d5a3d7c7da9a27eb9acba502fb48b51c982c92f8a84906da74f"
+    },
+    "14-guest-tracked.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "d96e3b2a23865a4772cf33a343ab671d825b481d936e0954995c48d1b16a5697"
+    },
+    "15-guest-follow.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "c03045a08b125efa1f0d543f6baacc9db1c4db7bfb84ee04bd66db95462babf1"
+    },
+    "16-guest-roster.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "a0c5da50d129a60bf73f4cc27d1f34bd65a629af2f1a7ccf35cd259fc48d680c"
+    },
+    "17-large-guest-roster.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "facf21bf07c7e3c8031372cabd75ca1953257354d49f0de78cbaef4bda9a3945"
+    },
+    "18-path-build.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "a1913d02651010f51ce6777458e56316d8f24e0143d127303190fc271f2d3362"
+    },
+    "19-path-adjust.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "9454d3dbe0ed8f3c0c4e39cc778a8466e50ff47e0e3337cd0efd091b6a080817"
+    },
+    "20-scenery-build.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "6b18609c2bea86739a6d65611ab0ac479f71bc347b9e4ad3a948a1973e8dece7"
+    },
+    "21-scenery-adjust.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "df108a2f7d9642963e5016e270b3b0388f14f53808d44c8527c780c96cf58b58"
+    },
+    "22-landscape-build.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "dec90b27b25bb613af89b4fecbad6b15df3166dba27f21d8a670251ada4eca81"
+    },
+    "23-landscape-adjust.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "0bc4d77591cb865bb3ef4abc18bb36bee88bf58082a59568728c508694ebbc68"
+    },
+    "24-dashboard.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "b52b546797a1f57361f06849ff60d874f712bdd7eb28bff01cd4dd428a7ce659"
+    },
+    "contact-sheet.png": {
+      "size": [
+        1024,
+        2040
+      ],
+      "sha256": "8b80ffe46bff8ad2b7cac7996b2509e5547ce3ed3a7270f86841bc6daec833a7"
+    },
+    "regression-coaster-build.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "b19c010f3e276c2ab17adbaddbe0fc4f1fb11c101afe2aaf14bc2cb194ea3f8d"
+    },
+    "regression-demolition.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "29166e27d4aaf0ba2c39c8f2bacd531b4ab5792a85f105016589f094533ba2af"
+    },
+    "regression-ride-closed.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "667079904b5cfd3bd79a227773fa7024906f3bfeec93e3430584626a8ed77ad5"
+    },
+    "regression-ride-open.png": {
+      "size": [
+        512,
+        384
+      ],
+      "sha256": "f2b79b7178f1f741ac597833322c27a2e5375a14ab0871174ce92e16f27d97bf"
+    }
+  }
+}

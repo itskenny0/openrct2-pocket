@@ -1,0 +1,224 @@
+{
+  "title": "OpenRCT2 Pocket native shop appearance and preview lifecycle",
+  "date_utc": "2026-10-14",
+  "published_implementation_base": "5e25be1470132c91b3bab728d2c2afddaaf5793c",
+  "base_tree": "b547c214028b10cfc1735475d8f7aaf7ca1978e0",
+  "production_sources_sha256": {
+    "src/openrct2-ui/handheld/ShopAppearance.h": "a954ebac0f7f5c05937f007b2a55c0bf9f1e0782ef08393aba929082d0bcff1d",
+    "src/openrct2-ui/handheld/Menu.cpp": "0fd3eb05f69c8a0f66b8f4bc580454fdf22e3a77a0937f739931e7642c60547d",
+    "src/openrct2-ui/handheld/ShopManagement.cpp": "6d8c0f4b21a660bda381cf19cf8502bf8c8cfa6d3004902f5611a3fbfab38f86",
+    "src/openrct2/actions/ride/RideSetAppearanceAction.cpp": "aeebf872d816ef13abddfe6bf96fb604dbd3158b45f37ec8bd1e66e214b2a49e",
+    "src/openrct2/actions/ride/RideSetAppearanceAction.h": "dba889dbc14f1ed90ca0f7c80846e2d27a1649d5af0543e9887a77ce93d4a1af",
+    "src/openrct2/ride/Ride.cpp": "3344cd28de17e4b72ee73f4031db8a66fe74270a39fde019c3ee65e312af12c3",
+    "src/openrct2/ride/RideIdentity.h": "7e60e67024ac2b2aa99cd6cce92a979baaf6080d34c5d7297f803df03eea68cc",
+    "src/openrct2/ride/ShopAppearanceContext.h": "cd00d907176bf79f3b52e95fa23cc2cb87ccfcab8e05f4cd362eeb960c83db22"
+  },
+  "driver": "test/handheld/ShopAppearanceTests.cpp",
+  "driver_sha256": "2e5181ac622c24db09e10f45eadbc72fadfa8293624180e33138426a052220a4",
+  "driver_binary_sha256": "e44d4fa497ae63a79bc3594b878c109ca88d68cecee8394dd1996b46b327f246",
+  "engine": "native X8DrawingEngine / ViewportRender / actual Pocket menu onDraw, shop overlay/footer and HUD",
+  "original_g1_sha256": "a78acefbcd1b0f5c8dbbf201afb8cf1a3d9294505134efa155c1323242c55a21",
+  "native_objects": "v1.8.0",
+  "invocation": "SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy POCKET_SHOP_APPEARANCE_CAPTURES=<capture-dir> ShopAppearanceTests <engine-data> <private-profile> <original-rct2>",
+  "fixture": "Native initialized 64x64 owned grass map; original Burger, Balloon, Toilet, ATM and Information objects; all placement, edits, demolition/reuse and save/load through native actions/APIs. No guests/customers/income fabricated. Native initial unavailable statistics remain explicit.",
+  "inspection": "All 28 final PNGs individually inspected at native pixel size in 4-up inspection sheets for clipping, overlap, gold focus, indigo contrast, controls, native park visibility and HUD collisions; sheets excluded.",
+  "limitations": "Production components and native viewport, not physical Brick captures or a whole SDL framebuffer screenshot. Paused preview uses the native build-in-pause cheat in the isolated fixture. No hardware, dense-park performance, sustained shop operation or multiplayer validation claimed.",
+  "images": [
+    {
+      "file": "01-capability-0.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "81d6e489ab5c9d4672288bca90d5ade4e0113f8006d2464cfa1ab8a9235ca881",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "01-capability-1.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "da0852228c9e6c1f04c186cb75c586a77dc4287c6851dfd87e3bd25bf5598feb",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "01-capability-2.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "0e0da00f6d94c4695748ed32cac34760adb74f42f3bca92e86cc3e07750e697e",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "01-capability-3.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "99286e6636fd4ad31c0dcd27398ef003fbb927de4022363ba770b3a3f94ea72d",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "01-capability-4.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "64d59f8d65338d8481a4d3d5d7074a9761b5e6c8690571cccaf59faa92d7b523",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "02-native-palette.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "10f505f398c9f9df64bdf5d602441316733eb6df221b3be29f0bf2c0a9efba54",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "03-cancel-first-review.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "3303a2e1634c695fda45971ff1f5d18e7595393445dae7c1862222f487ac4647",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "04-unchanged-cancellation.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "7a7db07d872682d72a214fe5171ec3d1dcdd5305641941d5c654692a768caec1",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "05-native-applied.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "1e671c8d59f45516715d55b208af19919c3837f257e7592e0e923b52df06618b",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "06-held-a-review.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "bb05af0c5fc4084d74b228da82c093c28d04758329be63443db76b05097a5586",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "07-stale-review-recovery.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "1dbebdff72aa90c92176345ce6c1e3af0a031a6924aab98778c6cc8eee417ab7",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "08-reloaded-merchandise.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "501f278072e1fb271739d94e35513561eac0d64f0cc76b784e11a92ea078e47c",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "09-result-0.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "81d6e489ab5c9d4672288bca90d5ade4e0113f8006d2464cfa1ab8a9235ca881",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "09-result-1.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "d54c04731da46bfcfa547c581a78d966b6fb8f88f24479c5f68398939eed5789",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "09-result-2.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "0e0da00f6d94c4695748ed32cac34760adb74f42f3bca92e86cc3e07750e697e",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "09-result-3.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "99286e6636fd4ad31c0dcd27398ef003fbb927de4022363ba770b3a3f94ea72d",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "09-result-4.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "cf836ae301837eb851812c2ef51e1511463356bb3f82d10135e39e1b326dfbd1",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "10-management-0.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "7a59b2364cdf4f6a054bd6bf2561284acaae98be1f4bd6ef2fdac5aacfe7568d",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "10-management-1.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "7c8c61c0911bd8799844a07c7fba9ddf393949cd9e3df565bd7dc3551cb22c37",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "10-management-2.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "4d8b5653f876da15435260cae79886a8ea66280afa6000598021adb4f01263ba",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "10-management-3.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "e5ea42799bbe89ebe7e66eb87b176ee15ff9a653f3eb0f1adfe94aedcd3b876d",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "10-management-4.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "993b6a65cabebd42fee41790998abf036b2f1d212c7fb00d1ebe518af90a064c",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "11-paged-native-palette.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "7353171fa19fde7b37ebb62ba3f862fe8030ea20de1bf4a8f1fbd941d3ab2027",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "12-paused-native-preview.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "f900e8c5060e94df4ffe726b10acd5fd53180c7dda6f4ec2f6c701b7785dfbda",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "13-preview-management-return.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "a2093dfeb50f4d99d982889717a9e538158aaf0c375ac50397d0c940092ce48b",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "14-autosave-reload-preservation.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "501f278072e1fb271739d94e35513561eac0d64f0cc76b784e11a92ea078e47c",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "15-native-merchandise-choices.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "592a9224a0a96adf7154d7e3268c8e84dffbacef72d2b593367a2664e2947345",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    },
+    {
+      "file": "16-pending-review-load-recovery.png",
+      "width": 512,
+      "height": 384,
+      "sha256": "501f278072e1fb271739d94e35513561eac0d64f0cc76b784e11a92ea078e47c",
+      "provenance": "Actual native test state and production rendering; filename identifies controller workflow."
+    }
+  ]
+}

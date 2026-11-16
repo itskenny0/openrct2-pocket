@@ -10,6 +10,7 @@
 #include "../interface/Theme.h"
 
 #include <openrct2-ui/handheld/ControllerInput.h>
+#include <openrct2-ui/handheld/Panel.h>
 #include <openrct2-ui/interface/Objective.h>
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/interface/Window.h>
@@ -151,6 +152,8 @@ namespace OpenRCT2::Ui::Windows
             setWidgets(_scenarioSelectWidgets);
             if (Handheld::IsEnabled())
             {
+                colours[0] = ColourWithFlags{ Colour::grey };
+                colours[1] = ColourWithFlags{ Colour::grey };
                 widgets[WIDX_BACKGROUND].right = width - 1;
                 widgets[WIDX_BACKGROUND].bottom = height - 1;
                 widgets[WIDX_TITLEBAR].right = width - 2;
@@ -176,16 +179,27 @@ namespace OpenRCT2::Ui::Windows
         {
             std::vector<const ScenarioIndexEntry*> selectable;
             for (const auto& item : _listItems)
-                if (item.type == ListItemType::scenario && !item.scenario.is_locked)
+                if (item.type == ListItemType::scenario)
                     selectable.push_back(item.scenario.scenario);
             if (selectable.empty())
+            {
+                _highlightedScenario = nullptr;
+                _showLockedInformation = false;
+                _preview = {};
+                invalidate();
                 return;
+            }
             auto found = std::find(selectable.begin(), selectable.end(), _highlightedScenario);
             int32_t index = found == selectable.end() ? (direction > 0 ? -1 : 0)
                                                       : static_cast<int32_t>(found - selectable.begin());
             index = (index + direction + static_cast<int32_t>(selectable.size())) % static_cast<int32_t>(selectable.size());
+            const bool changed = _highlightedScenario != selectable[index];
             _highlightedScenario = selectable[index];
             _showLockedInformation = false;
+            for (const auto& item : _listItems)
+                if (item.type == ListItemType::scenario && item.scenario.scenario == _highlightedScenario)
+                    _showLockedInformation = item.scenario.is_locked;
+            if (changed) LoadPreview();
             int32_t y = 0;
             for (const auto& item : _listItems)
             {
@@ -193,11 +207,23 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 y += item.type == ListItemType::heading ? 18 : GetScenarioListItemSize();
             }
-            const auto visibleHeight = height - kWidgetsStart - 20;
+            const auto visibleHeight = widgets[WIDX_SCENARIOLIST].height() - 2;
             if (y < scrolls[0].contentOffsetY)
                 scrolls[0].contentOffsetY = y;
             else if (y + GetScenarioListItemSize() > scrolls[0].contentOffsetY + visibleHeight)
                 scrolls[0].contentOffsetY = std::max(0, y + GetScenarioListItemSize() - visibleHeight);
+            invalidate();
+        }
+
+        void handheldToggleLocking()
+        {
+            const auto* previous = _highlightedScenario;
+            Config::Get().general.scenarioUnlockingEnabled = !Config::Get().general.scenarioUnlockingEnabled;
+            Config::Save();
+            initialiseListItems();
+            // Preserve the exact row where it remains visible after the native setting changes.
+            _highlightedScenario = previous;
+            handheldMove(0);
             invalidate();
         }
 
@@ -356,7 +382,7 @@ namespace OpenRCT2::Ui::Windows
         ScreenCoordsXY DrawPreview(RenderTarget& rt, ScreenCoordsXY screenPos)
         {
             auto targetImageType = PreviewImageType::miniMap;
-            if (Config::Get().interface.scenarioPreviewScreenshots)
+            if (!Handheld::IsEnabled() && Config::Get().interface.scenarioPreviewScreenshots)
                 targetImageType = PreviewImageType::screenshot;
 
             // Find minimap image to draw, if available
@@ -391,6 +417,16 @@ namespace OpenRCT2::Ui::Windows
         void onDraw(RenderTarget& rt) override
         {
             drawWidgets(rt);
+            if (Handheld::IsEnabled())
+            {
+                Handheld::Fill(rt, windowPos + ScreenCoordsXY{1, height - 35}, {width - 2, 34}, Handheld::Theme::raised);
+                Handheld::DrawModernText(rt, windowPos + ScreenCoordsXY{8, height - 30},
+                    std::string("{WHITE}D-pad Browse  L/R Source  X Unlocking ")
+                        + (Config::Get().general.scenarioUnlockingEnabled ? "On" : "Off"));
+                Handheld::DrawModernText(rt, windowPos + ScreenCoordsXY{8, height - 16},
+                    _showLockedInformation ? "{WHITE}Locked: complete earlier parks, or X turn unlocking off"
+                                           : "{WHITE}A Start park    B Back");
+            }
 
             StringId format = STR_WINDOW_COLOUR_2_STRINGID;
             FontStyle fontStyle = FontStyle::medium;
@@ -512,7 +548,7 @@ namespace OpenRCT2::Ui::Windows
 
         void onPrepareDraw() override
         {
-            const int32_t bottomMargin = Config::Get().general.debuggingTools ? 17 : 5;
+            const int32_t bottomMargin = Handheld::IsEnabled() ? 38 : Config::Get().general.debuggingTools ? 17 : 5;
             widgets[WIDX_SCENARIOLIST].right = width - GetPreviewPaneWidth() - 2 * kPadding;
             widgets[WIDX_SCENARIOLIST].bottom = height - bottomMargin;
         }
@@ -619,7 +655,7 @@ namespace OpenRCT2::Ui::Windows
 
         void onScrollDraw(int32_t scrollIndex, RenderTarget& rt) override
         {
-            auto paletteIndex = getColourMap(colours[1].colour).midLight;
+            auto paletteIndex = Handheld::IsEnabled() ? Handheld::Theme::ink : getColourMap(colours[1].colour).midLight;
             GfxClear(rt, paletteIndex);
 
             StringId highlighted_format = STR_WINDOW_COLOUR_2_STRINGID;
@@ -663,7 +699,13 @@ namespace OpenRCT2::Ui::Windows
                         bool isHighlighted = _highlightedScenario == scenario;
                         if (isHighlighted)
                         {
-                            Rectangle::filter(rt, { 0, y, width, y + scenarioItemHeight - 1 }, FilterPaletteID::paletteDarken1);
+                            if (Handheld::IsEnabled())
+                                Rectangle::fill(
+                                    rt, { 1, y, listWidth - 1, y + scenarioItemHeight - 2 },
+                                    Handheld::Theme::gold);
+                            else
+                                Rectangle::filter(
+                                    rt, { 0, y, width, y + scenarioItemHeight - 1 }, FilterPaletteID::paletteDarken1);
                         }
 
                         bool isCompleted = scenario->Highscore != nullptr;
@@ -680,9 +722,17 @@ namespace OpenRCT2::Ui::Windows
                         auto darkness = isDisabled ? TextDarkness::dark : TextDarkness::regular;
                         const auto scrollCentre = widgets[WIDX_SCENARIOLIST].width() / 2;
 
-                        drawText(
-                            rt, { scrollCentre, y + 1 }, format, ft,
-                            { colour, FontStyle::medium, TextAlignment::centre, darkness });
+                        if (Handheld::IsEnabled())
+                        {
+                            if (isDisabled) GfxDrawSprite(rt, ImageId(SPR_G2_LOCKED), {listWidth - 20, y + 5});
+                            Handheld::DrawModernEllipsised(
+                                rt, { 8, y + 5 }, listWidth - (isDisabled ? 36 : 16), (isHighlighted ? "{BLACK}" : "{WHITE}") + scenario->Name,
+                                { Colour::white });
+                        }
+                        else
+                            drawText(
+                                rt, { scrollCentre, y + 1 }, format, ft,
+                                { colour, FontStyle::medium, TextAlignment::centre, darkness });
 
                         // Check if scenario is completed
                         if (isCompleted)
@@ -931,6 +981,8 @@ namespace OpenRCT2::Ui::Windows
 
         static int32_t GetScenarioListItemSize()
         {
+            if (Handheld::IsEnabled())
+                return Handheld::kPanelRowPitch;
             if (!LocalisationService_UseTrueTypeFont())
                 return kTrueFontSize;
 
@@ -974,6 +1026,12 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::scenarioSelect))
             static_cast<ScenarioSelectWindow*>(window)->handheldTab(direction);
+    }
+
+    void ScenarioSelectHandheldToggleLocking()
+    {
+        if (auto* window = GetWindowManager()->FindByClass(WindowClass::scenarioSelect))
+            static_cast<ScenarioSelectWindow*>(window)->handheldToggleLocking();
     }
 
     void ScenarioSelectHandheldConfirm()

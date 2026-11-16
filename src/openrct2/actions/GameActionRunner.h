@@ -23,6 +23,7 @@ namespace OpenRCT2::GameActions
 
     void Enqueue(const GameAction* ga, uint32_t tick);
     void Enqueue(GameAction::Ptr&& ga, uint32_t tick);
+    bool IsProcessingQueue();
     void ProcessQueue(GameState_t& gameState);
     void ClearQueue();
 

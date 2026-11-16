@@ -1,0 +1,8 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+WARNING[/workspace/scratch/d2d0a4acf14b/openrct2-pocket/src/openrct2-ui/drawing/engines/HardwareDisplayDrawingEngine.cpp:115 (Resize)]: HWDisplayDrawingEngine::Resize error: Parameter 'renderer' is invalid
+WARNING[/workspace/scratch/d2d0a4acf14b/openrct2-pocket/src/openrct2-ui/drawing/engines/HardwareDisplayDrawingEngine.cpp:115 (Resize)]: HWDisplayDrawingEngine::Resize error: Parameter 'renderer' is invalid
+INFO: Handheld controller: Virtual Controller (instance 0)
+Unable to open '/workspace/scratch/d2d0a4acf14b/profile-MazeAccessPreviewTests/absent-native-load.park'
+ERROR[/workspace/scratch/d2d0a4acf14b/openrct2-pocket/src/openrct2-ui/windows/Changelog.cpp:232 (ReadFile)]: Unable to read text file
+MazeAccessPreviewTests access/maze native/SDL PASS

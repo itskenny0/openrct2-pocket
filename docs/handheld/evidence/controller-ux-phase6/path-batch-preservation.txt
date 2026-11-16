@@ -1,0 +1,11 @@
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+Building object index (2504 items)
+Finished building object index in 0.05 seconds.
+Building track design index (264 items)
+Finished building track design index in 0.02 seconds.
+Building scenario index (172 items)
+Finished building scenario index in 0.24 seconds.
+1000 cached preview calls us=23
+64 tile native queued build us=297
+PASS PathBatchTests: Single, lines, fill, queues, native validation/cost/connectivity, review/cancel, failure reporting, controls, cache, bounds, save/reload

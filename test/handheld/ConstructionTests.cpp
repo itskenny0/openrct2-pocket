@@ -1,0 +1,665 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Public object metadata/native park fixture. No original sprites or live coaster assets.
+#include <iostream>
+#include <openrct2-ui/handheld/AreaTools.h>
+#include <openrct2-ui/handheld/Paths.h>
+#include <openrct2-ui/handheld/RightsTools.h>
+#include <openrct2-ui/handheld/SceneryTools.h>
+#include <openrct2/Context.h>
+#include <openrct2/GameState.h>
+#include <openrct2/OpenRCT2.h>
+#include <openrct2/actions/footpath/FootpathPlaceAction.h>
+#include <openrct2/actions/footpath/FootpathRemoveAction.h>
+#include <openrct2/config/Config.h>
+#include <openrct2/object/ObjectManager.h>
+#include <openrct2/world/tile_element/LargeSceneryElement.h>
+#include <openrct2/scenario/Scenario.h>
+#include <openrct2/world/Map.h>
+#include <openrct2/world/TileElementsView.h>
+#include <openrct2/world/tile_element/PathElement.h>
+#include <openrct2/world/tile_element/SurfaceElement.h>
+#include <stdexcept>
+using namespace OpenRCT2;
+namespace S = Ui::Handheld::SceneryTools;
+static void Require(bool b, const char* m)
+{
+    if (!b)
+        throw std::runtime_error(m);
+}
+static size_t Ghosts()
+{
+    size_t n = 0;
+    for (int y = 32; y < 992; y += 32)
+        for (int x = 32; x < 992; x += 32)
+            for (const auto* e : TileElementsView<>(CoordsXY{ x, y }))
+                n += e->isGhost() || (e->getType() == TileElementType::path && e->asPath()->additionIsGhost());
+    return n;
+}
+static S::Target TargetAt(CoordsXY tile, S::Category category)
+{
+    for (auto* e : TileElementsView<>(tile))
+    {
+        InteractionInfo hit{};
+        hit.Loc = tile;
+        hit.Element = e;
+        const auto t = S::Capture(hit);
+        if (t && t->category == category)
+            return *t;
+    }
+    throw std::runtime_error("Placed scenery target not found");
+}
+int main(int argc, char** argv)
+{
+    try
+    {
+        if (argc != 3)
+            return 2;
+        gCustomOpenRCT2DataPath = argv[1];
+        gCustomUserDataPath = argv[2];
+        gOpenRCT2Headless = true;
+        gOpenRCT2NoGraphics = true;
+        auto context = CreateContext();
+        Config::SetDefaults();
+        Require(context->Initialise(), "Fixture init failed");
+        auto& state = getGameState();
+        auto& objects = context->GetObjectManager();
+        gameStateInitAll(state, { 32, 32 });
+        gLegacyScene = LegacyScene::playing;
+        state.park.cash = 1000000;
+        state.park.flags.unset(ParkFlag::noMoney, ParkFlag::noMoneyScenario);
+        // Scenario fixture ownership/research only. All tested construction uses actual native actions.
+        for (int y = 32; y < 992; y += 32)
+            for (int x = 32; x < 992; x += 32)
+                MapGetSurfaceElementAt(CoordsXY{ x, y })->setOwnership({ OwnershipFlag::landOwned });
+        auto load = [&](const char* id, uint8_t type) {
+            auto* o = objects.LoadObject(id);
+            Require(o, "Object metadata missing");
+            auto i = objects.GetLoadedObjectEntryIndex(o);
+            ScenerySetInvented({ type, i });
+            return i;
+        };
+        auto* surface = objects.LoadObject("rct2.footpath_surface.tarmac");
+        auto* railing = objects.LoadObject("rct2.footpath_railings.wood");
+        Require(surface && railing, "Path fixture objects missing");
+        const CoordsXY bannerTile{ 608, 192 };
+        for (auto t : { bannerTile, CoordsXY{ 576, 192 } })
+        {
+            GameActions::FootpathPlaceAction a(
+                { t, MapGetSurfaceElementAt(t)->getBaseZ() }, FootpathSlope{}, objects.GetLoadedObjectEntryIndex(surface),
+                objects.GetLoadedObjectEntryIndex(railing));
+            Require(GameActions::Execute(&a, state).error == GameActions::Status::ok, "Banner path failed");
+            GameActions::ProcessQueue(state);
+        }
+        struct Case
+        {
+            S::Category category;
+            const char* id;
+            uint8_t type;
+            CoordsXY tile;
+        };
+        const Case cases[] = { { S::Category::small, "rct2.scenery_small.corroof", SCENERY_TYPE_SMALL, { 128, 192 } },
+                               { S::Category::large, "rct2.scenery_large.ssig4", SCENERY_TYPE_LARGE, { 288, 192 } },
+                               { S::Category::walls, "rct2.scenery_wall.wbrg", SCENERY_TYPE_WALL, { 448, 192 } },
+                               { S::Category::banners, "rct2.footpath_banner.bn1", SCENERY_TYPE_BANNER, bannerTile },
+                               { S::Category::additions, "rct2.footpath_item.bench1", SCENERY_TYPE_PATH_ITEM, bannerTile },
+                               { S::Category::additions, "rct2.footpath_item.litter1", SCENERY_TYPE_PATH_ITEM, bannerTile },
+                               { S::Category::additions, "rct2.footpath_item.lamp1", SCENERY_TYPE_PATH_ITEM, bannerTile },
+                               { S::Category::additions, "rct2.footpath_item.jumpfnt1", SCENERY_TYPE_PATH_ITEM, bannerTile } };
+        for (const auto& c : cases)
+        {
+            const auto i = load(c.id, c.type);
+            S::Settings settings;
+            settings.category = c.category;
+            settings.object = i;
+            settings.direction = 0;
+            settings.quadrant = 2;
+            Require(
+                S::Eligible(c.category, i) && !S::Eligible(c.category, kObjectEntryIndexNull), "Scenery loaded filter failed");
+            ScenerySetNotInvented({ c.type, i });
+            Require(S::Place(c.tile, settings, false).error != GameActions::Status::ok, "Unresearched object accepted");
+            ScenerySetInvented({ c.type, i });
+            Require(
+                S::Place(CoordsXY{ 0, 0 }, settings, true).error != GameActions::Status::ok
+                    && S::Place(CoordsXY{ 129, 192 }, settings, false).error != GameActions::Status::ok,
+                "Scenery bounds redirected");
+            const auto cash = state.park.cash;
+            const auto q = S::Place(c.tile, settings, false);
+            Require(q.error == GameActions::Status::ok && state.park.cash == cash, "Scenery query failed/charged");
+            state.park.cash = 0;
+            Require(S::Place(c.tile, settings, false).error != GameActions::Status::ok, "Scenery funds rule bypassed");
+            state.park.cash = cash;
+            S::SelectCategory(c.category);
+            Require(S::Select(i), "Scenery selection failed");
+            while (S::Current().direction != 0)
+                S::Configure(2);
+            S::UpdatePreview(c.tile);
+            Require(Ghosts() > 0 && state.park.cash == cash, "Scenery ghost absent/charged");
+            S::RemovePreviewTemporarily();
+            S::RemovePreviewTemporarily();
+            Require(Ghosts() == 0, "Nested scenery suspension leaked");
+            S::RestorePreview();
+            Require(Ghosts() == 0, "Nested scenery restored early");
+            S::RestorePreview();
+            Require(Ghosts() > 0, "Scenery restoration missing");
+            MapGetSurfaceElementAt(c.tile)->setOwnership({});
+            S::ClearPreview();
+            Require(Ghosts() == 0, "Scenery ghost cleanup failed after ownership loss");
+            Require(S::Place(c.tile, settings, false).error != GameActions::Status::ok, "Unowned scenery accepted");
+            MapGetSurfaceElementAt(c.tile)->setOwnership({ OwnershipFlag::landOwned });
+            Require(S::Place(c.tile, settings, true).error == GameActions::Status::ok, "Scenery execute failed");
+            GameActions::ProcessQueue(state);
+            Require(state.park.cash == cash - q.cost && Ghosts() == 0, "Scenery exact cost/ghost failed");
+            auto target = TargetAt(c.tile, c.category);
+            const auto beforePick = S::Current();
+            const auto pickCash = state.park.cash;
+            const auto pickLedger = state.park.expenditureTable;
+            Require(S::Pick(target, false).error == GameActions::Status::ok && S::Current() == beforePick,
+                "Eyedropper query changed tool selection");
+            Require(S::Pick(target, true).error == GameActions::Status::ok, "Eyedropper selection failed");
+            const auto copied = S::Current();
+            Require(copied.category == c.category && copied.object == i && copied.mode == S::Mode::place
+                    && TargetAt(c.tile, c.category) == target && Ghosts() == 0
+                    && state.park.cash == pickCash && state.park.expenditureTable == pickLedger,
+                "Eyedropper changed native element, ghosts or accounting");
+            const auto channels = S::Channels(c.category, i);
+            for (size_t channel = 0; channel < channels.size(); ++channel)
+                Require(copied.colours[channel] == (channels[channel] ? target.colours[channel] : beforePick.colours[channel]),
+                    "Eyedropper changed unsupported colours or missed native colours");
+            Require(copied.quadrant == (c.category == S::Category::small ? target.part : 0),
+                "Eyedropper native quadrant mismatch");
+            Require(copied.height == target.location.z - (c.category == S::Category::banners ? 2 * kCoordsZStep : 0),
+                "Eyedropper native placement height mismatch");
+            if (c.category == S::Category::large)
+            {
+                bool selectedSequence = false;
+                for (int y = 32; y < 992 && !selectedSequence; y += 32)
+                    for (int x = 32; x < 992 && !selectedSequence; x += 32)
+                        for (auto* element : TileElementsView<>(CoordsXY{x,y}))
+                            if (const auto* large = element->asLargeScenery(); large && large->getEntryIndex() == i
+                                    && large->getSequenceIndex() > 0 && !element->isGhost())
+                            {
+                                InteractionInfo hit{};hit.Loc={x,y};hit.Element=element;
+                                const auto sequence = S::Capture(hit);
+                                Require(sequence && S::Pick(*sequence,true).error == GameActions::Status::ok
+                                        && S::Current().height == copied.height && S::Current().direction == copied.direction
+                                        && state.park.cash == pickCash && state.park.expenditureTable == pickLedger,
+                                    "Eyedropper non-origin large sequence changed origin height/direction/accounting");
+                                selectedSequence = true;break;
+                            }
+                Require(selectedSequence,"Native multi-tile eyedropper fixture lacked a second sequence");
+            }
+            auto stalePick = target;stalePick.descriptor += "-removed";
+            Require(S::Pick(stalePick, true).error != GameActions::Status::ok && S::Current() == copied,
+                "Eyedropper accepted stale descriptor");
+            ScenerySetNotInvented({ c.type, i });
+            Require(S::Pick(target, true).error != GameActions::Status::ok && S::Current() == copied,
+                "Eyedropper bypassed native research eligibility");
+            ScenerySetInvented({ c.type, i });
+            auto colours = target.colours;
+            colours[0] = Drawing::Colour::brightRed;
+            if (S::Channels(c.category, i)[0])
+            {
+                Require(
+                    S::Modify(target, S::Mode::recolour, colours, false).error == GameActions::Status::ok,
+                    "Recolour query failed");
+                Require(
+                    S::Modify(target, S::Mode::recolour, colours, true).error == GameActions::Status::ok,
+                    "Recolour execute failed");
+                GameActions::ProcessQueue(state);
+                Require(
+                    S::Modify(target, S::Mode::recolour, colours, true).error != GameActions::Status::ok,
+                    "Repeated recolour accepted");
+                target = TargetAt(c.tile, c.category);
+                Require(target.colours[0] == colours[0], "Native recolour differs");
+            }
+            if (target.banner != BannerIndex::GetNull())
+            {
+                Require(S::SetText(target, "Pocket sign", false).error == GameActions::Status::ok, "Sign text query failed");
+                Require(S::SetText(target, "Pocket sign", true).error == GameActions::Status::ok, "Sign text execute failed");
+                GameActions::ProcessQueue(state);
+                Require(
+                    S::SetText(target, "Pocket sign", true).error != GameActions::Status::ok, "Repeated sign draft accepted");
+                target = TargetAt(c.tile, c.category);
+                Require(target.text == "Pocket sign", "Native sign text differs");
+            }
+            SaveFlags flags{};
+            auto save = std::string(argv[2]) + "/construction.park";
+            const auto savedCash = state.park.cash;
+            Require(ScenarioSave(state, save, flags) && context->LoadParkFromFile(save), "Scenery save/reload failed");
+            target = TargetAt(c.tile, c.category);
+            Require(state.park.cash == savedCash && Ghosts() == 0, "Scenery persistence accounting failed");
+            const auto savedTarget = target;
+            const auto remove = S::Modify(target, S::Mode::remove, {}, false);
+            Require(remove.error == GameActions::Status::ok, "Scenery removal query failed");
+            Require(
+                S::Modify(target, S::Mode::remove, {}, true).error == GameActions::Status::ok,
+                "Scenery removal execute failed");
+            GameActions::ProcessQueue(state);
+            Require(
+                state.park.cash == savedCash - remove.cost
+                    && S::Modify(target, S::Mode::remove, {}, true).error != GameActions::Status::ok,
+                "Scenery refund/stale removal failed");
+            Require(S::Pick(savedTarget, true).error != GameActions::Status::ok, "Removed eyedropper target accepted");
+            if (c.category != S::Category::banners && c.category != S::Category::additions)
+            {
+                settings.direction = 2;
+                settings.height = MapGetSurfaceElementAt(c.tile)->getBaseZ() + 16;
+                const auto elevated = S::Place(c.tile, settings, false);
+                Require(elevated.error == GameActions::Status::ok, "Elevated rotated scenery query failed");
+                Require(
+                    S::Place(c.tile, settings, true).error == GameActions::Status::ok,
+                    "Elevated rotated scenery execute failed");
+                GameActions::ProcessQueue(state);
+                const auto raised = TargetAt(c.tile, c.category);
+                Require(raised.location.z == settings.height, "Native scenery height differs");
+                Require(S::Pick(raised,true).error == GameActions::Status::ok
+                        && S::Current().height == settings.height && S::Current().direction == raised.location.direction,
+                    "Eyedropper selected a different stacked height or rotated element");
+                Require(
+                    S::Modify(raised, S::Mode::remove, {}, true).error == GameActions::Status::ok,
+                    "Elevated scenery cleanup failed");
+                GameActions::ProcessQueue(state);
+            }
+            std::cout << "Native " << S::CategoryName(c.category)
+                      << " / query-research-bounds-ghost-ownership-colour-removal-persistence passed\n";
+        }
+        namespace P = Ui::Handheld::Paths;
+        // Start from an actual native path. No path edges or heights are patched.
+        const CoordsXY start{ 640, 480 };
+        GameActions::FootpathPlaceAction seed(
+            { start, MapGetSurfaceElementAt(start)->getBaseZ() }, FootpathSlope{}, objects.GetLoadedObjectEntryIndex(surface),
+            objects.GetLoadedObjectEntryIndex(railing));
+        Require(GameActions::Execute(&seed, state).error == GameActions::Status::ok, "Connected seed failed");
+        GameActions::ProcessQueue(state);
+        P::BeginConnected(false);
+        InteractionInfo pathHit{};
+        pathHit.Loc = start;
+        pathHit.Element = reinterpret_cast<TileElement*>(
+            MapGetFootpathElement({ start, MapGetSurfaceElementAt(start)->getBaseZ() }));
+        pathHit.interactionType = ViewportInteractionItem::footpath;
+        P::UpdateTargetFromInfo(pathHit);
+        const auto startCash = state.park.cash;
+        Require(
+            P::Action(true).error == GameActions::Status::ok && P::ConnectedReady() && state.park.cash == startCash,
+            "Connected endpoint selection charged/failed");
+        for (int grade : { 0, 1, 0, -1, 0 })
+        {
+            P::SlopeConnected(1);
+            P::SlopeConnected(1);
+            P::SlopeConnected(-1); // flat
+            if (grade)
+                P::SlopeConnected(grade);
+            const auto next = P::TargetTile();
+            Require(next.has_value(), "Connected target missing");
+            const auto cash = state.park.cash;
+            const auto q = P::Action(false);
+            Require(q.error == GameActions::Status::ok, "Connected native query failed");
+            P::UpdatePreview();
+            Require(Ghosts() > 0 && state.park.cash == cash, "Connected ghost missing/charged");
+            Require(P::Action(true).error == GameActions::Status::ok, "Connected execute failed");
+            Require(P::Action(true).error != GameActions::Status::ok, "Repeated pending connected action accepted");
+            GameActions::ProcessQueue(state);
+            Require(
+                state.park.cash == cash - q.cost && P::TargetTile() != next && Ghosts() == 0,
+                "Connected advance/accounting/ghost failed");
+            bool found = false;
+            for (const auto* path : TileElementsView<PathElement>(*next))
+                if (!path->isGhost())
+                {
+                    found = true;
+                    Require(path->getEdges() != 0, "Native connected edges missing");
+                }
+            Require(found, "Connected path missing");
+        }
+        auto undo = P::BeginUndo();
+        Require(undo.has_value(), "Native connected undo absent");
+        auto changedQuote = *undo;
+        ++changedQuote.cost;
+        Require(P::Undo(changedQuote, true).error != GameActions::Status::ok, "Changed undo quote accepted");
+        const auto undoCash = state.park.cash;
+        Require(P::Undo(*undo, false).error == GameActions::Status::ok && state.park.cash == undoCash, "Undo query charged");
+        Require(P::Undo(*undo, true).error == GameActions::Status::ok, "Native undo failed");
+        Require(P::Undo(*undo, true).error != GameActions::Status::ok, "Repeated undo accepted");
+        GameActions::ProcessQueue(state);
+        Require(state.park.cash == undoCash - undo->cost && !MapGetFootpathElement(undo->position), "Undo refund differs");
+        Require(P::Action(true).error == GameActions::Status::ok, "Undo context did not recover");
+        GameActions::ProcessQueue(state);
+        P::UpdatePreview();
+        P::RemovePreviewTemporarily();
+        Require(Ghosts() == 0, "Connected suspension leaked");
+        P::RestorePreview();
+        P::ClearPreview();
+        const auto joinTile = *P::TargetTile();
+        GameActions::FootpathPlaceAction junction({joinTile, MapGetSurfaceElementAt(joinTile)->getBaseZ()},
+            FootpathSlope{}, objects.GetLoadedObjectEntryIndex(surface), objects.GetLoadedObjectEntryIndex(railing));
+        Require(GameActions::Execute(&junction, state).error == GameActions::Status::ok, "Existing junction seed failed");
+        GameActions::ProcessQueue(state);
+        Require(P::Action(true).error != GameActions::Status::ok, "Externally changed connected edges accepted");
+        P::BeginConnected(false);
+        pathHit.Loc = CoordsXY(undo->position);
+        pathHit.Element = reinterpret_cast<TileElement*>(MapGetFootpathElement(undo->position));
+        P::UpdateTargetFromInfo(pathHit);
+        Require(P::Action(true).error == GameActions::Status::ok, "Fresh junction source selection failed");
+        Require(P::Action(true).error == GameActions::Status::ok, "Joining native existing path failed");
+        GameActions::ProcessQueue(state);
+        Require(!P::BeginUndo(), "Existing junction offered destructive undo");
+        P::End();
+        Require(Ghosts() == 0 && !P::IsActive(), "Connected cancel leaked");
+        auto* queueSurface = objects.LoadObject("rct2.footpath_surface.queue_blue");
+        Require(queueSurface, "Queue surface missing");
+        P::BeginConnected(true);
+        pathHit.Element = reinterpret_cast<TileElement*>(
+            MapGetFootpathElement({ start, MapGetSurfaceElementAt(start)->getBaseZ() }));
+        P::UpdateTargetFromInfo(pathHit);
+        Require(P::Action(true).error == GameActions::Status::ok && P::TurnConnected(), "Queue connected start failed");
+        const auto queueTile = P::TargetTile();
+        Require(queueTile.has_value(), "Queue connected target missing");
+        const auto queueCash = state.park.cash;
+        const auto queueQuery = P::Action(false);
+        Require(
+            queueQuery.error == GameActions::Status::ok && P::Action(true).error == GameActions::Status::ok,
+            "Queue connected native action failed");
+        GameActions::ProcessQueue(state);
+        auto* queuePath = MapGetFootpathElement({ *queueTile, MapGetSurfaceElementAt(*queueTile)->getBaseZ() });
+        Require(
+            queuePath && queuePath->isQueue() && queuePath->getEdges() && state.park.cash == queueCash - queueQuery.cost,
+            "Connected queue geometry/cash failed");
+        P::End();
+        S::Settings furniture;
+        furniture.category = S::Category::additions;
+        furniture.object = load("rct2.footpath_item.bench1", SCENERY_TYPE_PATH_ITEM);
+        Require(S::Place(*queueTile, furniture, false).error != GameActions::Status::ok, "Bench accepted on queue");
+        Require(S::Place(CoordsXY{ 576, 480 }, furniture, false).error != GameActions::Status::ok, "Bench accepted on slope");
+        furniture.object = load("rct2.footpath_item.qtv1", SCENERY_TYPE_PATH_ITEM);
+        Require(
+            S::Place(bannerTile, furniture, false).error != GameActions::Status::ok, "Queue screen accepted on normal path");
+        Require(S::Place(*queueTile, furniture, true).error == GameActions::Status::ok, "Queue screen rejected on queue");
+        GameActions::ProcessQueue(state);
+        SaveFlags pathSaveFlags{};
+        auto pathSave = std::string(argv[2]) + "/connected.park";
+        const auto pathCash = state.park.cash;
+        Require(
+            ScenarioSave(state, pathSave, pathSaveFlags) && context->LoadParkFromFile(pathSave),
+            "Connected save/reload failed");
+        Require(
+            state.park.cash == pathCash && Ghosts() == 0
+                && TargetAt(*queueTile, S::Category::additions).object == furniture.object,
+            "Queue furniture persistence failed");
+        P::BeginConnected(true);
+        pathHit.Loc = *queueTile;
+        const auto queuePosition = CoordsXYZ{ *queueTile, MapGetSurfaceElementAt(*queueTile)->getBaseZ() };
+        pathHit.Element = reinterpret_cast<TileElement*>(MapGetFootpathElement(queuePosition));
+        P::UpdateTargetFromInfo(pathHit);
+        Require(P::Action(true).error == GameActions::Status::ok, "Stale endpoint start failed");
+        GameActions::FootpathRemoveAction removeEndpoint(queuePosition);
+        Require(
+            GameActions::Execute(&removeEndpoint, state).error == GameActions::Status::ok, "Native endpoint removal failed");
+        GameActions::ProcessQueue(state);
+        Require(P::Action(true).error != GameActions::Status::ok, "Stale connected source accepted");
+        P::End();
+        std::cout
+            << "Native connected start / flat-rise-elevated-descend / queue-edges-cost-repeat / stale-cancel-save passed\n";
+        std::cout << "Native furniture queue/slope restrictions and queue screen placement/persistence passed\n";
+        namespace A = Ui::Handheld::AreaTools;
+        const CoordsXY areaTile{ 736, 736 };
+        A::Settings area;
+        area.width = 2;
+        area.height = 2;
+        Require(
+            !A::Range(CoordsXY{ 32, 32 }, 3, 3) && !A::Range(CoordsXY{ 33, 32 }, 1, 1) && !A::Range(areaTile, 65, 1),
+            "Brush bounds clamped/redirected");
+        A::Settings single;
+        Require(A::Action(areaTile, single, true).error == GameActions::Status::ok, "Mixed-height seed native raise failed");
+        GameActions::ProcessQueue(state);
+        const auto mixedHeight = MapGetSurfaceElementAt(areaTile)->getBaseZ();
+        for (auto operation : { A::Operation::raise, A::Operation::lower, A::Operation::smoothRaise, A::Operation::smoothLower,
+                                A::Operation::waterRaise, A::Operation::waterLower })
+        {
+            area.operation = operation;
+            const auto before = state.park.cash;
+            const auto q = A::Action(areaTile, area, false);
+            Require(q.error == GameActions::Status::ok && state.park.cash == before, "Area query failed/charged");
+            Require(A::Action(areaTile, area, true).error == GameActions::Status::ok, "Area native execute failed");
+            GameActions::ProcessQueue(state);
+            Require(state.park.cash == before - q.cost && Ghosts() == 0, "Area exact native cash/ghost differs");
+        }
+        area.operation = A::Operation::raise;
+        area.selection = 1;
+        Require(A::Action(areaTile, area, true).error == GameActions::Status::ok, "Native corner operation failed");
+        GameActions::ProcessQueue(state);
+        area.selection = 5;
+        Require(A::Action(areaTile, area, true).error == GameActions::Status::ok, "Native edge operation failed");
+        GameActions::ProcessQueue(state);
+        const auto funds = state.park.cash;
+        state.park.cash = 0;
+        area.selection = 0;
+        Require(A::Action(areaTile, area, false).error != GameActions::Status::ok, "Area funds bypassed");
+        state.park.cash = funds;
+        for (auto t : { areaTile, areaTile + CoordsXY{ 32, 0 }, areaTile + CoordsXY{ 0, 32 }, areaTile + CoordsXY{ 32, 32 } })
+            MapGetSurfaceElementAt(t)->setOwnership({});
+        Require(A::Action(areaTile, area, false).error != GameActions::Status::ok, "Area ownership bypassed");
+        for (auto t : { areaTile, areaTile + CoordsXY{ 32, 0 }, areaTile + CoordsXY{ 0, 32 }, areaTile + CoordsXY{ 32, 32 } })
+            MapGetSurfaceElementAt(t)->setOwnership({ OwnershipFlag::landOwned });
+        auto* sand = objects.LoadObject("rct2.terrain_surface.sand");
+        auto* edge = objects.LoadObject("rct2.terrain_edge.wood_red");
+        Require(sand && edge, "Area paint metadata missing");
+        area.operation = A::Operation::paint;
+        area.surface = objects.GetLoadedObjectEntryIndex(sand);
+        area.edge = objects.GetLoadedObjectEntryIndex(edge);
+        const auto beforePaint = state.park.cash;
+        const auto pq = A::Action(areaTile, area, false);
+        Require(pq.error == GameActions::Status::ok, "Area style query failed");
+        const auto height = MapGetSurfaceElementAt(areaTile)->getBaseZ();
+        const auto water = MapGetSurfaceElementAt(areaTile)->getWaterHeight();
+        Require(A::Action(areaTile, area, true).error == GameActions::Status::ok, "Area style execute failed");
+        GameActions::ProcessQueue(state);
+        for (auto t : { areaTile, areaTile + CoordsXY{ 32, 0 }, areaTile + CoordsXY{ 0, 32 }, areaTile + CoordsXY{ 32, 32 } })
+            Require(
+                MapGetSurfaceElementAt(t)->getSurfaceObjectIndex() == area.surface
+                    && MapGetSurfaceElementAt(t)->getEdgeObjectIndex() == area.edge,
+                "Area style footprint differs");
+        Require(
+            MapGetSurfaceElementAt(areaTile)->getBaseZ() == height
+                && MapGetSurfaceElementAt(areaTile)->getWaterHeight() == water && state.park.cash == beforePaint - pq.cost,
+            "Area painting changed height/water/accounting");
+        SaveFlags areaFlags{};
+        const auto areaSave = std::string(argv[2]) + "/area.park";
+        const auto areaCash = state.park.cash;
+        Require(ScenarioSave(state, areaSave, areaFlags) && context->LoadParkFromFile(areaSave), "Area save/reload failed");
+        Require(
+            state.park.cash == areaCash && MapGetSurfaceElementAt(areaTile)->getBaseZ() == height
+                && MapGetSurfaceElementAt(areaTile)->getEdgeObjectIndex() == area.edge && mixedHeight > 0,
+            "Area persistence differs");
+        std::cout << "Native area terrain / mixed heights / smoothing / corner-edge / water / style-footprint / "
+                     "bounds-ownership-funds / cash-persistence passed\n";
+        namespace R = Ui::Handheld::RightsTools;
+        const CoordsXY rightsTile{ 160, 736 };
+        R::Settings rs;
+        rs.width = 2;
+        MapGetSurfaceElementAt(rightsTile)->setOwnership({ OwnershipFlag::landForSale });
+        MapGetSurfaceElementAt(rightsTile + CoordsXY{ 32, 0 })->setOwnership({});
+        const auto rightsCash = state.park.cash;
+        const auto draft = R::Begin(rightsTile, rs);
+        Require(draft.has_value(), "Land purchase review missing");
+        Require(
+            R::Count(*Ui::Handheld::AreaTools::Range(rightsTile, 2, 1), false).available == 1
+                && R::Count(*Ui::Handheld::AreaTools::Range(rightsTile, 2, 1), false).unavailable == 1,
+            "Land availability inspection differs");
+        Require(
+            R::Action(*draft, false).error == GameActions::Status::ok && state.park.cash == rightsCash
+                && !MapGetSurfaceElementAt(rightsTile)->hasOwnership(OwnershipFlag::landOwned),
+            "Land cancellation/query mutated ownership/cash");
+        state.scenarioOptions.landPrice += 10;
+        Require(R::Action(*draft, true).error != GameActions::Status::ok, "Stale land price accepted");
+        state.scenarioOptions.landPrice -= 10;
+        MapGetSurfaceElementAt(rightsTile)->setOwnership({});
+        Require(R::Action(*draft, true).error != GameActions::Status::ok, "Stale land availability accepted");
+        MapGetSurfaceElementAt(rightsTile)->setOwnership({ OwnershipFlag::landForSale });
+        state.park.cash = 0;
+        Require(!R::Begin(rightsTile, rs), "Land funds bypassed");
+        state.park.cash = rightsCash;
+        Require(R::Action(*draft, true).error == GameActions::Status::ok, "Land native purchase failed");
+        GameActions::ProcessQueue(state);
+        Require(
+            MapGetSurfaceElementAt(rightsTile)->hasOwnership(OwnershipFlag::landOwned)
+                && MapGetSurfaceElementAt(rightsTile + CoordsXY{ 32, 0 })->getOwnership().isEmpty()
+                && state.park.cash == rightsCash - draft->cost && R::Action(*draft, true).error != GameActions::Status::ok,
+            "Land native ownership/accounting/repeat differs");
+        const CoordsXY constructionTile{ 256, 736 };
+        MapGetSurfaceElementAt(constructionTile)->setOwnership({ OwnershipFlag::constructionRightsForSale });
+        rs.width = 1;
+        rs.construction = true;
+        const auto cd = R::Begin(constructionTile, rs);
+        Require(
+            cd.has_value() && R::Action(*cd, true).error == GameActions::Status::ok,
+            "Construction rights native purchase failed");
+        GameActions::ProcessQueue(state);
+        Require(
+            MapGetSurfaceElementAt(constructionTile)->hasOwnership(OwnershipFlag::constructionRightsOwned)
+                && !MapGetSurfaceElementAt(constructionTile)->hasOwnership(OwnershipFlag::landOwned),
+            "Construction rights converted to land");
+        rs.construction = false;
+        Require(!R::Begin(constructionTile, rs), "Unavailable land purchase invented");
+        SaveFlags rf{};
+        const auto rightsSave = std::string(argv[2]) + "/rights.park";
+        const auto boughtCash = state.park.cash;
+        Require(ScenarioSave(state, rightsSave, rf) && context->LoadParkFromFile(rightsSave), "Rights save/reload failed");
+        Require(
+            state.park.cash == boughtCash
+                && MapGetSurfaceElementAt(constructionTile)->hasOwnership(OwnershipFlag::constructionRightsOwned),
+            "Rights persistence differs");
+        std::cout << "Native land / construction rights / mixed available-unavailable / query-cancel-stale-funds / exact cash "
+                     "/ save-reload passed\n";
+        S::Settings scatter;
+        scatter.object=objects.GetLoadedObjectEntryIndex(objects.LoadObject("rct2.scenery_small.corroof"));
+        ScenerySetInvented({SCENERY_TYPE_SMALL,scatter.object});
+        scatter.scatter=true; scatter.scatterDensity=ScatterToolDensity::highDensity;
+        const CoordsXY scatterTile{864,864};
+        MapGetSurfaceElementAt(scatterTile)->setOwnership({OwnershipFlag::landOwned});
+        const auto scatterCash=state.park.cash;
+        const auto scatterLedger=state.park.expenditureTable;
+        const auto quote=S::Place(scatterTile,scatter,false);
+        Require(quote.error==GameActions::Status::ok && S::Place(scatterTile,scatter,false).cost==quote.cost
+            && state.park.cash==scatterCash && state.park.expenditureTable==scatterLedger && Ghosts()==0,
+            "Scatter estimate resampled, charged or mutated map/accounting");
+        Require(S::Place(scatterTile,scatter,true).error==GameActions::Status::ok && S::ScatterReviewed()
+            && state.park.cash==scatterCash,"Scatter first A skipped read-only review");
+        S::ClearPreview(); GameActions::ProcessQueue(state);
+        Require(state.park.cash==scatterCash && state.park.expenditureTable==scatterLedger && !S::ScatterReviewed(),
+            "Scatter cancel placed or charged");
+        Require(S::Place(scatterTile,scatter,true).error==GameActions::Status::ok,"Scatter review failed");
+        MapGetSurfaceElementAt(scatterTile)->setOwnership({});
+        Require(S::Place(scatterTile,scatter,true).error!=GameActions::Status::ok && state.park.cash==scatterCash,
+            "Scatter stale ownership review accepted");
+        MapGetSurfaceElementAt(scatterTile)->setOwnership({OwnershipFlag::landOwned});
+        Require(S::Place(scatterTile,scatter,true).error==GameActions::Status::ok,"Native scatter batch rejected");
+        Require(S::Place(scatterTile,scatter,true).error!=GameActions::Status::ok,"Pending native scatter repeated");
+        GameActions::ProcessQueue(state);
+        Require(S::ScatterStatus().find("1/3 placed")!=std::string::npos && state.park.cash==scatterCash-quote.cost/3,
+            "Native partial failures or actual cost misreported");
+        S::ClearPreview(); ScenerySetNotInvented({SCENERY_TYPE_SMALL,scatter.object});
+        Require(S::Place(CoordsXY{896,864},scatter,true).error!=GameActions::Status::ok,"Scatter bypassed research");
+        ScenerySetInvented({SCENERY_TYPE_SMALL,scatter.object}); scatter.scatterSize=65;
+        Require(S::Place(scatterTile,scatter,true).error!=GameActions::Status::ok,"Scatter bound bypassed");
+        scatter.scatterSize=4;
+        const CoordsXY areaScatter{640,864};
+        auto countScenery=[&] {
+            size_t count=0;
+            for (int y=32;y<992;y+=32) for (int x=32;x<992;x+=32)
+                for (auto* e:TileElementsView<>(CoordsXY{x,y}))
+                {
+                    InteractionInfo hit{}; hit.Loc={x,y}; hit.Element=e;
+                    const auto t=S::Capture(hit);
+                    if (t && t->category==S::Category::small && t->object==scatter.object && !e->isGhost()) ++count;
+                }
+            return count;
+        };
+        const auto beforeCount=countScenery(); const auto beforeBulkCash=state.park.cash;
+        Require(S::Place(areaScatter,scatter,true).error==GameActions::Status::ok && S::ScatterReviewed(),"Native area scatter review failed");
+        Require(S::Place(areaScatter,scatter,true).error==GameActions::Status::ok,"Native area scatter apply failed");
+        GameActions::ProcessQueue(state);
+        const auto added=countScenery()-beforeCount;
+        Require(added>0 && added<=12 && beforeBulkCash-state.park.cash==static_cast<money64>(added)*quote.cost/3,
+            "Native multi-tile scatter population and actual cash differ");
+        SaveFlags scatterFlags{}; const auto scatterSave=std::string(argv[2])+"/scatter.park";
+        const auto placed=TargetAt(scatterTile,S::Category::small);
+        const auto paidCash=state.park.cash;
+        Require(ScenarioSave(state,scatterSave,scatterFlags) && context->LoadParkFromFile(scatterSave),"Scatter save/reload failed");
+        Require(TargetAt(scatterTile,S::Category::small)==placed && state.park.cash==paidCash && Ghosts()==0,
+            "Scatter native map/accounting persistence differs");
+        S::ResetScatter(); Require(!S::ScatterActive() && !S::ScatterReviewed(),"Scatter load/exit state survived cleanup");
+        std::cout << "Native scatter stable estimate / read-only review / cancel / stale ownership / partial clearance / pending guard / actual cost / save passed\n";
+        A::Settings colours;
+        colours.operation=A::Operation::paint; colours.width=colours.height=2;
+        auto* grid=objects.LoadObject("rct2.terrain_surface.grid");
+        auto* stucco=objects.LoadObject("official.terrain_edge.stucco");
+        auto* grass=objects.LoadObject("rct2.terrain_surface.grass");
+        auto* rock=objects.LoadObject("rct2.terrain_edge.rock");
+        Require(grid && stucco && grass && rock,"Native colourable terrain objects missing");
+        colours.surface=objects.GetLoadedObjectEntryIndex(grid); colours.edge=objects.GetLoadedObjectEntryIndex(stucco);
+        colours.surfaceColour=Drawing::Colour::brightRed; colours.edgeColour=Drawing::Colour::lightBlue;
+        Require(A::SurfaceColourSupported(colours.surface) && A::EdgeColourSupported(colours.edge),"Native primary-colour flags missing");
+        const CoordsXY colourTile{512,864}; const auto colourRange=*A::Range(colourTile,2,2);
+        for(int y=864;y<=896;y+=32) for(int x=512;x<=544;x+=32)
+            MapGetSurfaceElementAt(CoordsXY{x,y})->setOwnership({OwnershipFlag::landOwned});
+        const auto terrainBefore=A::CapturePaint(colourRange); const auto terrainCash=state.park.cash;
+        const auto terrainLedger=state.park.expenditureTable;
+        const auto colourQuote=A::Action(colourTile,colours,false);
+        auto colourDraft=A::BeginPaint(colourTile,colours);
+        Require(colourQuote.error==GameActions::Status::ok && colourDraft && colourDraft->cost==colourQuote.cost
+            && A::ApplyPaint(*colourDraft,false).error==GameActions::Status::ok
+            && state.park.cash==terrainCash && state.park.expenditureTable==terrainLedger
+            && A::CapturePaint(colourRange)==terrainBefore,"Terrain colour review/query mutated native state");
+        auto staleColour=*colourDraft; ++staleColour.cost;
+        Require(A::ApplyPaint(staleColour,true).error!=GameActions::Status::ok,"Changed colour quote accepted");
+        staleColour=*colourDraft; staleColour.surfaceDescriptor="reused slot";
+        Require(A::ApplyPaint(staleColour,true).error!=GameActions::Status::ok,"Stale terrain object descriptor accepted");
+        MapGetSurfaceElementAt(colourTile)->setOwnership({});
+        Require(A::ApplyPaint(*colourDraft,true).error!=GameActions::Status::ok,"Stale terrain ownership accepted");
+        MapGetSurfaceElementAt(colourTile)->setOwnership({OwnershipFlag::landOwned});
+        state.park.flags.set(ParkFlag::forbidLandscapeChanges);
+        Require(A::Action(colourTile,colours,true).error!=GameActions::Status::ok,"Native landscaping restriction bypassed");
+        state.park.flags.unset(ParkFlag::forbidLandscapeChanges);
+        state.park.cash=0;
+        Require(A::ApplyPaint(*colourDraft,true).error!=GameActions::Status::ok,"Terrain colour funds bypassed");
+        state.park.cash=terrainCash;
+        auto invalidColour=colours; invalidColour.surfaceColour=static_cast<Drawing::Colour>(72);
+        Require(A::Action(colourTile,invalidColour,true).error!=GameActions::Status::ok,"Invalid native palette accepted");
+        Require(A::ApplyPaint(*colourDraft,true).error==GameActions::Status::ok && !A::BeginPaint(colourTile,colours)
+            && A::ApplyPaint(*colourDraft,true).error!=GameActions::Status::ok,"Terrain pending/repeated action guard failed");
+        GameActions::ProcessQueue(state);
+        Require(state.park.cash==terrainCash-colourQuote.cost && !*A::paintPending,"Terrain actual native cost/completion differs");
+        const auto painted=A::CapturePaint(colourRange);
+        for(size_t i=0;i<painted.size();++i)
+            Require(painted[i].surface==colours.surface && painted[i].edge==colours.edge
+                && painted[i].surfaceColour==colours.surfaceColour && painted[i].edgeColour==colours.edgeColour
+                && painted[i].baseZ==terrainBefore[i].baseZ && painted[i].water==terrainBefore[i].water
+                && painted[i].slope==terrainBefore[i].slope,"Native terrain colour encoding/geometry differs");
+        SaveFlags colourFlags{}; const auto colourSave=std::string(argv[2])+"/terrain-colours.park";
+        const auto colourCash=state.park.cash;
+        Require(ScenarioSave(state,colourSave,colourFlags) && context->LoadParkFromFile(colourSave)
+            && A::CapturePaint(colourRange)==painted && state.park.cash==colourCash,"Native terrain colour save persistence differs");
+        auto fixed=colours; fixed.surface=objects.GetLoadedObjectEntryIndex(objects.LoadObject("rct2.terrain_surface.grass"));
+        fixed.edge=objects.GetLoadedObjectEntryIndex(objects.LoadObject("rct2.terrain_edge.rock"));
+        Require(!A::SurfaceColourSupported(fixed.surface) && !A::EdgeColourSupported(fixed.edge),"Fixed terrain exposes unsupported colours");
+        A::settings=fixed; const auto unsupported=A::settings;
+        A::Configure(7); A::Configure(8);
+        Require(A::settings==unsupported,"Unsupported native colour row changed selection");
+        fixed.surfaceColour=Drawing::Colour::black; fixed.edgeColour=Drawing::Colour::black;
+        Require(A::Action(colourTile,fixed,true).error==GameActions::Status::ok,"Native fixed-style action failed");
+        GameActions::ProcessQueue(state);
+        const auto fixedPainted=A::CapturePaint(colourRange);
+        for(const auto& t:fixedPainted)
+            Require(t.surfaceColour==colours.surfaceColour && t.edgeColour==colours.edgeColour,
+                "Native fixed surface/edge action overwrote unsupported stored colour channel");
+        A::ResetPaint(); Require(!*A::paintPending,"Terrain load/exit cleanup retained pending action");
+        std::cout << "Native surface/edge colours / supported palette / query purity / stale review / native restriction-funds / pending repeat / exact cash / encoding / unsupported preservation / save passed\n";
+        std::cout << "Pocket park construction native checks passed\n";
+        return 0;
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+        return 1;
+    }
+}

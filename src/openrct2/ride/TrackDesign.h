@@ -21,6 +21,7 @@
 #include "VehicleColour.h"
 
 #include <memory>
+#include <optional>
 
 namespace OpenRCT2::RCT12
 {
@@ -235,6 +236,8 @@ extern bool gTrackDesignSceneryToggle;
 extern bool _trackDesignDrawingPreview;
 
 extern bool _trackDesignPlaceStateSceneryUnavailable;
+// Native failed optional scenery subactions in the last placement/query; never park state.
+extern uint32_t _trackDesignPlaceStateSceneryOmitted;
 extern bool gTrackDesignSaveMode;
 extern RideId gTrackDesignSaveRideIndex;
 
@@ -271,3 +274,13 @@ bool TrackDesignAreEntranceAndExitPlaced();
 extern std::vector<TrackDesignSceneryElement> _trackSavedTileElementsDesc;
 
 u8string trackDesignGetExtension(OpenRCT2::RCT12::TD46Version version);
+
+// Read-only native scenery resolution, shared by placement and availability inspection.
+struct TrackSceneryEntry
+{
+    OpenRCT2::ObjectType Type = OpenRCT2::ObjectType::none;
+    OpenRCT2::ObjectEntryIndex Index = OpenRCT2::kObjectEntryIndexNull;
+    OpenRCT2::ObjectEntryIndex SecondaryIndex = OpenRCT2::kObjectEntryIndexNull; // For footpath railing
+};
+
+std::optional<TrackSceneryEntry> TrackDesignResolveScenery(const TrackDesignSceneryElement& scenery);

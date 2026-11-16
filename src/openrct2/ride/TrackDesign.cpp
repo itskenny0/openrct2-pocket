@@ -93,6 +93,7 @@ static constexpr TileCoordsXY kTrackDesignPreviewMapSize = TileCoordsXY{ 256, 25
 
 bool gTrackDesignSceneryToggle;
 bool _trackDesignDrawingPreview;
+uint32_t _trackDesignPlaceStateSceneryOmitted{};
 bool _trackDesignPlaceStateSceneryUnavailable = false;
 
 static bool _trackDesignPlaceStateEntranceExitPlaced{};
@@ -655,13 +656,6 @@ static void TrackDesignLoadSceneryObjects(const TrackDesign& td)
     objectManager.LoadObject(td.appearance.stationObjectIdentifier);
 }
 
-struct TrackSceneryEntry
-{
-    ObjectType Type = ObjectType::none;
-    ObjectEntryIndex Index = kObjectEntryIndexNull;
-    ObjectEntryIndex SecondaryIndex = kObjectEntryIndexNull; // For footpath railing
-};
-
 static ObjectEntryIndex TrackDesignGetDefaultSurfaceIndex(bool isQueue)
 {
     for (ObjectEntryIndex i = 0; i < kMaxFootpathSurfaceObjects; i++)
@@ -698,7 +692,7 @@ static ObjectEntryIndex TrackDesignGetDefaultRailingIndex()
     return kObjectEntryIndexNull;
 }
 
-static std::optional<TrackSceneryEntry> TrackDesignPlaceSceneryElementGetEntry(const TrackDesignSceneryElement& scenery)
+std::optional<TrackSceneryEntry> TrackDesignResolveScenery(const TrackDesignSceneryElement& scenery)
 {
     TrackSceneryEntry result;
 
@@ -738,7 +732,6 @@ static std::optional<TrackSceneryEntry> TrackDesignPlaceSceneryElementGetEntry(c
 
         if (result.Index == kObjectEntryIndexNull || (secondaryIndexRequired && result.SecondaryIndex == kObjectEntryIndexNull))
         {
-            _trackDesignPlaceStateSceneryUnavailable = true;
             return {};
         }
     }
@@ -757,11 +750,17 @@ static std::optional<TrackSceneryEntry> TrackDesignPlaceSceneryElementGetEntry(c
         }
         if (objectUnavailable)
         {
-            _trackDesignPlaceStateSceneryUnavailable = true;
             return {};
         }
     }
     return result;
+}
+
+static std::optional<TrackSceneryEntry> TrackDesignPlaceSceneryElementGetEntry(const TrackDesignSceneryElement& scenery)
+{
+    auto entry = TrackDesignResolveScenery(scenery);
+    if (!entry) _trackDesignPlaceStateSceneryUnavailable = true;
+    return entry;
 }
 
 /**
@@ -1110,6 +1109,7 @@ static GameActions::Result TrackDesignPlaceSceneryElement(
             auto res = flags.has(CommandFlag::apply) ? GameActions::ExecuteNested(&smallSceneryPlace, gameState)
                                                      : GameActions::QueryNested(&smallSceneryPlace, gameState);
 
+            if (res.error != GameActions::Status::ok) ++_trackDesignPlaceStateSceneryOmitted;
             cost = res.error == GameActions::Status::ok ? res.cost : 0;
             break;
         }
@@ -1150,6 +1150,7 @@ static GameActions::Result TrackDesignPlaceSceneryElement(
             auto res = flags.has(CommandFlag::apply) ? GameActions::ExecuteNested(&sceneryPlaceAction, gameState)
                                                      : GameActions::QueryNested(&sceneryPlaceAction, gameState);
 
+            if (res.error != GameActions::Status::ok) ++_trackDesignPlaceStateSceneryOmitted;
             cost = res.cost;
             break;
         }
@@ -1188,6 +1189,7 @@ static GameActions::Result TrackDesignPlaceSceneryElement(
             auto res = flags.has(CommandFlag::apply) ? GameActions::ExecuteNested(&wallPlaceAction, gameState)
                                                      : GameActions::QueryNested(&wallPlaceAction, gameState);
 
+            if (res.error != GameActions::Status::ok) ++_trackDesignPlaceStateSceneryOmitted;
             cost = res.cost;
             break;
         }
@@ -1229,7 +1231,8 @@ static GameActions::Result TrackDesignPlaceSceneryElement(
                 auto res = flags.has(CommandFlag::apply) ? GameActions::ExecuteNested(&footpathPlaceAction, gameState)
                                                          : GameActions::QueryNested(&footpathPlaceAction, gameState);
                 // Ignore failures
-                cost = res.error == GameActions::Status::ok ? res.cost : 0;
+                if (res.error != GameActions::Status::ok) ++_trackDesignPlaceStateSceneryOmitted;
+            cost = res.error == GameActions::Status::ok ? res.cost : 0;
             }
             else
             {
@@ -1769,6 +1772,7 @@ static GameActions::Result TrackDesignPlaceVirtual(
     const CoordsXYZD& coords, bool isReplay = false)
 {
     _trackDesignPlaceStateSceneryUnavailable = false;
+    _trackDesignPlaceStateSceneryOmitted = 0;
     _trackDesignPlaceStateEntranceExitPlaced = false;
 
     tds.placeScenery = placeScenery;

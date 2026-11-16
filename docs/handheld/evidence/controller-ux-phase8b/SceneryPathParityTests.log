@@ -1,0 +1,11 @@
+/workspace/scratch/3dd26b9bb351/repo/src/openrct2-ui/handheld/SceneryTools.cpp: In function ‘Configure’:
+/workspace/scratch/3dd26b9bb351/repo/src/openrct2-ui/handheld/SceneryTools.cpp:370:32: warning: ‘MEM[(union _Storage *)&previewHeight]._M_value’ may be used uninitialized [-Wmaybe-uninitialized]
+  370 |                 current.height = *previewHeight;
+      |                                ^
+/workspace/scratch/3dd26b9bb351/repo/src/openrct2-ui/handheld/SceneryTools.cpp:363:20: note: ‘MEM[(union _Storage *)&previewHeight]._M_value’ was declared here
+  363 |         const auto previewHeight = ghost && requested && requested->settings == current
+      |                    ^
+Importing legacy shortcuts...
+For security reasons, it is not recommended to run OpenRCT2 with elevated permissions.
+Native clear categories/bounds, stale reviews, whole multi-tile refunds, cancellation, paths preserved/opt-in passed
+Scenery groups, native banner/sign styles, stale/bounds, SDL Cancel-first and persistence passed
