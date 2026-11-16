@@ -6,7 +6,7 @@ namespace OpenRCT2::Ui::Handheld::PocketPalette
 {
     // Stable entries from SPR_GAME_DEFAULT_PALETTE. Themes never change the
     // world palette, object recolours or cycling colours.
-    enum class Style { slate, daylight };
+    enum class Style { slate, daylight, pixel };
     inline Style style = Style::daylight;
     inline uint8_t panel=20, border=16, separator=17, selection=194;
     inline uint8_t primary=10, secondary=13, dark=21;
@@ -16,7 +16,7 @@ namespace OpenRCT2::Ui::Handheld::PocketPalette
     inline void SetStyle(Style value)
     {
         style=value;
-        const bool light=value==Style::daylight;
+        const bool light=value!=Style::slate;
         panel=light?20:12; border=light?16:15; separator=light?17:14;
         // Both themes select with a saturated colour and light label ink, so the highlight
         // reads at a glance (and section colours can replace it) on ivory or slate panels.
@@ -26,5 +26,13 @@ namespace OpenRCT2::Ui::Handheld::PocketPalette
         body=light?19:10; raised=light?225:13; edge=light?16:14;
         highlight=light?21:17; selectionLight=198; shadow=light?17:16;
         accent=light?180:19;
+        if(value==Style::pixel)
+        {
+            // Pixel: white windows with navy outlines and pale blue cards, navy ink - the look of
+            // a handheld RPG menu, built from the same RCT2 palette.
+            panel=21; border=119; separator=139; edge=119; body=21; raised=141; highlight=21;
+            primary=118; secondary=121; dark=21; shadow=138; disabled=16; accent=52;
+        }
     }
+    inline bool Pixel() { return style == Style::pixel; }
 }

@@ -142,7 +142,11 @@ int main(int argc, char** argv)
         press(H::Action::confirm);
         Check(H::PocketPalette::style!=originalTheme,"Theme action did not switch");
         capture("00b-slate-choice.png");
-        press(H::Action::confirm); // same focused row switches back
+        const auto secondTheme=H::PocketPalette::style;
+        press(H::Action::confirm); // same focused row moves on to the third theme
+        Check(H::PocketPalette::style!=originalTheme&&H::PocketPalette::style!=secondTheme,"Theme cycle skipped a theme");
+        capture("00b2-pixel-choice.png");
+        press(H::Action::confirm); // and back round to where it started
         Check(H::PocketPalette::style==originalTheme,"Theme focus or round trip lost");
         capture("00c-daylight-restored.png");
         H::MenuThemes::Settings reloaded;

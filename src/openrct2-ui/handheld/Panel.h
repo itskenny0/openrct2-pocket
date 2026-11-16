@@ -86,6 +86,26 @@ namespace OpenRCT2::Ui::Handheld
     // Five-pixel rounded corners and quiet single-line edges, at native resolution.
     inline void DrawCard(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, bool selected = false, bool button = false)
     {
+        if (PocketPalette::Pixel())
+        {
+            // Windows: navy outline with notched corners and a pale inner frame line.
+            const auto face = selected ? Theme::gold : button ? Theme::raised : Theme::ink;
+            Fill(rt, pos + ScreenCoordsXY{ 2, 0 }, { size.width - 4, size.height }, Theme::edge);
+            Fill(rt, pos + ScreenCoordsXY{ 0, 2 }, { size.width, size.height - 4 }, Theme::edge);
+            Fill(rt, pos + ScreenCoordsXY{ 1, 1 }, { size.width - 2, size.height - 2 }, Theme::edge);
+            Fill(rt, pos + ScreenCoordsXY{ 2, 2 }, { size.width - 4, size.height - 4 }, face);
+            if (size.width > 12 && size.height > 12)
+            {
+                const auto line = static_cast<Drawing::PaletteIndex>(PocketPalette::separator);
+                Fill(rt, pos + ScreenCoordsXY{ 4, 3 }, { size.width - 8, 1 }, line);
+                Fill(rt, pos + ScreenCoordsXY{ 4, size.height - 4 }, { size.width - 8, 1 }, line);
+                Fill(rt, pos + ScreenCoordsXY{ 3, 4 }, { 1, size.height - 8 }, line);
+                Fill(rt, pos + ScreenCoordsXY{ size.width - 4, 4 }, { 1, size.height - 8 }, line);
+            }
+            if (selected)
+                ReportSelected(rt, pos, size);
+            return;
+        }
         const auto edge = selected ? Theme::gold : Theme::edge;
         const auto face = selected ? Theme::gold : button ? Theme::raised : Theme::ink;
         Fill(rt, pos + ScreenCoordsXY{ 5, 0 }, { size.width - 10, size.height }, edge);
@@ -123,6 +143,13 @@ namespace OpenRCT2::Ui::Handheld
     // Small-radius rounded rectangle (2 px corner), crisp at the native 1x canvas.
     inline void FillRound(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, Drawing::PaletteIndex colour)
     {
+        if (PocketPalette::Pixel() && size.width >= 3 && size.height >= 3)
+        {
+            // Pixel theme: a single notched pixel per corner, like a GBA window.
+            Fill(rt, pos + ScreenCoordsXY{ 1, 0 }, { size.width - 2, size.height }, colour);
+            Fill(rt, pos + ScreenCoordsXY{ 0, 1 }, { size.width, size.height - 2 }, colour);
+            return;
+        }
         if (size.width < 4 || size.height < 4)
             return Fill(rt, pos, size, colour);
         Fill(rt, pos + ScreenCoordsXY{ 2, 0 }, { size.width - 4, size.height }, colour);
@@ -136,6 +163,14 @@ namespace OpenRCT2::Ui::Handheld
         {
             const auto p = pos + ScreenCoordsXY{ t, t };
             const ScreenSize s{ size.width - 2 * t, size.height - 2 * t };
+            if (PocketPalette::Pixel())
+            {
+                Fill(rt, p + ScreenCoordsXY{ 1, 0 }, { s.width - 2, 1 }, colour);
+                Fill(rt, p + ScreenCoordsXY{ 1, s.height - 1 }, { s.width - 2, 1 }, colour);
+                Fill(rt, p + ScreenCoordsXY{ 0, 1 }, { 1, s.height - 2 }, colour);
+                Fill(rt, p + ScreenCoordsXY{ s.width - 1, 1 }, { 1, s.height - 2 }, colour);
+                continue;
+            }
             Fill(rt, p + ScreenCoordsXY{ 2, 0 }, { s.width - 4, 1 }, colour);
             Fill(rt, p + ScreenCoordsXY{ 2, s.height - 1 }, { s.width - 4, 1 }, colour);
             Fill(rt, p + ScreenCoordsXY{ 0, 2 }, { 1, s.height - 4 }, colour);
@@ -166,6 +201,21 @@ namespace OpenRCT2::Ui::Handheld
         if (!enabled)
         {
             OutlineRound(rt, pos, size, Theme::edge);
+            return;
+        }
+        if (PocketPalette::Pixel())
+        {
+            // Navy outline, a light top edge and a thick bottom shade: a chunky pressable block.
+            const auto face = ButtonFaceColour(kind);
+            const bool filled = kind != ButtonKind::secondary;
+            FillRound(rt, pos, size, Theme::edge);
+            Fill(rt, pos + ScreenCoordsXY{ 1, 1 }, { size.width - 2, size.height - 2 }, face);
+            Fill(rt, pos + ScreenCoordsXY{ 1, size.height - 4 }, { size.width - 2, 3 },
+                filled ? Theme::goldShadow : static_cast<Drawing::PaletteIndex>(PocketPalette::separator));
+            Fill(rt, pos + ScreenCoordsXY{ 2, 2 }, { size.width - 4, 1 },
+                filled ? Theme::goldLight : static_cast<Drawing::PaletteIndex>(PocketPalette::highlight));
+            if (focused)
+                DrawFocusRing(rt, pos, size);
             return;
         }
         const auto face = ButtonFaceColour(kind);
@@ -250,6 +300,16 @@ namespace OpenRCT2::Ui::Handheld
             Fill(rt, { rect.x + 4, rect.y + rect.height - 1 }, { rect.width - 8, 1 }, ghost);
             Fill(rt, { rect.x, rect.y + 4 }, { 1, rect.height - 8 }, ghost);
             Fill(rt, { rect.x + rect.width - 1, rect.y + 4 }, { 1, rect.height - 8 }, ghost);
+        }
+        if (PocketPalette::Pixel())
+        {
+            // Pixel theme: the classic menu cursor, a solid triangle that nudges toward the choice.
+            const auto ink = static_cast<Drawing::PaletteIndex>(PocketPalette::primary);
+            const int x = std::max(0, rect.x - 9) + feel.PointerBob(now);
+            const int y = rect.y + rect.height / 2;
+            for (int i = 0; i < 5; ++i)
+                Fill(rt, { x + i, y - 4 + i }, { 1, 9 - 2 * i }, ink);
+            return;
         }
         static constexpr const char* kGlove[] = {
             "....ooo...........",
@@ -420,6 +480,12 @@ namespace OpenRCT2::Ui::Handheld
             key == "A"   ? PocketPalette::positive
                 : key == "B" ? PocketPalette::destructive
                              : PocketPalette::secondary);
+        if (PocketPalette::Pixel())
+        {
+            FillRound(rt, centre - ScreenCoordsXY{ 6, 5 }, { 13, 11 }, face);
+            DrawButtonLabel(rt, centre - ScreenCoordsXY{ 6, 6 }, { 13, 13 }, key);
+            return;
+        }
         static constexpr int kSpan[]{ 3, 5, 6, 7, 7, 7, 7, 7, 6, 5, 3 }; // half-widths of an 15x11 disc
         for (int row = 0; row < 11; ++row)
             Fill(rt, centre + ScreenCoordsXY{ -kSpan[row], row - 5 }, { 2 * kSpan[row] + 1, 1 }, face);

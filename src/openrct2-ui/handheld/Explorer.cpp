@@ -73,6 +73,8 @@
 
 namespace OpenRCT2::Ui::Handheld
 {
+    // The Pixel theme's bitmap font reads glyphs from g1.dat through this hook.
+    static const bool kPixelFontReady = (PixelFont::glyphSource = [](uint32_t sprite) { return GfxGetG1Element(sprite); }, true);
     static ConstructionAdjust::State _constructionAdjust;
     static bool _terrainActive{};
     static bool _waterTool{};

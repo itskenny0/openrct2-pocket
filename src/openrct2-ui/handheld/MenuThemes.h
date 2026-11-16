@@ -21,7 +21,7 @@ namespace OpenRCT2::Ui::Handheld::MenuThemes
             _loaded=true; _file=profile/"pocket-theme.cfg";
             std::ifstream in(_file);
             std::string name; std::getline(in,name);
-            PocketPalette::SetStyle(name=="slate"?PocketPalette::Style::slate:PocketPalette::Style::daylight);
+            PocketPalette::SetStyle(name=="slate"?PocketPalette::Style::slate:name=="pixel"?PocketPalette::Style::pixel:PocketPalette::Style::daylight);
             std::ifstream motion(profile/"pocket-motion.cfg");
             std::string mode; std::getline(motion,mode);
             MenuFeel::reduceMotion = mode=="reduced";
@@ -45,7 +45,8 @@ namespace OpenRCT2::Ui::Handheld::MenuThemes
         bool Toggle()
         {
             using namespace PocketPalette;
-            SetStyle(style==Style::daylight?Style::slate:Style::daylight);
+            // Daylight -> Slate -> Pixel -> Daylight.
+            SetStyle(style==Style::daylight?Style::slate:style==Style::slate?Style::pixel:Style::daylight);
             std::error_code error;
             std::filesystem::create_directories(_file.parent_path(),error);
             if(error) return false;
@@ -54,7 +55,7 @@ namespace OpenRCT2::Ui::Handheld::MenuThemes
             if(status.type()!=std::filesystem::file_type::not_found || (error && error!=std::errc::no_such_file_or_directory)) return false;
             error.clear();
             std::ofstream out(pending,std::ios::trunc);
-            out<<(style==Style::daylight?"daylight\n":"slate\n");out.close();
+            out<<(style==Style::daylight?"daylight\n":style==Style::slate?"slate\n":"pixel\n");out.close();
             bool success=bool(out);
             if(success){std::filesystem::rename(pending,_file,error);success=!error;}
             if(!success)std::filesystem::remove(pending,error);
@@ -68,6 +69,7 @@ namespace OpenRCT2::Ui::Handheld::MenuThemes
     }
     inline std::string Choice()
     {
-        return PocketPalette::style==PocketPalette::Style::daylight?"Theme: Daylight":"Theme: Slate";
+        return PocketPalette::style==PocketPalette::Style::daylight?"Theme: Daylight"
+            :PocketPalette::style==PocketPalette::Style::slate?"Theme: Slate":"Theme: Pixel";
     }
 }

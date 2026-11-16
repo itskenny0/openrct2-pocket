@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
+#include "PixelFont.h"
 #include "PocketPalette.h"
 #include "PocketSansData.h"
 #include "PocketSansStrongData.h"
@@ -41,8 +42,8 @@ namespace OpenRCT2::Ui::Handheld
             bool ready{};
             std::array<Drawing::PaletteIndex, 16> colours{};
         };
-        static std::array<std::array<std::array<Ramp, 256>, 8>, 2> ramps;
-        auto& ramp = ramps[PocketPalette::style == PocketPalette::Style::daylight ? 1 : 0][static_cast<size_t>(ink)][static_cast<uint8_t>(background)];
+        static std::array<std::array<std::array<Ramp, 256>, 8>, 3> ramps;
+        auto& ramp = ramps[static_cast<size_t>(PocketPalette::style)][static_cast<size_t>(ink)][static_cast<uint8_t>(background)];
         if (!ramp.ready)
         {
             const auto* palette = GfxGetG1Palette(SPR_GAME_DEFAULT_PALETTE);
@@ -158,9 +159,28 @@ namespace OpenRCT2::Ui::Handheld
             text.pop_back();
     }
 
+    // Solid ink for the Pixel theme's bitmap font (no anti-aliasing to blend).
+    inline Drawing::PaletteIndex InkColour(Ink ink)
+    {
+        return static_cast<Drawing::PaletteIndex>(
+            ink == Ink::caution           ? PocketPalette::caution
+                : ink == Ink::destructive ? PocketPalette::destructive
+                : ink == Ink::disabled    ? PocketPalette::disabled
+                : ink == Ink::positive    ? PocketPalette::positive
+                : ink == Ink::muted       ? PocketPalette::secondary
+                : ink == Ink::dark        ? PocketPalette::dark
+                : ink == Ink::gold        ? PocketPalette::accent
+                                          : PocketPalette::primary);
+    }
+    inline PixelFont::Style PixelStyle(bool strong, bool heading)
+    {
+        return strong || heading ? PixelFont::Style::bold : PixelFont::Style::regular;
+    }
     inline int TextWidth(const std::string& rawText, bool strong = false, bool heading = false)
     {
         const auto text = PlainPunctuation(rawText);
+        if (PocketPalette::Pixel())
+            return PixelFont::Width(text, PixelStyle(strong, heading), heading ? 2 : 1);
         int width = 0;
         if (const auto glyphs = Glyphs(text))
         {
@@ -196,13 +216,32 @@ namespace OpenRCT2::Ui::Handheld
                 break;
             }
         text = PlainPunctuation(std::move(text));
+        if (PocketPalette::Pixel() && text.find('{') == std::string::npos)
+        {
+            const auto style = PixelStyle(strong, heading);
+            const int scale = heading ? 2 : 1;
+            if (maxWidth > 0 && PixelFont::Width(text, style, scale) > maxWidth)
+            {
+                while (!text.empty() && PixelFont::Width(text + "...", style, scale) > maxWidth)
+                    PopCharacter(text);
+                text += "...";
+            }
+            const int width = PixelFont::Width(text, style, scale);
+            if (paint.alignment == TextAlignment::centre)
+                pos.x -= width / 2;
+            else if (paint.alignment == TextAlignment::right)
+                pos.x -= width;
+            // Pocket Sans boxes put the cap line a few pixels down; match it so layouts line up.
+            PixelFont::Draw(rt, pos + ScreenCoordsXY{ 0, heading || strong ? 1 : 2 }, text, style, InkColour(ink), scale);
+            return;
+        }
         // Localised names and native error formatting keep the complete engine fallback; currency
         // symbols and the other extra glyphs stay in Pocket Sans.
         if (text.find('{') != std::string::npos || !Glyphs(text))
         {
             // Localised currency and names use native glyphs too. Match the
             // light theme's ink polarity instead of forcing white on ivory.
-            const char* nativeInk = PocketPalette::style == PocketPalette::Style::daylight
+            const char* nativeInk = PocketPalette::style != PocketPalette::Style::slate
                 ? (ink == Ink::dark ? "{WHITE}" : ink == Ink::destructive ? "{RED}"
                     : "{BLACK}")
                 : (ink == Ink::gold ? "{YELLOW}" : "{WHITE}");
@@ -288,6 +327,16 @@ namespace OpenRCT2::Ui::Handheld
     // Button labels centre the visible ink, rather than the font advance/baseline.
     inline void DrawButtonLabel(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, const std::string& text)
     {
+        if (PocketPalette::Pixel())
+        {
+            // Bold when it fits; shoulder labels like "L1/R1" drop to the regular weight.
+            const auto style = PixelFont::Width(text, PixelFont::Style::bold) <= size.width - 2 ? PixelFont::Style::bold
+                                                                                               : PixelFont::Style::regular;
+            const int width = PixelFont::Width(text, style);
+            PixelFont::Draw(rt, pos + ScreenCoordsXY{ (size.width - width) / 2, (size.height - 8) / 2 }, text, style,
+                InkColour(Ink::dark));
+            return;
+        }
         int left = 10000, top = 10000, right = -1, bottom = -1, advance = 0;
         for (const unsigned char c : text)
         {
