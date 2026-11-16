@@ -1011,7 +1011,10 @@ namespace OpenRCT2::Ui::Windows
         }
 
         window = windowMgr->Create<ScenarioSelectWindow>(
-            WindowClass::scenarioSelect, {}, Handheld::IsEnabled() ? ScreenSize{ 504, 360 } : kWindowSize,
+            WindowClass::scenarioSelect, {},
+            // Handheld: 504x360 on the Brick, shrinking to fit shorter or narrower canvases.
+            Handheld::IsEnabled() ? ScreenSize{ std::min(504, ContextGetWidth() - 8), std::min(360, ContextGetHeight() - 8) }
+                                  : kWindowSize,
             { WindowFlag::autoPosition, WindowFlag::centreScreen }, callback);
         return window;
     }

@@ -145,31 +145,35 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         DrawSurface(rt, rail, { railWidth, height });
         DrawStrongText(rt, rail + ScreenCoordsXY{ 10, 14 }, "{WHITE}Your park", railWidth - 20);
         Rule(rt, rail + ScreenCoordsXY{ 10, 42 }, railWidth - 20);
+        // 40 px rows on the Brick; shorter canvases (16:9 panels) tighten the pitch so all
+        // sections stay on screen.
+        const int pitch = std::clamp((height - 56) / static_cast<int>(kCategories.size()), 30, 40);
         for (size_t i = 0; i < kCategories.size(); ++i)
         {
             const auto& category = kCategories[i];
-            const int y = 52 + static_cast<int>(i) * 40;
+            const int y = 52 + static_cast<int>(i) * pitch;
             const bool active = i == state.index();
             const bool focused = active && state.focus == Focus::rail;
             if (focused)
             {
-                Fill(rt, rail + ScreenCoordsXY{ 6, y }, { railWidth - 12, 36 }, Theme::gold);
-                ReportSelected(rt, rail + ScreenCoordsXY{ 6, y }, { railWidth - 12, 36 });
+                Fill(rt, rail + ScreenCoordsXY{ 6, y }, { railWidth - 12, pitch - 4 }, Theme::gold);
+                ReportSelected(rt, rail + ScreenCoordsXY{ 6, y }, { railWidth - 12, pitch - 4 });
             }
             else if (active)
             {
                 for (int x = 6; x <= 8; ++x)
                     GfxDrawLine(
-                        rt, { rail + ScreenCoordsXY{ x, y + 3 }, rail + ScreenCoordsXY{ x, y + 31 } },
+                        rt, { rail + ScreenCoordsXY{ x, y + 3 }, rail + ScreenCoordsXY{ x, y + pitch - 9 } },
                         static_cast<Drawing::PaletteIndex>(PocketPalette::selection));
             }
             static constexpr std::array sprites{SPR_TAB_PARK_ENTRANCE, SPR_TAB_RIDE_0, SPR_TAB_GUESTS_0,
                 SPR_TAB_STAFF_OPTIONS_0, SPR_TAB_FINANCES_SUMMARY_0, SPR_TAB_FINANCES_RESEARCH_0, SPR_TAB_FINANCES_MARKETING_0};
             static constexpr std::array<uint8_t, 7> frames{ 1, 16, 8, 7, 8, 8, 19 };
-            if (!DrawNativeMenuArt(rt, rail + ScreenCoordsXY{ 7, y + 2 }, { 28, 32 }, { sprites[i], frames[i] }, focused))
-                DrawCategoryMark(rt, rail + ScreenCoordsXY{12, y + 7}, i, focused);
+            const int inset = (pitch - 40) / 2;
+            if (!DrawNativeMenuArt(rt, rail + ScreenCoordsXY{ 7, y + 2 + inset }, { 28, 32 }, { sprites[i], frames[i] }, focused))
+                DrawCategoryMark(rt, rail + ScreenCoordsXY{12, y + 7 + inset}, i, focused);
             DrawModernEllipsised(
-                rt, rail + ScreenCoordsXY{ 39, y + 13 }, railWidth - 45,
+                rt, rail + ScreenCoordsXY{ 39, y + 13 + inset }, railWidth - 45,
                 std::string(
                     focused                  ? "{BLACK}"
                         : active             ? "{GOLD}"
