@@ -11,6 +11,7 @@
 #include <openrct2/drawing/Drawing.Sprite.h>
 #include <openrct2/drawing/G1Element.h>
 #include <openrct2/drawing/Palette.h>
+#include <openrct2/drawing/Drawing.h>
 #include <openrct2/drawing/RenderTarget.h>
 #include <openrct2/drawing/Text.h>
 #include <optional>
@@ -259,6 +260,29 @@ namespace OpenRCT2::Ui::Handheld
         Drawing::RenderTarget& rt, ScreenCoordsXY pos, int width, const std::string& text, TextPaint paint = {})
     {
         DrawModernText(rt, pos, text, paint, width);
+    }
+
+    // Console-style marquee for a focused label that does not fit: pauses, scrolls to the end,
+    // pauses, and repeats. Falls back to an ellipsis for text the Pocket fonts cannot draw.
+    // The caller's redraw cadence (the menu pointer's idle tick) drives the motion.
+    inline void DrawMarquee(
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, int width, const std::string& ink, const std::string& text, uint64_t now,
+        bool strong = false)
+    {
+        const int overflow = TextWidth(text, strong) - width;
+        if (overflow <= 0 || !Glyphs(PlainPunctuation(text)))
+        {
+            DrawModernText(rt, pos, ink + text, {}, width, strong);
+            return;
+        }
+        constexpr int kPauseMs = 900, kPixelMs = 28;
+        const int travel = overflow * kPixelMs;
+        const int cycle = 2 * kPauseMs + travel;
+        const int phase = static_cast<int>(now % static_cast<uint64_t>(cycle));
+        const int shift = phase < kPauseMs ? 0 : phase < kPauseMs + travel ? (phase - kPauseMs) / kPixelMs : overflow;
+        Drawing::RenderTarget clip;
+        if (ClipRenderTarget(clip, rt, pos - ScreenCoordsXY{ 0, 3 }, width, 18))
+            DrawModernText(clip, { -shift, 3 }, ink + text, {}, 0, strong);
     }
 
     // Button labels centre the visible ink, rather than the font advance/baseline.

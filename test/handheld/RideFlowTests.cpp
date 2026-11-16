@@ -144,8 +144,8 @@ int main(int argc, char** argv)
         FocusRideTabAction("Open...");press(H::Action::confirm);Check(W::HandheldRidesPresentation().confirmation,"Native Open unavailable after access placement");
         W::HandheldMenuMove(-1);press(H::Action::confirm);GameActions::ProcessQueue(state);Check(GetRide(target.id)->status==RideStatus::open,"Modern Open action failed");capture("05a-open-ride.png");
         FocusRideTabAction("Close...");press(H::Action::confirm);W::HandheldMenuMove(-1);press(H::Action::confirm);GameActions::ProcessQueue(state);Check(GetRide(target.id)->status==RideStatus::closed,"Modern Close action failed");
-        FocusRideTabAction("Close...");press(H::Action::confirm);Check(W::HandheldRidesPresentation().confirmation&&W::HandheldRidesPresentation().selected==1,"Status review lost Cancel-first");
-        press(H::Action::back);FocusRideTabAction("Demolish...");press(H::Action::confirm);capture("06-demolition-review.png");press(H::Action::back);Check(H::RideManagement::Resolve(target),"Cancel demolished ride");closeMenu();
+        FocusRideTabAction("Close...");press(H::Action::confirm);Check(W::HandheldRidesPresentation().confirmation&&W::HandheldRidesPresentation().selected==0,"Status review does not start on the action");
+        press(H::Action::back);FocusRideTabAction("Demolish...");press(H::Action::confirm);Check(W::HandheldRidesPresentation().selected==1,"Demolition review is not Cancel-first");capture("06-demolition-review.png");press(H::Action::back);Check(H::RideManagement::Resolve(target),"Cancel demolished ride");closeMenu();
         const auto wooden=load("rct2.ride.ptct1",RIDE_TYPE_WOODEN_ROLLER_COASTER);
         Check(H::BeginCustomTrack(wooden,RIDE_TYPE_WOODEN_ROLLER_COASTER),"Coaster start failed");GameActions::ProcessQueue(state);C::Update(CoordsXY{1408,640});focus({1424,656,64});
         for(int i=0;i<3;++i){Check(C::Select(TrackElemType::endStation)&&C::Action(true).error==GameActions::Status::ok,"Station action failed");GameActions::ProcessQueue(state);}

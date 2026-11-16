@@ -573,7 +573,7 @@ namespace OpenRCT2::Ui::Handheld
     inline void DrawTerrainOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, bool raise, bool water = false)
     {
         using namespace Concept;
-        Box(rt, pos, { kRailWidth, 174 });
+        Box(rt, pos, { kRailWidth, 200 });
         Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, water ? "Water" : "Terrain");
         Row(rt, pos + ScreenCoordsXY{ 8, 34 }, water ? "Raise water" : "Raise land", Icon::rise, raise);
         Row(rt, pos + ScreenCoordsXY{ 8, 62 }, water ? "Lower water" : "Lower land", Icon::lower, !raise);
@@ -581,6 +581,7 @@ namespace OpenRCT2::Ui::Handheld
         Section(rt, pos + ScreenCoordsXY{ 10, 109 }, "Brush");
         DrawModernText(rt, pos + ScreenCoordsXY{ 12, 132 }, "Single tile");
         DrawModernText(rt, pos + ScreenCoordsXY{ 12, 153 }, "{MUTED}1 x 1");
+        DrawCommand(rt, pos + ScreenCoordsXY{ 12, 174 }, 32, "L2/R2", "Lower / raise");
     }
 
     inline void DrawSurfaceOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& name)
@@ -889,20 +890,24 @@ namespace OpenRCT2::Ui::Handheld
         }
     }
 
+    // Cost and status share the name-chip style: a card sized to its text with a colour tab.
     inline void DrawCostBadge(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& amount, bool quote = false)
     {
-        Concept::Box(rt, pos, { 160, 26 });
-        DrawModernText(rt, pos + ScreenCoordsXY{ 8, 8 }, quote ? "{MUTED}Quote:" : "{MUTED}Cost:");
-        const int valueX = quote ? 50 : 43;
-        DrawStrongText(rt, pos + ScreenCoordsXY{ valueX, 8 }, "{WHITE}" + amount, 152 - valueX);
+        const std::string label = quote ? "Quote" : "Cost";
+        const int labelWidth = TextWidth(label);
+        const int width = std::min(kContextSize.width, labelWidth + TextWidth(amount, true) + 30);
+        DrawCard(rt, pos, { width, 22 });
+        Fill(rt, pos + ScreenCoordsXY{ 4, 4 }, { 4, 14 }, static_cast<Drawing::PaletteIndex>(PocketPalette::accent));
+        DrawModernText(rt, pos + ScreenCoordsXY{ 13, 6 }, "{MUTED}" + label);
+        DrawStrongText(rt, pos + ScreenCoordsXY{ 19 + labelWidth, 6 }, "{WHITE}" + amount, width - labelWidth - 24);
     }
 
     inline void DrawContextMessage(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& text)
     {
-        // Two short lines preserve feedback without reserving a permanent status row.
-        Concept::Box(rt, pos, kContextSize);
+        // One line when it fits, otherwise two; never a permanent status row.
+        constexpr int kLine = 140;
         auto split = text.size();
-        while (split > 0 && TextWidth(text.substr(0, split)) > 140)
+        while (split > 0 && TextWidth(text.substr(0, split)) > kLine)
             --split;
         if (split < text.size())
         {
@@ -910,9 +915,17 @@ namespace OpenRCT2::Ui::Handheld
             if (space != std::string::npos && space > 0)
                 split = space;
         }
-        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 10, 7 }, 140, "{WHITE}" + text.substr(0, split));
-        if (split < text.size())
-            DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 10, 24 }, 140, "{MUTED}" + text.substr(split));
+        const auto first = text.substr(0, split);
+        auto second = split < text.size() ? text.substr(split) : std::string();
+        while (!second.empty() && second.front() == ' ')
+            second.erase(0, 1);
+        const int width = std::min(kContextSize.width, std::max(TextWidth(first), TextWidth(second)) + 24);
+        const int height = second.empty() ? 22 : 38;
+        DrawCard(rt, pos, { width, height });
+        Fill(rt, pos + ScreenCoordsXY{ 4, 4 }, { 4, height - 8 }, static_cast<Drawing::PaletteIndex>(PocketPalette::selection));
+        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 13, 6 }, width - 18, "{WHITE}" + first);
+        if (!second.empty())
+            DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 13, 22 }, width - 18, "{MUTED}" + second);
     }
 
     // Bounded, content-sized feedback for a selection-wide native rejection or result.

@@ -1582,14 +1582,14 @@ namespace OpenRCT2::Ui::Windows
                 _focus.move(static_cast<int32_t>(std::min(_guestRideFocus, rows().size() - 1)), rows().size());
             if (next == Page::guestRoster)
                 _focus.move(static_cast<int32_t>(std::min(_guestRosterFocus, rows().size() - 1)), rows().size());
-            if (next == Page::accessReview || next == Page::saveReview || next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish
-                || next == Page::overviewConfirm || next == Page::ridesConfirm || next == Page::financeConfirm
-                || next == Page::marketingConfirm || next == Page::staffHire || next == Page::staffDismiss
-                || next == Page::staffNameConfirm || next == Page::guestNameConfirm || next == Page::guestTracking
-                || next == Page::peepCancel)
-                _focus.move(1, 2); // destructive confirmations default to Cancel
-            if (next == Page::researchConfirm)
-                _focus.move(static_cast<int32_t>(rows().size() - 1), rows().size());
+            // Only confirmations that lose something (a save, the session, a ride, an employee, a
+            // placement) start on Cancel; ordinary decisions start on the action so A-A completes them.
+            const bool destructive = next == Page::overwrite || next == Page::discard || next == Page::exit
+                || next == Page::shopDemolish || next == Page::staffDismiss || next == Page::peepCancel
+                || (next == Page::ridesConfirm && _ridesDraft && _ridesDraft->demolition)
+                || (next == Page::saveReview && _saveDraft && _saveDraft->baseline);
+            if (destructive)
+                _focus.move(1, 2);
             invalidate();
         }
         std::vector<Handheld::SceneryTools::Style> signStyles() const

@@ -1900,10 +1900,7 @@ namespace OpenRCT2::Ui::Handheld
                 else if (_surfaceTool)
                     DrawSurfaceOverlay(rt, Concept::kOrigin, Surface::Name(_surfaceIndex));
                 else
-                {
                     DrawTerrainOverlay(rt, Concept::kOrigin, _raiseLand, _waterTool);
-                    DrawModernText(rt,Concept::kOrigin+ScreenCoordsXY{12,184},"{WHITE}L2 Lower | R2 Raise");
-                }
             }
             if (Designs::Active() || FlatRides::CurrentStage() != FlatRides::Stage::inactive)
             { /* The shared ride panel owns its action strip. */

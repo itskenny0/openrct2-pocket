@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
+#include "MenuFeel.h"
 #include "Panel.h"
 
 #include <algorithm>
@@ -153,8 +154,10 @@ namespace OpenRCT2::Ui::Handheld
                     object->DrawPreview(preview, preview.zoom_level.ApplyTo(86), preview.zoom_level.ApplyTo(62));
                 }
             }
-            DrawModernEllipsised(
-                gridRt, cell + ScreenCoordsXY{ 5, 70 }, 84, (selected ? "{BLACK}" : "{WHITE}") + entries[index].name);
+            if (selected)
+                DrawMarquee(gridRt, cell + ScreenCoordsXY{ 5, 70 }, 84, "{BLACK}", entries[index].name, MenuFeel::Clock());
+            else
+                DrawModernEllipsised(gridRt, cell + ScreenCoordsXY{ 5, 70 }, 84, "{WHITE}" + entries[index].name);
         }
         }
         Rule(rt, p + ScreenCoordsXY{ 12, detailTop }, 296);

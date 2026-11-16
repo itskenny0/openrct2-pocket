@@ -126,8 +126,8 @@ int main(int argc, char** argv)
         CheckVisualPolishLayout();
         const auto initialCash=state.park.cash;W::HandheldStaffOpen({});H::Frame top;top.navigateY=-1;H::HandleExplorerInput(input,top);Check(sm().selected==0,"Toolbar Up wrapped to list tail");capture("01-staff-empty.png");
         press(H::Action::confirm);Check(sm().title=="Choose staff role","Hire toolbar failed");press(H::Action::confirm);
-        Check(sm().confirmation&&sm().selected==1,"Hire is not Cancel-first");capture("02-hire-review.png");
-        W::HandheldMenuMove(-1);press(H::Action::confirm);GameActions::ProcessQueue(state);
+        Check(sm().confirmation&&sm().selected==0,"Hire review does not start on Hire");capture("02-hire-review.png");
+        press(H::Action::confirm);GameActions::ProcessQueue(state);
         Check(S::Roster().size()==1&&state.park.cash==initialCash,"Native hire cost/duplicate protection changed");
         Check(sm().tabs.size()==4,"Hire did not open employee workspace");const auto employee=S::Roster().front();capture("03-employee-overview.png");
         for(int i=0;i<3;++i)press(H::Action::nextOption);

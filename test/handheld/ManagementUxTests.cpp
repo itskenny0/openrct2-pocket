@@ -111,8 +111,8 @@ int main(int argc,char** argv)
         press(H::Action::previousOption);Check(model().selected==ledgerFocus,"Ledger focus lost across tabs");press(H::Action::nextOption);press(H::Action::nextOption);
         Check(model().selectedTab==3,"Financial controls unavailable");capture("05-finance-controls.png");
         select("Borrow / repay...");const auto cash=park.cash;const auto loan=park.bankLoan;press(H::Action::confirm);nav(1,0);capture("06-finance-loan-draft.png");
-        Check(park.cash==cash&&park.bankLoan==loan,"Finance draft spent cash");press(H::Action::confirm);Check(model().confirmation&&model().selected==1,"Finance review not Cancel-first");
-        press(H::Action::confirm);Check(park.cash==cash,"Cancel applied loan");Check(model().selectedTab==3,"Cancel lost Controls tab");
+        Check(park.cash==cash&&park.bankLoan==loan,"Finance draft spent cash");press(H::Action::confirm);Check(model().confirmation&&model().selected==0,"Finance review does not start on Apply");
+        W::HandheldMenuMove(1);press(H::Action::confirm);Check(park.cash==cash,"Cancel applied loan");Check(model().selectedTab==3,"Cancel lost Controls tab");
         press(H::Action::confirm);nav(1,0);press(H::Action::confirm);capture("07-finance-review.png");select("Borrow");press(H::Action::confirm);
         Check(park.bankLoan==loan,"Finance bypassed native queue");press(H::Action::confirm);GameActions::ProcessQueue(state);
         Check(park.bankLoan==loan+1000.00_GBP&&park.cash==cash+1000.00_GBP,"Finance native callback charged incorrectly/twice");
@@ -159,10 +159,11 @@ int main(int argc,char** argv)
         if (model().selectedTab != 1)
             press(H::Action::nextOption);
         Check(model().headerStatus == "Current settings", "Discard left stale research draft");
-        press(H::Action::contextPrimary);select("Review settings...");press(H::Action::confirm);Check(model().rows.size()==2&&model().selected==1,"Research review not compact/Cancel-first");capture("16-research-review.png");
+        press(H::Action::contextPrimary);select("Review settings...");press(H::Action::confirm);Check(model().rows.size()==2&&model().selected==0,"Research review not compact/action-first");capture("16-research-review.png");
         press(H::Action::back);Check(model().headerStatus=="Unsaved draft"&&model().selectedTab==1,"Research review Back lost draft");
         select("Review settings...");
         press(H::Action::confirm);
+        W::HandheldMenuMove(1); // the review starts on Apply; move to Cancel
         press(H::Action::confirm);
         Check(model().headerStatus == "Unsaved draft", "Explicit review Cancel discarded research draft");
         select("Review settings...");press(H::Action::confirm);select("Apply settings");press(H::Action::confirm);GameActions::ProcessQueue(state);
@@ -210,7 +211,7 @@ int main(int argc,char** argv)
         Check(model().rows[0].find("Carousel")!=std::string::npos,"Inline target change failed");const auto selectedTarget=model().rows[0];capture("20-campaign-editor.png");
         press(H::Action::confirm);W::HandheldMenuMove(12);capture("21-campaign-targets.png");press(H::Action::back);Check(model().rows[0]==selectedTarget,"Target browsing Cancel changed draft");
         W::HandheldMenuMove(1);nav(1,0);Check(model().rows[1].find("3 weeks")!=std::string::npos,"Inline duration failed");
-        select("Review campaign...");press(H::Action::confirm);Check(model().confirmation&&model().selected==1,"Campaign confirmation not safe");capture("22-campaign-review.png");
+        select("Review campaign...");press(H::Action::confirm);Check(model().confirmation&&model().selected==0,"Campaign review does not start on Start campaign");capture("22-campaign-review.png");
         const auto marketingCash=park.cash;press(H::Action::back);Check(model().rows[1].find("3 weeks")!=std::string::npos,"Review Back lost duration");
         select("Review campaign...");press(H::Action::confirm);select("Start campaign");press(H::Action::confirm);GameActions::ProcessQueue(state);
         Check(MarketingGetCampaign(ADVERTISING_CAMPAIGN_RIDE)&&park.cash==marketingCash-AdvertisingCampaignPricePerWeek[ADVERTISING_CAMPAIGN_RIDE]*3,"Native campaign accounting/duration changed");
