@@ -101,7 +101,7 @@ int main(int argc,char** argv)
         WindowCullDead();
         Check(!W::HandheldDashboardIsOpen(), "Dashboard rail Back did not return to park");
         open(4);Check(model().tabs.size()==4&&model().selectedTab==0,"Finance tabs missing");
-        Check(model().stats[2].second==H::FormatMoney(270.00_GBP),"Month net not native signed ledger total");capture("01-finance-overview.png");
+        Check(model().chart&&model().chart->splitValues.size()==2&&std::get<1>(model().chart->split[0])-std::get<1>(model().chart->split[1])==270.00_GBP,"Month in/out not native signed ledger totals");Check(model().heroStat&&model().primaryRow==0,"Finance overview lost its headline or primary action");capture("01-finance-overview.png");
         press(H::Action::nextOption);Check(model().rowValues.size()==14,"Ledger omitted categories/values");
         Check(model().rowValues[0]==H::FormatMoney(-120.00_GBP),"Ledger sign lost");capture("02-finance-ledger.png");
         nav(-1,0);Check(model().rowValues[6]==H::FormatMoney(280.00_GBP),"Ledger month selection failed");nav(1,0);

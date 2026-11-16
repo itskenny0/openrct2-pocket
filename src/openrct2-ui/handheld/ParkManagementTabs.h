@@ -27,22 +27,35 @@ namespace OpenRCT2::Ui::Handheld::ParkManagementTabs
         m.actionGrid=true;
         if(tab==0)
         {
+            // Cash is the headline; the loan reads as a bar against its limit; this month and the
+            // last eight weeks of profit are a picture rather than three lines of numbers.
             const auto [income,expense]=Finances::MonthlyTotals();
-            m.stats={{"Cash",Money(park.cash)},{"Loan balance",Money(park.bankLoan)},
-                {"Month net",Money(income==kMoney64Undefined || expense==kMoney64Undefined ? kMoney64Undefined : income-expense)},
-                {"Park value",Money(park.value)}};
+            const bool known=income!=kMoney64Undefined && expense!=kMoney64Undefined;
+            m.stats={{"Cash",Money(park.cash)},
+                {"Loan, limit "+Money(park.maxBankLoan),Money(park.bankLoan)},
+                {"Park value",Money(park.value)},
+                {"Weekly profit",Money(park.currentProfit)}};
             m.metricColumns=2;
-            m.statInk = { "{WHITE}", "{WHITE}",
-                          income == kMoney64Undefined || expense == kMoney64Undefined ? "{WHITE}"
-                              : income < expense                                      ? "{DANGER}"
-                              : income > expense                                      ? "{POSITIVE}"
-                                                                                      : "{WHITE}",
-                          "{WHITE}" };
-            m.bodyLines={Period(GetDate().GetMonthsElapsed())+" / month to date",
-                "Income "+Money(income)+"   Expenses "+Money(expense),
-                "Current weekly profit: "+Money(park.currentProfit)};
-            m.rows={"Borrow / repay...","Expenditure ledger","Financial history","Financial controls"};
-            m.rowEnabled={Finances::Available(Finances::Field::loan),true,true,true};
+            m.metricHeight=52;
+            m.heroStat=true;
+            m.statInk={"{WHITE}","{WHITE}","{WHITE}",park.currentProfit<0?"{DANGER}":"{POSITIVE}"};
+            m.meters={-1,park.maxBankLoan>0?static_cast<int>(park.bankLoan*100/park.maxBankLoan):-1,-1,-1};
+            ManagementPresentation::Chart chart;
+            chart.splitTitle=Period(GetDate().GetMonthsElapsed());
+            if(known)
+            {
+                chart.split={{"In",income,"{POSITIVE}"},{"Out",expense,"{DANGER}"}};
+                chart.splitValues={Money(income),Money(expense)};
+            }
+            chart.columnsTitle="Profit, last 8 weeks";
+            for(int week=7;week>=0;--week)
+                if(park.weeklyProfitHistory[week]!=kMoney64Undefined)
+                    chart.columns.push_back(park.weeklyProfitHistory[week]);
+            m.chart=chart;
+            m.bodyLines.clear();
+            m.rows={"Borrow or repay","Spending ledger"};
+            m.rowEnabled={Finances::Available(Finances::Field::loan),true};
+            m.primaryRow=0;
         }
         else if(tab==1)
         {

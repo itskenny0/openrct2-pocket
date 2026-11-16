@@ -57,7 +57,22 @@ namespace OpenRCT2::Ui::Handheld
         // The one action this screen is for, drawn filled in the section colour. Unset: the first row
         // of a review. Set to rows.size() to mark none.
         std::optional<size_t> primaryRow;
+        // The first stat is the headline number: drawn in the heading font.
+        bool heroStat{};
+        // A small picture of recent numbers: paired bars on the left ("this month: in / out") and
+        // a column per period on the right (negative columns hang below the line).
+        struct Chart
+        {
+            std::string splitTitle;
+            std::vector<std::tuple<std::string, int64_t, std::string>> split; // label, value, ink
+            std::vector<std::string> splitValues;
+            std::string columnsTitle;
+            std::vector<int64_t> columns;
+            std::vector<std::string> columnLabels;
+        };
+        std::optional<Chart> chart;
     };
+    inline constexpr int kChartHeight = 84;
     inline std::optional<size_t> PrimaryRow(const ManagementPresentation& model)
     {
         if (model.primaryRow)
@@ -82,7 +97,7 @@ namespace OpenRCT2::Ui::Handheld
         const int statHeight = model.summaryMetrics ? std::max(model.metricHeight, model.meterDirections.empty() ? 0 : 66) : 24;
         const int statRows = (static_cast<int>(model.stats.size()) + statColumns - 1) / statColumns;
         const int rowStart = kHeaderHeight + (model.tabs.empty() ? 0 : kTabsHeight) + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16
-            + model.reservedHeight + (model.graph.empty() ? 0 : 110) + (model.rows.empty() ? 0 : 11) + (model.toolbarCount ? 36 : 0);
+            + model.reservedHeight + (model.graph.empty() ? 0 : 110) + (model.chart ? kChartHeight + 6 : 0) + (model.rows.empty() ? 0 : 11) + (model.toolbarCount ? 36 : 0);
         const int rowHeight = model.rowHeight ? model.rowHeight : model.denseRoster ? 38 : model.rosterCards ? 46 : model.actionGrid ? 30 : columns > 1 ? 24 : 30;
         const size_t capacity = std::max(1, (size.height - rowStart - 34) / rowHeight) * columns;
         return {columns, rowHeight, rowStart, statColumns, statHeight, capacity};
@@ -146,7 +161,7 @@ namespace OpenRCT2::Ui::Handheld
                 DrawMetric(
                     rt, p + ScreenCoordsXY{ 12 + static_cast<int>(i % statColumns) * cellWidth, y },
                     { cellWidth - 4, statHeight - 5 }, model.stats[i].first, model.stats[i].second, highlight,
-                    i < model.statInk.size() ? model.statInk[i] : "{WHITE}");
+                    i < model.statInk.size() ? model.statInk[i] : "{WHITE}", model.heroStat && i == 0);
             }
             else
             {
@@ -165,10 +180,10 @@ namespace OpenRCT2::Ui::Handheld
             const auto start=p+ScreenCoordsXY{12+static_cast<int>(i%statColumns)*cellWidth,contentTop+static_cast<int>(i/statColumns)*statHeight+statHeight-8};
             const bool directional = i < model.meterDirections.size();
             const bool attention = i < model.meterAttention.size() && model.meterAttention[i];
-            const auto ink = attention                        ? PocketPalette::caution
-                : directional && model.meterDirections[i] > 0 ? PocketPalette::positive
-                                                              : PocketPalette::secondary;
-            DrawMeter(rt, start + ScreenCoordsXY{ 8, -2 }, cellWidth - 22, model.meters[i], static_cast<Drawing::PaletteIndex>(ink), 4);
+            const auto ink = attention                        ? static_cast<Drawing::PaletteIndex>(PocketPalette::caution)
+                : directional && model.meterDirections[i] > 0 ? static_cast<Drawing::PaletteIndex>(PocketPalette::positive)
+                                                              : Theme::gold;
+            DrawMeter(rt, start + ScreenCoordsXY{ 8, -2 }, cellWidth - 22, model.meters[i], ink, 4);
             if (directional && attention)
                 DrawModernText(rt, start + ScreenCoordsXY{ 0, -13 }, "{CAUTION}! Attention", {}, cellWidth - 6);
         }
@@ -180,6 +195,60 @@ namespace OpenRCT2::Ui::Handheld
         for (size_t i = 0; i < model.bodyLines.size(); ++i)
             DrawModernEllipsised(rt, p + ScreenCoordsXY{12, contentTop + 4 + statRows * statHeight + static_cast<int>(i) * 16},
                 width - 24, model.bodyLines[i].starts_with("{") ? model.bodyLines[i] : "{WHITE}" + model.bodyLines[i]);
+        if (model.chart)
+        {
+            const auto& chart = *model.chart;
+            const auto origin = p + ScreenCoordsXY{ 12, contentTop + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16 + 2 };
+            const int chartWidth = width - 24;
+            FillRound(rt, origin, { chartWidth, kChartHeight }, Theme::raised);
+            const int half = chartWidth / 2;
+            DrawModernEllipsised(rt, origin + ScreenCoordsXY{ 8, 6 }, half - 12, "{MUTED}" + chart.splitTitle);
+            int64_t largest = 1;
+            for (const auto& [label, value, ink] : chart.split)
+                largest = std::max<int64_t>(largest, std::abs(value));
+            for (size_t i = 0; i < chart.split.size(); ++i)
+            {
+                const auto& [label, value, ink] = chart.split[i];
+                const int y = 24 + static_cast<int>(i) * 22;
+                DrawModernText(rt, origin + ScreenCoordsXY{ 8, y + 1 }, "{WHITE}" + label);
+                const int barRoom = half - 120;
+                const int bar = std::max<int>(2, static_cast<int>(barRoom * std::abs(value) / largest));
+                FillRound(rt, origin + ScreenCoordsXY{ 56, y + 1 }, { bar, 9 },
+                    static_cast<Drawing::PaletteIndex>(ink == "{DANGER}" ? PocketPalette::destructive : PocketPalette::positive));
+                if (i < chart.splitValues.size())
+                    DrawStrongText(rt, origin + ScreenCoordsXY{ 60 + bar, y + 1 }, "{WHITE}" + chart.splitValues[i], half - 64 - bar);
+            }
+            Fill(rt, origin + ScreenCoordsXY{ half, 8 }, { 1, kChartHeight - 16 }, Theme::edge);
+            DrawModernEllipsised(rt, origin + ScreenCoordsXY{ half + 8, 6 }, half - 16, "{MUTED}" + chart.columnsTitle);
+            if (!chart.columns.empty())
+            {
+                int64_t high = 1, low = 0;
+                for (const auto value : chart.columns)
+                {
+                    high = std::max(high, value);
+                    low = std::min(low, value);
+                }
+                const int top = 22, bottom = kChartHeight - 16;
+                const int zero = top + static_cast<int>((bottom - top) * high / (high - low));
+                const int slot = (half - 16) / static_cast<int>(chart.columns.size());
+                Fill(rt, origin + ScreenCoordsXY{ half + 8, zero }, { half - 16, 1 }, Theme::edge);
+                for (size_t i = 0; i < chart.columns.size(); ++i)
+                {
+                    const auto value = chart.columns[i];
+                    const int x = half + 8 + static_cast<int>(i) * slot + 2;
+                    const int span = value >= 0 ? static_cast<int>((zero - top) * value / high)
+                                                : static_cast<int>((bottom - zero) * -value / std::max<int64_t>(1, -low));
+                    if (value >= 0)
+                        FillRound(rt, origin + ScreenCoordsXY{ x, zero - span }, { slot - 4, std::max(span, 1) },
+                            static_cast<Drawing::PaletteIndex>(PocketPalette::positive));
+                    else
+                        FillRound(rt, origin + ScreenCoordsXY{ x, zero + 1 }, { slot - 4, std::max(span, 1) },
+                            static_cast<Drawing::PaletteIndex>(PocketPalette::destructive));
+                    if (i < chart.columnLabels.size())
+                        DrawModernText(rt, origin + ScreenCoordsXY{ x + (slot - 4) / 2 - 3, bottom + 4 }, "{MUTED}" + chart.columnLabels[i]);
+                }
+            }
+        }
         if (!model.graph.empty())
         {
             const auto [low, high] = std::minmax_element(model.graph.begin(), model.graph.end());

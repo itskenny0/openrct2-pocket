@@ -87,7 +87,7 @@ namespace OpenRCT2::Ui::Handheld
         if (label == "Park awards...") return { SPR_AWARD };
         if (label == "Read objectives") return { SPR_TAB_OBJECTIVE_0, 16 };
         if (label == "Park history..." || label == "Financial history") return { SPR_GRAPH };
-        if (label == "Borrow / repay..." || label == "Expenditure ledger" || label == "Financial controls") return { SPR_FINANCE };
+        if (label == "Borrow / repay..." || label == "Borrow or repay" || label == "Expenditure ledger" || label == "Spending ledger" || label == "Financial controls") return { SPR_FINANCE };
         if (label == "Admission price..." || label == "Admission...") return { SPR_TAB_ADMISSION_0, 8 };
         if (label == "Invention catalog...") return { SPR_TAB_FINANCES_RESEARCH_0, 8 };
         if (label == "Funding & priorities") return { SPR_TAB_FINANCES_SUMMARY_0, 8 };

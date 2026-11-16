@@ -513,13 +513,16 @@ namespace OpenRCT2::Ui::Handheld
 
     inline void DrawMetric(
         Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& label, const std::string& value,
-        bool selected = false, const std::string& valueInk = "{WHITE}")
+        bool selected = false, const std::string& valueInk = "{WHITE}", bool hero = false)
     {
         FillRound(rt, p, size, Theme::raised);
         DrawModernEllipsised(rt, p + ScreenCoordsXY{8, size.height < 34 ? 5 : 8}, size.width - 16, "{MUTED}" + label);
-        DrawStrongText(
-            rt, p + ScreenCoordsXY{ 8, size.height >= 40 ? 25 : size.height < 34 ? size.height - 12 : 22 }, valueInk + value,
-            size.width - 16);
+        if (hero && size.height >= 40)
+            DrawHeadingText(rt, p + ScreenCoordsXY{ 8, 20 }, valueInk + value, size.width - 16);
+        else
+            DrawStrongText(
+                rt, p + ScreenCoordsXY{ 8, size.height >= 40 ? 25 : size.height < 34 ? size.height - 12 : 22 }, valueInk + value,
+                size.width - 16);
         if (selected)
             DrawFocusRing(rt, p, size);
     }
