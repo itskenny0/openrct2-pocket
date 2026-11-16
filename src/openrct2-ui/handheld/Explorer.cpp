@@ -46,6 +46,13 @@
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
+#include <openrct2/entity/Peep.h>
+#include <openrct2/ride/Ride.h>
+#include <openrct2/ride/RideData.h>
+#include <openrct2/ride/Vehicle.h>
+#include <openrct2/world/tile_element/EntranceElement.h>
+#include <openrct2/world/tile_element/PathElement.h>
+#include <openrct2/world/tile_element/TrackElement.h>
 #include <openrct2/Input.h>
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/actions/GameActionRunner.h>
@@ -684,7 +691,7 @@ namespace OpenRCT2::Ui::Handheld
                 { /* Accessible without a stick-click; camera preserves the construction draft. */
                 }
                 else if (action==Action::contextSecondary && Windows::HandheldObjectPickerGroup()) {}
-                else if (action==Action::contextPrimary && Windows::HandheldDashboardNews()) {}
+                else if (action==Action::contextSecondary && Windows::HandheldDashboardNews()) {}
                 else if (
                     Windows::HandheldObjectPickerIsOpen() && (action == Action::previousOption || action == Action::nextOption))
                     Windows::HandheldObjectPickerMove(0, action == Action::nextOption ? 2 : -2);
@@ -732,9 +739,58 @@ namespace OpenRCT2::Ui::Handheld
         return false;
     }
 
+    // What A would inspect at the fixed cursor, refreshed each update so the footer verb and the
+    // name chip preview the press instead of leaving it to guesswork.
+    struct InspectTarget
+    {
+        std::string verb = "Inspect";
+        std::string name;
+    };
+    static InspectTarget _inspect;
+
+    static InspectTarget ResolveInspectTarget()
+    {
+        const auto info = GetMapCoordinatesFromPos(
+            Centre(), { ViewportInteractionItem::entity, ViewportInteractionItem::ride, ViewportInteractionItem::parkEntrance });
+        const auto rideTarget = [](const Ride* ride) {
+            if (ride == nullptr)
+                return InspectTarget{};
+            const bool shop = ride->getRideTypeDescriptor().flags.has(RtdFlag::isShopOrFacility);
+            return InspectTarget{ shop ? "Inspect shop" : "Inspect ride", ride->getName() };
+        };
+        switch (info.interactionType)
+        {
+            case ViewportInteractionItem::entity:
+                if (info.Entity == nullptr)
+                    break;
+                if (const auto* peep = info.Entity->as<Peep>(); peep != nullptr)
+                    return { info.Entity->type == EntityType::staff ? "Inspect staff" : "Inspect guest", peep->getName() };
+                if (const auto* vehicle = info.Entity->as<Vehicle>(); vehicle != nullptr && !vehicle->IsCableLift())
+                    return rideTarget(GetRide(vehicle->ride));
+                break;
+            case ViewportInteractionItem::ride:
+                if (info.Element == nullptr)
+                    break;
+                if (info.Element->getType() == TileElementType::track)
+                    return rideTarget(GetRide(info.Element->asTrack()->getRideIndex()));
+                if (info.Element->getType() == TileElementType::entrance)
+                    return rideTarget(GetRide(info.Element->asEntrance()->getRideIndex()));
+                if (info.Element->getType() == TileElementType::path)
+                    return rideTarget(GetRide(info.Element->asPath()->getRideIndex()));
+                break;
+            case ViewportInteractionItem::parkEntrance:
+                return { "Inspect park", getGameState().park.name };
+            default:
+                break;
+        }
+        return {};
+    }
+
     void UpdateExplorer(ControllerInput& input)
     {
         GuestFollow::Update();
+        _inspect = !_terrainActive && !Paths::IsActive() && CanExplore() && ContextHasFocus() ? ResolveInspectTarget()
+                                                                                             : InspectTarget{};
         if (gLegacyScene != LegacyScene::playing)
         {
             EndTerrain();
@@ -1373,7 +1429,7 @@ namespace OpenRCT2::Ui::Handheld
                         if (Paths::IsActive())
                         {
                             const auto result = Paths::Action(true);
-                            _terrainStatus = result.error == GameActions::Status::ok ? Paths::BatchActive() ? "" : "Path change requested."
+                            _terrainStatus = result.error == GameActions::Status::ok ? Paths::BatchActive() ? "" : Paths::IsRemoving() ? "Path removed." : Paths::IsQueue() ? "Queue placed." : "Path placed."
                                                                                      : result.getErrorMessage();
                         }
                         else if (_sceneryClearTool && _terrainTile)
@@ -1415,13 +1471,13 @@ namespace OpenRCT2::Ui::Handheld
                                 }
                                 _terrainStatus = result.error == GameActions::Status::ok
                                     ? (FlatRides::CurrentStage() != FlatRides::Stage::inactive ? ""
-                                           : _shopTool                                         ? "Shop placement requested."
-                                           : _treeTool                                         ? "Tree requested / Move, then A again"
-                                           : _sceneryTool                                      ? "Scenery requested / Move, then A again"
+                                           : _shopTool                                         ? "Shop placed."
+                                           : _treeTool                                         ? "Tree planted / move, then A again"
+                                           : _sceneryTool                                      ? "Scenery placed / move, then A again"
                                            : _colourRide                                       ? "Track colour scheme applied."
-                                           : _sceneryRemovalTool                               ? "Removal requested."
-                                           : _surfaceTool                                      ? "Surface change requested."
-                                           : _waterTool                                        ? "Water change requested."
+                                           : _sceneryRemovalTool                               ? "Removed."
+                                           : _surfaceTool                                      ? "Surface painted."
+                                           : _waterTool                                        ? "Water level changed."
                                                                                                : "Land changed.")
                                     : result.getErrorMessage();
                             }
@@ -1739,7 +1795,8 @@ namespace OpenRCT2::Ui::Handheld
                 DrawConstructionFooter(rt,{ContextGetWidth(),height},"Apply","Adjust");
             else
                 DrawGameplayFooter(
-                    rt, { ContextGetWidth(), height }, status, _terrainActive, _surfaceTool || _colourRide.has_value());
+                    rt, { ContextGetWidth(), height }, status, _terrainActive, _surfaceTool || _colourRide.has_value(),
+                    _inspect.verb);
         }
         // A colour palette owns the D-pad; placement feedback/cursor is unrelated
         // here and suggested a placement error while merely choosing a colour.
@@ -1753,6 +1810,8 @@ namespace OpenRCT2::Ui::Handheld
             DrawCostBadge(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), costAmount, Paths::BatchActive());
         if (GuestFollow::Current() && !_terrainActive && !Paths::IsActive())
             DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), status);
+        else if (!_inspect.name.empty() && !_terrainActive && !Paths::IsActive())
+            DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), _inspect.name);
         // High contrast, fixed map focus; this does not move the desktop pointer.
         DrawMapFocus(rt, c);
     }

@@ -49,7 +49,7 @@ namespace OpenRCT2::Ui::Handheld::PeopleTabs
             model.headerInk = changed ? "{CAUTION}" : "{WHITE}";
             model.status = changed ? "Unsaved duties" : "";
             model.bodyLines.clear();
-            if(StaffManagement::Orders(target.type).empty()) {model.rows={"Overview"};model.bodyLines={"This role has no configurable duties."};}
+            if(StaffManagement::Orders(target.type).empty()) {model.rows={"Back to overview"};model.bodyLines={"This role has no configurable duties."};}
         } else {
             Actions(model,native,StaffActions(tabs.tab));
             if(tabs.tab==0) {
@@ -98,7 +98,7 @@ namespace OpenRCT2::Ui::Handheld::PeopleTabs
         if(tabs.tab==1) {
             model.stats=GuestManagement::Presentation(V::needs,0,{},target).stats;
             model.metricHeight = 56;
-            model.rows = { "Overview" };
+            model.rows = { "Back to overview" };
             for (size_t i = 0; i < model.stats.size(); ++i)
             {
                 model.meters.push_back(std::stoi(model.stats[i].second));
@@ -120,7 +120,7 @@ namespace OpenRCT2::Ui::Handheld::PeopleTabs
             model.actionGrid = false;
             model.rowHeight = 44;
             model.listLabel = "CURRENT THOUGHTS / A READ FULL TEXT";
-            if(model.rows.empty()){model.bodyLines={"No current thoughts"};model.rows={"Overview"};}
+            if(model.rows.empty()){model.listLabel="NO CURRENT THOUGHTS";model.bodyLines={"Nothing on their mind right now."};model.rows={"Back to overview"};}
         } else {
             Actions(model,native,GuestActions(tabs.tab));
             if(tabs.tab==0) {

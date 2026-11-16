@@ -116,7 +116,7 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
             hints.push_back({ "L1/R1", "Page" });
         else if (state.focus == Focus::rail)
             hints.push_back({ "L1/R1", "Section" });
-        if (state.focus == Focus::rail) hints.push_back({"X","News"});
+        if (state.focus == Focus::rail) hints.push_back({"Y","News"});
         if (state.focus == Focus::content && !model.contextualAction.empty())
             hints.push_back({ "X", model.contextualAction });
         hints.push_back(

@@ -420,6 +420,7 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::ParkInformation::NewsTarget> _parkNewsTarget;
         size_t _parkNewsPage{}, _parkNewsFocus{};
         bool _newsFromPark{}, _newsFromDashboard{};
+        bool _objectivesFromPark{};
         Handheld::Dashboard::State _newsDashboard;
         bool _parkGuestHistory{};
         bool _managementNewsReturn{};
@@ -1489,7 +1490,10 @@ namespace OpenRCT2::Ui::Windows
                 _dashboard.section = Handheld::Dashboard::Section::rides;
             }
             if (next == Page::dashboard)
+            {
                 _dashboard.focus = Handheld::Dashboard::Focus::rail;
+                _objectivesFromPark = false;
+            }
             else if (next == Page::staff)
                 _dashboard.section = Handheld::Dashboard::Section::staff;
             else if (next == Page::finances)
@@ -2280,6 +2284,15 @@ namespace OpenRCT2::Ui::Windows
                     _focus.move(0,rows().size());
             } else page(Page::parkNews);
         }
+        // Scenario start shows the objective as a Pocket page instead of the desktop window;
+        // B from it returns straight to the park, matching news opened from the park.
+        void openObjectives()
+        {
+            _parkTabs.tab = 1;
+            _focus = {};
+            page(Page::overview);
+            _objectivesFromPark = true;
+        }
         bool dashboardNews(){if(_page!=Page::dashboard)return false;openNews(false);return true;}
         bool pickerGroup(){
             if (_page == Page::researchCatalog) {
@@ -2515,10 +2528,15 @@ namespace OpenRCT2::Ui::Windows
                 _dashboard.section=Handheld::Dashboard::Section::rides;
                 _dashboard.focus=Handheld::Dashboard::Focus::content;
                 page(Page::ridesInspect);
-                // Incomplete native access remains a one-press contextual action.
                 const auto visible=rows();
+                // Start on the status change that matters (Close for an open ride, Open otherwise) rather
+                // than offering Open on a ride that is already running. Both lead to a confirmation.
+                const bool running = ride && ride->status == RideStatus::open;
+                const auto primary=std::find(visible.begin(),visible.end(),running ? "Close..." : "Open...");
+                if(primary!=visible.end()) {_focus={};_focus.move(static_cast<int>(primary-visible.begin()),visible.size());}
+                // Incomplete native access remains a one-press contextual action.
                 const auto place=std::find(visible.begin(),visible.end(),"Place entrance / exit...");
-                if(place!=visible.end()) _focus.move(static_cast<int>(place-visible.begin()),visible.size());
+                if(place!=visible.end()) {_focus={};_focus.move(static_cast<int>(place-visible.begin()),visible.size());}
             }
         }
         void openLoad()
@@ -2841,14 +2859,22 @@ namespace OpenRCT2::Ui::Windows
         {
             _guestRideInspection = false;
             _guestTabs={};_guestFromPark=true;
+            bool restored=false;
             if(const auto context=Handheld::PeopleNavigation::guest;context && context->target==person) {
                 _guestTabs=context->tabs;_guestRosterFocus=context->rosterFocus;_guestFilter=context->filter;_guestFromPark=context->fromPark;_guestRosterParent=static_cast<Page>(context->rosterParent);_guestRosterRideParent=context->rideParent;
+                restored=true;
             }
             Handheld::PeopleNavigation::guest.reset();
             _guestTarget = person;
             _dashboard.section = Handheld::Dashboard::Section::guests;
             _dashboard.focus = Handheld::Dashboard::Focus::content;
             page(Page::guestInspect);
+            // A guest picked at the cursor is already on screen, so Locate is a no-op; start on Follow instead.
+            if(!restored) {
+                const auto visible=rows();
+                const auto follow=std::find(visible.begin(),visible.end(),"Follow guest");
+                if(follow!=visible.end()) {_focus={};_focus.move(static_cast<int>(follow-visible.begin()),visible.size());}
+            }
         }
         void openPeepOptions()
         {
@@ -3475,6 +3501,14 @@ namespace OpenRCT2::Ui::Windows
                     page(Page::overview);
                     break;
                 case Page::overview:
+                    if (_objectivesFromPark)
+                    {
+                        _objectivesFromPark = false;
+                        close();
+                        break;
+                    }
+                    page(Page::dashboard);
+                    break;
                 case Page::finances:
                 case Page::guests:
                 case Page::research:
@@ -5796,7 +5830,7 @@ namespace OpenRCT2::Ui::Windows
                     {
                         const auto result = Handheld::ShopManagement::SetStatus(
                             *_shop, Handheld::ShopManagement::Find(*_shop)->status != RideStatus::open);
-                        _status = result.error == GameActions::Status::ok ? "Status change requested"
+                        _status = result.error == GameActions::Status::ok ? "Status updated"
                                                                           : result.getErrorMessage();
                     }
                     invalidate();
@@ -5833,7 +5867,7 @@ namespace OpenRCT2::Ui::Windows
                         {
                             const auto result = Handheld::ShopManagement::SetPrice(
                                 *_shop, prices[choice].primary, *_priceDraft);
-                            _status = result.error == GameActions::Status::ok ? "Price change requested"
+                            _status = result.error == GameActions::Status::ok ? "Price updated"
                                                                               : result.getErrorMessage();
                             _priceDraft.reset();
                         }
@@ -5907,7 +5941,7 @@ namespace OpenRCT2::Ui::Windows
                         auto action = GameActions::RideSetStatusAction(
                             _rideId, choice == 0 ? RideStatus::open : RideStatus::closed);
                         const auto result = GameActions::Execute(&action, getGameState());
-                        _status = result.error == GameActions::Status::ok ? "Ride status change requested."
+                        _status = result.error == GameActions::Status::ok ? "Ride status updated."
                                                                           : result.getErrorMessage();
                         invalidate();
                     }
@@ -7111,6 +7145,7 @@ namespace OpenRCT2::Ui::Windows
 {
     std::string HandheldNewsText(const std::string& text){return Handheld::ParkInformation::PlainText(text);}
     void HandheldNewsOpen(){HandheldDashboardOpen();auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);if(w)static_cast<HandheldMenuWindow*>(w)->openNews(true);}
+    void HandheldObjectivesOpen(){HandheldDashboardOpen();auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);if(w)static_cast<HandheldMenuWindow*>(w)->openObjectives();}
     bool HandheldDashboardNews(){auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);return w&&static_cast<HandheldMenuWindow*>(w)->dashboardNews();}
     bool HandheldToolSettingsPage(int direction){auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);return w&&static_cast<HandheldMenuWindow*>(w)->toolSettingsPage(direction);}
     bool HandheldTrackSelectionMove(int x,int y){auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);return w&&static_cast<HandheldMenuWindow*>(w)->trackSelectionMove(x,y);}

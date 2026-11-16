@@ -99,6 +99,7 @@ namespace OpenRCT2::Ui::Windows
     bool HandheldToolSettingsPage(int direction);
     std::string HandheldNewsText(const std::string& text);
     void HandheldNewsOpen();
+    void HandheldObjectivesOpen();
     bool HandheldDashboardNews();
     void HandheldPeepPlacementOptionsOpen();
     void HandheldStaffOpen(std::optional<Handheld::StaffManagement::Target> target = {});

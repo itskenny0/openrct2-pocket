@@ -680,7 +680,8 @@ namespace OpenRCT2::Ui::Handheld
         DrawFooter(rt, screen, { { "D-pad", "Move" }, { "A", "Paint" }, { "Y", "Scheme" }, { "B", "Back" } });
     }
     inline void DrawGameplayFooter(
-        Drawing::RenderTarget& rt, ScreenSize screen, const std::string&, bool terrain, bool surface = false)
+        Drawing::RenderTarget& rt, ScreenSize screen, const std::string&, bool terrain, bool surface = false,
+        const std::string& inspect = "Inspect")
     {
         DrawActionStrip(rt, screen);
 
@@ -698,7 +699,7 @@ namespace OpenRCT2::Ui::Handheld
             DrawFooter(
                 rt, screen,
                 { { "D-pad", "Move" },
-                  { "A", "Inspect" },
+                  { "A", inspect },
                   { "Y", "News" },
                   { "B", "Back" },
                   { "SEL", "Build" },

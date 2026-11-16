@@ -14,6 +14,8 @@
 #include <openrct2/drawing/RenderTarget.h>
 #include <openrct2/drawing/Text.h>
 #include <string>
+#include <string_view>
+#include <utility>
 
 namespace OpenRCT2::Ui::Handheld
 {
@@ -81,8 +83,26 @@ namespace OpenRCT2::Ui::Handheld
         return ramp.colours[coverage];
     }
 
-    inline int TextWidth(const std::string& text, bool strong = false, bool heading = false)
+    // Pocket Sans covers printable ASCII. Typographic punctuation in scenario and object names
+    // (e.g. the right single quote in scenario names like Katie's Dreamland) would otherwise send the whole
+    // string to the engine sprite font, so map it to the closest ASCII form first.
+    inline std::string PlainPunctuation(std::string text)
     {
+        static constexpr std::pair<std::string_view, std::string_view> kMap[] = {
+            { "\xE2\x80\x98", "'" }, { "\xE2\x80\x99", "'" }, { "\xE2\x80\x9C", "\"" }, { "\xE2\x80\x9D", "\"" },
+            { "\xE2\x80\x93", "-" }, { "\xE2\x80\x94", "-" }, { "\xE2\x80\xA6", "..." }, { "\xC2\xA0", " " },
+        };
+        if (std::all_of(text.begin(), text.end(), [](unsigned char c) { return c < 128; }))
+            return text;
+        for (const auto& [from, to] : kMap)
+            for (auto at = text.find(from); at != std::string::npos; at = text.find(from, at + to.size()))
+                text.replace(at, from.size(), to);
+        return text;
+    }
+
+    inline int TextWidth(const std::string& rawText, bool strong = false, bool heading = false)
+    {
+        const auto text = PlainPunctuation(rawText);
         int width = 0;
         for (const unsigned char c : text)
             if (c >= 32 && c < 127)
@@ -111,6 +131,7 @@ namespace OpenRCT2::Ui::Handheld
                 text.erase(0, prefix.size());
                 break;
             }
+        text = PlainPunctuation(std::move(text));
         // Localised names and native error formatting keep the complete engine fallback.
         if (std::any_of(text.begin(), text.end(), [](unsigned char c) { return c < 32 || c >= 127 || c == '{'; }))
         {

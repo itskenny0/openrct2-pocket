@@ -197,6 +197,11 @@ public:
             case WindowView::parkRating:
                 return ParkRatingOpen();
             case WindowView::parkObjective:
+                if (Handheld::IsEnabled())
+                {
+                    HandheldObjectivesOpen();
+                    return FindByClass(WindowClass::handheldMenu);
+                }
                 return ParkObjectiveOpen();
             case WindowView::parkGuests:
                 return ParkGuestsOpen();
@@ -213,9 +218,11 @@ public:
             case WindowView::networkPassword:
                 return NetworkStatusOpenPassword();
             case WindowView::changelog:
-                return ChangelogOpen(WindowView::changelog);
             case WindowView::newVersionInfo:
-                return ChangelogOpen(WindowView::newVersionInfo);
+                // Release notes are a desktop window with no controller focus; the Pak ships its own notes.
+                if (Handheld::IsEnabled())
+                    return nullptr;
+                return ChangelogOpen(view);
             case WindowView::contributors:
                 return ChangelogOpen(WindowView::contributors);
             case WindowView::financeMarketing:

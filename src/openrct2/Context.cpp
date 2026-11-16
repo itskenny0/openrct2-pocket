@@ -80,6 +80,8 @@
 #include "world/MapSelection.h"
 #include "world/Park.h"
 
+#include <cstdlib>
+#include <string_view>
 #include <chrono>
 #include <cmath>
 #include <exception>
@@ -430,7 +432,10 @@ namespace OpenRCT2
             if (Platform::ProcessIsElevated())
             {
                 std::string elevationWarning = _localisationService->GetString(STR_ADMIN_NOT_RECOMMENDED);
-                if (gOpenRCT2Headless)
+                // NextUI launches every Pak as root, so a handheld build would show this
+                // desktop dialog (which a controller cannot dismiss) on each launch.
+                const char* handheld = std::getenv("OPENRCT2_HANDHELD");
+                if (gOpenRCT2Headless || (handheld != nullptr && std::string_view(handheld) == "1"))
                 {
                     Console::Error::WriteLine(elevationWarning.c_str());
                 }

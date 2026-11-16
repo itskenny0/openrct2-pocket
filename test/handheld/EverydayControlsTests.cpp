@@ -104,8 +104,13 @@ int main(int argc, char** argv)
             Imaging::WriteToFile((std::filesystem::path(folder)/name).string(),image,ImageFormat::png);engine.EndDraw();};
 
         Check(context->LoadParkFromFile((std::filesystem::path(argv[3]) / "Scenarios/Electric Fields.SC6").string(), false, true), "Capture scenario failed");
-        wm->CloseByClass(WindowClass::parkInformation); wm->CloseByClass(WindowClass::progressWindow); WindowCullDead();
+        // Scenario start presents the objective as a Pocket page, never the desktop park window.
+        Check(!wm->FindByClass(WindowClass::parkInformation), "Desktop objective window opened at scenario start");
+        Check(W::HandheldOverviewIsOpen(), "Scenario start did not open the Pocket objectives page");
+        wm->CloseByClass(WindowClass::progressWindow); WindowCullDead();
         WindowGetMain()->onResize(); InputSetState(InputState::normal);
+        press(H::Action::back);
+        Check(!wm->FindByClass(WindowClass::handheldMenu), "B from scenario objectives did not return to the park");
         auto* viewport = WindowGetMain()->viewport;
         viewport->viewPos = Translate3DTo2DWithZ(viewport->rotation, {1504, 1504, 32}) - ScreenCoordsXY{256,192};
         WindowGetMain()->savedViewPos = viewport->viewPos;
