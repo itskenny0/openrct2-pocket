@@ -960,6 +960,11 @@ namespace OpenRCT2::Ui::Windows
                     {
                         model.hero=rideHero(*ride);
                         if(selected==0) {model.navigationHint="Change";model.primaryAction="Next";}
+                        if(!model.settingRows.empty())
+                        {
+                            model.settingValues={Handheld::RideManagement::PricePermitted(*ride)?Handheld::FormatMoney(ride->price[0]):"Not charged"};
+                            if(selected==model.settingRows.front()) {model.navigationHint="Price";model.primaryAction="Editor";}
+                        }
                     }
                 }
             }
@@ -2774,6 +2779,70 @@ namespace OpenRCT2::Ui::Windows
             }
             invalidate();
         }
+        // Ride prices change in place, one native step per press (holding repeats). Each step is the
+        // same RideSetPriceAction the editor uses, so limits and park pricing rules still apply.
+        void adjustRidePrice(int direction)
+        {
+            if (!_ridesTarget) return;
+            auto draft = Handheld::RideManagement::Begin(*_ridesTarget);
+            if (!draft) { _status = "This park does not charge for rides"; invalidate(); return; }
+            Handheld::RideManagement::AdjustPrice(*draft, direction);
+            const auto result = Handheld::RideManagement::Action(*draft, true);
+            if (result.error != GameActions::Status::ok)
+                _status = result.getErrorMessage().empty() ? result.getErrorTitle() : result.getErrorMessage();
+            else
+                _status.clear();
+            invalidate();
+        }
+        // Rows above a two-column grid that are changed with Left/Right in place (a state switch, a
+        // price). Up/Down walks the controls, then the grid keeps its columns.
+        void controlsThenGridMove(int x, int y, size_t controls, const std::function<void(size_t, int)>& adjust)
+        {
+            const auto count = rows().size();
+            const auto current = _focus.index();
+            size_t next = current;
+            if (current < controls)
+            {
+                if (x) adjust(current, x);
+                else if (y < 0 && current > 0) next = current - 1;
+                else if (y > 0 && current + 1 < count) next = current + 1;
+            }
+            else
+            {
+                const size_t grid = current - controls, cells = count - controls;
+                if (y < 0 && grid < 2) next = controls - 1;
+                else if (y)
+                {
+                    const auto candidate = static_cast<int>(grid) + y * 2;
+                    if (candidate >= 0 && candidate < static_cast<int>(cells)) next = static_cast<size_t>(candidate) + controls;
+                    else if (y > 0 && grid / 2 < (cells - 1) / 2) next = count - 1;
+                }
+                else if (x < 0 && grid % 2) --next;
+                else if (x > 0 && grid % 2 == 0 && grid + 1 < cells) ++next;
+            }
+            _focus.move(static_cast<int>(next) - static_cast<int>(current), count);
+            invalidate();
+        }
+        void setParkOpen(bool open)
+        {
+            auto draft = Handheld::ParkOverview::Begin();
+            if (!draft) { _status = "Park status locked by objective"; invalidate(); return; }
+            if (draft->baselineOpen == open) return;
+            const auto result = Handheld::ParkOverview::Action(*draft, true);
+            _status = result.error == GameActions::Status::ok ? "" : Handheld::Finances::Feedback(result);
+            invalidate();
+        }
+        void adjustAdmission(int direction)
+        {
+            if (!Handheld::Finances::Available(Handheld::Finances::Field::admission))
+            { _status = "Admission price locked"; invalidate(); return; }
+            auto draft = Handheld::Finances::Begin(Handheld::Finances::Field::admission);
+            Handheld::Finances::Adjust(draft, direction);
+            if (draft.value == draft.baseline) return;
+            const auto result = Handheld::Finances::Action(draft, true);
+            _status = result.error == GameActions::Status::ok ? "" : Handheld::Finances::Feedback(result);
+            invalidate();
+        }
         void enterDashboardContent()
         {
             using Handheld::Dashboard::Section;
@@ -2863,30 +2932,16 @@ namespace OpenRCT2::Ui::Windows
             }
             else if (_page == Page::ridesInspect && _rideTabs.tab == Handheld::RideTabs::overview)
             {
-                // Row 0 is the hero's state switch, above a two-column grid of the remaining rows.
-                const auto count = rows().size();
-                const auto current = _focus.index();
-                size_t next = current;
-                if (current == 0)
-                {
-                    if (x) stepRideState(x, false);
-                    else if (y > 0 && count > 1) next = 1;
-                }
-                else
-                {
-                    const size_t grid = current - 1, cells = count - 1;
-                    if (y < 0 && grid < 2) next = 0;
-                    else if (y)
-                    {
-                        const auto candidate = static_cast<int>(grid) + y * 2;
-                        if (candidate >= 0 && candidate < static_cast<int>(cells)) next = static_cast<size_t>(candidate) + 1;
-                        else if (y > 0 && grid / 2 < (cells - 1) / 2) next = cells;
-                    }
-                    else if (x < 0 && grid % 2) --next;
-                    else if (x > 0 && grid % 2 == 0 && grid + 1 < cells) ++next;
-                }
-                _focus.move(static_cast<int>(next) - static_cast<int>(current), count);
-                invalidate();
+                const auto model = ridesPresentationFor(_page, _focus.index());
+                controlsThenGridMove(x, y, model.settingRows.empty() ? 1 : 2, [this](size_t row, int dx) {
+                    if (row == 0) stepRideState(dx, false); else adjustRidePrice(dx);
+                });
+            }
+            else if (_page == Page::overview && !_overviewDraft)
+            {
+                controlsThenGridMove(x, y, 2, [this](size_t row, int dx) {
+                    if (row == 0) setParkOpen(dx > 0); else adjustAdmission(dx);
+                });
             }
             else if (_page == Page::ridesInspect || _page == Page::overview || _page==Page::finances || _page==Page::research
                 || (_page==Page::marketing&&_marketingTabs.tab==1)
@@ -4907,14 +4962,9 @@ namespace OpenRCT2::Ui::Windows
                     }
                     else if (choice == 0)
                     {
-                        _overviewDraft = Handheld::ParkOverview::Begin();
-                        if (_overviewDraft)
-                            page(Page::overviewConfirm);
-                        else
-                        {
-                            _status = "Park status locked by objective";
-                            invalidate();
-                        }
+                        // Opening and closing the park is free and reversible: change it in place.
+                        const bool open = getGameState().park.flags.has(ParkFlag::parkOpen);
+                        setParkOpen(!open);
                     }
                     else if (Handheld::Finances::Available(Handheld::Finances::Field::admission))
                     {

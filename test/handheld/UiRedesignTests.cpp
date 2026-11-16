@@ -166,9 +166,10 @@ int main(int argc,char** argv) { try {
  auto model=W::HandheldRidesPresentation();
  Check(model.tabs.size()==4&&model.selectedTab==0&&model.rows.front()=="Status"&&model.hero,"Ride Overview/state switch missing");
  capture("ride-overview.ppm");
- navigate(0,1);Check(W::HandheldRidesPresentation().selected==1,"Down from the state switch did not enter the grid");
- navigate(1,0);Check(W::HandheldRidesPresentation().selected==2,"Grid right moved incorrectly");
- navigate(0,-1);Check(W::HandheldRidesPresentation().selected==0,"Up from the grid top did not return to the switch");
+ navigate(0,1);Check(W::HandheldRidesPresentation().selected==1&&W::HandheldRidesPresentation().settingRows==std::vector<size_t>{1},"Down from the state switch did not reach the price row");
+ navigate(0,1);Check(W::HandheldRidesPresentation().selected==2,"Down from the price row did not enter the grid");
+ navigate(1,0);Check(W::HandheldRidesPresentation().selected==3,"Grid right moved incorrectly");
+ navigate(0,-1);Check(W::HandheldRidesPresentation().selected==1,"Up from the grid top did not return to the controls");
  navigate(0,1);navigate(1,0);
  const auto overviewFocus=W::HandheldRidesPresentation().selected;
  press(H::Action::nextOption);model=W::HandheldRidesPresentation();
@@ -192,11 +193,18 @@ int main(int argc,char** argv) { try {
  press(H::Action::back);model=W::HandheldRidesPresentation();
  Check(model.selectedTab==3&&model.selected==demolition&&H::RideManagement::Resolve(target),"Cancel lost target/tab/focus");
  press(H::Action::nextOption);Check(W::HandheldRidesPresentation().selected==overviewFocus,"Overview tab focus not retained");
- FocusRideTabAction("Price unavailable");press(H::Action::confirm);
+ FocusRideTabAction("Admission");press(H::Action::confirm);
  Check(W::HandheldRidesPresentation().tabs.size()==4,"Unavailable admission opened an editor");capture("disabled-action.ppm");
  // Admission can also be enabled by native park pricing policy; entering it never buys anything.
  getGameState().park.flags.set(ParkFlag::freeEntry);
- FocusRideTabAction("Admission price...");press(H::Action::confirm);
+ {
+  // The price changes in place with Left/Right, one native step per press, no editor or review.
+  FocusRideTabAction("Admission");const auto before=GetRide(target.id)->price[0];
+  navigate(1,0);GameActions::ProcessQueue(getGameState());
+  Check(GetRide(target.id)->price[0]>before&&!W::HandheldRidesPresentation().editing,"In-place price step failed");
+  navigate(-1,0);GameActions::ProcessQueue(getGameState());Check(GetRide(target.id)->price[0]==before,"In-place price step did not reverse");
+ }
+ FocusRideTabAction("Admission");press(H::Action::confirm);
  Check(W::HandheldRidesPresentation().editing,"Admission action did not open native price editor");
  capture("admission-editor.ppm");press(H::Action::back);
  W::HandheldDashboardSwitchPane();W::HandheldDashboardMove(1,0);

@@ -2,6 +2,8 @@
 #include "ParkOverview.h"
 
 #include "Alerts.h"
+#include <openrct2/SpriteIds.h>
+#include <openrct2/drawing/Drawing.Sprite.h>
 #include "Finances.h"
 
 #include <openrct2-ui/interface/Objective.h>
@@ -11,6 +13,7 @@
 #include <openrct2/localisation/Formatter.h>
 #include <openrct2/localisation/Formatting.h>
 #include <openrct2/scenario/Scenario.h>
+#include <openrct2/world/Park.h>
 
 namespace OpenRCT2::Ui::Handheld::ParkOverview
 {
@@ -18,6 +21,22 @@ namespace OpenRCT2::Ui::Handheld::ParkOverview
     {
         // Match the native Park entrance UI; the generic parameter action does not enforce this UI rule.
         return getGameState().scenarioOptions.objective.Type != Scenario::ObjectiveType::guestsAndRating;
+    }
+    // Row 0 (open/close) is the hero's switch and row 1 (admission) a value changed in place, so the
+    // two decisions a player makes most often never leave this screen.
+    static void MarkControls(ManagementPresentation& model)
+    {
+        const auto& park = getGameState().park;
+        model.heroRow = 0;
+        model.settingRows = { 1 };
+        model.settingValues = { park.flags.has(ParkFlag::noMoney)              ? "Free"
+                                    : Finances::Available(Finances::Field::admission) ? FormatMoney(Park::GetEntranceFee(park))
+                                                                                  : "Locked" };
+        if (model.hero && !StatusPermitted())
+        {
+            model.hero->states = { std::string(park.flags.has(ParkFlag::parkOpen) ? "Open (locked)" : "Closed (locked)") };
+            model.hero->state = 0;
+        }
     }
     std::optional<Draft> Begin()
     {
@@ -104,13 +123,22 @@ namespace OpenRCT2::Ui::Handheld::ParkOverview
         }
         model.summaryMetrics = true;
         model.actionGrid = true;
-        model.stats = { { "Park status", status },
-                        { "Guests in park", std::to_string(park.numGuestsInPark) },
-                        { "Park rating", std::to_string(park.rating) + " / 999" },
+        model.stats = { { "Guests in park", std::to_string(park.numGuestsInPark) },
                         { "Park value",
                           park.flags.has(ParkFlag::noMoney)     ? "Not applicable"
                               : park.value == kMoney64Undefined ? "Unavailable"
                                                                 : FormatMoney(park.value) } };
+        model.metricColumns = 2;
+        model.metricHeight = 38;
+        // The park itself: open or closed as a switch, and the rating as a meter.
+        ManagementPresentation::Hero hero;
+        hero.picture = [](Drawing::RenderTarget& rt) { GfxDrawSprite(rt, ImageId(SPR_TAB_PARK_ENTRANCE), { 18, 16 }); };
+        hero.states = { "Closed", "Open" };
+        hero.state = park.flags.has(ParkFlag::parkOpen) ? 1 : 0;
+        const int rating = park.rating;
+        hero.meters.push_back({ "Park rating", std::to_string(rating) + " / 999", rating * 100 / 999,
+                                rating >= 600 ? "{POSITIVE}" : rating < 300 ? "{DANGER}" : "{WHITE}" });
+        model.hero = hero;
         // The home screen leads with what needs the player. When something does, it replaces the long
         // objective text (which has its own page) so the action grid still fits on a small screen.
         if (const auto& alerts = Alerts::Current(); !alerts.empty())
@@ -127,30 +155,16 @@ namespace OpenRCT2::Ui::Handheld::ParkOverview
                                              : "Park status locked",
                            Finances::Available(Finances::Field::admission) ? "Admission..." : "Admission unavailable",
                            "Park map...", "Park news...", "Park awards...", "Park history..." };
-            if (StatusPermitted() && !park.flags.has(ParkFlag::parkOpen))
-                model.primaryRow = 0;
+            MarkControls(model);
             return model;
         }
+        // The full objective has its own page; the home screen keeps one line so the actions fit.
         model.bodyLines.push_back("{POSITIVE}All clear - nothing needs you right now");
-        std::string wrapped;
-        int32_t count{};
-        // Reuse the desktop objective string/arguments and native UTF-8/format-aware wrapping.
-        Drawing::wrapString(ObjectiveText(), 320, FontStyle::medium, &wrapped, &count);
-        size_t start = 0;
-        while (start < wrapped.size())
-        {
-            const auto end = wrapped.find('\0', start);
-            model.bodyLines.push_back(wrapped.substr(start, end == std::string::npos ? end : end - start));
-            if (end == std::string::npos)
-                break;
-            start = end + 1;
-        }
         model.bodyLines.push_back("Objective: " + Outcome());
         model.rows = { StatusPermitted() ? (park.flags.has(ParkFlag::parkOpen) ? "Close park..." : "Open park...")
                                          : "Park status locked",
                        Finances::Available(Finances::Field::admission) ? "Admission..." : "Admission unavailable", "Park map...", "Park news...", "Park awards...", "Park history..." };
-        if (StatusPermitted() && !park.flags.has(ParkFlag::parkOpen))
-            model.primaryRow = 0; // A closed park has one obvious next step.
+        MarkControls(model);
         return model;
     }
 } // namespace OpenRCT2::Ui::Handheld::ParkOverview

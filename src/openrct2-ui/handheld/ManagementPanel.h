@@ -101,6 +101,16 @@ namespace OpenRCT2::Ui::Handheld
         };
         std::optional<Hero> hero;
         std::optional<size_t> heroRow; // A row that is the hero's switch: not drawn as a button.
+        // Rows that are values you change in place with Left/Right (a price, say): drawn full width
+        // as "label  < value >" above the buttons instead of as a button that opens an editor.
+        std::vector<size_t> settingRows;
+        std::vector<std::string> settingValues; // Parallel to settingRows.
+        struct SettingLine
+        {
+            std::string label, value;
+            bool focused{}, enabled{};
+        };
+        std::vector<SettingLine> settingLines; // Render-only, filled when the model is laid out.
     };
     inline constexpr int kHeroHeight = 72;
     inline int ChangeHeight(const ManagementPresentation::Change& change)
@@ -133,7 +143,8 @@ namespace OpenRCT2::Ui::Handheld
         const int statRows = (static_cast<int>(model.stats.size()) + statColumns - 1) / statColumns;
         const int rowStart = kHeaderHeight + (model.tabs.empty() ? 0 : kTabsHeight) + (model.hero ? kHeroHeight + 6 : 0) + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16
             + model.reservedHeight + (model.graph.empty() ? 0 : 110) + (model.chart ? kChartHeight + 6 : 0)
-            + [&] { int h = model.changes.empty() ? 0 : 8; for (const auto& c : model.changes) h += ChangeHeight(c); return h; }() + (model.rows.empty() ? 0 : 11) + (model.toolbarCount ? 36 : 0);
+            + [&] { int h = model.changes.empty() ? 0 : 8; for (const auto& c : model.changes) h += ChangeHeight(c); return h; }()
+            + static_cast<int>(model.settingLines.size()) * 28 + (model.rows.empty() ? 0 : 11) + (model.toolbarCount ? 36 : 0);
         const int rowHeight = model.rowHeight ? model.rowHeight : model.denseRoster ? 38 : model.rosterCards ? 46 : model.actionGrid ? 30 : columns > 1 ? 24 : 30;
         const size_t capacity = std::max(1, (size.height - rowStart - 34) / rowHeight) * columns;
         return {columns, rowHeight, rowStart, statColumns, statHeight, capacity};
@@ -146,15 +157,26 @@ namespace OpenRCT2::Ui::Handheld
     }
     inline std::optional<ManagementPresentation> WithoutBackRows(const ManagementPresentation& model)
     {
-        const auto hidden = [&](size_t i) { return IsBackRow(model.rows[i]) || model.heroRow == i; };
+        const auto setting = [&](size_t i) { return std::find(model.settingRows.begin(), model.settingRows.end(), i) != model.settingRows.end(); };
+        const auto hidden = [&](size_t i) { return IsBackRow(model.rows[i]) || model.heroRow == i || setting(i); };
         size_t hiddenCount = 0;
         for (size_t i = 0; i < model.rows.size(); ++i)
             hiddenCount += hidden(i) ? 1 : 0;
         if (model.toolbarCount || !model.colourValues.empty() || hiddenCount == 0
-            || (hiddenCount == model.rows.size() && !model.heroRow))
+            || (hiddenCount == model.rows.size() && !model.heroRow && model.settingRows.empty()))
             return std::nullopt;
         auto filtered = model;
         filtered.heroRow.reset();
+        filtered.settingRows.clear();
+        filtered.settingValues.clear();
+        for (size_t n = 0; n < model.settingRows.size(); ++n)
+        {
+            const auto i = model.settingRows[n];
+            if (i >= model.rows.size())
+                continue;
+            filtered.settingLines.push_back({ ButtonText(model.rows[i]), n < model.settingValues.size() ? model.settingValues[n] : "",
+                                              model.selected == i, i >= model.rowEnabled.size() || model.rowEnabled[i] });
+        }
         if (filtered.hero)
             filtered.hero->stateFocused = model.heroRow && model.selected == *model.heroRow;
         filtered.rows.clear(); filtered.rowDetails.clear(); filtered.rowEnabled.clear();
@@ -446,6 +468,31 @@ namespace OpenRCT2::Ui::Handheld
                 GfxDrawLine(rt, {point(i - 1), point(i)}, Theme::gold);
             }
             DrawSectionLabel(rt, p + ScreenCoordsXY{12, plotBottom + 8}, width - 24, model.graphRange);
+        }
+        for (size_t i = 0; i < model.settingLines.size(); ++i)
+        {
+            const auto& line = model.settingLines[i];
+            const auto origin = p + ScreenCoordsXY{ 12, rowStart - 11 - static_cast<int>(model.settingLines.size() - i) * 28 };
+            const int lineWidth = width - 24;
+            FillRound(rt, origin, { lineWidth, 24 }, Theme::raised);
+            DrawStrongText(rt, origin + ScreenCoordsXY{ 10, 7 }, std::string(line.enabled ? "{WHITE}" : "{DISABLED}") + line.label, lineWidth / 2);
+            const int vw = TextWidth(line.value, true);
+            const int right = origin.x + lineWidth - 12;
+            if (line.enabled)
+            {
+                // < value >  : the arrows say Left/Right changes it right here.
+                const auto arrowInk = line.focused ? Theme::gold : Theme::text;
+                for (int r = 0; r < 4; ++r)
+                {
+                    Fill(rt, { right - 3 + r, origin.y + 8 + r }, { 1, 9 - 2 * r }, arrowInk);      // >
+                    Fill(rt, { right - vw - 17 - r, origin.y + 8 + r }, { 1, 9 - 2 * r }, arrowInk); // <
+                }
+                DrawStrongText(rt, { right - vw - 10, origin.y + 7 }, "{WHITE}" + line.value);
+            }
+            else
+                DrawModernText(rt, { right - TextWidth(line.value), origin.y + 7 }, "{DISABLED}" + line.value);
+            if (line.focused && focused)
+                DrawFocusRing(rt, origin, { lineWidth, 24 });
         }
         // List labels keep only their first part: "GUESTS / CURRENT ACTIVITY / HAPPINESS" says no more
         // than "GUESTS" once the rows themselves show activity and happiness.

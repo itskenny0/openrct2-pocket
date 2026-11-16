@@ -34,7 +34,7 @@ namespace OpenRCT2::Ui::Handheld::RideTabs
         // Status controls form one immediate group, rather than being interspersed
         // with inspection/navigation. Everything maps back to its native row.
         const std::vector<std::string_view> order = tab == overview
-            ? std::vector<std::string_view>{"Place entrance / exit...", "Admission price...", "Price unavailable", "Locate", "Entrances / exits..."}
+            ? std::vector<std::string_view>{"Admission price...", "Price unavailable", "Place entrance / exit...", "Locate", "Entrances / exits..."}
             : tab == operations ? std::vector<std::string_view>{"Operations...", "Vehicles...", "Dispatch...", "Maintenance..."}
             : tab == settings ? std::vector<std::string_view>{"Rename...", "Appearance...", "Music...", "Save design...", "Demolish...", "Back to roster"}
             : std::vector<std::string_view>{};
@@ -93,6 +93,14 @@ namespace OpenRCT2::Ui::Handheld::RideTabs
             model.rowDetails.insert(model.rowDetails.begin(), "");
             model.rowEnabled.insert(model.rowEnabled.begin(), true);
             model.heroRow = 0;
+            // The price is a value you change in place, right under the switch (row 1).
+            if (model.rows.size() > 1 && (model.rows[1] == "Admission price..." || model.rows[1] == "Price unavailable"))
+            {
+                model.settingRows = { 1 };
+                model.rows[1] = "Admission";
+                std::erase_if(model.stats, [](const auto& stat) { return stat.first == "Admission"; });
+                model.metricColumns = static_cast<int>(std::min<size_t>(5, std::max<size_t>(1, model.stats.size())));
+            }
             // The one obvious next step for an unfinished ride.
             const auto found = std::find(model.rows.begin(), model.rows.end(), "Place entrance / exit...");
             if (found != model.rows.end())
