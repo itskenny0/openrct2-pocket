@@ -111,6 +111,82 @@ namespace OpenRCT2::Ui::Handheld
 
     }
 
+    // ---- Component kit -------------------------------------------------------------------------
+    // Every Pocket screen draws its buttons, stats, meters and tabs through these few shapes, so the
+    // look is consistent and a skin can restyle the whole UI in one place.
+    enum class ButtonKind : uint8_t
+    {
+        secondary, // Quiet cream card with a lip: most choices.
+        primary,   // Filled with the section colour: the one thing this screen is for.
+        danger     // Filled red: destructive confirmations.
+    };
+    // Small-radius rounded rectangle (2 px corner), crisp at the native 1x canvas.
+    inline void FillRound(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, Drawing::PaletteIndex colour)
+    {
+        if (size.width < 4 || size.height < 4)
+            return Fill(rt, pos, size, colour);
+        Fill(rt, pos + ScreenCoordsXY{ 2, 0 }, { size.width - 4, size.height }, colour);
+        Fill(rt, pos + ScreenCoordsXY{ 1, 1 }, { size.width - 2, size.height - 2 }, colour);
+        Fill(rt, pos + ScreenCoordsXY{ 0, 2 }, { size.width, size.height - 4 }, colour);
+    }
+    inline void OutlineRound(
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, Drawing::PaletteIndex colour, int thickness = 1)
+    {
+        for (int t = 0; t < thickness; ++t)
+        {
+            const auto p = pos + ScreenCoordsXY{ t, t };
+            const ScreenSize s{ size.width - 2 * t, size.height - 2 * t };
+            Fill(rt, p + ScreenCoordsXY{ 2, 0 }, { s.width - 4, 1 }, colour);
+            Fill(rt, p + ScreenCoordsXY{ 2, s.height - 1 }, { s.width - 4, 1 }, colour);
+            Fill(rt, p + ScreenCoordsXY{ 0, 2 }, { 1, s.height - 4 }, colour);
+            Fill(rt, p + ScreenCoordsXY{ s.width - 1, 2 }, { 1, s.height - 4 }, colour);
+            Fill(rt, p + ScreenCoordsXY{ 1, 1 }, { 1, 1 }, colour);
+            Fill(rt, p + ScreenCoordsXY{ s.width - 2, 1 }, { 1, 1 }, colour);
+            Fill(rt, p + ScreenCoordsXY{ 1, s.height - 2 }, { 1, 1 }, colour);
+            Fill(rt, p + ScreenCoordsXY{ s.width - 2, s.height - 2 }, { 1, 1 }, colour);
+        }
+    }
+    inline Drawing::PaletteIndex ButtonFaceColour(ButtonKind kind)
+    {
+        return kind == ButtonKind::primary ? Theme::gold
+            : kind == ButtonKind::danger   ? static_cast<Drawing::PaletteIndex>(PocketPalette::destructive)
+                                           : Theme::raised;
+    }
+    // The focus ring sits just outside a card: the card keeps its own colour, so a focused primary
+    // still reads as primary and a focused secondary never pretends to be one.
+    inline void DrawFocusRing(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size)
+    {
+        OutlineRound(rt, pos - ScreenCoordsXY{ 2, 2 }, { size.width + 4, size.height + 4 }, Theme::gold, 2);
+        if (activeMenuFeel)
+            ReportSelected(rt, pos, size);
+    }
+    inline void DrawButtonFace(
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, ButtonKind kind, bool focused, bool enabled = true)
+    {
+        if (!enabled)
+        {
+            OutlineRound(rt, pos, size, Theme::edge);
+            return;
+        }
+        const auto face = ButtonFaceColour(kind);
+        FillRound(rt, pos, size, kind == ButtonKind::secondary ? Theme::edge : Theme::goldShadow);
+        FillRound(rt, pos + ScreenCoordsXY{ 1, 1 }, { size.width - 2, size.height - 3 }, face);
+        if (kind == ButtonKind::secondary)
+            Fill(rt, pos + ScreenCoordsXY{ 3, 1 }, { size.width - 6, 1 }, Theme::highlight);
+        if (focused)
+            DrawFocusRing(rt, pos, size);
+    }
+    // A thin rounded bar: loan against its limit, research progress, happiness. Shapes read faster
+    // than numbers on a small screen.
+    inline void DrawMeter(
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, int width, int percent, Drawing::PaletteIndex ink, int height = 6)
+    {
+        FillRound(rt, pos, { width, height }, Theme::edge);
+        const int filled = width * std::clamp(percent, 0, 100) / 100;
+        if (filled > 0)
+            FillRound(rt, pos, { std::max(filled, 4), height }, ink);
+    }
+
     // Closest stable (non-cycling) palette entry to an RGB colour.
     inline Drawing::PaletteIndex NearestPaletteIndex(int red, int green, int blue)
     {
@@ -364,25 +440,40 @@ namespace OpenRCT2::Ui::Handheld
     {
         return ControlKeyWidth(ControlKey(hint.key)) + 5 + TextWidth(hint.label) + 6;
     }
+    // Face buttons are round badges in fixed colours (A teal, B red, X and Y dark), the way console
+    // games print them, so the same glyph means the same button on every screen.
+    inline void DrawButtonGlyph(Drawing::RenderTarget& rt, ScreenCoordsXY centre, const std::string& key)
+    {
+        const auto face = static_cast<Drawing::PaletteIndex>(
+            key == "A"   ? PocketPalette::positive
+                : key == "B" ? PocketPalette::destructive
+                             : PocketPalette::secondary);
+        static constexpr int kSpan[]{ 3, 5, 6, 7, 7, 7, 7, 7, 6, 5, 3 }; // half-widths of an 15x11 disc
+        for (int row = 0; row < 11; ++row)
+            Fill(rt, centre + ScreenCoordsXY{ -kSpan[row], row - 5 }, { 2 * kSpan[row] + 1, 1 }, face);
+        DrawButtonLabel(rt, centre - ScreenCoordsXY{ 7, 6 }, { 15, 13 }, key);
+    }
     inline void DrawCommand(Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t, const char* key, const char* label)
     {
         const auto name = ControlKey(key);
         const int width = ControlKeyWidth(name);
         const int top = pos.y - 3;
-        const auto face = static_cast<Drawing::PaletteIndex>(name == "A" ? PocketPalette::positive : PocketPalette::selection);
         if (name == "D-pad")
         {
             Fill(rt, { pos.x + 5, top + 1 }, { 5, 15 }, Theme::text);
             Fill(rt, { pos.x, top + 6 }, { 15, 5 }, Theme::text);
             Fill(rt, { pos.x + 6, top + 7 }, { 3, 3 }, Theme::edge);
         }
+        else if (name.size() == 1)
+            DrawButtonGlyph(rt, { pos.x + width / 2, top + 8 }, name);
         else
         {
-            Fill(rt, { pos.x + 2, top }, { width - 4, 17 }, face);
-            Fill(rt, { pos.x, top + 2 }, { width, 13 }, face);
+            // Shoulders, START and SELECT: a dark pill.
+            const auto face = static_cast<Drawing::PaletteIndex>(PocketPalette::secondary);
+            FillRound(rt, { pos.x, top + 1 }, { width, 15 }, face);
             DrawButtonLabel(rt, { pos.x, top }, { width, 17 }, name);
         }
-        DrawModernText(rt, { pos.x + width + 5, pos.y }, std::string(name == "A" ? "{WHITE}" : "{MUTED}") + label);
+        DrawModernText(rt, { pos.x + width + 5, pos.y }, std::string("{WHITE}") + label);
     }
     inline void DrawFooter(Drawing::RenderTarget&, ScreenSize, const std::vector<ControlHint>&);
     inline void DrawFooterAt(Drawing::RenderTarget&, ScreenCoordsXY, ScreenSize, const std::vector<ControlHint>&);
@@ -424,40 +515,56 @@ namespace OpenRCT2::Ui::Handheld
         Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& label, const std::string& value,
         bool selected = false, const std::string& valueInk = "{WHITE}")
     {
-        Fill(rt, p, size, selected ? Theme::gold : Theme::raised);
-        DrawModernEllipsised(rt, p + ScreenCoordsXY{8, size.height < 34 ? 5 : 9}, size.width - 16,
-            std::string(selected ? "{BLACK}" : "{MUTED}") + label);
+        FillRound(rt, p, size, Theme::raised);
+        DrawModernEllipsised(rt, p + ScreenCoordsXY{8, size.height < 34 ? 5 : 8}, size.width - 16, "{MUTED}" + label);
         DrawStrongText(
-            rt, p + ScreenCoordsXY{ 8, size.height >= 40 ? 27 : size.height < 34 ? size.height - 12 : 23 }, std::string(selected ? "{BLACK}" : valueInk) + value,
+            rt, p + ScreenCoordsXY{ 8, size.height >= 40 ? 25 : size.height < 34 ? size.height - 12 : 22 }, valueInk + value,
             size.width - 16);
+        if (selected)
+            DrawFocusRing(rt, p, size);
     }
 
+    // Labels ending in "..." are a desktop convention for "opens another window"; on a console every
+    // button opens something, so the dots are just noise.
+    inline std::string ButtonText(std::string text)
+    {
+        while (text.ends_with("...") || text.ends_with("\xE2\x80\xA6"))
+            text.erase(text.size() - 3); // "..." and U+2026 are both three bytes
+        return text;
+    }
     inline void DrawActionRow(
-        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& title, const std::string& subtitle,
-        bool focused, bool enabled = true, PanelIcon icon = PanelIcon::none, bool destructive = false, bool allowNativeArt = true)
+        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& rawTitle, const std::string& subtitle,
+        bool focused, bool enabled = true, PanelIcon icon = PanelIcon::none, bool destructive = false, bool allowNativeArt = true,
+        bool primary = false)
     {
         const int press = ButtonPressOffset(focused);
         p.y += press;
         size.height -= press;
-        if (enabled) DrawCard(rt, p, size, focused, true);
-        else Fill(rt, p, size, Theme::ink);
-        const auto colour = !enabled ? "{DISABLED}" : focused ? "{BLACK}" : destructive ? "{DANGER}" : "{WHITE}";
-        if (destructive)
-            Fill(rt, p, { 3, size.height }, static_cast<Drawing::PaletteIndex>(PocketPalette::destructive));
+        const auto title = ButtonText(rawTitle);
+        const auto kind = !enabled ? ButtonKind::secondary
+            : destructive          ? ButtonKind::danger
+            : primary              ? ButtonKind::primary
+                                   : ButtonKind::secondary;
+        DrawButtonFace(rt, p, size, kind, focused, enabled);
+        const bool filled = enabled && kind != ButtonKind::secondary;
+        const auto colour = !enabled ? "{DISABLED}" : filled ? "{BLACK}" : "{WHITE}";
         const bool roomForArt = allowNativeArt && TextWidth(title, true) + 58 <= size.width;
         const bool native = roomForArt && DrawNativeMenuArt(rt, p + ScreenCoordsXY{ 5, (size.height - 24) / 2 },
-            { 26, 24 }, ActionArt(title), focused && enabled);
+            { 26, 24 }, ActionArt(rawTitle), filled);
         const int inset = native || (roomForArt && icon != PanelIcon::none) ? 36 : 10;
-        if (!native && roomForArt) DrawIcon(rt, p + ScreenCoordsXY{9, 8}, icon, focused);
+        if (!native && roomForArt) DrawIcon(rt, p + ScreenCoordsXY{9, 8}, icon, filled);
+        // The focused button carries the A glyph where a desktop menu would put a chevron: it says
+        // which button acts and how, without reading the footer.
+        const int glyphRoom = focused && enabled ? 22 : 8;
         DrawStrongText(
             rt, p + ScreenCoordsXY{ inset, subtitle.empty() || size.height < 34 ? (size.height - 12) / 2 + 3 : 8 },
-            std::string(colour) + title, size.width - inset - 22);
+            std::string(colour) + title, size.width - inset - glyphRoom);
         if (!subtitle.empty() && size.height >= 34)
             DrawModernEllipsised(
-                rt, p + ScreenCoordsXY{ inset, size.height - 13 }, size.width - inset - 22,
-                std::string(!enabled ? "{DISABLED}" : focused ? "{BLACK}" : "{MUTED}") + subtitle);
-        DrawModernText(rt, p + ScreenCoordsXY{size.width - 15, (size.height - 12) / 2 + 3},
-            std::string(colour) + (enabled ? ">" : "-"));
+                rt, p + ScreenCoordsXY{ inset, size.height - 13 }, size.width - inset - glyphRoom,
+                std::string(!enabled ? "{DISABLED}" : filled ? "{BLACK}" : "{MUTED}") + subtitle);
+        if (focused && enabled)
+            DrawButtonGlyph(rt, p + ScreenCoordsXY{ size.width - 12, size.height / 2 - 1 }, "A");
     }
 
     inline void DrawPagePosition(
@@ -479,22 +586,37 @@ namespace OpenRCT2::Ui::Handheld
             {{"D-pad", "Choose"}, {"A", "Select"}, {"B", backLabel}});
     }
 
+    // One segmented strip with the shoulder buttons that move through it at either end, instead of
+    // four separate button-shaped tabs that look like more things to press.
     inline void DrawTabs(
         Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t width, const std::vector<std::string>& labels, size_t selected, std::string_view context = {})
     {
         if (labels.empty())
             return;
-        const auto tabWidth = width / static_cast<int32_t>(labels.size());
+        constexpr int height = 26;
+        FillRound(rt, pos, { width, height }, Theme::edge);
+        FillRound(rt, pos + ScreenCoordsXY{ 1, 1 }, { width - 2, height - 2 }, Theme::raised);
+        DrawModernText(rt, pos + ScreenCoordsXY{ 6, 10 }, "{MUTED}L1");
+        DrawModernText(rt, pos + ScreenCoordsXY{ width - 19, 10 }, "{MUTED}R1");
+        const int inner = width - 50;
+        const auto tabWidth = inner / static_cast<int32_t>(labels.size());
         for (size_t i = 0; i < labels.size(); ++i)
         {
-            const auto tabPos = pos + ScreenCoordsXY{ static_cast<int32_t>(i) * tabWidth, 0 };
-            DrawCard(rt, tabPos, { tabWidth - 3, 28 }, i == selected, true);
-            const bool showArt = TextWidth(labels[i]) + 45 <= tabWidth;
-            const bool native = showArt && DrawNativeMenuArt(rt, tabPos + ScreenCoordsXY{ 4, 2 }, { 28, 24 }, TabArt(labels[i], context), i == selected);
-            const int inset = native ? 36 : 9;
-            DrawModernEllipsised(
-                rt, tabPos + ScreenCoordsXY{ inset, 9 }, tabWidth - inset - 9, (i == selected ? "{BLACK}" : "{WHITE}") + labels[i],
-                { Drawing::Colour::white });
+            const auto tabPos = pos + ScreenCoordsXY{ 25 + static_cast<int32_t>(i) * tabWidth, 3 };
+            const bool active = i == selected;
+            if (active)
+                FillRound(rt, tabPos, { tabWidth - 2, height - 6 }, Theme::gold);
+            const bool showArt = TextWidth(labels[i], active) + 34 <= tabWidth;
+            const bool native = showArt
+                && DrawNativeMenuArt(rt, tabPos + ScreenCoordsXY{ 2, -1 }, { 24, 22 }, TabArt(labels[i], context), active);
+            const int inset = native ? 28 : 0;
+            const int textWidth = TextWidth(labels[i], active);
+            const int x = native ? inset : std::max(4, (tabWidth - 2 - textWidth) / 2);
+            const auto ink = active ? std::string("{BLACK}") : std::string("{WHITE}");
+            if (active)
+                DrawStrongText(rt, tabPos + ScreenCoordsXY{ x, 7 }, ink + labels[i], tabWidth - x - 4);
+            else
+                DrawModernEllipsised(rt, tabPos + ScreenCoordsXY{ x, 7 }, tabWidth - x - 4, ink + labels[i]);
         }
     }
 
@@ -776,8 +898,25 @@ namespace OpenRCT2::Ui::Handheld
             height = std::max(height, screen.height - p.y + 7);
         return height;
     }
-    inline void DrawFooter(Drawing::RenderTarget& rt, ScreenSize screen, const std::vector<ControlHint>& hints)
+    // When a sheet slides in, its content moves but the controls strip must not: menus point this at
+    // the unshifted screen for the duration of a draw (see FooterSurfaceScope).
+    inline Drawing::RenderTarget* FooterSurface = nullptr;
+    struct FooterSurfaceScope
     {
+        Drawing::RenderTarget* previous;
+        explicit FooterSurfaceScope(Drawing::RenderTarget& target)
+            : previous(FooterSurface)
+        {
+            FooterSurface = &target;
+        }
+        ~FooterSurfaceScope()
+        {
+            FooterSurface = previous;
+        }
+    };
+    inline void DrawFooter(Drawing::RenderTarget& shifted, ScreenSize screen, const std::vector<ControlHint>& hints)
+    {
+        auto& rt = FooterSurface ? *FooterSurface : shifted;
         LastControlHints = hints;
         const int height = FooterHeight(screen, hints);
         Fill(rt, { 0, screen.height - height }, { screen.width, height }, Theme::ink);

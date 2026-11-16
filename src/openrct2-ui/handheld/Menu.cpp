@@ -6248,6 +6248,7 @@ namespace OpenRCT2::Ui::Windows
             rt.cullingX -= slideX;
             rt.cullingY -= slideY;
             Handheld::MenuFeelScope buttonMotion(_menuFeel);
+            Handheld::FooterSurfaceScope fixedFooter(screen);
             _menuFeel.base = { reinterpret_cast<const uint8_t*>(rt.bits), rt.x, rt.y, rt.LineStride() };
             // Runs after every early return below, drawing the pointer above all content.
             struct PointerOverlay

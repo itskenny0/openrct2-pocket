@@ -54,7 +54,22 @@ namespace OpenRCT2::Ui::Handheld
         std::vector<uint16_t> colourValues; // Native palette entries; focus is a spatial swatch grid.
         uint16_t currentColour{};
         size_t columns = 1; // Controller text entry uses the same content shell.
+        // The one action this screen is for, drawn filled in the section colour. Unset: the first row
+        // of a review. Set to rows.size() to mark none.
+        std::optional<size_t> primaryRow;
     };
+    inline std::optional<size_t> PrimaryRow(const ManagementPresentation& model)
+    {
+        if (model.primaryRow)
+            return *model.primaryRow < model.rows.size() ? model.primaryRow : std::nullopt;
+        // Only a review has an obvious default; elsewhere each presenter marks its own primary, since
+        // a grid of equal choices (campaign types, say) has none.
+        if (model.confirmation && !model.rows.empty() && (model.rowEnabled.empty() || model.rowEnabled[0]))
+            return size_t{ 0 };
+        return std::nullopt;
+    }
+    // Header band: title (with optional status on the right), a rule, then tabs.
+    inline constexpr int kHeaderHeight = 46, kTabsHeight = 32;
     struct ManagementLayout
     {
         int columns, rowHeight, rowStart, statColumns, statHeight;
@@ -66,7 +81,7 @@ namespace OpenRCT2::Ui::Handheld
         const int statColumns = model.summaryMetrics && !model.stats.empty() ? (model.metricColumns ? model.metricColumns : size.width >= 440 ? 3 : 2) : 1;
         const int statHeight = model.summaryMetrics ? std::max(model.metricHeight, model.meterDirections.empty() ? 0 : 66) : 24;
         const int statRows = (static_cast<int>(model.stats.size()) + statColumns - 1) / statColumns;
-        const int rowStart = 64 + (model.tabs.empty() ? 0 : 34) + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16
+        const int rowStart = kHeaderHeight + (model.tabs.empty() ? 0 : kTabsHeight) + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16
             + model.reservedHeight + (model.graph.empty() ? 0 : 110) + (model.rows.empty() ? 0 : 11) + (model.toolbarCount ? 36 : 0);
         const int rowHeight = model.rowHeight ? model.rowHeight : model.denseRoster ? 38 : model.rosterCards ? 46 : model.actionGrid ? 30 : columns > 1 ? 24 : 30;
         const size_t capacity = std::max(1, (size.height - rowStart - 34) / rowHeight) * columns;
@@ -85,6 +100,7 @@ namespace OpenRCT2::Ui::Handheld
         const auto layout = MeasureManagement(size, model);
         const auto [columns, rowHeight, rowStart, statColumns, statHeight, capacity] = layout;
         const size_t toolbar=std::min(model.toolbarCount,model.rows.size());
+        const auto primary = PrimaryRow(model);
         const size_t count=model.rows.size()-toolbar;
         const size_t selectedItem=std::max(model.selected,toolbar)-toolbar;
         const size_t totalRows=(count+columns-1)/columns;
@@ -93,22 +109,27 @@ namespace OpenRCT2::Ui::Handheld
         const size_t first=toolbar+static_cast<size_t>(offset/rowHeight)*columns;
         const size_t end=std::min(model.rows.size(),toolbar+static_cast<size_t>((offset+listHeight+rowHeight-1)/rowHeight)*columns);
         if (drawSurface) DrawSurface(rt, p, size);
-        DrawSectionLabel(rt, p + ScreenCoordsXY{12, 13}, width - 24 - (model.headerStatus.empty() ? 0 : 138), model.breadcrumb);
-        if (!model.headerStatus.empty()
-            && (model.headerInk == "{POSITIVE}" || model.headerInk == "{CAUTION}" || model.headerInk == "{DANGER}"))
-            Fill(
-                rt, p + ScreenCoordsXY{ width - 148, 12 }, { 4, 12 },
-                static_cast<Drawing::PaletteIndex>(
-                    model.headerInk == "{POSITIVE}"     ? PocketPalette::positive
-                        : model.headerInk == "{DANGER}" ? PocketPalette::destructive
-                                                        : PocketPalette::caution));
-        if (!model.headerStatus.empty()) DrawStrongText(rt,p+ScreenCoordsXY{width-138,13},model.headerInk+model.headerStatus,126);
-        const int contentTop = model.tabs.empty() ? 64 : 98;
-        if (!model.tabs.empty()) DrawTabs(rt,p+ScreenCoordsXY{10,62},width-20,model.tabs,model.selectedTab,model.breadcrumb);
-        DrawHeadingText(rt, p + ScreenCoordsXY{12, 29},
-            std::string(model.destructive ? "{DANGER}" : model.confirmation ? "{GOLD}" : "{WHITE}") + model.title, width - 24);
-        Fill(rt, p + ScreenCoordsXY{12, 55}, {width - 24, 1}, Theme::edge);
-        if (model.destructive) Fill(rt,p+ScreenCoordsXY{12,55},{width-24,2},static_cast<Drawing::PaletteIndex>(PocketPalette::destructive));
+        // No breadcrumb: the rail and tabs already say where you are, and the title says what this is.
+        const int statusWidth = model.headerStatus.empty() ? 0 : std::min(160, TextWidth(model.headerStatus, true) + 14);
+        if (!model.headerStatus.empty())
+        {
+            const bool coloured = model.headerInk == "{POSITIVE}" || model.headerInk == "{CAUTION}" || model.headerInk == "{DANGER}";
+            if (coloured)
+                FillRound(
+                    rt, p + ScreenCoordsXY{ width - 12 - statusWidth, 13 }, { 4, 14 },
+                    static_cast<Drawing::PaletteIndex>(
+                        model.headerInk == "{POSITIVE}"     ? PocketPalette::positive
+                            : model.headerInk == "{DANGER}" ? PocketPalette::destructive
+                                                            : PocketPalette::caution));
+            DrawStrongText(rt, p + ScreenCoordsXY{ width - 12 - statusWidth + 9, 17 }, model.headerInk + model.headerStatus, statusWidth - 9);
+        }
+        const int contentTop = kHeaderHeight + (model.tabs.empty() ? 0 : kTabsHeight);
+        DrawHeadingText(rt, p + ScreenCoordsXY{12, 11},
+            std::string(model.destructive ? "{DANGER}" : model.confirmation ? "{GOLD}" : "{WHITE}") + model.title,
+            width - 24 - statusWidth - (statusWidth ? 6 : 0));
+        Fill(rt, p + ScreenCoordsXY{12, 37}, {width - 24, 1}, Theme::edge);
+        if (model.destructive) Fill(rt,p+ScreenCoordsXY{12,37},{width-24,2},static_cast<Drawing::PaletteIndex>(PocketPalette::destructive));
+        if (!model.tabs.empty()) DrawTabs(rt,p+ScreenCoordsXY{10,kHeaderHeight - 2},width-20,model.tabs,model.selectedTab,model.breadcrumb);
         if (!model.colourValues.empty())
         {
             DrawColourGrid(rt, p, size, model.colourValues, model.rows, model.selected, model.currentColour);
@@ -142,15 +163,12 @@ namespace OpenRCT2::Ui::Handheld
             if(model.meters[i]<0) continue;
             const int cellWidth=(width-24)/statColumns;
             const auto start=p+ScreenCoordsXY{12+static_cast<int>(i%statColumns)*cellWidth,contentTop+static_cast<int>(i/statColumns)*statHeight+statHeight-8};
-            Fill(rt,start,{cellWidth-6,3},Theme::ink);
             const bool directional = i < model.meterDirections.size();
             const bool attention = i < model.meterAttention.size() && model.meterAttention[i];
             const auto ink = attention                        ? PocketPalette::caution
                 : directional && model.meterDirections[i] > 0 ? PocketPalette::positive
                                                               : PocketPalette::secondary;
-            Fill(
-                rt, start, { (cellWidth - 6) * std::clamp(model.meters[i], 0, 100) / 100, 3 },
-                static_cast<Drawing::PaletteIndex>(ink));
+            DrawMeter(rt, start + ScreenCoordsXY{ 8, -2 }, cellWidth - 22, model.meters[i], static_cast<Drawing::PaletteIndex>(ink), 4);
             if (directional && attention)
                 DrawModernText(rt, start + ScreenCoordsXY{ 0, -13 }, "{CAUTION}! Attention", {}, cellWidth - 6);
         }
@@ -179,9 +197,11 @@ namespace OpenRCT2::Ui::Handheld
             }
             DrawSectionLabel(rt, p + ScreenCoordsXY{12, plotBottom + 8}, width - 24, model.graphRange);
         }
-        if (!model.rows.empty() && model.bodyLines.empty())
+        // List labels keep only their first part: "GUESTS / CURRENT ACTIVITY / HAPPINESS" says no more
+        // than "GUESTS" once the rows themselves show activity and happiness.
+        if (!model.rows.empty() && model.bodyLines.empty() && !model.listLabel.empty())
             DrawSectionLabel(rt, p + ScreenCoordsXY{12, rowStart - 12}, width - 24,
-                !model.listLabel.empty() ? model.listLabel : model.confirmation ? "REVIEW & DECIDE" : model.rosterCards ? "CHOOSE A RIDE" : "");
+                model.listLabel.substr(0, model.listLabel.find(" / ")));
         Drawing::RenderTarget listRt;
         if(ClipRenderTarget(listRt,rt,p+ScreenCoordsXY{0,rowStart},width-8,listHeight))
         {
@@ -228,7 +248,8 @@ namespace OpenRCT2::Ui::Handheld
                 DrawActionRow(
                     listRt, ScreenCoordsXY{ x, y }, { cellWidth - 4, rowHeight - 2 }, model.rows[i],
                     i < model.rowDetails.size() ? model.rowDetails[i] : "", focused && i == model.selected, enabled,
-                    PanelIcon::none, model.destructive && i == 0, !model.rosterCards && !model.denseRoster);
+                    PanelIcon::none, model.destructive && i == 0, !model.rosterCards && !model.denseRoster,
+                    primary == i);
         }
         }
         // Feedback and overflow have independent lines, so failures never hide pagination.
