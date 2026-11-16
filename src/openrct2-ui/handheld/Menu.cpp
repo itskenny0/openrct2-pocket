@@ -3237,9 +3237,19 @@ namespace OpenRCT2::Ui::Windows
                 invalidate();
                 return;
             }
-            const auto count=rows().size();
+            const auto visible=rows();
+            const auto count=visible.size();
             if(count) {
-                const auto next=std::clamp<int64_t>(static_cast<int64_t>(_focus.index())+direction,0,static_cast<int64_t>(count)-1);
+                auto next=std::clamp<int64_t>(static_cast<int64_t>(_focus.index())+direction,0,static_cast<int64_t>(count)-1);
+                // Hidden "Back to ..." rows (B does that) are stepped over, unless nothing else is left.
+                if(managementShell() && direction!=0)
+                {
+                    const int step=direction>0?1:-1;
+                    auto probe=next;
+                    while(probe>=0 && probe<static_cast<int64_t>(count) && Handheld::IsBackRow(visible[probe])) probe+=step;
+                    if(probe>=0 && probe<static_cast<int64_t>(count)) next=probe;
+                    else if(Handheld::IsBackRow(visible[next])) next=_focus.index();
+                }
                 _focus.move(static_cast<int32_t>(next)-static_cast<int32_t>(_focus.index()),count);
             }
             if ((_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles)) { _fileFocus = _focus.index(); _fileDetail = 0; }
@@ -6640,7 +6650,9 @@ namespace OpenRCT2::Ui::Windows
                 if (_page == Page::dashboard)
                 {
                     model.metricHeight = 40;
-                    model.rowHeight = 26;
+                    // Rosters keep their detail line in the preview, so the rail already shows
+                    // status and queues before you step in.
+                    if (model.rowDetails.empty()) model.rowHeight = 26;
                 }
                 Handheld::Dashboard::Draw(
                     rt, { ContextGetWidth(), ContextGetHeight() }, _dashboard, model, dashboardCanSwitch());

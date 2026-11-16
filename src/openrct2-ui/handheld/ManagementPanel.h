@@ -117,9 +117,44 @@ namespace OpenRCT2::Ui::Handheld
         const size_t capacity = std::max(1, (size.height - rowStart - 34) / rowHeight) * columns;
         return {columns, rowHeight, rowStart, statColumns, statHeight, capacity};
     }
+    // "Back to ..." rows repeat what B does on every screen. They stay in the model (so native row
+    // indices and handlers are untouched) but are not drawn, unless they are the only rows.
+    inline bool IsBackRow(const std::string& label)
+    {
+        return label.starts_with("Back to ");
+    }
+    inline std::optional<ManagementPresentation> WithoutBackRows(const ManagementPresentation& model)
+    {
+        if (model.toolbarCount || !model.colourValues.empty()
+            || std::none_of(model.rows.begin(), model.rows.end(), IsBackRow)
+            || std::all_of(model.rows.begin(), model.rows.end(), IsBackRow))
+            return std::nullopt;
+        auto filtered = model;
+        filtered.rows.clear(); filtered.rowDetails.clear(); filtered.rowEnabled.clear();
+        filtered.rowReadOnly.clear(); filtered.rowValues.clear();
+        filtered.selected = SIZE_MAX;
+        filtered.primaryRow = model.primaryRow ? std::optional<size_t>{ model.rows.size() } : std::nullopt;
+        for (size_t i = 0; i < model.rows.size(); ++i)
+        {
+            if (IsBackRow(model.rows[i]))
+                continue;
+            if (i == model.selected) filtered.selected = filtered.rows.size();
+            if (model.primaryRow == i) filtered.primaryRow = filtered.rows.size();
+            filtered.rows.push_back(model.rows[i]);
+            if (i < model.rowDetails.size()) filtered.rowDetails.resize(filtered.rows.size() - 1), filtered.rowDetails.push_back(model.rowDetails[i]);
+            if (i < model.rowEnabled.size()) filtered.rowEnabled.resize(filtered.rows.size() - 1, true), filtered.rowEnabled.push_back(model.rowEnabled[i]);
+            if (i < model.rowReadOnly.size()) filtered.rowReadOnly.resize(filtered.rows.size() - 1, false), filtered.rowReadOnly.push_back(model.rowReadOnly[i]);
+            if (i < model.rowValues.size()) filtered.rowValues.resize(filtered.rows.size() - 1), filtered.rowValues.push_back(model.rowValues[i]);
+        }
+        if (filtered.selected == SIZE_MAX)
+            filtered.selected = filtered.rows.size(); // Focus is on a hidden row: draw none focused.
+        return filtered;
+    }
     inline void DrawManagementContent(
         Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const ManagementPresentation& model, bool focused = true, bool drawSurface = true)
     {
+        if (const auto filtered = WithoutBackRows(model))
+            return DrawManagementContent(rt, p, size, *filtered, focused, drawSurface);
         if (model.confirmation || model.contentSized)
         {
             const auto measured = MeasureManagement(size, model);

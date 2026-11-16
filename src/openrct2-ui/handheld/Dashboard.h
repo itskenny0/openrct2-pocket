@@ -186,7 +186,28 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
                     std::string(focused ? "{BLACK}" : "{MUTED}") + "Unavailable");
         }
         }
-        const auto workspace = model.confirmation ? ScreenCoordsXY{(screen.width-360)/2, Layout::margin+20} : expanded ? rail : content;
+        // Inside a section the rail stays on screen, collapsed to its icons, so the frame never jumps
+        // and you can always see which section you are in.
+        constexpr int compactRail = 40;
+        if (expanded)
+        {
+            DrawSurface(rt, rail, { compactRail, height });
+            const int pitch = std::clamp((height - 16) / static_cast<int>(kCategories.size()), 30, 44);
+            static constexpr std::array sprites{SPR_TAB_PARK_ENTRANCE, SPR_TAB_RIDE_0, SPR_TAB_GUESTS_0,
+                SPR_TAB_STAFF_OPTIONS_0, SPR_TAB_FINANCES_SUMMARY_0, SPR_TAB_FINANCES_RESEARCH_0, SPR_TAB_FINANCES_MARKETING_0};
+            static constexpr std::array<uint8_t, 7> frames{ 1, 16, 8, 7, 8, 8, 19 };
+            for (size_t i = 0; i < kCategories.size(); ++i)
+            {
+                const int y = 8 + static_cast<int>(i) * pitch;
+                const bool active = i == state.index();
+                if (active)
+                    FillRound(rt, rail + ScreenCoordsXY{ 4, y }, { compactRail - 8, pitch - 4 }, Theme::gold);
+                if (!DrawNativeMenuArt(rt, rail + ScreenCoordsXY{ 6, y + (pitch - 4 - 30) / 2 }, { 28, 30 }, { sprites[i], frames[i] }, active))
+                    DrawCategoryMark(rt, rail + ScreenCoordsXY{ 11, y + 6 }, i, active);
+            }
+        }
+        const auto inner = rail + ScreenCoordsXY{ compactRail + Layout::gutter, 0 };
+        const auto workspace = model.confirmation ? ScreenCoordsXY{(screen.width-360)/2, Layout::margin+20} : expanded ? inner : content;
         DrawManagementContent(
             rt, workspace, {model.confirmation ? 360 : screen.width - workspace.x - Layout::margin,
                 model.confirmation ? height-20 : height}, model, state.focus == Focus::content);
