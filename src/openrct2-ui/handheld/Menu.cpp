@@ -28,6 +28,7 @@
 #include "Panel.h"
 #include "MenuThemes.h"
 #include "FeelSound.h"
+#include "Hud.h"
 #include "ParkOverview.h"
 #include "ParkMap.h"
 #include "ParkInformation.h"
@@ -1344,7 +1345,8 @@ namespace OpenRCT2::Ui::Windows
                                      size.height };
             const ScreenSize bounds = (choiceCards() || _page == Page::staffPatrolClear || _page == Page::rightsConfirm
                                        || _page == Page::parkInspect || (_page == Page::designInspect || _page == Page::designVehicles || _page == Page::designWarnings || _page == Page::designConfirm) || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch || _page == Page::sceneryConfirm
-                                       || (_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement() || managementShell())
+                                       || (_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement() || managementShell()
+                                       || _page == Page::park)
                 ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
                 : information() ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 }
                                 : target;
@@ -1353,7 +1355,7 @@ namespace OpenRCT2::Ui::Windows
                 *this,
                 (choiceCards() || _page == Page::staffPatrolClear || _page == Page::rightsConfirm || _page == Page::parkInspect || (_page == Page::designInspect || _page == Page::designVehicles || _page == Page::designWarnings || _page == Page::designConfirm) || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
                  || _page == Page::sceneryConfirm || (_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement()
-                 || managementShell())
+                 || managementShell() || _page == Page::park)
                     ? ScreenCoordsXY{ 0, 0 }
                     : ScreenCoordsXY{ 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
         }
@@ -6813,94 +6815,107 @@ namespace OpenRCT2::Ui::Windows
                     _page==Page::sceneryOptions,rows(),_focus.index(),_status);
                 return;
             }
-            const char* title = "PARK / PAUSE";
+            if (_page == Page::park)
+            {
+                const auto hud = Handheld::NativeHud();
+                const bool paused = (gGamePaused & ~(_pausedHere ? GAME_PAUSED_NORMAL : 0)) != 0;
+                Handheld::PauseSummary summary{ getGameState().park.name, hud.date, hud.noMoney ? "" : hud.cash,
+                                                hud.guests + " guests",
+                                                paused ? "Paused" : std::to_string(1u << (gGameSpeed - 1)) + "x speed" };
+                Handheld::DrawPauseScreen(rt, { ContextGetWidth(), ContextGetHeight() }, rows(), _focus.index(), summary, _status);
+                Handheld::DrawFooter(rt, { ContextGetWidth(), ContextGetHeight() },
+                    { { "D-pad", "Choose" }, { "A", "Select" }, { "B", "Resume" } });
+                return;
+            }
+            const char* title = "Paused";
             switch (_page)
             {
                 case Page::dashboard:
-                    title = "PARK DASHBOARD";
+                    title = "Park dashboard";
                     break;
                 case Page::overview:
-                    title = "PARK OVERVIEW";
+                    title = "Park overview";
                     break;
                 case Page::finances:
-                    title = "FINANCES";
+                    title = "Finances";
                     break;
                 case Page::guests:
-                    title = "GUESTS";
+                    title = "Guests";
                     break;
                 case Page::research:
-                    title = "RESEARCH";
+                    title = "Research";
                     break;
                 case Page::ride:
-                    title = "RIDE INSPECTION";
+                    title = "Ride";
                     break;
                 case Page::paths:
-                    title = "PATHS";
+                    title = "Paths";
                     break;
                 case Page::pathOptions:
-                    title = "PATH OPTIONS";
+                    title = "Path options";
                     break;
                 case Page::customChoice:
-                    title = "RIDE CONSTRUCTION";
+                    title = "Build a ride";
                     break;
                 case Page::designOptions:
-                    title = "DESIGN OPTIONS";
+                    title = "Design options";
                     break;
                 case Page::designConfirm:
-                    title = "PLACE DESIGN?";
+                    title = "Place design?";
                     break;
                 case Page::peepOptions:
                 case Page::peepCancel:
-                    title = "PERSON PLACEMENT";
+                    title = "Place person";
                     break;
                 case Page::staffPatrolOptions:
-                    title = "STAFF PATROL";
+                    title = "Staff patrol";
                     break;
                 case Page::rightsOptions:
-                    title = "LAND / RIGHTS OPTIONS";
+                    title = "Land and rights";
                     break;
                 case Page::areaOptions:
-                    title = "AREA BRUSH OPTIONS";
+                    title = "Brush options";
                     break;
-                case Page::sceneryClearOptions: title="CLEAR AREA OPTIONS"; break;
+                case Page::sceneryClearOptions: title="Clear area"; break;
                 case Page::sceneryGroups:
-                    title = "SCENERY GROUP";
+                    title = "Scenery group";
                     break;
                 case Page::sceneryStyle:
-                    title = "SIGN STYLE";
+                    title = "Sign style";
                     break;
                 case Page::sceneryCategory:
-                    title = "SCENERY CATEGORY";
+                    title = "Scenery";
                     break;
                 case Page::sceneryOptions:
-                    title = "SCENERY OPTIONS";
+                    title = "Scenery options";
                     break;
                 case Page::build:
-                    title = "BUILD";
+                    title = "Build";
                     break;
                 case Page::save:
-                    title = _exitAfterSave ? "SAVE AND QUIT" : "SAVE PARK";
+                    title = _exitAfterSave ? "Save and quit" : "Save park";
                     break;
                 case Page::load:
-                    title = "LOAD PARK";
+                    title = "Load park";
                     break;
                 case Page::overwrite:
-                    title = "REPLACE SAVE?";
+                    title = "Replace save?";
                     break;
                 case Page::discard:
-                    title = "DISCARD UNSAVED CHANGES?";
+                    title = "Discard unsaved changes?";
                     break;
                 case Page::quitChoice:
-                    title = "QUIT GAME";
+                    title = "Quit game";
                     break;
                 case Page::exit:
-                    title = "EXIT WITHOUT SAVING?";
+                    title = "Exit without saving?";
                     break;
                 default:
                     break;
             }
             Handheld::MenuPresentation model;
             model.title = title;
+            model.destructive = _page == Page::exit || _page == Page::discard || _page == Page::overwrite;
             model.rows = rows();
             model.selected = _focus.index();
             model.status = _status;

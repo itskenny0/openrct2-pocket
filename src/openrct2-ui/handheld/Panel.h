@@ -375,36 +375,8 @@ namespace OpenRCT2::Ui::Handheld
     inline void DrawPanelHeading(Drawing::RenderTarget& rt, const Window& window, const std::string& title)
     {
         DrawSurface(rt, window.windowPos, { window.width, window.height });
-        Fill(rt, window.windowPos + ScreenCoordsXY{ 5, 3 }, { window.width - 10, 29 }, Theme::ink);
-        Fill(rt, window.windowPos + ScreenCoordsXY{ 13, 11 }, { 3, 14 }, Theme::gold);
+        DrawHeadingText(rt, window.windowPos + ScreenCoordsXY{ 12, 9 }, "{WHITE}" + title, window.width - 24);
         Fill(rt, window.windowPos + ScreenCoordsXY{ 10, 35 }, { window.width - 20, 1 }, Theme::edge);
-        DrawModernEllipsised(
-            rt, window.windowPos + ScreenCoordsXY{ 24, 13 }, window.width - 40, title, { Drawing::Colour::white });
-    }
-
-    inline void DrawIconRow(
-        Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t width, const std::string& label, bool selected, PanelIcon icon)
-    {
-        const int press = ButtonPressOffset(selected);
-        pos.y += press;
-        DrawCard(rt, pos, { width, 28 - press }, selected, true);
-        const auto art = ActionArt(label);
-        const bool roomForArt = TextWidth(label) + 53 <= width;
-        const bool native = roomForArt && DrawNativeMenuArt(rt, pos + ScreenCoordsXY{ 5, 2 }, { 26, 24 }, art, selected);
-        if (!native && roomForArt) DrawIcon(rt, pos + ScreenCoordsXY{ 8, 6 }, icon, selected);
-        const bool illustrated = native || (roomForArt && icon != PanelIcon::none);
-        DrawModernEllipsised(
-            rt, pos + ScreenCoordsXY{ illustrated ? 39 : 12, 9 },
-            width - (illustrated ? 53 : 26), (selected ? "{BLACK}" : "{WHITE}") + label,
-            { Drawing::Colour::white });
-        if (selected)
-            DrawModernText(rt, pos + ScreenCoordsXY{ width - 11, 9 }, "{BLACK}>", { Drawing::Colour::white });
-    }
-
-    inline void DrawPanelRow(
-        Drawing::RenderTarget& rt, const Window& window, int32_t y, const std::string& label, bool selected)
-    {
-        DrawIconRow(rt, { window.windowPos.x + 10, y - 8 }, window.width - 20, label, selected, PanelIcon::play);
     }
 
     enum class HintPriority
@@ -607,6 +579,102 @@ namespace OpenRCT2::Ui::Handheld
             DrawButtonGlyph(rt, p + ScreenCoordsXY{ size.width - 12, size.height / 2 - 1 }, "A");
     }
 
+    inline void DrawIconRow(
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t width, const std::string& label, bool selected, PanelIcon icon)
+    {
+        DrawActionRow(rt, pos, { width, 28 }, label, "", selected, true, icon);
+    }
+
+    inline void DrawPanelRow(
+        Drawing::RenderTarget& rt, const Window& window, int32_t y, const std::string& label, bool selected)
+    {
+        DrawIconRow(rt, { window.windowPos.x + 10, y - 8 }, window.width - 20, label, selected, PanelIcon::play);
+    }
+
+    // The pause screen is the game's home base, so it gets a proper layout: the park at a glance on
+    // top, game actions on the left (Resume first and filled), and settings on the right as compact
+    // choices that show their current value. Rows keep their order, so focus still moves down the
+    // left column and then the right.
+    struct PauseSummary
+    {
+        std::string park, date, cash, guests, simulation;
+    };
+    inline void DrawSettingRow(Drawing::RenderTarget& rt, ScreenCoordsXY p, int width, const std::string& label,
+        const std::string& value, bool current, bool focused)
+    {
+        if (focused)
+        {
+            FillRound(rt, p, { width, 22 }, Theme::raised);
+            DrawFocusRing(rt, p, { width, 22 });
+        }
+        // Radio mark: filled when this is the current choice.
+        OutlineRound(rt, p + ScreenCoordsXY{ 6, 6 }, { 10, 10 }, Theme::text);
+        if (current)
+            FillRound(rt, p + ScreenCoordsXY{ 8, 8 }, { 6, 6 }, Theme::gold);
+        DrawModernEllipsised(rt, p + ScreenCoordsXY{ 22, 6 }, width - 30, std::string(current ? "{WHITE}" : "{MUTED}") + label);
+        if (!value.empty())
+        {
+            const int w = TextWidth(value, true);
+            DrawStrongText(rt, p + ScreenCoordsXY{ width - 8 - w, 6 }, "{WHITE}" + value);
+        }
+    }
+    inline void DrawPauseScreen(Drawing::RenderTarget& rt, ScreenSize screen, const std::vector<std::string>& rows,
+        size_t selected, const PauseSummary& summary, const std::string& status)
+    {
+        const int width = std::min(screen.width - 16, 496);
+        const int left = (screen.width - width) / 2;
+        const int bottom = screen.height - 34;
+        // Park at a glance.
+        DrawCard(rt, { left, 8 }, { width, 44 });
+        DrawHeadingText(rt, { left + 12, 14 }, "{WHITE}" + summary.park, width / 2);
+        const std::string glance = summary.date + "   " + summary.cash + "   " + summary.guests;
+        DrawModernEllipsised(rt, { left + 12, 35 }, width - 24, "{MUTED}" + glance);
+        const int pillWidth = TextWidth(summary.simulation, true) + 18;
+        FillRound(rt, { left + width - 12 - pillWidth, 14 }, { pillWidth, 18 }, Theme::gold);
+        DrawStrongText(rt, { left + width - 12 - pillWidth + 9, 17 }, "{BLACK}" + summary.simulation);
+        // Game actions.
+        const int columnTop = 60;
+        const int actionsWidth = width * 56 / 100;
+        DrawCard(rt, { left, columnTop }, { actionsWidth, bottom - columnTop });
+        DrawSectionLabel(rt, { left + 12, columnTop + 8 }, actionsWidth - 24, "GAME");
+        const size_t actions = std::min<size_t>(8, rows.size());
+        const int pitch = std::min(32, (bottom - columnTop - 30) / static_cast<int>(std::max<size_t>(1, actions)));
+        for (size_t i = 0; i < actions; ++i)
+            DrawActionRow(rt, { left + 10, columnTop + 24 + static_cast<int>(i) * pitch }, { actionsWidth - 20, pitch - 3 },
+                rows[i], "", i == selected, true, PanelIcon::none, false, true, i == 0);
+        // Settings.
+        const int settingsLeft = left + actionsWidth + 8;
+        const int settingsWidth = width - actionsWidth - 8;
+        DrawCard(rt, { settingsLeft, columnTop }, { settingsWidth, bottom - columnTop });
+        DrawSectionLabel(rt, { settingsLeft + 12, columnTop + 8 }, settingsWidth - 24, "SPEED");
+        int y = columnTop + 24;
+        for (size_t i = 8; i < rows.size() && i < 12; ++i, y += 24)
+        {
+            const bool current = rows[i].starts_with("Current: ");
+            DrawSettingRow(rt, { settingsLeft + 8, y }, settingsWidth - 16, current ? rows[i].substr(9) : rows[i], "",
+                current, i == selected);
+        }
+        y += 8;
+        DrawSectionLabel(rt, { settingsLeft + 12, y }, settingsWidth - 24, "DISPLAY");
+        y += 16;
+        for (size_t i = 12; i < rows.size(); ++i, y += 24)
+        {
+            const auto colon = rows[i].find(": ");
+            const auto label = colon == std::string::npos ? rows[i] : rows[i].substr(0, colon);
+            const auto value = colon == std::string::npos ? std::string() : rows[i].substr(colon + 2);
+            if (i == selected)
+            {
+                FillRound(rt, { settingsLeft + 8, y }, { settingsWidth - 16, 22 }, Theme::raised);
+                DrawFocusRing(rt, { settingsLeft + 8, y }, { settingsWidth - 16, 22 });
+            }
+            DrawModernEllipsised(rt, { settingsLeft + 16, y + 6 }, settingsWidth / 2, "{MUTED}" + label);
+            const int w = TextWidth(value, true);
+            DrawStrongText(rt, { settingsLeft + settingsWidth - 16 - w, y + 6 }, "{WHITE}" + value);
+        }
+        if (!status.empty())
+            DrawModernEllipsised(rt, { settingsLeft + 12, bottom - 18 }, settingsWidth - 24, "{MUTED}" + status);
+    }
+
     inline void DrawPagePosition(
         Drawing::RenderTarget& rt, ScreenCoordsXY p, int width, size_t selected, size_t count, size_t capacity)
     {
@@ -674,6 +742,7 @@ namespace OpenRCT2::Ui::Handheld
         std::vector<PanelIcon> icons;
         std::string status;
         size_t selected{};
+        bool destructive{}; // The first row discards or replaces something: drawn red.
     };
 
     inline ScreenSize OverlaySize(size_t rows)
@@ -699,8 +768,9 @@ namespace OpenRCT2::Ui::Handheld
         Drawing::RenderTarget listRt;
         if(ClipRenderTarget(listRt,rt,p+ScreenCoordsXY{0,43},window.width,listHeight))
             for(size_t i=first;i<model.rows.size() && static_cast<int>(i)*kPanelRowPitch-offset<listHeight;++i)
-                DrawIconRow(listRt,{10,static_cast<int>(i)*kPanelRowPitch-offset},window.width-20,
-                    model.rows[i],i==model.selected,i<model.icons.size() ? model.icons[i] : PanelIcon::none);
+                DrawActionRow(listRt,{10,static_cast<int>(i)*kPanelRowPitch-offset},{window.width-20,28},
+                    model.rows[i],"",i==model.selected,true,i<model.icons.size() ? model.icons[i] : PanelIcon::none,
+                    model.destructive && i==0);
         DrawModernEllipsised(
             rt, p + ScreenCoordsXY{ 13, window.height - 45 }, window.width - 26, model.status, { Drawing::Colour::white });
         DrawOverlayCommands(rt, window);
