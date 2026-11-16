@@ -1176,10 +1176,10 @@ namespace OpenRCT2::Ui::Windows
         {
             using I = Handheld::PanelIcon;
             if (_page == Page::build)
-                return {{0,"Raise land","Lift the ground under your cursor",I::raise},
-                    {1,"Lower land","Lower the ground under your cursor",I::lower},
+                return {{0,"Raise hill","Gentle hills; Y also digs, makes ponds or flattens",I::raise},
+                    {1,"Dig","Lower the ground with gentle slopes",I::lower},
                     {2,"Paths","Footpaths, queues, connected paths and removal",I::path},
-                    {3,"Water","Raise or lower water",I::terrain,SPR_TAB_WATER},
+                    {3,"Pond","Dig a pond that fills with water",I::terrain,SPR_TAB_WATER},
                     {4,"Surfaces","Choose a ground surface",I::terrain,SPR_G2_TAB_LAND},
                     {5,"Remove scenery","Remove an existing scenery object",I::remove},
                     {6,"Trees","Choose a tree from the visual catalog",I::tree},
@@ -1187,7 +1187,7 @@ namespace OpenRCT2::Ui::Windows
                     {8,"Rides","Choose a ride, then place or construct it",I::play,SPR_TAB_RIDE_0},
                     {9,"Saved designs","Browse your saved track designs",I::folder},
                     {10,"Scenery","Trees, buildings, fences, signs and path furniture",I::largeScenery},
-                    {11,"Landscape","Brush, shape, water and terrain painting",I::terrain,SPR_G2_TAB_LAND},
+                    {11,"Advanced landscape","Corners, edges, water levels and terrain painting",I::terrain,SPR_G2_TAB_LAND},
                     {12,"Land & rights","Buy available land or construction rights",I::terrain},
                     {13,"Park","Return to your park",I::back}};
             if (_page == Page::paths)
@@ -1845,10 +1845,10 @@ namespace OpenRCT2::Ui::Windows
                 case Page::customChoice:
                     return { "Custom build", "Saved designs...", "Back" };
                 case Page::build:
-                    return { "Raise land",
-                             "Lower land",
+                    return { "Raise hill",
+                             "Dig",
                              "Paths",
-                             "Water",
+                             "Pond",
                              "Surface",
                              "Remove scenery",
                              "Trees",

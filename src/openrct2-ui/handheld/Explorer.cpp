@@ -6,6 +6,7 @@
 #include "GuestFollow.h"
 #include "Explorer.h"
 #include "Alerts.h"
+#include "Landscape.h"
 
 #include "AreaTools.h"
 #include "ConstructionPanel.h"
@@ -172,14 +173,17 @@ namespace OpenRCT2::Ui::Handheld
         _sceneryTarget.reset();
         _surfaceIndex = kObjectEntryIndexNull;
         _raiseLand = raise;
+        Landscape::shape = raise ? Landscape::Shape::hill : Landscape::Shape::dig;
         _terrainStatus.clear();
         _scatterFeedback = false;
     }
 
+    // Water is a pond you dig, not a column you raise: the quick tool fills what it digs, so the
+    // water always sits inside its banks. Raw water levels remain in Build > Landscape.
     void BeginWater(bool raise)
     {
         BeginTerrain(raise);
-        _waterTool = true;
+        Landscape::shape = Landscape::Shape::pond;
     }
 
     void BeginSurface()
@@ -497,16 +501,7 @@ namespace OpenRCT2::Ui::Handheld
             return Surface::Action(_terrainTile, _surfaceIndex, execute);
         if (_waterTool)
             return Water::Action(_terrainTile, _raiseLand, execute);
-        const auto tile = *_terrainTile;
-        const MapRange range{ tile.x, tile.y, tile.x, tile.y };
-        const CoordsXY centre{ tile.x + 16, tile.y + 16 };
-        if (_raiseLand)
-        {
-            auto action = GameActions::LandRaiseAction(centre, range, MapSelectType::full);
-            return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
-        }
-        auto action = GameActions::LandLowerAction(centre, range, MapSelectType::full);
-        return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+        return Landscape::Action(_terrainTile, execute);
     }
 
     static bool HasTextOrModalInput()
@@ -1003,7 +998,7 @@ namespace OpenRCT2::Ui::Handheld
                 Paths::UpdatePreview();
             }
             auto coords = Paths::IsActive() ? Paths::TargetTile() : ScreenGetMapXY(Centre(), nullptr);
-            if (_waterTool)
+            if (_waterTool || (SimpleTerrain() && Landscape::shape == Landscape::Shape::pond))
             {
                 const auto info = GetMapCoordinatesFromPos(
                     Centre(), { ViewportInteractionItem::terrain, ViewportInteractionItem::water });
@@ -1076,6 +1071,19 @@ namespace OpenRCT2::Ui::Handheld
                 if (_sceneryClearTool) {
                     const auto range=AreaTools::Range(_terrainTile,SceneryClear::settings.width,SceneryClear::settings.height);
                     if(!range)_terrainTile.reset(); else {gMapSelectPositionA={range->getX1(),range->getY1()};gMapSelectPositionB={range->getX2(),range->getY2()};}
+                }
+                if (SimpleTerrain())
+                {
+                    // Preview the whole brush so the player sees exactly what A will shape.
+                    if (const auto range = Landscape::Range(_terrainTile))
+                    {
+                        gMapSelectPositionA = { range->getX1(), range->getY1() };
+                        gMapSelectPositionB = { range->getX2(), range->getY2() };
+                        gMapSelectType = Landscape::shape == Landscape::Shape::pond ? MapSelectType::fullWater
+                                                                                    : MapSelectType::full;
+                    }
+                    else
+                        _terrainTile.reset();
                 }
                 if (_areaTool)
                 {
@@ -1642,7 +1650,9 @@ namespace OpenRCT2::Ui::Handheld
                                            : _sceneryRemovalTool                               ? "Removed."
                                            : _surfaceTool                                      ? "Surface painted."
                                            : _waterTool                                        ? "Water level changed."
-                                                                                               : "Land changed.")
+                                           : Landscape::shape == Landscape::Shape::pond        ? "Pond dug / A again to go deeper"
+                                           : Landscape::shape == Landscape::Shape::flatten     ? "Levelled one step"
+                                                                                               : "Land shaped.")
                                     : result.getErrorMessage();
                             }
                         }
@@ -1727,6 +1737,8 @@ namespace OpenRCT2::Ui::Handheld
                                 _constructionAdjust.active=true;
                                 _constructionAdjust.focus.tab=2; _constructionAdjust.row=0;
                             }
+                            else if (SimpleTerrain())
+                                Landscape::Cycle(1);
                             else if (!_sceneryRemovalTool)
                             {
                                 _areaTool=true;
@@ -1761,7 +1773,7 @@ namespace OpenRCT2::Ui::Handheld
                         else if (_areaTool)
                             AreaTools::Configure(1,action == Action::slopeUp ? 1 : -1);
                         else if(SimpleTerrain())
-                            _raiseLand=action==Action::slopeUp;
+                            Landscape::Resize(action == Action::slopeUp ? 1 : -1);
                         break;
                     case Action::cameraMode:
                         break;
@@ -1841,7 +1853,7 @@ namespace OpenRCT2::Ui::Handheld
                 : _sceneryRemovalTool                                     ? "REMOVE SCENERY"
                 : _surfaceTool                                            ? "PAINT SURFACE"
                 : _waterTool                                              ? (_raiseLand ? "RAISE WATER" : "LOWER WATER")
-                                                                          : (_raiseLand ? "RAISE LAND" : "LOWER LAND");
+                                                                          : std::string(Landscape::Name(Landscape::shape));
             if (_terrainTile)
             {
                 const auto result = TerrainAction(false);
@@ -1922,7 +1934,7 @@ namespace OpenRCT2::Ui::Handheld
                 else if (_surfaceTool)
                     DrawSurfaceOverlay(rt, Concept::kOrigin, Surface::Name(_surfaceIndex));
                 else
-                    DrawTerrainOverlay(rt, Concept::kOrigin, _raiseLand, _waterTool);
+                    DrawLandscapeOverlay(rt, Concept::kOrigin, static_cast<int>(Landscape::shape), Landscape::brush);
             }
             if (Designs::Active() || FlatRides::CurrentStage() != FlatRides::Stage::inactive)
             { /* The shared ride panel owns its action strip. */
@@ -1957,7 +1969,9 @@ namespace OpenRCT2::Ui::Handheld
             else if(_surfaceTool)
                 ConstructionAdjust::Footer(rt,{ContextGetWidth(),height},false,false,"Paint");
             else if(SimpleTerrain())
-                DrawConstructionFooter(rt,{ContextGetWidth(),height},"Apply","Adjust");
+                DrawFooter(rt, { ContextGetWidth(), height },
+                    { { "D-pad", "Move" }, { "A", Landscape::Name(Landscape::shape) }, { "Y", "Shape" },
+                      { "L2/R2", "Brush size" }, { "B", "Back" }, { "L1/R1", "Zoom", HintPriority::guide } });
             else
                 DrawGameplayFooter(
                     rt, { ContextGetWidth(), height }, status, _terrainActive, _surfaceTool || _colourRide.has_value(),

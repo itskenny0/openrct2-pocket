@@ -16,6 +16,7 @@
 #include <openrct2-ui/handheld/RideAccess.h>
 #include <openrct2-ui/handheld/TrackEditing.h>
 #include <openrct2-ui/handheld/Alerts.h>
+#include <openrct2-ui/handheld/Landscape.h>
 #include <openrct2-ui/handheld/ParkOverview.h>
 #include <openrct2/ride/Track.h>
 #include <openrct2/ride/TrackData.h>
@@ -167,6 +168,15 @@ int main(int argc, char** argv)
             Check(!home.bodyLines.empty()&&home.bodyLines.front().find("Needs attention")!=std::string::npos,"Overview does not lead with alerts");
             press(H::Action::openMenu);capture("06b-overview-alerts.png");closeMenu();
             ride->flags.unset(RideFlag::brokenDown);H::Alerts::Invalidate();
+        }
+        {
+            // A rendered look at quick landscaping beside the ride: a 3x3 pond and a hill.
+            namespace L=H::Landscape;
+            H::BeginWater();L::brush=3;
+            Check(L::Action(CoordsXY{800,544},true).error==GameActions::Status::ok,"Pond failed beside ride");GameActions::ProcessQueue(state);GameActions::ProcessQueue(state);
+            L::shape=L::Shape::hill;Check(L::Action(CoordsXY{544,800},true).error==GameActions::Status::ok,"Hill failed beside ride");GameActions::ProcessQueue(state);
+            L::shape=L::Shape::pond;focus({720,600,48});H::UpdateExplorer(input);capture("06c-landscape.png");
+            L::brush=1;H::EndTerrain();
         }
         const auto wooden=load("rct2.ride.ptct1",RIDE_TYPE_WOODEN_ROLLER_COASTER);
         Check(H::BeginCustomTrack(wooden,RIDE_TYPE_WOODEN_ROLLER_COASTER),"Coaster start failed");GameActions::ProcessQueue(state);C::Update(CoordsXY{1408,640});focus({1424,656,64});

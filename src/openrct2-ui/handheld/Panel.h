@@ -570,18 +570,35 @@ namespace OpenRCT2::Ui::Handheld
     inline constexpr ScreenSize kTerrainOverlaySize{ 164, 278 };
     inline constexpr ScreenSize kContextSize{ 160, 42 };
 
-    inline void DrawTerrainOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, bool raise, bool water = false)
+    // Quick landscaping: four shapes named for what you want, the current one highlighted, and the
+    // brush drawn as a little tile grid so its size reads at a glance.
+    inline void DrawLandscapeOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, int shape, int brush)
     {
         using namespace Concept;
-        Box(rt, pos, { kRailWidth, 200 });
-        Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, water ? "Water" : "Terrain");
-        Row(rt, pos + ScreenCoordsXY{ 8, 34 }, water ? "Raise water" : "Raise land", Icon::rise, raise);
-        Row(rt, pos + ScreenCoordsXY{ 8, 62 }, water ? "Lower water" : "Lower land", Icon::lower, !raise);
-        Rule(rt, pos + ScreenCoordsXY{ 8, 99 }, 148);
-        Section(rt, pos + ScreenCoordsXY{ 10, 109 }, "Brush");
-        DrawModernText(rt, pos + ScreenCoordsXY{ 12, 132 }, "Single tile");
-        DrawModernText(rt, pos + ScreenCoordsXY{ 12, 153 }, "{MUTED}1 x 1");
-        DrawCommand(rt, pos + ScreenCoordsXY{ 12, 174 }, 32, "L2/R2", "Lower / raise");
+        static constexpr const char* names[]{ "Raise hill", "Dig", "Pond", "Flatten" };
+        static constexpr const char* help[]{ "Gentle slopes up", "Gentle slopes down", "Dig and fill with water",
+                                             "Level to the middle" };
+        const Icon icons[]{ Icon::rise, Icon::lower, Icon::ground, Icon::ground };
+        Box(rt, pos, { kRailWidth, 236 });
+        Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, "Landscape");
+        for (int i = 0; i < 4; ++i)
+            Row(rt, pos + ScreenCoordsXY{ 8, 34 + i * 26 }, names[i], icons[i], i == shape);
+        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 12, 140 }, kRailWidth - 20, std::string("{MUTED}") + help[shape & 3]);
+        Rule(rt, pos + ScreenCoordsXY{ 8, 158 }, 148);
+        Section(rt, pos + ScreenCoordsXY{ 10, 166 }, "Brush");
+        const std::string size = std::to_string(brush) + " x " + std::to_string(brush);
+        DrawModernText(rt, pos + ScreenCoordsXY{ 12, 186 }, brush == 1 ? "Single tile" : size + " tiles");
+        // Tile grid preview, 5 x 5 cells with the brush filled from the centre.
+        const ScreenCoordsXY grid = pos + ScreenCoordsXY{ kRailWidth - 52, 168 };
+        for (int y = 0; y < 5; ++y)
+            for (int x = 0; x < 5; ++x)
+            {
+                const int r = brush / 2;
+                const bool on = std::abs(x - 2) <= r && std::abs(y - 2) <= r;
+                Fill(rt, grid + ScreenCoordsXY{ x * 8, y * 8 }, { 7, 7 },
+                     on ? Theme::gold : static_cast<Drawing::PaletteIndex>(PocketPalette::disabled));
+            }
+        DrawCommand(rt, pos + ScreenCoordsXY{ 12, 210 }, 32, "Y", "Shape   L2/R2  Size");
     }
 
     inline void DrawSurfaceOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& name)
