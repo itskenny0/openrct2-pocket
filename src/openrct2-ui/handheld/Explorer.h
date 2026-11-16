@@ -32,6 +32,9 @@ namespace OpenRCT2::Ui::Handheld
     // Shows an upstream error as a short Pocket notice under the HUD (sound only while a menu
     // or build tool is open, since those already show the message in their own status line).
     void ShowToast(std::string_view title, std::string_view message);
+    // Y in the park: moves the camera to the next alert and shows what usually fixes it. Returns
+    // false when nothing needs attention.
+    bool JumpToNextAlert();
     void UpdateExplorer(ControllerInput& input);
     void HandleExplorerInput(ControllerInput& input, const Frame& frame);
     void EndTerrain();

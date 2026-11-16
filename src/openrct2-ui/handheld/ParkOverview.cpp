@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "ParkOverview.h"
 
+#include "Alerts.h"
 #include "Finances.h"
 
 #include <openrct2-ui/interface/Objective.h>
@@ -110,6 +111,25 @@ namespace OpenRCT2::Ui::Handheld::ParkOverview
                           park.flags.has(ParkFlag::noMoney)     ? "Not applicable"
                               : park.value == kMoney64Undefined ? "Unavailable"
                                                                 : FormatMoney(park.value) } };
+        // The home screen leads with what needs the player. When something does, it replaces the long
+        // objective text (which has its own page) so the action grid still fits on a small screen.
+        if (const auto& alerts = Alerts::Current(); !alerts.empty())
+        {
+            model.bodyLines.push_back("{CAUTION}Needs attention  -  Y in the park visits each one");
+            for (size_t i = 0; i < std::min<size_t>(alerts.size(), 3); ++i)
+                model.bodyLines.push_back(
+                    std::string(alerts[i].kind <= Alerts::Kind::breakdown ? "{DANGER}" : "{WHITE}") + alerts[i].title
+                    + "  -  " + alerts[i].fix);
+            if (alerts.size() > 3)
+                model.bodyLines.push_back("{MUTED}and " + std::to_string(alerts.size() - 3) + " more");
+            model.bodyLines.push_back("{MUTED}Objective: " + Outcome());
+            model.rows = { StatusPermitted() ? (park.flags.has(ParkFlag::parkOpen) ? "Close park..." : "Open park...")
+                                             : "Park status locked",
+                           Finances::Available(Finances::Field::admission) ? "Admission..." : "Admission unavailable",
+                           "Park map...", "Park news...", "Park awards...", "Park history..." };
+            return model;
+        }
+        model.bodyLines.push_back("{POSITIVE}All clear - nothing needs you right now");
         std::string wrapped;
         int32_t count{};
         // Reuse the desktop objective string/arguments and native UTF-8/format-aware wrapping.

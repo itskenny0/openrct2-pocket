@@ -161,7 +161,7 @@ namespace OpenRCT2::Ui::Handheld
         }
         for (size_t i = 0; i < model.bodyLines.size(); ++i)
             DrawModernEllipsised(rt, p + ScreenCoordsXY{12, contentTop + 4 + statRows * statHeight + static_cast<int>(i) * 16},
-                width - 24, "{WHITE}" + model.bodyLines[i]);
+                width - 24, model.bodyLines[i].starts_with("{") ? model.bodyLines[i] : "{WHITE}" + model.bodyLines[i]);
         if (!model.graph.empty())
         {
             const auto [low, high] = std::minmax_element(model.graph.begin(), model.graph.end());

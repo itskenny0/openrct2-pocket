@@ -15,6 +15,8 @@
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/RideAccess.h>
 #include <openrct2-ui/handheld/TrackEditing.h>
+#include <openrct2-ui/handheld/Alerts.h>
+#include <openrct2-ui/handheld/ParkOverview.h>
 #include <openrct2/ride/Track.h>
 #include <openrct2/ride/TrackData.h>
 #include <openrct2/ride/ted/TrackElementDescriptor.h>
@@ -149,6 +151,23 @@ int main(int argc, char** argv)
         FocusRideTabAction("Close...");press(H::Action::confirm);W::HandheldMenuMove(-1);press(H::Action::confirm);GameActions::ProcessQueue(state);Check(GetRide(target.id)->status==RideStatus::closed,"Modern Close action failed");
         FocusRideTabAction("Close...");press(H::Action::confirm);Check(W::HandheldRidesPresentation().confirmation&&W::HandheldRidesPresentation().selected==0,"Status review does not start on the action");
         press(H::Action::back);FocusRideTabAction("Demolish...");press(H::Action::confirm);Check(W::HandheldRidesPresentation().selected==1,"Demolition review is not Cancel-first");capture("06-demolition-review.png");press(H::Action::back);Check(H::RideManagement::Resolve(target),"Cancel demolished ride");closeMenu();
+        {
+            // Attention: a broken ride becomes the first alert, Y glides the camera to it, and the
+            // overview home leads with it. With no problems, Y is News as before.
+            auto* ride=GetRide(target.id);ride->flags.set(RideFlag::brokenDown);H::Alerts::Invalidate();
+            const auto& alerts=H::Alerts::Current();
+            Check(!alerts.empty()&&alerts.front().kind==H::Alerts::Kind::breakdown&&alerts.front().ride==target.id.ToUnderlying(),"Broken ride is not the first alert");
+            Check(H::Alerts::HintLabel().starts_with("Alerts ("),"Footer does not advertise alerts");
+            auto* main=WindowGetMain();main->savedViewPos={};main->flags.unset(WindowFlag::scrollingToLocation);
+            press(H::Action::contextSecondary);
+            Check(main->flags.has(WindowFlag::scrollingToLocation)&&main->savedViewPos!=ScreenCoordsXY{},"Y did not glide to the alert");
+            main->viewport->viewPos=main->savedViewPos;main->flags.unset(WindowFlag::scrollingToLocation);
+            capture("06a-alert-jump.png");
+            const auto home=H::ParkOverview::Presentation(0);
+            Check(!home.bodyLines.empty()&&home.bodyLines.front().find("Needs attention")!=std::string::npos,"Overview does not lead with alerts");
+            press(H::Action::openMenu);capture("06b-overview-alerts.png");closeMenu();
+            ride->flags.unset(RideFlag::brokenDown);H::Alerts::Invalidate();
+        }
         const auto wooden=load("rct2.ride.ptct1",RIDE_TYPE_WOODEN_ROLLER_COASTER);
         Check(H::BeginCustomTrack(wooden,RIDE_TYPE_WOODEN_ROLLER_COASTER),"Coaster start failed");GameActions::ProcessQueue(state);C::Update(CoordsXY{1408,640});focus({1424,656,64});
         for(int i=0;i<3;++i){Check(C::Select(TrackElemType::endStation)&&C::Action(true).error==GameActions::Status::ok,"Station action failed");GameActions::ProcessQueue(state);}

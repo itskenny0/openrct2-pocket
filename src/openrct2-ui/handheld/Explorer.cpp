@@ -5,6 +5,7 @@
 
 #include "GuestFollow.h"
 #include "Explorer.h"
+#include "Alerts.h"
 
 #include "AreaTools.h"
 #include "ConstructionPanel.h"
@@ -601,6 +602,7 @@ namespace OpenRCT2::Ui::Handheld
     {
         std::string title, message;
         uint64_t shown{};
+        bool notice{}; // An alert the player asked to see (Y), not an error: calmer colour and sound.
     };
     static Toast _toast;
     static constexpr uint64_t kToastMs = 2600, kToastSlideMs = 150;
@@ -1737,7 +1739,8 @@ namespace OpenRCT2::Ui::Handheld
                             _terrainStatus.clear();
                             _scatterFeedback = false;
                         }
-                        else Windows::HandheldNewsOpen();
+                        else if (!JumpToNextAlert())
+                            Windows::HandheldNewsOpen();
                         break;
                     case Action::back:
                     case Action::openMenu:
@@ -1958,7 +1961,7 @@ namespace OpenRCT2::Ui::Handheld
             else
                 DrawGameplayFooter(
                     rt, { ContextGetWidth(), height }, status, _terrainActive, _surfaceTool || _colourRide.has_value(),
-                    _inspect.verb);
+                    _inspect.verb, Alerts::HintLabel());
         }
         // A colour palette owns the D-pad; placement feedback/cursor is unrelated
         // here and suggested a placement error while merely choosing a colour.
@@ -1984,8 +1987,10 @@ namespace OpenRCT2::Ui::Handheld
                 const ScreenCoordsXY origin{ 0, ToastOffset() };
                 DrawCard(slot, origin, size);
                 Fill(slot, origin + ScreenCoordsXY{ 5, 4 }, { 4, size.height - 8 },
-                    static_cast<Drawing::PaletteIndex>(PocketPalette::destructive));
-                DrawStrongText(slot, origin + ScreenCoordsXY{ 16, 6 }, "{DANGER}" + _toast.title, size.width - 24);
+                    static_cast<Drawing::PaletteIndex>(_toast.notice ? PocketPalette::caution : PocketPalette::destructive));
+                DrawStrongText(
+                    slot, origin + ScreenCoordsXY{ 16, 6 }, (_toast.notice ? "{CAUTION}" : "{DANGER}") + _toast.title,
+                    size.width - 24);
                 if (!_toast.message.empty())
                     DrawModernEllipsised(slot, origin + ScreenCoordsXY{ 16, 23 }, size.width - 24, "{WHITE}" + _toast.message);
             }
@@ -2006,6 +2011,31 @@ namespace OpenRCT2::Ui::Handheld
         _toast.title = Windows::HandheldNewsText(std::string(title));
         _toast.message = Windows::HandheldNewsText(std::string(message));
         _toast.shown = MenuFeel::Clock();
+        _toast.notice = false;
+    }
+
+    static size_t _alertIndex{};
+    // Y in the park: glide to the next thing that needs the player and say what usually fixes it.
+    // The camera stops with the problem under the cursor, so A opens that ride (or the guest there)
+    // exactly as if the player had walked over to it. With nothing to report, Y is News as before.
+    bool JumpToNextAlert()
+    {
+        Alerts::Invalidate();
+        const auto& alerts = Alerts::Current();
+        auto* main = WindowGetMain();
+        if (alerts.empty() || main == nullptr)
+            return false;
+        const auto& alert = alerts[_alertIndex++ % alerts.size()];
+        WindowScrollToLocation(*main, alert.location);
+        Audio::Play(Audio::SoundId::click1, -400, Audio::kAudioPlayAtCentre);
+        _toast.title = Windows::HandheldNewsText(alert.title);
+        _toast.message = (alerts.size() > 1 ? std::to_string((_alertIndex - 1) % alerts.size() + 1) + " of "
+                                  + std::to_string(alerts.size()) + "  |  "
+                                            : std::string())
+            + alert.fix;
+        _toast.shown = MenuFeel::Clock();
+        _toast.notice = true;
+        return true;
     }
 } // namespace OpenRCT2::Ui::Handheld
 
