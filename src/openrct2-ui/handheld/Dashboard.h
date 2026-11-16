@@ -152,7 +152,10 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
             const bool active = i == state.index();
             const bool focused = active && state.focus == Focus::rail;
             if (focused)
+            {
                 Fill(rt, rail + ScreenCoordsXY{ 6, y }, { railWidth - 12, 36 }, Theme::gold);
+                ReportSelected(rt, rail + ScreenCoordsXY{ 6, y }, { railWidth - 12, 36 });
+            }
             else if (active)
             {
                 for (int x = 6; x <= 8; ++x)

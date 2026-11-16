@@ -46,6 +46,7 @@
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
+#include <openrct2/audio/Audio.h>
 #include <openrct2/entity/Peep.h>
 #include <openrct2/ride/Ride.h>
 #include <openrct2/ride/RideData.h>
@@ -543,6 +544,93 @@ namespace OpenRCT2::Ui::Handheld
             shortcut->action();
     }
 
+    // What A would inspect at the fixed cursor, refreshed each update so the footer verb, the
+    // cursor colour and the name chip preview the press instead of leaving it to guesswork.
+    enum class InspectKind : uint8_t
+    {
+        none,
+        ride,
+        shop,
+        guest,
+        staff,
+        park,
+    };
+    struct InspectTarget
+    {
+        std::string verb = "Inspect";
+        std::string name;
+        InspectKind kind = InspectKind::none;
+    };
+    static InspectTarget _inspect;
+    static InspectKind _drawnInspectKind = InspectKind::none;
+
+    static Drawing::PaletteIndex InspectColour(InspectKind kind)
+    {
+        switch (kind)
+        {
+            case InspectKind::ride: return NearestPaletteIndex(70, 200, 110);
+            case InspectKind::shop: return NearestPaletteIndex(245, 150, 40);
+            case InspectKind::guest: return NearestPaletteIndex(250, 215, 60);
+            case InspectKind::staff: return NearestPaletteIndex(90, 160, 245);
+            case InspectKind::park: return NearestPaletteIndex(225, 110, 220);
+            default: return NearestPaletteIndex(240, 240, 240);
+        }
+    }
+    static constexpr int kCursorWindow = 41;
+    // Brackets breathe 0-3 px on a ~0.8 s cycle; still with reduced motion.
+    static int BracketPulse()
+    {
+        if (MenuFeel::reduceMotion)
+            return 1;
+        static constexpr int kSteps[] = { 0, 1, 2, 3, 2, 1 };
+        return kSteps[(MenuFeel::Clock() / 140) % 6];
+    }
+    static ScreenSize InspectChipSize()
+    {
+        return { std::min(ContextGetWidth() / 2, TextWidth(_inspect.name, true) + 24), 20 };
+    }
+    static ScreenCoordsXY InspectChipOrigin()
+    {
+        const auto size = InspectChipSize();
+        auto origin = Centre() + ScreenCoordsXY{ 16, 12 };
+        origin.x = std::min(origin.x, ContextGetWidth() - size.width - Layout::margin);
+        return origin;
+    }
+
+    struct Toast
+    {
+        std::string title, message;
+        uint64_t shown{};
+    };
+    static Toast _toast;
+    static constexpr uint64_t kToastMs = 2600, kToastSlideMs = 150;
+    static bool ToastVisible(uint64_t now = MenuFeel::Clock())
+    {
+        return _toast.shown != 0 && now - _toast.shown < kToastMs;
+    }
+    static ScreenSize ToastSize()
+    {
+        const int text = std::max(TextWidth(_toast.title, true), TextWidth(_toast.message));
+        return { std::min(ContextGetWidth() - 2 * Layout::margin, text + 34), _toast.message.empty() ? 24 : 40 };
+    }
+    static ScreenCoordsXY ToastOrigin()
+    {
+        return { (ContextGetWidth() - ToastSize().width) / 2, Layout::hudTop + Layout::hudHeight + 6 };
+    }
+    // Slides down from under the HUD, then back up before it disappears.
+    static int ToastOffset(uint64_t now = MenuFeel::Clock())
+    {
+        if (MenuFeel::reduceMotion || !ToastVisible(now))
+            return 0;
+        const auto age = now - _toast.shown;
+        const auto height = ToastSize().height + 8;
+        if (age < kToastSlideMs)
+            return -static_cast<int>(height * (kToastSlideMs - age) / kToastSlideMs);
+        if (age > kToastMs - kToastSlideMs)
+            return -static_cast<int>(height * (age - (kToastMs - kToastSlideMs)) / kToastSlideMs);
+        return 0;
+    }
+
     class FocusWindow final : public Window
     {
     public:
@@ -563,13 +651,14 @@ namespace OpenRCT2::Ui::Handheld
             wm->CloseByClass(WindowClass::handheldHud);
             return;
         }
-        const auto position = Centre() - ScreenCoordsXY{ 9, 9 };
+        const auto position = Centre() - ScreenCoordsXY{ kCursorWindow / 2, kCursorWindow / 2 };
         if (focus == nullptr)
         {
             // An empty, input-transparent widget list lets map hit testing pass through.
             // A real overlay window also keeps viewport scroll blits from smearing the reticle.
+            // Sized for the pulsing target brackets, not just the cross.
             wm->Create<FocusWindow>(
-                WindowClass::handheldFocus, position, { 19, 19 },
+                WindowClass::handheldFocus, position, { kCursorWindow, kCursorWindow },
                 { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
         }
         else if (focus->windowPos != position)
@@ -577,6 +666,65 @@ namespace OpenRCT2::Ui::Handheld
             focus->invalidate();
             focus->windowPos = position;
             focus->invalidate();
+        }
+        else if (_inspect.kind != _drawnInspectKind || (_inspect.kind != InspectKind::none && !MenuFeel::reduceMotion))
+            focus->invalidate(); // Target colour changed, or the brackets are pulsing.
+        _drawnInspectKind = _inspect.kind;
+        // Name chip beside the cursor, sized to the name; absent when nothing is under it.
+        auto* chip = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 4 });
+        if (_inspect.name.empty() || _terrainActive || Paths::IsActive())
+        {
+            if (chip != nullptr)
+                wm->Close(*chip);
+        }
+        else
+        {
+            const auto origin = InspectChipOrigin();
+            const auto size = InspectChipSize();
+            if (chip == nullptr)
+            {
+                chip = wm->Create<FocusWindow>(
+                    WindowClass::handheldHud, origin, size,
+                    { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
+                if (chip != nullptr)
+                    chip->number = 4;
+            }
+            else if (chip->windowPos != origin || chip->width != size.width)
+            {
+                chip->invalidate();
+                chip->windowPos = origin;
+                chip->width = size.width;
+                chip->height = size.height;
+            }
+            if (chip != nullptr)
+                chip->invalidate();
+        }
+        auto* toast = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 5 });
+        if (!ToastVisible())
+        {
+            if (toast != nullptr)
+                wm->Close(*toast);
+        }
+        else
+        {
+            const auto size = ToastSize();
+            if (toast == nullptr)
+            {
+                toast = wm->Create<FocusWindow>(
+                    WindowClass::handheldHud, ToastOrigin(), size,
+                    { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
+                if (toast != nullptr)
+                    toast->number = 5;
+            }
+            else
+            {
+                toast->invalidate();
+                toast->windowPos = ToastOrigin();
+                toast->width = size.width;
+                toast->height = size.height;
+            }
+            if (toast != nullptr)
+                toast->invalidate();
         }
         auto* hud = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 0 });
         if (hud == nullptr)
@@ -741,13 +889,6 @@ namespace OpenRCT2::Ui::Handheld
 
     // What A would inspect at the fixed cursor, refreshed each update so the footer verb and the
     // name chip preview the press instead of leaving it to guesswork.
-    struct InspectTarget
-    {
-        std::string verb = "Inspect";
-        std::string name;
-    };
-    static InspectTarget _inspect;
-
     static InspectTarget ResolveInspectTarget()
     {
         const auto info = GetMapCoordinatesFromPos(
@@ -756,7 +897,8 @@ namespace OpenRCT2::Ui::Handheld
             if (ride == nullptr)
                 return InspectTarget{};
             const bool shop = ride->getRideTypeDescriptor().flags.has(RtdFlag::isShopOrFacility);
-            return InspectTarget{ shop ? "Inspect shop" : "Inspect ride", ride->getName() };
+            return InspectTarget{ shop ? "Inspect shop" : "Inspect ride", ride->getName(),
+                                  shop ? InspectKind::shop : InspectKind::ride };
         };
         switch (info.interactionType)
         {
@@ -764,7 +906,11 @@ namespace OpenRCT2::Ui::Handheld
                 if (info.Entity == nullptr)
                     break;
                 if (const auto* peep = info.Entity->as<Peep>(); peep != nullptr)
-                    return { info.Entity->type == EntityType::staff ? "Inspect staff" : "Inspect guest", peep->getName() };
+                {
+                    const bool staff = info.Entity->type == EntityType::staff;
+                    return { staff ? "Inspect staff" : "Inspect guest", peep->getName(),
+                             staff ? InspectKind::staff : InspectKind::guest };
+                }
                 if (const auto* vehicle = info.Entity->as<Vehicle>(); vehicle != nullptr && !vehicle->IsCableLift())
                     return rideTarget(GetRide(vehicle->ride));
                 break;
@@ -779,7 +925,7 @@ namespace OpenRCT2::Ui::Handheld
                     return rideTarget(GetRide(info.Element->asPath()->getRideIndex()));
                 break;
             case ViewportInteractionItem::parkEntrance:
-                return { "Inspect park", getGameState().park.name };
+                return { "Inspect park", getGameState().park.name, InspectKind::park };
             default:
                 break;
         }
@@ -1811,9 +1957,39 @@ namespace OpenRCT2::Ui::Handheld
         if (GuestFollow::Current() && !_terrainActive && !Paths::IsActive())
             DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), status);
         else if (!_inspect.name.empty() && !_terrainActive && !Paths::IsActive())
-            DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), _inspect.name);
-        // High contrast, fixed map focus; this does not move the desktop pointer.
-        DrawMapFocus(rt, c);
+            DrawInspectChip(rt, InspectChipOrigin(), InspectChipSize(), _inspect.name, InspectColour(_inspect.kind));
+        if (ToastVisible())
+        {
+            // Clipped to its resting slot so it slides out from under the HUD rather than over it.
+            const auto size = ToastSize();
+            Drawing::RenderTarget slot;
+            if (ClipRenderTarget(slot, rt, ToastOrigin(), size.width, size.height))
+            {
+                const ScreenCoordsXY origin{ 0, ToastOffset() };
+                DrawCard(slot, origin, size);
+                Fill(slot, origin + ScreenCoordsXY{ 5, 4 }, { 4, size.height - 8 },
+                    static_cast<Drawing::PaletteIndex>(PocketPalette::destructive));
+                DrawStrongText(slot, origin + ScreenCoordsXY{ 16, 6 }, "{DANGER}" + _toast.title, size.width - 24);
+                if (!_toast.message.empty())
+                    DrawModernEllipsised(slot, origin + ScreenCoordsXY{ 16, 23 }, size.width - 24, "{WHITE}" + _toast.message);
+            }
+        }
+        // High contrast, fixed map focus; this does not move the desktop pointer. While exploring
+        // it changes shape and colour over anything A can inspect; tools keep the precise cross.
+        if (!_terrainActive && !Paths::IsActive() && _inspect.kind != InspectKind::none)
+            DrawTargetBrackets(rt, c, InspectColour(_inspect.kind), BracketPulse());
+        else
+            DrawMapFocus(rt, c);
+    }
+
+    void ShowToast(std::string_view title, std::string_view message)
+    {
+        Audio::Play(Audio::SoundId::error, -300, Audio::kAudioPlayAtCentre);
+        if (!CanExplore() || _terrainActive || Paths::IsActive())
+            return;
+        _toast.title = Windows::HandheldNewsText(std::string(title));
+        _toast.message = Windows::HandheldNewsText(std::string(message));
+        _toast.shown = MenuFeel::Clock();
     }
 } // namespace OpenRCT2::Ui::Handheld
 

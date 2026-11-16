@@ -24,6 +24,7 @@
 #include "Mazes.h"
 #include "Panel.h"
 #include "MenuThemes.h"
+#include "FeelSound.h"
 #include "ParkOverview.h"
 #include "ParkMap.h"
 #include "ParkInformation.h"
@@ -421,6 +422,7 @@ namespace OpenRCT2::Ui::Windows
         size_t _parkNewsPage{}, _parkNewsFocus{};
         bool _newsFromPark{}, _newsFromDashboard{};
         bool _objectivesFromPark{};
+        bool _feelBack{};
         Handheld::Dashboard::State _newsDashboard;
         bool _parkGuestHistory{};
         bool _managementNewsReturn{};
@@ -1084,6 +1086,27 @@ namespace OpenRCT2::Ui::Windows
             _parkMap.Update();
             invalidate();
         }
+        Handheld::Accent accent() const
+        {
+            using Handheld::Accent;
+            using Section = Handheld::Dashboard::Section;
+            if (managementShell())
+            {
+                switch (_dashboard.section)
+                {
+                    case Section::rides: return Accent::rides;
+                    case Section::guests: return Accent::guests;
+                    case Section::staff: return Accent::staff;
+                    case Section::finances: return Accent::finances;
+                    case Section::research: return Accent::research;
+                    case Section::marketing: return Accent::marketing;
+                    default: return Accent::standard;
+                }
+            }
+            if (choiceCards() || picker())
+                return Accent::build;
+            return Accent::standard;
+        }
         bool choiceCards() const
         {
             return _page == Page::build || _page == Page::paths || _page == Page::sceneryCategory
@@ -1618,7 +1641,8 @@ namespace OpenRCT2::Ui::Windows
                 case Page::park:
                     return { "Resume park",   "Build",     "Park dashboard",      "Save park",
                              "Save and quit", "Load park", "Quit...", "Controls...",
-                             simulationChoice(0), simulationChoice(1), simulationChoice(2), simulationChoice(3), Handheld::MenuThemes::Choice() };
+                             simulationChoice(0), simulationChoice(1), simulationChoice(2), simulationChoice(3), Handheld::MenuThemes::Choice(),
+                             Handheld::MenuThemes::MotionChoice() };
                 case Page::quitChoice:
                     return { "Save and quit", "Quit without saving...", "Cancel" };
                 case Page::controls:
@@ -2324,6 +2348,13 @@ namespace OpenRCT2::Ui::Windows
             _status.clear();
             invalidate();
         }
+        // Sounds follow what changed on screen, so every input path (lists, grids, rails,
+        // tabs) gets the same feedback without each handler playing its own.
+        void playFeelSound(Handheld::MenuFeel::Event event)
+        {
+            Handheld::PlayFeelSound(event, _feelBack);
+            _feelBack = false;
+        }
         void pickerPause()
         {
             if (picker())
@@ -2331,7 +2362,7 @@ namespace OpenRCT2::Ui::Windows
         }
         void onUpdate() override
         {
-            _menuFeel.Observe(scrollKey(), _focus.index() + (_dashboard.index() << 16));
+            playFeelSound(_menuFeel.Observe(scrollKey(), _focus.index() + (_dashboard.index() << 16), Handheld::MenuFeel::Clock(), static_cast<int>(_page)));
             if (_menuFeel.NeedsDraw()) invalidate();
             if(_scrollViews[scrollKey()].moving())invalidate();
             if (_page == Page::sceneryPicker) { refreshPicker(); invalidate(); }
@@ -3149,6 +3180,8 @@ namespace OpenRCT2::Ui::Windows
         }
         void back()
         {
+            _menuFeel.MarkBack();
+            _feelBack = true;
             if (_leaveAction)
             {
                 cancelLeave();
@@ -3877,6 +3910,12 @@ namespace OpenRCT2::Ui::Windows
                             Handheld::MenuThemes::settings.Load(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user));
                             _status = Handheld::MenuThemes::settings.Toggle()
                                 ? "Theme changed" : "Theme changed for this session; preference could not be saved";
+                            invalidate();
+                            break;
+                        case 13:
+                            Handheld::MenuThemes::settings.Load(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user));
+                            _status = Handheld::MenuThemes::settings.ToggleMotion()
+                                ? "Motion changed" : "Motion changed for this session; preference could not be saved";
                             invalidate();
                             break;
                         case 8: case 9: case 10: case 11:
@@ -6129,12 +6168,32 @@ namespace OpenRCT2::Ui::Windows
             if (widget == 2)
                 back();
         }
-        void onDraw(RenderTarget& rt) override
+        void onDraw(RenderTarget& screen) override
         {
             Handheld::MenuThemes::settings.Load(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user));
             Handheld::Theme::Refresh();
-            _menuFeel.Observe(scrollKey(), _focus.index() + (_dashboard.index() << 16));
+            Handheld::ApplyAccent(accent());
+            playFeelSound(_menuFeel.Observe(scrollKey(), _focus.index() + (_dashboard.index() << 16), Handheld::MenuFeel::Clock(), static_cast<int>(_page)));
+            // Page transitions offset a copy of the target, so every draw below slides together.
+            RenderTarget rt = screen;
+            const auto [slideX, slideY] = _menuFeel.Slide();
+            rt.x -= slideX;
+            rt.y -= slideY;
+            rt.cullingX -= slideX;
+            rt.cullingY -= slideY;
             Handheld::MenuFeelScope buttonMotion(_menuFeel);
+            _menuFeel.base = { reinterpret_cast<const uint8_t*>(rt.bits), rt.x, rt.y, rt.LineStride() };
+            // Runs after every early return below, drawing the pointer above all content.
+            struct PointerOverlay
+            {
+                RenderTarget& target;
+                Handheld::MenuFeel& feel;
+                ~PointerOverlay()
+                {
+                    feel.EndFrame();
+                    Handheld::DrawFocusPointer(target, feel);
+                }
+            } pointerOverlay{ rt, _menuFeel };
             Handheld::ListScrollScope listMotion(_scrollViews[scrollKey()]);
             if(_page==Page::staffUniform && _staffTarget) {
                 auto model=staffPresentation();model.breadcrumb="Staff / Uniform colour";

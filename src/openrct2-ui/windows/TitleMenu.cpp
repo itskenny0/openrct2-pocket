@@ -8,7 +8,10 @@
  *****************************************************************************/
 
 #include <openrct2-ui/handheld/ControllerInput.h>
+#include <openrct2-ui/handheld/FeelSound.h>
 #include <openrct2-ui/handheld/Panel.h>
+#include <openrct2-ui/handheld/Currency.h>
+#include <openrct2-ui/handheld/SavedParkPresentation.h>
 #include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/interface/Window.h>
@@ -100,25 +103,88 @@ namespace OpenRCT2::Ui::Windows
     private:
         ScreenRect _filterRect;
         WidgetIndex _handheldSelection = WIDX_START_NEW_GAME;
+        Handheld::MenuFeel _feel;
+        // Handheld rows: Continue (when a save exists) followed by the visible menu buttons.
+        static constexpr int kContinueRow = -1;
+        size_t _handheldRow{};
+        std::optional<std::filesystem::path> _continuePath;
+        std::string _continueName, _continueDetail;
+        bool _continueScanned{};
+
+        // The newest park in the saves folder, including slots, named saves and autosaves.
+        void scanContinue()
+        {
+            if (_continueScanned)
+                return;
+            _continueScanned = true;
+            namespace fs = std::filesystem;
+            std::error_code error;
+            const auto root = fs::u8path(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user, DirId::saves));
+            fs::file_time_type newest{};
+            for (auto it = fs::recursive_directory_iterator(root, fs::directory_options::skip_permission_denied, error);
+                 !error && it != fs::recursive_directory_iterator(); it.increment(error))
+            {
+                if (!it->is_regular_file(error) || it->path().extension() != ".park")
+                    continue;
+                const auto time = it->last_write_time(error);
+                if (!error && (!_continuePath || time > newest))
+                {
+                    newest = time;
+                    _continuePath = it->path();
+                }
+            }
+            if (!_continuePath)
+                return;
+            const auto preview = Handheld::SavedParkPresentation::Read(*_continuePath);
+            if (!preview)
+            {
+                _continuePath.reset();
+                return;
+            }
+            _continueName = preview->parkName.empty() ? _continuePath->stem().u8string() : preview->parkName;
+            _continueDetail = Handheld::SavedParkPresentation::Date(*preview);
+            if (preview->parkUsesMoney)
+                _continueDetail += "  |  " + Handheld::FormatMoney(preview->cash);
+        }
+        std::vector<int> handheldRows()
+        {
+            scanContinue();
+            std::vector<int> rows;
+            if (_continuePath)
+                rows.push_back(kContinueRow);
+            for (auto index : { WIDX_START_NEW_GAME, WIDX_CONTINUE_SAVED_GAME, WIDX_MULTIPLAYER, WIDX_GAME_TOOLS })
+                if (widgets[index].isVisible())
+                    rows.push_back(index);
+            return rows;
+        }
 
     public:
         void handheldMove(int32_t direction)
         {
-            do
-            {
-                _handheldSelection = (_handheldSelection + direction + 4) % 4;
-            } while (!widgets[_handheldSelection].isVisible());
+            const auto rows = handheldRows();
+            _handheldRow = (_handheldRow + rows.size() + direction) % rows.size();
+            if (rows[_handheldRow] != kContinueRow)
+                _handheldSelection = rows[_handheldRow];
             invalidate();
         }
 
         void handheldConfirm()
         {
-            if (_handheldSelection == WIDX_CONTINUE_SAVED_GAME)
+            const auto rows = handheldRows();
+            const int row = rows[std::min(_handheldRow, rows.size() - 1)];
+            if (row == kContinueRow)
+            {
+                // A failed load (moved or damaged file) falls back to the load browser.
+                if (!_continuePath || !GetContext()->LoadParkFromFile(_continuePath->u8string()))
+                    HandheldLoadOpen();
+                return;
+            }
+            if (row == WIDX_CONTINUE_SAVED_GAME)
                 HandheldLoadOpen();
-            else if (_handheldSelection == WIDX_GAME_TOOLS)
-                onMouseDown(_handheldSelection);
+            else if (row == WIDX_GAME_TOOLS)
+                onMouseDown(row);
             else
-                onMouseUp(_handheldSelection);
+                onMouseUp(row);
         }
 
         void onOpen() override
@@ -317,33 +383,56 @@ namespace OpenRCT2::Ui::Windows
                 _filterRect.point1.y = windowPos.y;
         }
 
+        void onUpdate() override
+        {
+            if (!Handheld::IsEnabled())
+                return;
+            Handheld::PlayFeelSound(_feel.Observe("title", _handheldRow));
+            if (_feel.NeedsDraw())
+                invalidate();
+        }
+
         void onDraw(RenderTarget& rt) override
         {
             if (Handheld::IsEnabled())
             {
+                Handheld::PlayFeelSound(_feel.Observe("title", _handheldRow));
+                Handheld::MenuFeelScope motion(_feel);
+                _feel.base = { reinterpret_cast<const uint8_t*>(rt.bits), rt.x, rt.y, rt.LineStride() };
                 // Preserve the native animated title park and OpenRCT2 branding.
                 const ScreenCoordsXY logo{(width - 232) / 2, 8};
                 GfxDrawSprite(rt, ImageId(SPR_G2_LOGO), logo);
                 GfxDrawSprite(rt, ImageId(SPR_G2_TITLE), logo + ScreenCoordsXY{104, 18});
-                const ScreenCoordsXY p{(width - 320) / 2, 148};
-                const int count = widgets[WIDX_MULTIPLAYER].isVisible() ? 4 : 3;
-                Handheld::DrawSurface(rt, p, {320, 68 + count * 34});
+                const auto rows = handheldRows();
+                _handheldRow = std::min(_handheldRow, rows.size() - 1);
+                const bool hasContinue = _continuePath.has_value();
+                constexpr int kContinueHeight = 44;
+                const int cardHeight = 68 + static_cast<int>(rows.size()) * 34 + (hasContinue ? kContinueHeight - 32 : 0);
+                const ScreenCoordsXY p{ (width - 320) / 2, std::min(148, ContextGetHeight() - 34 - cardHeight) };
+                Handheld::DrawSurface(rt, p, {320, cardHeight});
                 Handheld::DrawSectionLabel(rt, p + ScreenCoordsXY{12, 14}, 296, "OPENRCT2 POCKET");
                 static constexpr const char* labels[] = { "New park", "Load saved park", "Multiplayer", "Game tools" };
                 static constexpr Handheld::PanelIcon icons[] = { Handheld::PanelIcon::terrain, Handheld::PanelIcon::folder,
                     Handheld::PanelIcon::play, Handheld::PanelIcon::save };
-                int32_t row = 0;
-                for (auto index : { WIDX_START_NEW_GAME, WIDX_CONTINUE_SAVED_GAME, WIDX_MULTIPLAYER, WIDX_GAME_TOOLS })
+                int32_t y = 49;
+                for (size_t i = 0; i < rows.size(); ++i)
                 {
-                    if (widgets[index].isVisible())
+                    const bool focused = i == _handheldRow;
+                    if (rows[i] == kContinueRow)
                     {
-                        Handheld::DrawActionRow(rt, p + ScreenCoordsXY{12, 49 + row * 34}, {296, 32},
-                            labels[index], {}, _handheldSelection == index, true, icons[index]);
-                        ++row;
+                        Handheld::DrawActionRow(rt, p + ScreenCoordsXY{12, y}, {296, kContinueHeight},
+                            "Continue: " + _continueName, _continueDetail, focused, true, Handheld::PanelIcon::play);
+                        y += kContinueHeight + 2;
+                        continue;
                     }
+                    Handheld::DrawActionRow(rt, p + ScreenCoordsXY{12, y}, {296, 32},
+                        labels[rows[i]], {}, focused, true, icons[rows[i]]);
+                    y += 34;
                 }
                 Handheld::DrawFooter(rt, {ContextGetWidth(), ContextGetHeight()},
                     {{"D-pad", "Navigate"}, {"A", "Select"}, {"B", "Exit"}});
+                _feel.EndFrame();
+                Handheld::DrawFocusPointer(rt, _feel);
                 return;
             }
             Rectangle::filter(rt, _filterRect, FilterPaletteID::palette51);

@@ -3,6 +3,7 @@
 #include "ConceptStyle.h"
 #include <filesystem>
 #include <optional>
+#include <openrct2/Context.h>
 #include <openrct2/park/ParkPreview.h>
 #include <openrct2/ParkImporter.h>
 #include <openrct2/core/FileStream.h>

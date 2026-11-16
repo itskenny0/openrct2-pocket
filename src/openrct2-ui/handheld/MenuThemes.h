@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
+#include "MenuFeel.h"
 #include "PocketPalette.h"
 #include <filesystem>
 #include <fstream>
@@ -21,6 +22,25 @@ namespace OpenRCT2::Ui::Handheld::MenuThemes
             std::ifstream in(_file);
             std::string name; std::getline(in,name);
             PocketPalette::SetStyle(name=="slate"?PocketPalette::Style::slate:PocketPalette::Style::daylight);
+            std::ifstream motion(profile/"pocket-motion.cfg");
+            std::string mode; std::getline(motion,mode);
+            MenuFeel::reduceMotion = mode=="reduced";
+        }
+        // Same atomic write as the theme, in its own file so older builds ignore it.
+        bool ToggleMotion()
+        {
+            MenuFeel::reduceMotion=!MenuFeel::reduceMotion;
+            std::error_code error;
+            const auto file=_file.parent_path()/"pocket-motion.cfg";
+            std::filesystem::create_directories(file.parent_path(),error);
+            if(error) return false;
+            auto pending=file; pending+=".pending";
+            std::ofstream out(pending,std::ios::trunc);
+            out<<(MenuFeel::reduceMotion?"reduced\n":"full\n");out.close();
+            bool success=bool(out);
+            if(success){std::filesystem::rename(pending,file,error);success=!error;}
+            if(!success)std::filesystem::remove(pending,error);
+            return success;
         }
         bool Toggle()
         {
@@ -42,6 +62,10 @@ namespace OpenRCT2::Ui::Handheld::MenuThemes
         }
     };
     inline Settings settings;
+    inline std::string MotionChoice()
+    {
+        return MenuFeel::reduceMotion?"Motion: Reduced":"Motion: Full";
+    }
     inline std::string Choice()
     {
         return PocketPalette::style==PocketPalette::Style::daylight?"Theme: Daylight":"Theme: Slate";

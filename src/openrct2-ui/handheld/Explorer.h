@@ -13,6 +13,7 @@
 #include <openrct2/ride/TrackConstructionSupport.h>
 
 #include <cstddef>
+#include <string_view>
 #include <openrct2/Identifiers.h>
 #include <openrct2/object/ObjectTypes.h>
 #include <openrct2/world/Location.hpp>
@@ -28,6 +29,9 @@ namespace OpenRCT2::Ui::Handheld
     struct ManagementPresentation;
     struct Frame;
     bool HandleMenuInput(ControllerInput& input, const Frame& frame);
+    // Shows an upstream error as a short Pocket notice under the HUD (sound only while a menu
+    // or build tool is open, since those already show the message in their own status line).
+    void ShowToast(std::string_view title, std::string_view message);
     void UpdateExplorer(ControllerInput& input);
     void HandleExplorerInput(ControllerInput& input, const Frame& frame);
     void EndTerrain();

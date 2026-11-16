@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "ConceptStyle.h"
+#include "MenuFeel.h"
 #include "ModernText.h"
 #include "ListScroll.h"
 #include "NativeMenuArt.h"
@@ -55,10 +56,37 @@ namespace OpenRCT2::Ui::Handheld
             Drawing::Rectangle::fill(rt, { pos, pos + ScreenCoordsXY{ size.width - 1, size.height - 1 } }, colour);
     }
 
+    // Reports a focused card to the pointer in the frame's top-level coordinates. List and
+    // grid rows draw into scrolled sub-targets; their pixel offset from the base target gives
+    // the translation, and rows scrolled out of view are ignored.
+    inline void ReportSelected(const Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size)
+    {
+        if (activeMenuFeel == nullptr)
+            return;
+        if (pos.x + size.width <= rt.x || pos.x >= rt.x + rt.width || pos.y + size.height <= rt.y || pos.y >= rt.y + rt.height)
+            return;
+        const auto& base = activeMenuFeel->base;
+        if (base.bits == nullptr || base.stride <= 0)
+        {
+            activeMenuFeel->Selected({ pos.x, pos.y, size.width, size.height });
+            return;
+        }
+        const auto offset = reinterpret_cast<const uint8_t*>(rt.bits) - base.bits;
+        auto dy = offset / base.stride;
+        auto dx = offset % base.stride;
+        if (dx < 0)
+        {
+            dx += base.stride;
+            --dy;
+        }
+        activeMenuFeel->Selected({ pos.x - rt.x + static_cast<int>(dx) + base.x, pos.y - rt.y + static_cast<int>(dy) + base.y,
+                                   size.width, size.height });
+    }
+
     // Five-pixel rounded corners and quiet single-line edges, at native resolution.
     inline void DrawCard(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, bool selected = false, bool button = false)
     {
-        const auto edge = selected ? static_cast<Drawing::PaletteIndex>(PocketPalette::positive) : Theme::edge;
+        const auto edge = selected ? Theme::gold : Theme::edge;
         const auto face = selected ? Theme::gold : button ? Theme::raised : Theme::ink;
         Fill(rt, pos + ScreenCoordsXY{ 5, 0 }, { size.width - 10, size.height }, edge);
         Fill(rt, pos + ScreenCoordsXY{ 2, 2 }, { size.width - 4, size.height - 4 }, edge);
@@ -68,14 +96,110 @@ namespace OpenRCT2::Ui::Handheld
         Fill(rt, pos + ScreenCoordsXY{ 1, 5 }, { size.width - 2, size.height - 10 }, face);
         Fill(rt, pos + ScreenCoordsXY{ 5, 1 }, { size.width - 10, 1 }, selected ? Theme::goldLight : Theme::highlight);
         if (button)
+        {
+            // A two-pixel lip under every button so it reads as something to press.
             Fill(rt, pos + ScreenCoordsXY{ 5, size.height - 2 }, { size.width - 10, 1 }, Theme::goldShadow);
+            Fill(rt, pos + ScreenCoordsXY{ 3, size.height - 3 }, { size.width - 6, 1 }, Theme::goldShadow);
+        }
         if (selected && activeMenuFeel)
         {
             const int accentWidth = std::max(2, (size.width - 10) * activeMenuFeel->FocusPercent() / 100);
             Fill(rt, pos + ScreenCoordsXY{ (size.width - accentWidth) / 2, size.height - 2 },
-                { accentWidth, 1 }, static_cast<Drawing::PaletteIndex>(PocketPalette::positive));
+                { accentWidth, 1 }, Theme::goldLight);
+            ReportSelected(rt, pos, size);
         }
 
+    }
+
+    // Closest stable (non-cycling) palette entry to an RGB colour.
+    inline Drawing::PaletteIndex NearestPaletteIndex(int red, int green, int blue)
+    {
+        int best = 1 << 30, index = 10;
+        for (int i = 10; i < 230; ++i)
+        {
+            const auto colour = Drawing::gPalette[static_cast<uint8_t>(i)];
+            const int r = colour.red - red, g = colour.green - green, b = colour.blue - blue;
+            const int distance = r * r + g * g + b * b;
+            if (distance < best)
+            {
+                best = distance;
+                index = i;
+            }
+        }
+        return static_cast<Drawing::PaletteIndex>(index);
+    }
+
+    // Each part of the game gets its own selection colour, so a glance at the highlight tells
+    // you where you are. Colours stay dark enough for the light selected-label ink.
+    enum class Accent : uint8_t
+    {
+        standard,
+        rides,
+        guests,
+        staff,
+        finances,
+        research,
+        marketing,
+        build,
+    };
+    inline void ApplyAccent(Accent accent)
+    {
+        if (accent == Accent::standard || PocketPalette::style != PocketPalette::Style::daylight)
+            return;
+        struct Rgb
+        {
+            int r, g, b;
+        };
+        static constexpr Rgb kAccents[] = {
+            { 0, 0, 0 },      { 176, 48, 48 },  { 44, 92, 178 },  { 118, 70, 160 },
+            { 164, 118, 24 }, { 40, 128, 72 },  { 170, 50, 120 }, { 200, 120, 30 },
+        };
+        const auto& c = kAccents[static_cast<size_t>(accent)];
+        Theme::gold = NearestPaletteIndex(c.r, c.g, c.b);
+        Theme::goldLight = NearestPaletteIndex(std::min(255, c.r + 60), std::min(255, c.g + 60), std::min(255, c.b + 60));
+    }
+
+    // RCT-style pointing glove beside the focused card. It glides between cards as focus
+    // moves, with a faint outline tracing the same path, then idles with a slow bob.
+    inline void DrawFocusPointer(Drawing::RenderTarget& rt, const MenuFeel& feel)
+    {
+        if (!feel.HasFocusRect())
+            return;
+        const auto now = MenuFeel::Clock();
+        const auto rect = feel.FocusRect(now);
+        if (feel.Gliding(now))
+        {
+            const auto ghost = static_cast<Drawing::PaletteIndex>(PocketPalette::positive);
+            Fill(rt, { rect.x + 4, rect.y }, { rect.width - 8, 1 }, ghost);
+            Fill(rt, { rect.x + 4, rect.y + rect.height - 1 }, { rect.width - 8, 1 }, ghost);
+            Fill(rt, { rect.x, rect.y + 4 }, { 1, rect.height - 8 }, ghost);
+            Fill(rt, { rect.x + rect.width - 1, rect.y + 4 }, { 1, rect.height - 8 }, ghost);
+        }
+        static constexpr const char* kGlove[] = {
+            "....ooo...........",
+            "...o###o..........",
+            "...o###oooooooooo.",
+            "..oo#############o",
+            ".o#o#############o",
+            "o##o##oooooooooooo",
+            "o####o###o........",
+            "o#####oooo........",
+            "o####o###o........",
+            "o#####oooo........",
+            ".o#####oo.........",
+            "..ooooo...........",
+        };
+        const auto outline = NearestPaletteIndex(28, 28, 36);
+        const auto fill = NearestPaletteIndex(255, 255, 255);
+        const int x = std::max(0, rect.x - 13) + feel.PointerBob(now);
+        const int y = rect.y + rect.height / 2 - 6;
+        for (int row = 0; row < 12; ++row)
+            for (int column = 0; kGlove[row][column] != '\0'; ++column)
+            {
+                const char cell = kGlove[row][column];
+                if (cell != '.')
+                    Fill(rt, { x + column, y + row }, { 1, 1 }, cell == 'o' ? outline : fill);
+            }
     }
 
     inline void DrawSurface(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size)
@@ -858,6 +982,40 @@ namespace OpenRCT2::Ui::Handheld
         GfxDrawLine(rt, { centre + ScreenCoordsXY{ 1, -7 }, centre + ScreenCoordsXY{ 1, 7 } }, Drawing::PaletteIndex::pi10);
         GfxDrawLine(rt, { centre + ScreenCoordsXY{ -6, 0 }, centre + ScreenCoordsXY{ 6, 0 } }, Drawing::PaletteIndex::pi21);
         GfxDrawLine(rt, { centre + ScreenCoordsXY{ 0, -6 }, centre + ScreenCoordsXY{ 0, 6 } }, Drawing::PaletteIndex::pi21);
+    }
+
+    // Viewfinder corners in the target's colour with a dark outline, breathing by a few pixels,
+    // and a centre dot so the exact hit point stays visible.
+    inline void DrawTargetBrackets(Drawing::RenderTarget& rt, ScreenCoordsXY centre, Drawing::PaletteIndex colour, int pulse)
+    {
+        const auto outline = NearestPaletteIndex(28, 28, 36);
+        const int half = 11 + pulse;
+        constexpr int arm = 6;
+        for (int sx : { -1, 1 })
+            for (int sy : { -1, 1 })
+            {
+                const ScreenCoordsXY corner = centre + ScreenCoordsXY{ sx * half, sy * half };
+                const int hx = sx < 0 ? corner.x : corner.x - arm + 1;
+                const int vy = sy < 0 ? corner.y : corner.y - arm + 1;
+                const int cx = sx < 0 ? corner.x : corner.x - 1;
+                const int cy = sy < 0 ? corner.y : corner.y - 1;
+                Fill(rt, { hx - 1, cy - 1 }, { arm + 2, 4 }, outline);
+                Fill(rt, { cx - 1, vy - 1 }, { 4, arm + 2 }, outline);
+                Fill(rt, { hx, cy }, { arm, 2 }, colour);
+                Fill(rt, { cx, vy }, { 2, arm }, colour);
+            }
+        Fill(rt, centre - ScreenCoordsXY{ 2, 2 }, { 4, 4 }, outline);
+        Fill(rt, centre - ScreenCoordsXY{ 1, 1 }, { 2, 2 }, colour);
+    }
+
+    // Compact label beside the cursor naming what A would inspect, with a colour tab matching
+    // the cursor brackets.
+    inline void DrawInspectChip(
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, const std::string& name, Drawing::PaletteIndex colour)
+    {
+        DrawCard(rt, pos, size);
+        Fill(rt, pos + ScreenCoordsXY{ 4, 4 }, { 4, size.height - 8 }, colour);
+        DrawStrongText(rt, pos + ScreenCoordsXY{ 13, 5 }, "{WHITE}" + name, size.width - 18);
     }
 
     // One layout for pause, tool selection, save/load and confirmation pages.

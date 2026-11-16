@@ -194,7 +194,7 @@ namespace OpenRCT2::Ui::Handheld
                 : model.rows[i].find("unavailable") == std::string::npos && model.rows[i].find("Unavailable") == std::string::npos;
             if (columns > 2) // Native on-screen keyboard retains its compact cells.
             {
-                if (focused && i == model.selected) Fill(listRt, ScreenCoordsXY{x, y}, {cellWidth - 2, rowHeight - 2}, Theme::gold);
+                if (focused && i == model.selected) {Fill(listRt, ScreenCoordsXY{x, y}, {cellWidth - 2, rowHeight - 2}, Theme::gold);ReportSelected(listRt, {x, y}, {cellWidth - 2, rowHeight - 2});}
                 DrawModernEllipsised(listRt, ScreenCoordsXY{x + 3, y + 6}, cellWidth - 6,
                     std::string(focused && i == model.selected ? "{BLACK}" : "{WHITE}") + model.rows[i]);
             }
@@ -202,13 +202,14 @@ namespace OpenRCT2::Ui::Handheld
             {
                 const bool selected=focused && i==model.selected;
                 Fill(listRt,{x,y},{cellWidth-4,rowHeight-2},selected?Theme::gold:Theme::ink);
+                if(selected)ReportSelected(listRt,{x,y},{cellWidth-4,rowHeight-2});
                 DrawModernEllipsised(listRt,{x+8,y+7},cellWidth-20,
                     std::string(selected?"{BLACK}":"{WHITE}")+model.rows[i]);
             }
             else if (i < model.rowValues.size())
             {
                 const bool selected=focused&&i==model.selected;
-                if(selected)Fill(listRt,ScreenCoordsXY{x,y},{cellWidth-4,rowHeight-2},Theme::gold);
+                if(selected){Fill(listRt,ScreenCoordsXY{x,y},{cellWidth-4,rowHeight-2},Theme::gold);ReportSelected(listRt,{x,y},{cellWidth-4,rowHeight-2});}
                 DrawModernEllipsised(listRt,ScreenCoordsXY{x+8,y+7},cellWidth-164,
                     std::string(selected?"{BLACK}":"{WHITE}")+model.rows[i]);
                 DrawModernEllipsised(listRt,ScreenCoordsXY{x+cellWidth-150,y+7},140,
@@ -218,6 +219,7 @@ namespace OpenRCT2::Ui::Handheld
             {
                 const bool selected = focused && i == model.selected;
                 Fill(listRt, ScreenCoordsXY{ x, y }, { cellWidth - 4, rowHeight - 2 }, selected ? Theme::gold : Theme::ink);
+                if (selected) ReportSelected(listRt, { x, y }, { cellWidth - 4, rowHeight - 2 });
                 DrawWrappedLabel(
                     listRt, ScreenCoordsXY{ x + 8, y + 7 }, cellWidth - 20,
                     std::string(selected ? "{BLACK}" : "{WHITE}") + model.rows[i], 2);
