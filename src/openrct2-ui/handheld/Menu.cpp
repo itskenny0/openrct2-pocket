@@ -275,7 +275,7 @@ namespace OpenRCT2::Ui::Windows
         std::array<std::array<size_t,5>,2> _toolGroupRows{};
         Handheld::ObjectPicker _picker;
         bool _pausedHere{};
-        size_t _buildFocus{}, _pathModeFocus{};
+        size_t _buildFocus{8}, _pathModeFocus{}; // Build opens on Rides.
         std::array<size_t, 2> _pathOptionsFocus{};
         bool _shopPickerFromBuild{};
         bool _ridePickerFromBuild{};
@@ -1253,24 +1253,69 @@ namespace OpenRCT2::Ui::Windows
             return _page == Page::build || _page == Page::paths || _page == Page::sceneryCategory
                 || _page == Page::customChoice;
         }
+        // Build menu art: a real loaded object of each kind, drawn with the same preview the object
+        // catalog uses, so the big cards show this park's own rides, shops, paths and scenery.
+        enum class BuildArt { ride, shop, path, scenery };
+        static std::function<void(RenderTarget&)> BuildPicture(BuildArt kind)
+        {
+            auto& objects = GetContext()->GetObjectManager();
+            const Object* chosen = nullptr;
+            if (kind == BuildArt::ride || kind == BuildArt::shop)
+            {
+                for (ObjectEntryIndex i = 0; i < kMaxRideObjects && !chosen; ++i)
+                    if (const auto* ride = objects.GetLoadedObject<RideObject>(i))
+                        for (auto type : ride->GetEntry().ride_type)
+                            if (type != kRideTypeNull)
+                            {
+                                const auto& rtd = GetRideTypeDescriptor(type);
+                                const bool shop = rtd.flags.has(RtdFlag::isShopOrFacility);
+                                if ((kind == BuildArt::shop) == shop
+                                    && (shop || rtd.Category == RideCategory::rollerCoaster || rtd.Category == RideCategory::thrill))
+                                    chosen = ride;
+                                break;
+                            }
+            }
+            else
+            {
+                const auto type = kind == BuildArt::path ? ObjectType::footpathSurface : ObjectType::smallScenery;
+                for (ObjectEntryIndex i = 0; i < 64 && !chosen; ++i)
+                    chosen = objects.GetLoadedObject(type, i);
+            }
+            if (!chosen) return {};
+            const bool square = kind == BuildArt::ride || kind == BuildArt::shop;
+            return [chosen, square](RenderTarget& rt) {
+                // Ride previews are fixed 112 px squares drawn from their corner: centre a half-size
+                // window for them. Other previews centre themselves.
+                RenderTarget art = rt;
+                if (square)
+                {
+                    const int side = std::min({ 56, rt.width, rt.height });
+                    if (!ClipRenderTarget(art, rt, { (rt.width - side) / 2, (rt.height - side) / 2 }, side, side)) return;
+                }
+                art.zoom_level = ZoomLevel{ 1 };
+                chosen->DrawPreview(art, art.zoom_level.ApplyTo(art.width), art.zoom_level.ApplyTo(art.height));
+            };
+        }
         std::vector<Handheld::ChoiceCard> choices() const
         {
             using I = Handheld::PanelIcon;
             if (_page == Page::build)
-                return {{0,"Raise hill","Gentle hills; Y also digs, makes ponds or flattens",I::raise},
-                    {1,"Dig","Lower the ground with gentle slopes",I::lower},
-                    {2,"Paths","Footpaths, queues, connected paths and removal",I::path},
-                    {3,"Pond","Dig a pond that fills with water",I::terrain,SPR_TAB_WATER},
-                    {4,"Surfaces","Choose a ground surface",I::terrain,SPR_G2_TAB_LAND},
-                    {5,"Remove scenery","Remove an existing scenery object",I::remove},
-                    {6,"Trees","Choose a tree from the visual catalog",I::tree},
-                    {7,"Shops & facilities","Food, drinks, shops and guest facilities",I::folder,SPR_SHOP_ITEM_BURGER},
-                    {8,"Rides","Choose a ride, then place or construct it",I::play,SPR_TAB_RIDE_0},
-                    {9,"Saved designs","Browse your saved track designs",I::folder},
-                    {10,"Scenery","Trees, buildings, fences, signs and path furniture",I::largeScenery},
-                    {11,"Advanced landscape","Corners, edges, water levels and terrain painting",I::terrain,SPR_G2_TAB_LAND},
-                    {12,"Land & rights","Buy available land or construction rights",I::terrain},
-                    {13,"Park","Return to your park",I::back}};
+                // Grouped by what you are doing: building things first (big cards), then shaping
+                // the land, then tools. Actions keep their native numbers; only the order changed.
+                // "Park" is gone: B does that.
+                return {{8,"Rides","Choose a ride, then place or construct it",I::play,SPR_TAB_RIDE_0,0,16,BuildPicture(BuildArt::ride)},
+                    {7,"Shops","Food, drinks, shops and guest facilities",I::folder,SPR_SHOP_ITEM_BURGER,0,1,BuildPicture(BuildArt::shop)},
+                    {2,"Paths","Footpaths and queues",I::path,0,0,1,BuildPicture(BuildArt::path)},
+                    {10,"Scenery","Trees, buildings, fences, signs and path furniture",I::largeScenery,0,0,1,BuildPicture(BuildArt::scenery)},
+                    {9,"Saved designs","Rides you or others saved, ready to place",I::folder,0,0},
+                    {0,"Raise hill","Gentle hills; Y also digs, makes ponds or flattens",I::raise,0,1},
+                    {1,"Dig","Lower the ground with gentle slopes",I::lower,0,1},
+                    {3,"Pond","Dig a pond that fills with water",I::terrain,SPR_TAB_WATER,1},
+                    {4,"Surfaces","Choose a ground surface",I::terrain,SPR_G2_TAB_LAND,1},
+                    {6,"Trees","Plant from the tree catalog",I::tree,0,1},
+                    {5,"Remove scenery","Pick up placed scenery",I::remove,0,2},
+                    {12,"Land & rights","Buy land or construction rights",I::terrain,0,2},
+                    {11,"Advanced","Corners, edges, water levels and terrain painting",I::terrain,SPR_G2_TAB_LAND,2}};
             if (_page == Page::paths)
                 return {{0,"Footpath","Place individual tiles; Y Adjust also offers Line and Fill",I::path},
                     {1,"Queue","Build a queue for a ride entrance",I::path},
@@ -1331,7 +1376,8 @@ namespace OpenRCT2::Ui::Windows
             }
             if (choiceCards())
             {
-                const auto next = Handheld::MoveChoiceCards(choices(), _focus.index(), _page == Page::build ? 4 : 3, x, y);
+                const auto next = _page == Page::build ? Handheld::MoveChoiceGroups(choices(), 3, _focus.index(), x, y)
+                                                       : Handheld::MoveChoiceCards(choices(), _focus.index(), 3, x, y);
                 _focus.move(static_cast<int>(next) - static_cast<int>(_focus.index()), rows().size());
                 invalidate();
                 return;
@@ -6465,6 +6511,12 @@ namespace OpenRCT2::Ui::Windows
             if(_page==Page::accessManage || _page==Page::accessPoint){drawAccessSelection(rt);return;}
 
             if (_page == Page::trackBlocks || _page == Page::trackBlock || _page==Page::trackContext) { drawTrackSelection(rt); return; }
+            if (_page == Page::build)
+            {
+                Handheld::DrawChoiceGroups(rt, {ContextGetWidth(), ContextGetHeight()}, "Build", choices(),
+                    {{"BUILD", 104}, {"SHAPE THE LAND", 70}, {"TOOLS", 30}}, _focus.index(), "Park");
+                return;
+            }
             if (choiceCards())
             {
                 Handheld::DrawChoiceCards(rt, {ContextGetWidth(), ContextGetHeight()},

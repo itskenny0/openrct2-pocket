@@ -3,6 +3,7 @@
 #include "Panel.h"
 #include <algorithm>
 #include <vector>
+#include <functional>
 
 namespace OpenRCT2::Ui::Handheld
 {
@@ -12,7 +13,52 @@ namespace OpenRCT2::Ui::Handheld
         std::string label, detail;
         PanelIcon icon = PanelIcon::none;
         uint32_t sprite = 0;
+        size_t group = 0;    // Grouped menus: which row of the menu this card sits in.
+        uint8_t frames = 1;  // Animated tab sprites play while focused.
+        std::function<void(Drawing::RenderTarget&)> picture{}; // Big cards: a real object preview.
     };
+    // A grouped menu (Build): each group is one row with its own card size, under a small label. The
+    // first group is the big, everyday one; later groups get smaller.
+    struct ChoiceGroup
+    {
+        std::string title;
+        int height;
+    };
+    inline std::vector<std::vector<size_t>> GroupSlots(const std::vector<ChoiceCard>& cards, size_t groups)
+    {
+        std::vector<std::vector<size_t>> slots(groups);
+        for (size_t i = 0; i < cards.size(); ++i)
+            if (cards[i].group < groups)
+                slots[cards[i].group].push_back(i);
+        return slots;
+    }
+    inline size_t MoveChoiceGroups(const std::vector<ChoiceCard>& cards, size_t groups, size_t action, int x, int y)
+    {
+        const auto slots = GroupSlots(cards, groups);
+        size_t g = 0, i = 0;
+        for (size_t gi = 0; gi < slots.size(); ++gi)
+            for (size_t k = 0; k < slots[gi].size(); ++k)
+                if (cards[slots[gi][k]].action == action) { g = gi; i = k; }
+        if (x)
+        {
+            const int next = static_cast<int>(i) + (x > 0 ? 1 : -1);
+            if (next >= 0 && next < static_cast<int>(slots[g].size())) i = static_cast<size_t>(next);
+        }
+        else if (y)
+        {
+            int target = static_cast<int>(g) + (y > 0 ? 1 : -1);
+            while (target >= 0 && target < static_cast<int>(slots.size()) && slots[target].empty())
+                target += y > 0 ? 1 : -1;
+            if (target >= 0 && target < static_cast<int>(slots.size()))
+            {
+                // Keep the same horizontal position: map the card's centre onto the other row.
+                const double centre = (i + 0.5) / static_cast<double>(slots[g].size());
+                i = std::min(slots[target].size() - 1, static_cast<size_t>(centre * slots[target].size()));
+                g = static_cast<size_t>(target);
+            }
+        }
+        return slots[g].empty() ? action : cards[slots[g][i]].action;
+    }
     inline size_t MoveChoiceCards(const std::vector<ChoiceCard>& cards, size_t action, size_t columns, int x, int y)
     {
         if (cards.empty() || columns == 0) return action;
@@ -34,7 +80,18 @@ namespace OpenRCT2::Ui::Handheld
         const int press = ButtonPressOffset(focused);
         cell.y += press;
         size.height -= press;
-        DrawCard(rt, cell, size, focused, true);
+        if (card.picture && size.height >= 80)
+        {
+            // Big card: the object itself fills the top, the name sits centred underneath.
+            DrawButtonFace(rt, cell, size, ButtonKind::secondary, focused);
+            Drawing::RenderTarget art;
+            if (ClipRenderTarget(art, rt, cell + ScreenCoordsXY{ 3, 3 }, size.width - 6, size.height - 26))
+                card.picture(art);
+            const int w = std::min(TextWidth(card.label, true), size.width - 8);
+            DrawStrongText(rt, cell + ScreenCoordsXY{ (size.width - w) / 2, size.height - 19 }, "{WHITE}" + card.label, size.width - 8);
+            return;
+        }
+        DrawButtonFace(rt, cell, size, ButtonKind::secondary, focused);
         Drawing::RenderTarget inside;
         if (!ClipRenderTarget(inside, rt, cell + ScreenCoordsXY{ 3, 3 }, size.width - 6, size.height - 6)) return;
         // Reserve two complete 16px label lines, including glyph descenders.
@@ -43,10 +100,53 @@ namespace OpenRCT2::Ui::Handheld
         const int artSize = std::clamp(size.height - (twoLines ? 38 : 34), 20, 38);
         const auto icon = ScreenCoordsXY{ (size.width - artSize) / 2 - 3, 1 };
         if (card.sprite)
-            DrawNativeMenuArt(inside, icon, { artSize, artSize }, { card.sprite }, focused);
+            DrawNativeMenuArt(inside, icon, { artSize, artSize }, { card.sprite, card.frames }, focused);
         else DrawIcon(inside, icon + ScreenCoordsXY{ artSize / 2 - 8, artSize / 2 - 8 }, card.icon, focused);
-        DrawWrappedLabel(inside, {4, artSize + 2}, size.width - 14,
-            std::string(focused ? "{BLACK}" : "{WHITE}") + card.label, 2);
+        DrawWrappedLabel(inside, {4, artSize + 2}, size.width - 14, "{WHITE}" + card.label, 2);
+    }
+    // Small groups draw as compact chips: icon and label side by side.
+    inline void DrawChoiceChip(Drawing::RenderTarget& rt, ScreenCoordsXY cell, ScreenSize size, const ChoiceCard& card, bool focused)
+    {
+        DrawButtonFace(rt, cell, size, ButtonKind::secondary, focused);
+        const bool art = card.sprite && DrawNativeMenuArt(rt, cell + ScreenCoordsXY{ 4, (size.height - 24) / 2 }, { 24, 24 }, { card.sprite, card.frames }, false);
+        if (!art) DrawIcon(rt, cell + ScreenCoordsXY{ 8, (size.height - 16) / 2 }, card.icon, false);
+        DrawStrongText(rt, cell + ScreenCoordsXY{ 32, (size.height - 12) / 2 + 2 }, "{WHITE}" + card.label, size.width - 38);
+    }
+    inline void DrawChoiceGroups(Drawing::RenderTarget& rt, ScreenSize screen, const std::string& title,
+        const std::vector<ChoiceCard>& cards, const std::vector<ChoiceGroup>& groups, size_t selected, const std::string& back)
+    {
+        const ScreenCoordsXY p{ 8, 8 };
+        const int width = screen.width - 16;
+        const int height = Layout::ContentHeight(screen);
+        DrawSurface(rt, p, { width, height });
+        DrawHeadingText(rt, p + ScreenCoordsXY{ 12, 11 }, "{WHITE}" + title, width - 24);
+        Fill(rt, p + ScreenCoordsXY{ 12, 37 }, { width - 24, 1 }, Theme::edge);
+        const auto slots = GroupSlots(cards, groups.size());
+        int y = 44;
+        for (size_t g = 0; g < groups.size(); ++g)
+        {
+            if (slots[g].empty())
+                continue;
+            DrawSectionLabel(rt, p + ScreenCoordsXY{ 14, y }, width - 28, groups[g].title);
+            y += 14;
+            const int count = static_cast<int>(slots[g].size());
+            const int cellWidth = (width - 18) / count;
+            for (int k = 0; k < count; ++k)
+            {
+                const auto& card = cards[slots[g][k]];
+                const auto cell = p + ScreenCoordsXY{ 10 + k * cellWidth, y };
+                const ScreenSize size{ cellWidth - 6, groups[g].height };
+                if (groups[g].height < 40)
+                    DrawChoiceChip(rt, cell, size, card, selected == card.action);
+                else
+                    DrawChoiceCard(rt, cell, size, card, selected == card.action);
+            }
+            y += groups[g].height + 8;
+        }
+        const auto found = std::find_if(cards.begin(), cards.end(), [&](const auto& c) { return c.action == selected; });
+        if (found != cards.end())
+            DrawWrappedLabel(rt, p + ScreenCoordsXY{ 14, y + 2 }, width - 28, "{MUTED}" + found->detail, 2);
+        DrawFooter(rt, screen, { { "D-pad", "Choose" }, { "A", "Select" }, { "B", back } });
     }
     inline void DrawChoiceCards(Drawing::RenderTarget& rt, ScreenSize screen, const std::string& title,
         const std::vector<ChoiceCard>& cards, size_t selected, size_t columns, const std::string& back = "Back")
