@@ -342,7 +342,7 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
             model.rows.push_back(HistoryRideCurrent(target, rideTarget) ? ride->getName() : "Ride unavailable");
         }
         model.rows.push_back("Back to guest");
-        model.status = !guest ? "Guest no longer in park" : list.empty() ? "No ride history yet" : "A Inspect ride";
+        model.status = !guest ? "Guest no longer in park" : list.empty() ? "No ride history yet" : "";
         return model;
     }
     ManagementPresentation Presentation(

@@ -66,7 +66,7 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         const auto index = static_cast<size_t>(section);
         model.title = index < kCategories.size() ? kCategories[index].name : "Unavailable";
         model.stats = { { "Availability", "Not implemented" } };
-        model.status = "Choose an available section";
+        model.status.clear();
         return model;
     }
     // Small semantic fallbacks also work without the original RCT2 tab sprites.

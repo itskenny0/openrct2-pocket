@@ -67,7 +67,7 @@ namespace OpenRCT2::Ui::Handheld::ParkManagementTabs
                 m.rowValues.push_back(Money(ledger.Value(i)));
             }
             m.actionGrid=false;m.rowHeight=26;m.listLabel="SIGNED CATEGORIES / LEFT-RIGHT MONTH";
-            m.primaryAction="Read";m.status="Up/Down entries / Left/Right month";
+            m.primaryAction="Read";m.status="< > changes month";
         }
         else if(tab==2)
         {
@@ -131,7 +131,7 @@ namespace OpenRCT2::Ui::Handheld::ParkManagementTabs
             }
             m.rows.insert(m.rows.end(),{"Review settings...","Discard draft"});
             m.rowEnabled.insert(m.rowEnabled.end(),{changed,true});m.primaryAction=row<7?"Toggle":"Select";
-            m.status = changed ? "Unsaved / B or tab change reviews edits" : "No changes pending";
+            m.status = changed ? "Unsaved changes" : "";
             const auto query=ResearchManagement::Action(d,false);
             if(query.error!=GameActions::Status::ok)m.status=Finances::Feedback(query);
         }
@@ -182,7 +182,7 @@ namespace OpenRCT2::Ui::Handheld::ParkManagementTabs
                     :NeedsTarget(type)&&Targets(type).empty()?"No eligible open target":"From "+FormatMoney(AdvertisingCampaignPricePerWeek[type])+" / week";
                 m.rowDetails.push_back(reason);
             }
-            m.status="Choose a type / B returns to sections";
+            m.status.clear();
         }
         if(!status.empty())m.status=status;
         return m;

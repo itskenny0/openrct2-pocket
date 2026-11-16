@@ -340,29 +340,31 @@ namespace OpenRCT2::Ui::Handheld
             else if (i < model.rowReadOnly.size() && model.rowReadOnly[i])
             {
                 const bool selected=focused && i==model.selected;
-                Fill(listRt,{x,y},{cellWidth-4,rowHeight-2},selected?Theme::gold:Theme::ink);
-                if(selected)ReportSelected(listRt,{x,y},{cellWidth-4,rowHeight-2});
-                DrawModernEllipsised(listRt,{x+8,y+7},cellWidth-20,
-                    std::string(selected?"{BLACK}":"{WHITE}")+model.rows[i]);
+                DrawListBackground(listRt,{x,y},{cellWidth-4,rowHeight-2},selected);
+                DrawModernEllipsised(listRt,{x+8,y+7},cellWidth-20,"{WHITE}"+model.rows[i]);
             }
             else if (i < model.rowValues.size())
             {
                 const bool selected=focused&&i==model.selected;
-                if(selected){Fill(listRt,ScreenCoordsXY{x,y},{cellWidth-4,rowHeight-2},Theme::gold);ReportSelected(listRt,{x,y},{cellWidth-4,rowHeight-2});}
-                DrawModernEllipsised(listRt,ScreenCoordsXY{x+8,y+7},cellWidth-164,
-                    std::string(selected?"{BLACK}":"{WHITE}")+model.rows[i]);
-                DrawModernEllipsised(listRt,ScreenCoordsXY{x+cellWidth-150,y+7},140,
-                    std::string(selected?"{BLACK}":"{WHITE}")+model.rowValues[i]);
+                DrawListBackground(listRt,{x,y},{cellWidth-4,rowHeight-2},selected);
+                DrawModernEllipsised(listRt,ScreenCoordsXY{x+8,y+7},cellWidth-164,"{WHITE}"+model.rows[i]);
+                const auto& value=model.rowValues[i];
+                // Values right-aligned, losses in red: a ledger you can read down the column.
+                const auto valueInk=value.starts_with("-")||value.find("-")==1?"{DANGER}":"{WHITE}";
+                const int valueWidth=std::min(140,TextWidth(value,true));
+                DrawStrongText(listRt,ScreenCoordsXY{x+cellWidth-12-valueWidth,y+7},valueInk+value,140);
             }
             else if (model.listLabel.starts_with("CURRENT THOUGHTS"))
             {
                 const bool selected = focused && i == model.selected;
-                Fill(listRt, ScreenCoordsXY{ x, y }, { cellWidth - 4, rowHeight - 2 }, selected ? Theme::gold : Theme::ink);
-                if (selected) ReportSelected(listRt, { x, y }, { cellWidth - 4, rowHeight - 2 });
-                DrawWrappedLabel(
-                    listRt, ScreenCoordsXY{ x + 8, y + 7 }, cellWidth - 20,
-                    std::string(selected ? "{BLACK}" : "{WHITE}") + model.rows[i], 2);
+                DrawListBackground(listRt, { x, y }, { cellWidth - 4, rowHeight - 2 }, selected);
+                DrawWrappedLabel(listRt, ScreenCoordsXY{ x + 8, y + 7 }, cellWidth - 20, "{WHITE}" + model.rows[i], 2);
             }
+            else if (!model.actionGrid && !model.confirmation && !model.editing && columns == 1)
+                DrawListRow(
+                    listRt, ScreenCoordsXY{ x, y }, { cellWidth - 4, rowHeight - 2 }, model.rows[i],
+                    i < model.rowDetails.size() ? model.rowDetails[i] : "", focused && i == model.selected, enabled,
+                    !model.rosterCards && !model.denseRoster);
             else
                 DrawActionRow(
                     listRt, ScreenCoordsXY{ x, y }, { cellWidth - 4, rowHeight - 2 }, model.rows[i],

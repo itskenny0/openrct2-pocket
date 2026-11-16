@@ -1053,7 +1053,7 @@ namespace OpenRCT2::Ui::Windows
                 model.rows.back() = _guestRosterParent == Page::guestGroups ? "Back to groups"
                     : _guestRosterParent == Page::ridesCustomers ? "Back to ride customers" : "Back to Guests";
                 model.rows[2]=_guestFilter.tracked ? "All tracking" : "Tracked only";
-                model.status = std::to_string(_guestRoster.size()) + " guests / A Inspect or map";
+                model.status = std::to_string(_guestRoster.size()) + " guests";
             }
             return model;
         }

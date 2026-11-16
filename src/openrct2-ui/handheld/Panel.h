@@ -570,6 +570,43 @@ namespace OpenRCT2::Ui::Handheld
             DrawButtonGlyph(rt, p + ScreenCoordsXY{ size.width - 12, size.height / 2 - 1 }, "A");
     }
 
+    inline void DrawListBackground(Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, bool focused)
+    {
+        if (focused)
+        {
+            FillRound(rt, p, { size.width, size.height - 1 }, Theme::raised);
+            DrawFocusRing(rt, p, { size.width, size.height - 1 });
+        }
+        else
+            Fill(rt, p + ScreenCoordsXY{ 4, size.height - 1 }, { size.width - 8, 1 }, Theme::edge);
+    }
+    // Rosters and long lists are rows, not a stack of buttons: plain text on the panel with a hairline
+    // between entries. The focused row lifts into a card with the ring and the A glyph.
+    inline void DrawListRow(
+        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& rawTitle, const std::string& rawSubtitle,
+        bool focused, bool enabled = true, bool allowNativeArt = true)
+    {
+        const auto title = ButtonText(rawTitle);
+        auto subtitle = rawSubtitle;
+        for (auto at = subtitle.find(" / "); at != std::string::npos; at = subtitle.find(" / ", at + 5))
+            subtitle.replace(at, 3, "  |  ");
+        DrawListBackground(rt, p, size, focused);
+        const bool roomForArt = allowNativeArt && TextWidth(title, true) + 58 <= size.width;
+        const bool native = roomForArt && DrawNativeMenuArt(rt, p + ScreenCoordsXY{ 5, (size.height - 24) / 2 },
+            { 26, 24 }, ActionArt(rawTitle), false);
+        const int inset = native ? 36 : 8;
+        const int glyphRoom = focused && enabled ? 22 : 8;
+        const auto ink = enabled ? "{WHITE}" : "{DISABLED}";
+        DrawStrongText(
+            rt, p + ScreenCoordsXY{ inset, subtitle.empty() || size.height < 34 ? (size.height - 12) / 2 + 2 : 6 },
+            std::string(ink) + title, size.width - inset - glyphRoom);
+        if (!subtitle.empty() && size.height >= 34)
+            DrawModernEllipsised(rt, p + ScreenCoordsXY{ inset, size.height - 15 }, size.width - inset - glyphRoom,
+                std::string(enabled ? "{MUTED}" : "{DISABLED}") + subtitle);
+        if (focused && enabled)
+            DrawButtonGlyph(rt, p + ScreenCoordsXY{ size.width - 12, size.height / 2 - 1 }, "A");
+    }
+
     inline void DrawPagePosition(
         Drawing::RenderTarget& rt, ScreenCoordsXY p, int width, size_t selected, size_t count, size_t capacity)
     {
