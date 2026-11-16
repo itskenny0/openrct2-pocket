@@ -112,6 +112,11 @@ namespace OpenRCT2::Ui::Handheld
         {
             return _pressed && now >= _pressTime && now - _pressTime < 90 ? 1 : 0;
         }
+        // Time since focus last moved, for effects that should start fresh on each item.
+        uint64_t FocusElapsed(uint64_t now = Clock()) const
+        {
+            return now >= _focusTime ? now - _focusTime : 0;
+        }
         int FocusPercent(uint64_t now = Clock()) const
         {
             if (reduceMotion)

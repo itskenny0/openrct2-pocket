@@ -31,6 +31,8 @@ namespace OpenRCT2::Ui::Handheld
         std::string name;
         ZoomLevel previewZoom{ 2 };
         std::function<void(Drawing::RenderTarget&)> drawPreview{};
+        std::string label{};  // Short name for the grid cell; the full name shows in the detail pane.
+        std::string detail{}; // Optional description shown under the full name.
     };
     // Presentation/navigation only. Each caller supplies its eligible objects and activation.
     class ObjectPicker
@@ -109,10 +111,15 @@ namespace OpenRCT2::Ui::Handheld
         size_t _focus{};
     };
 
+    // Marquees restart when focus moves, so each name begins from its first letter.
+    inline uint64_t MarqueeTime()
+    {
+        return activeMenuFeel != nullptr ? activeMenuFeel->FocusElapsed() : MenuFeel::Clock();
+    }
     inline void DrawObjectPicker(
         Drawing::RenderTarget& rt, ScreenSize screen, const ObjectPicker& picker, const std::string& title,
         const std::string& status = {}, const std::string& emptyLabel = "No objects available", bool searchControl = false,
-        const std::string& startAction = "Pause", const std::string& extraAction = "")
+        const std::string& startAction = "Pause", const std::string& extraAction = "", const std::string& groupAction = "")
     {
         using namespace Concept;
         const auto p = kMenuOrigin;
@@ -121,7 +128,9 @@ namespace OpenRCT2::Ui::Handheld
         const int offset=ListOffset(picker.focus()/3,(entries.size()+2)/3,viewportHeight,92);
         const auto start=static_cast<size_t>(offset/92)*3;
         const int detailTop=224;
-        Box(rt, p, { 320, detailTop + 78 });
+        const auto* focused = picker.selected();
+        const bool described = focused != nullptr && !focused->detail.empty();
+        Box(rt, p, { 320, detailTop + (described ? 92 : 78) });
         Heading(rt, p + ScreenCoordsXY{ 12, 12 }, title);
         DrawModernText(
             rt, p + ScreenCoordsXY{ 194, 12 },
@@ -154,18 +163,27 @@ namespace OpenRCT2::Ui::Handheld
                     object->DrawPreview(preview, preview.zoom_level.ApplyTo(86), preview.zoom_level.ApplyTo(62));
                 }
             }
+            const auto& cellName = entries[index].label.empty() ? entries[index].name : entries[index].label;
             if (selected)
-                DrawMarquee(gridRt, cell + ScreenCoordsXY{ 5, 70 }, 84, "{BLACK}", entries[index].name, MenuFeel::Clock());
+                DrawMarquee(gridRt, cell + ScreenCoordsXY{ 5, 70 }, 84, "{BLACK}", cellName, MarqueeTime());
             else
-                DrawModernEllipsised(gridRt, cell + ScreenCoordsXY{ 5, 70 }, 84, "{WHITE}" + entries[index].name);
+                DrawModernEllipsised(gridRt, cell + ScreenCoordsXY{ 5, 70 }, 84, "{WHITE}" + cellName);
         }
         }
         Rule(rt, p + ScreenCoordsXY{ 12, detailTop }, 296);
-        const auto* selected = picker.selected();
-        DrawWrappedLabel(rt, p + ScreenCoordsXY{ 12, detailTop + 12 }, 296, selected ? selected->name : emptyLabel, 2);
-        DrawModernText(
-            rt, p + ScreenCoordsXY{ 12, detailTop + 54 },
-            "{MUTED}" + (status.empty() ? std::to_string(entries.size()) + " available" : status), {}, 296);
+        const auto* selected = focused;
+        const auto statusLine = "{MUTED}" + (status.empty() ? std::to_string(entries.size()) + " available" : status);
+        if (described)
+        {
+            DrawMarquee(rt, p + ScreenCoordsXY{ 12, detailTop + 10 }, 296, "{WHITE}", selected->name, MarqueeTime(), true);
+            DrawWrappedLabel(rt, p + ScreenCoordsXY{ 12, detailTop + 30 }, 296, "{MUTED}" + selected->detail, 2);
+            DrawModernText(rt, p + ScreenCoordsXY{ 12, detailTop + 68 }, statusLine, {}, 296);
+        }
+        else
+        {
+            DrawWrappedLabel(rt, p + ScreenCoordsXY{ 12, detailTop + 12 }, 296, selected ? selected->name : emptyLabel, 2);
+            DrawModernText(rt, p + ScreenCoordsXY{ 12, detailTop + 54 }, statusLine, {}, 296);
+        }
         std::vector<ControlHint> hints{ { "D-pad", "Choose" },
                                         { "A", "Select" },
                                         { "B", "Back" },
@@ -174,6 +192,8 @@ namespace OpenRCT2::Ui::Handheld
                                           searchControl ? HintPriority::normal : HintPriority::guide } };
         if (!extraAction.empty())
             hints.push_back({ "X", extraAction });
+        if (!groupAction.empty())
+            hints.push_back({ "Y", groupAction });
         DrawFooter(rt, screen, hints);
     }
 } // namespace OpenRCT2::Ui::Handheld

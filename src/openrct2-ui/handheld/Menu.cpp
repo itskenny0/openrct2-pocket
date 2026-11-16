@@ -20,6 +20,9 @@
 #include "GuestFollow.h"
 #include "ListFocus.h"
 #include <map>
+#include <openrct2/object/RideObject.h>
+#include <openrct2/ride/Ride.h>
+#include <openrct2/ride/RideData.h>
 #include "MarketingManagement.h"
 #include "Mazes.h"
 #include "Panel.h"
@@ -423,6 +426,63 @@ namespace OpenRCT2::Ui::Windows
         bool _newsFromPark{}, _newsFromDashboard{};
         bool _objectivesFromPark{};
         bool _feelBack{};
+        size_t _rideCategory{}; // Ride picker filter: index into kRideCategories.
+        static constexpr std::array<std::pair<const char*, RideCategory>, 6> kRideCategories{ {
+            { "All rides", RideCategory::none },
+            { "Roller coasters", RideCategory::rollerCoaster },
+            { "Thrill rides", RideCategory::thrill },
+            { "Gentle rides", RideCategory::gentle },
+            { "Water rides", RideCategory::water },
+            { "Transport", RideCategory::transport },
+        } };
+        static RideCategory EntryCategory(const Handheld::PickerEntry& entry)
+        {
+            ride_type_t type = kRideTypeNull;
+            const auto& key = entry.identity.key;
+            if (key.starts_with("custom-type:"))
+                type = static_cast<ride_type_t>(std::stoi(key.substr(12)));
+            else if (key.starts_with("custom:"))
+                type = RIDE_TYPE_WOODEN_ROLLER_COASTER;
+            else if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject<RideObject>(entry.identity.index))
+                for (auto candidate : object->GetEntry().ride_type)
+                    if (candidate != kRideTypeNull)
+                    {
+                        type = candidate;
+                        break;
+                    }
+            return type == kRideTypeNull ? RideCategory::none : GetRideTypeDescriptor(type).Category;
+        }
+        // Filters by the selected category, adds the game's ride description, and gives each
+        // grid cell the part of the name that tells entries apart (the vehicle, when several
+        // entries share a ride type).
+        std::vector<Handheld::PickerEntry> rideCatalog() const
+        {
+            auto all = Handheld::FlatRides::Entries();
+            auto mazes = Handheld::Mazes::Entries();
+            all.insert(all.end(), mazes.begin(), mazes.end());
+            auto custom = Handheld::CustomTracks::RideEntries();
+            all.insert(all.end(), custom.begin(), custom.end());
+            const auto wanted = kRideCategories[_rideCategory % kRideCategories.size()].second;
+            std::vector<Handheld::PickerEntry> result;
+            std::map<std::string, int> typeCounts;
+            for (auto& entry : all)
+            {
+                if (wanted != RideCategory::none && EntryCategory(entry) != wanted)
+                    continue;
+                if (const auto slash = entry.name.find(" / "); slash != std::string::npos)
+                    ++typeCounts[entry.name.substr(0, slash)];
+                if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject<RideObject>(entry.identity.index))
+                    entry.detail = object->GetDescription();
+                result.push_back(std::move(entry));
+            }
+            for (auto& entry : result)
+                if (const auto slash = entry.name.find(" / "); slash != std::string::npos)
+                {
+                    const auto type = entry.name.substr(0, slash);
+                    entry.label = typeCounts[type] > 1 ? entry.name.substr(slash + 3) : type;
+                }
+            return result;
+        }
         Handheld::Dashboard::State _newsDashboard;
         bool _parkGuestHistory{};
         bool _managementNewsReturn{};
@@ -1138,8 +1198,8 @@ namespace OpenRCT2::Ui::Windows
                     {5,"Extend queue","Continue a queue from an endpoint",I::path},
                     {3,"Build menu","Return to the other building tools",I::back}};
             if (_page == Page::customChoice)
-                return {{0,"Build track","Construct your own track, piece by piece",I::play,SPR_TAB_RIDE_0},
-                    {1,"Saved design","Choose an existing design from the visual catalog",I::folder},
+                return {{1,"Ready-made design","Pick a finished ride from the design catalog",I::folder},
+                    {0,"Build track","Construct your own track, piece by piece",I::play,SPR_TAB_RIDE_0},
                     {2,"Back","Return to the ride catalog",I::back}};
             return {{0,"Trees & small","Plants, trees and small scenery objects",I::tree},
                 {1,"Buildings","Large scenery and building objects",I::largeScenery},
@@ -1582,6 +1642,8 @@ namespace OpenRCT2::Ui::Windows
                 _focus.move(static_cast<int32_t>(std::min(_guestRideFocus, rows().size() - 1)), rows().size());
             if (next == Page::guestRoster)
                 _focus.move(static_cast<int32_t>(std::min(_guestRosterFocus, rows().size() - 1)), rows().size());
+            if (next == Page::customChoice)
+                _focus.move(1, rows().size()); // Ready-made designs are the quickest way to a coaster.
             // Only confirmations that lose something (a save, the session, a ride, an employee, a
             // placement) start on Cancel; ordinary decisions start on the action so A-A completes them.
             const bool destructive = next == Page::overwrite || next == Page::discard || next == Page::exit
@@ -2140,11 +2202,7 @@ namespace OpenRCT2::Ui::Windows
         }
         void refreshPicker(std::optional<Handheld::PickerIdentity> preferred = {})
         {
-            auto rideEntries = Handheld::FlatRides::Entries();
-            auto mazes = Handheld::Mazes::Entries();
-            rideEntries.insert(rideEntries.end(), mazes.begin(), mazes.end());
-            auto custom = Handheld::CustomTracks::RideEntries();
-            rideEntries.insert(rideEntries.end(), custom.begin(), custom.end());
+            auto rideEntries = _page == Page::ridePicker ? rideCatalog() : std::vector<Handheld::PickerEntry>{};
             _picker.setEntries(
                 _page == Page::terrainMaterialPicker ? Handheld::TerrainMaterials::Entries(_terrainMaterialEdge)
                     : _page == Page::pathSurfacePicker   ? Handheld::PathSurfaces::Entries()
@@ -2319,6 +2377,14 @@ namespace OpenRCT2::Ui::Windows
         }
         bool dashboardNews(){if(_page!=Page::dashboard)return false;openNews(false);return true;}
         bool pickerGroup(){
+            if (_page == Page::ridePicker) {
+                _rideCategory = (_rideCategory + 1) % kRideCategories.size();
+                _picker = {};
+                refreshPicker();
+                _status.clear();
+                invalidate();
+                return true;
+            }
             if (_page == Page::researchCatalog) {
                 _researchFilter=(_researchFilter+1)%8; _researchCatalog=Handheld::ResearchCatalog::Roster(_researchFilter);
                 _focus={};invalidate();return true;
@@ -6621,8 +6687,10 @@ namespace OpenRCT2::Ui::Windows
             }
             if (_page == Page::ridePicker)
             {
+                const auto& category = kRideCategories[_rideCategory % kRideCategories.size()];
                 Handheld::DrawObjectPicker(
-                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Rides", _status, "No rides available");
+                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, category.first,
+                    _status, "None of this type available yet", false, "Pause", "", "Type");
                 return;
             }
             if (_page == Page::shopPicker)
