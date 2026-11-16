@@ -202,6 +202,7 @@ namespace OpenRCT2::Ui::Handheld
         {
             result.navigateX = x;
             result.navigateY = y;
+            result.navigateRepeat = true;
             _repeatAt = now + 95;
         }
         const float speed = 120.0f * (x != 0 && y != 0 ? 0.70710678f : 1.0f);

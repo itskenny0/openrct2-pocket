@@ -32,6 +32,13 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     bool Select(TrackElemType type);
     void Cycle(int direction);
     void Slope(int direction);
+    // D-pad steering: left/right bends the track, the opposite way straightens it. L1/R1 picks how
+    // tight the bend is. Returns false (with a toast) when the ride has no piece of that shape here.
+    bool Steer(int direction);
+    void SetTurnSize(int direction);
+    int CurrentTurn();
+    int TurnSize();
+    std::string TurnSizeName();
     uint8_t PlacementSpeed();
     bool SetPlacementSpeed(uint8_t speed);
     bool SeatSupported();

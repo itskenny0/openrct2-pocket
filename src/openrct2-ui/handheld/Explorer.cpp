@@ -1414,8 +1414,10 @@ namespace OpenRCT2::Ui::Handheld
                     {
                         if (CustomTracks::CameraMode())
                             Windows::MainWindowZoom(action == Action::nextOption, false);
-                        else
+                        else if (CustomTracks::StationPlacement())
                             CustomTracks::Cycle(action == Action::nextOption ? 1 : -1);
+                        else
+                            CustomTracks::SetTurnSize(action == Action::nextOption ? 1 : -1);
                     }
                     else if (action == Action::slopeDown || action == Action::slopeUp)
                     {
@@ -1425,6 +1427,20 @@ namespace OpenRCT2::Ui::Handheld
                 }
                 input.suspend();
                 break;
+            }
+            // While building, the D-pad drives the track like a car: left/right bend, up/down climb
+            // or dive. One press is one decision, so held repeats are ignored. The camera follows the
+            // end of the track on its own; camera mode (and station placement) still pan freely.
+            if (!CustomTracks::CameraMode() && !CustomTracks::StationPlacement())
+            {
+                if (!frame.navigateRepeat && !CustomTracks::Busy() && frame.actions.empty())
+                {
+                    if (frame.navigateX != 0)
+                        CustomTracks::Steer(frame.navigateX);
+                    else if (frame.navigateY != 0)
+                        CustomTracks::Slope(-frame.navigateY);
+                }
+                return;
             }
             if (frame.panX || frame.panY)
                 InputScrollViewportSmooth({ frame.panX, frame.panY }, WindowGetMain());
@@ -1800,7 +1816,10 @@ namespace OpenRCT2::Ui::Handheld
         if (CustomTracks::Active())
         {
             CustomTracks::DrawPanel(rt, { ContextGetWidth(), height });
-            DrawMapFocus(rt, c);
+            // Steering builds from the end of the track, not from the screen centre, so the cross
+            // only appears where it means something: free camera and placing the station.
+            if (CustomTracks::CameraMode() || CustomTracks::StationPlacement())
+                DrawMapFocus(rt, c);
             return;
         }
         std::string status = GuestFollow::Current() ? "Follow / B Guest / D-pad Stop" : "L/R: Zoom   X: Rotate";

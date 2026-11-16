@@ -15,6 +15,9 @@
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/RideAccess.h>
 #include <openrct2-ui/handheld/TrackEditing.h>
+#include <openrct2/ride/Track.h>
+#include <openrct2/ride/TrackData.h>
+#include <openrct2/ride/ted/TrackElementDescriptor.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
@@ -153,6 +156,31 @@ int main(int argc, char** argv)
         const auto coaster=*C::Target();C::Update(CoordsXY{1408,640});capture("07-coaster-build.png");
         const auto beforeUndo=state.park.cash;press(H::Action::back);GameActions::ProcessQueue(state);Check(C::Active()&&state.park.cash>beforeUndo,"Native B Undo changed");
         press(H::Action::slopeUp);C::Update(CoordsXY{1408,640});capture("08-coaster-adjust.png");
+        {
+            using namespace OpenRCT2::TrackMetadata;
+            // Steering: one D-pad press is one decision; held repeats never stack turns.
+            auto dpad=[&](int x,int y,bool repeat=false){H::Frame f;f.navigateX=x;f.navigateY=y;f.navigateRepeat=repeat;H::HandleExplorerInput(input,f);};
+            dpad(0,1);Check(GetTrackElementDescriptor(C::Selection()).definition.pitchEnd==TrackPitch::none,"D-pad down did not level the climb");
+            const auto view=WindowGetMain()->savedViewPos;
+            dpad(-1,0);Check(C::CurrentTurn()==-1,"D-pad left did not steer left");
+            Check(WindowGetMain()->savedViewPos==view,"Steering panned the camera");
+            dpad(-1,0,true);Check(C::CurrentTurn()==-1&&C::TurnSize()==1,"Held D-pad repeated a steer");
+            const auto normal=C::Selection();
+            press(H::Action::nextOption);Check(C::TurnSize()==2&&C::CurrentTurn()==-1,"R1 did not widen the turn");
+            press(H::Action::previousOption);press(H::Action::previousOption);Check(C::TurnSize()==0&&C::CurrentTurn()==-1,"L1 did not tighten the turn");
+            Check(GetTrackElementDescriptor(C::Selection()).sequenceData.numSequences<=GetTrackElementDescriptor(normal).sequenceData.numSequences,"Tight turn is larger than normal");
+            press(H::Action::nextOption);
+            C::Update(CoordsXY{1408,640});capture("08a-coaster-steer-left.png");
+            dpad(1,0);Check(C::CurrentTurn()==0,"Opposite D-pad did not straighten");
+            dpad(1,0);Check(C::CurrentTurn()==1,"D-pad right did not steer right");
+            const auto end=C::Endpoint();
+            Check(C::Action(true).error==GameActions::Status::ok,"Steered turn did not build");GameActions::ProcessQueue(state);
+            Check(C::Endpoint()!=end&&C::CurrentTurn()==1,"Next piece lost the steering intent");
+            Check(WindowGetMain()->savedViewPos!=view,"Camera did not follow the track end");
+            {auto* m=WindowGetMain();m->viewport->viewPos=m->savedViewPos;m->flags.unset(WindowFlag::scrollingToLocation);} // the glide has finished
+            C::Update(CoordsXY{1408,640});capture("08b-coaster-steer-built.png");
+            press(H::Action::back);GameActions::ProcessQueue(state);Check(C::Endpoint()==end,"Undo after steering failed");
+        }
         press(H::Action::openBuild);Check(W::HandheldObjectPickerIsOpen(),"Piece catalog missing");capture("09-track-pieces.png");
         press(H::Action::openMenu);Check(!C::Active()&&W::HandheldRidesPresentation().tabs.size()==4,"Start from piece catalog failed to return to ride");
         FocusRideTabAction("Continue track...");press(H::Action::confirm);press(H::Action::openBuild);press(H::Action::back);WindowCullDead();
