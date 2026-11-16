@@ -2537,6 +2537,17 @@ namespace OpenRCT2::Ui::Windows
         {
             if (!picker() || (x == 0 && y == 0))
                 return;
+            // In the ride catalog the shoulders move through the type tabs instead of paging.
+            if (_page == Page::ridePicker && (y == 2 || y == -2))
+            {
+                const auto count = kRideCategories.size();
+                _rideCategory = (_rideCategory + (y > 0 ? 1 : count - 1)) % count;
+                _picker = {};
+                refreshPicker();
+                _status.clear();
+                invalidate();
+                return;
+            }
             refreshPicker();
             _picker.move(x, y);
             _status.clear();
@@ -6922,10 +6933,6 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::DrawObjectPicker(
                     rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Track pieces", _status.empty() ? "Y Group: "+Handheld::CustomTracks::GroupName(Handheld::CustomTracks::CurrentGroup()) : _status, "No compatible pieces",
                     false, "Ride", "Camera");
-                const auto* e=_picker.selected();const ScreenCoordsXY p{336,36};Handheld::Concept::Box(rt,p,{168,246});
-                Handheld::DrawHeadingText(rt,p+ScreenCoordsXY{10,12},"{WHITE}Selected piece",148);
-                if(e&&!e->identity.key.empty()&&std::isdigit(static_cast<unsigned char>(e->identity.key[0]))){Drawing::RenderTarget preview;if(ClipRenderTarget(preview,rt,p+ScreenCoordsXY{8,40},152,110))e->drawPreview(preview);}
-                Handheld::DrawWrappedLabel(rt,p+ScreenCoordsXY{10,162},148,e ? e->name : "No compatible piece",4);
                 return;
             }
             if (_page == Page::designPicker)
@@ -6937,10 +6944,11 @@ namespace OpenRCT2::Ui::Windows
             }
             if (_page == Page::ridePicker)
             {
-                const auto& category = kRideCategories[_rideCategory % kRideCategories.size()];
+                static const std::vector<std::string> tabs{ "All", "Coasters", "Thrill", "Gentle", "Water", "Transport" };
                 Handheld::DrawObjectPicker(
-                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, category.first,
-                    _status, "None of this type available yet", false, "Pause", "", "Type");
+                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Rides",
+                    _status, "None of this type available yet", false, "Pause", "", "Type", tabs,
+                    _rideCategory % kRideCategories.size());
                 return;
             }
             if (_page == Page::shopPicker)
