@@ -164,10 +164,12 @@ int main(int argc,char** argv) { try {
  W::HandheldDashboardSwitchPane();W::HandheldDashboardMove(0,1);W::HandheldDashboardMove(1,0);
  capture("ride-roster.ppm");press(H::Action::confirm);
  auto model=W::HandheldRidesPresentation();
- Check(model.tabs.size()==4&&model.selectedTab==0&&model.rows.front()=="Open...","Ride Overview/status group missing");
+ Check(model.tabs.size()==4&&model.selectedTab==0&&model.rows.front()=="Status"&&model.hero,"Ride Overview/state switch missing");
  capture("ride-overview.ppm");
- navigate(1,0);Check(W::HandheldRidesPresentation().selected==1,"Grid right moved incorrectly");
- navigate(0,-1);Check(W::HandheldRidesPresentation().selected==1,"Grid top edge changed column");
+ navigate(0,1);Check(W::HandheldRidesPresentation().selected==1,"Down from the state switch did not enter the grid");
+ navigate(1,0);Check(W::HandheldRidesPresentation().selected==2,"Grid right moved incorrectly");
+ navigate(0,-1);Check(W::HandheldRidesPresentation().selected==0,"Up from the grid top did not return to the switch");
+ navigate(0,1);navigate(1,0);
  const auto overviewFocus=W::HandheldRidesPresentation().selected;
  press(H::Action::nextOption);model=W::HandheldRidesPresentation();
  Check(model.selectedTab==1&&model.rows.front()=="Operations...","L/R did not enter Operations tab");

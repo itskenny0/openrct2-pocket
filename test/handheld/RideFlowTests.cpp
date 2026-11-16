@@ -147,11 +147,15 @@ int main(int argc, char** argv)
             Check(done,"No native access side");}
         H::UpdateExplorer(input);Check(W::HandheldRidesPresentation().tabs.size()==4,"Completion returned to legacy handoff");
         press(H::Action::contextPrimary);Check(W::HandheldRidesPresentation().title=="Entrances / exits","X Access did not open points");capture("05-existing-access.png");press(H::Action::back);
-        FocusRideTabAction("Open...");press(H::Action::confirm);Check(W::HandheldRidesPresentation().confirmation,"Native Open unavailable after access placement");
-        W::HandheldMenuMove(-1);press(H::Action::confirm);GameActions::ProcessQueue(state);Check(GetRide(target.id)->status==RideStatus::open,"Modern Open action failed");capture("05a-open-ride.png");
-        FocusRideTabAction("Close...");press(H::Action::confirm);W::HandheldMenuMove(-1);press(H::Action::confirm);GameActions::ProcessQueue(state);Check(GetRide(target.id)->status==RideStatus::closed,"Modern Close action failed");
-        FocusRideTabAction("Close...");press(H::Action::confirm);Check(W::HandheldRidesPresentation().confirmation&&W::HandheldRidesPresentation().selected==0,"Status review does not start on the action");
-        press(H::Action::back);FocusRideTabAction("Demolish...");press(H::Action::confirm);Check(W::HandheldRidesPresentation().selected==1,"Demolition review is not Cancel-first");capture("06-demolition-review.png");press(H::Action::back);Check(H::RideManagement::Resolve(target),"Cancel demolished ride");closeMenu();
+        // Ride state is a switch in the hero, changed in place with Left/Right (no review screen).
+        FocusRideTabAction("Status");Check(W::HandheldRidesPresentation().hero&&W::HandheldRidesPresentation().hero->states.back()=="Open","Ride hero has no state switch");
+        for(int i=0;i<3;++i){W::HandheldDashboardMove(1,0);GameActions::ProcessQueue(state);}
+        Check(GetRide(target.id)->status==RideStatus::open&&!W::HandheldRidesPresentation().confirmation,"In-place Open failed");capture("05a-open-ride.png");
+        for(int i=0;i<3;++i){W::HandheldDashboardMove(-1,0);GameActions::ProcessQueue(state);}
+        Check(GetRide(target.id)->status==RideStatus::closed,"In-place Close failed");
+        press(H::Action::confirm);GameActions::ProcessQueue(state);Check(GetRide(target.id)->status!=RideStatus::closed,"A did not step the state");
+        for(int i=0;i<3;++i){W::HandheldDashboardMove(-1,0);GameActions::ProcessQueue(state);}
+        FocusRideTabAction("Demolish...");press(H::Action::confirm);Check(W::HandheldRidesPresentation().selected==1,"Demolition review is not Cancel-first");capture("06-demolition-review.png");press(H::Action::back);Check(H::RideManagement::Resolve(target),"Cancel demolished ride");closeMenu();
         {
             // Attention: a broken ride becomes the first alert, Y glides the camera to it, and the
             // overview home leads with it. With no problems, Y is News as before.

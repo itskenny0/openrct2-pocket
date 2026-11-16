@@ -21,14 +21,20 @@ namespace OpenRCT2::Ui::Handheld::RideTabs
             || label == "Edit track..." || label == "Access / paths...") return operations;
         return overview;
     }
+    // Open / Close / Test are one state switch in the overview's hero, changed in place; their
+    // native rows no longer appear as separate buttons.
+    inline bool StatusRow(std::string_view label)
+    {
+        return label == "Open..." || label == "Close..." || label == "Test..." || label == "Test unavailable";
+    }
+    inline constexpr std::string_view kStatusRow = "Status";
     inline std::vector<size_t> Indices(const ManagementPresentation& source, size_t tab)
     {
         std::vector<size_t> result;
         // Status controls form one immediate group, rather than being interspersed
         // with inspection/navigation. Everything maps back to its native row.
         const std::vector<std::string_view> order = tab == overview
-            ? std::vector<std::string_view>{"Open...", "Close...", "Test...", "Test unavailable",
-                "Admission price...", "Price unavailable", "Locate", "Entrances / exits...", "Place entrance / exit..."}
+            ? std::vector<std::string_view>{"Place entrance / exit...", "Admission price...", "Price unavailable", "Locate", "Entrances / exits..."}
             : tab == operations ? std::vector<std::string_view>{"Operations...", "Vehicles...", "Dispatch...", "Maintenance..."}
             : tab == settings ? std::vector<std::string_view>{"Rename...", "Appearance...", "Music...", "Save design...", "Demolish...", "Back to roster"}
             : std::vector<std::string_view>{};
@@ -36,7 +42,8 @@ namespace OpenRCT2::Ui::Handheld::RideTabs
             for (size_t i=0;i<source.rows.size();++i)
                 if (source.rows[i] == label) result.push_back(i);
         for (size_t i=0;i<source.rows.size();++i)
-            if (Group(source.rows[i]) == tab && std::find(result.begin(),result.end(),i)==result.end()) result.push_back(i);
+            if (Group(source.rows[i]) == tab && !(tab == overview && StatusRow(source.rows[i]))
+                && std::find(result.begin(),result.end(),i)==result.end()) result.push_back(i);
         return result;
     }
     inline ManagementPresentation Compose(
@@ -79,20 +86,17 @@ namespace OpenRCT2::Ui::Handheld::RideTabs
         {
             // The header already shows the status; the stat card would say it twice.
             std::erase_if(model.stats, [](const auto& stat) { return stat.first == "Status"; });
-            // The one obvious next step: finish an unfinished ride, otherwise open a closed one.
-            for (const auto* wanted : { "Place entrance / exit...", "Open..." })
-            {
-                const auto found = std::find(model.rows.begin(), model.rows.end(), wanted);
-                if (found == model.rows.end())
-                    continue;
-                const auto index = static_cast<size_t>(found - model.rows.begin());
-                const bool enabled = index >= model.rowEnabled.size() || model.rowEnabled[index];
-                if (enabled && (std::string_view(wanted) != "Open..." || model.headerStatus == "Closed"))
-                {
-                    model.primaryRow = index;
-                    break;
-                }
-            }
+            // One row of stats under the hero keeps every action on screen.
+            model.metricColumns = static_cast<int>(std::min<size_t>(5, std::max<size_t>(1, model.stats.size())));
+            // Row 0 is the hero's state switch (hidden as a button, focusable as the switch).
+            model.rows.insert(model.rows.begin(), std::string(kStatusRow));
+            model.rowDetails.insert(model.rowDetails.begin(), "");
+            model.rowEnabled.insert(model.rowEnabled.begin(), true);
+            model.heroRow = 0;
+            // The one obvious next step for an unfinished ride.
+            const auto found = std::find(model.rows.begin(), model.rows.end(), "Place entrance / exit...");
+            if (found != model.rows.end())
+                model.primaryRow = static_cast<size_t>(found - model.rows.begin());
         }
         return model;
     }

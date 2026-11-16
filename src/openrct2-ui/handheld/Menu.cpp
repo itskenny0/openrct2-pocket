@@ -29,6 +29,10 @@
 #include "MenuThemes.h"
 #include "FeelSound.h"
 #include "Hud.h"
+#include <openrct2/entity/Guest.h>
+#include <openrct2/entity/Peep.h>
+#include <openrct2/object/PeepAnimationsObject.h>
+#include <openrct2/object/ObjectManager.h>
 #include "ParkOverview.h"
 #include "ParkMap.h"
 #include "ParkInformation.h"
@@ -694,6 +698,64 @@ namespace OpenRCT2::Ui::Windows
                 || _page == Page::ridesOperations || _page == Page::ridesMaintenance || _page == Page::ridesAccess
                 || _page == Page::ridesPrice || _page == Page::ridesConfirm;
         }
+        // A guest at a glance: how they look and feel, then the three needs that drive what they do.
+        static Handheld::ManagementPresentation::Hero guestHero(const Guest& guest)
+        {
+            Handheld::ManagementPresentation::Hero hero;
+            const auto animations = guest.animationObjectIndex;
+            const auto group = guest.animationGroup;
+            const auto shirt = guest.tShirtColour, trousers = guest.trousersColour;
+            const auto face = GetPeepFaceSpriteLarge(const_cast<Guest*>(&guest));
+            hero.picture = [=](RenderTarget& rt) {
+                if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject<PeepAnimationsObject>(animations))
+                    GfxDrawSprite(rt, ImageId(object->GetPeepAnimation(group).baseImage + 1, shirt, trousers), { 16, 46 });
+                GfxDrawSprite(rt, ImageId(face), { 28, 14 });
+            };
+            const auto percent = [](int value, int maximum) { return std::clamp(value * 100 / std::max(1, maximum), 0, 100); };
+            const int happy = percent(guest.happiness, 255);
+            const int energy = percent(guest.energy - 32, 128 - 32);
+            const int nausea = percent(guest.nausea, 255);
+            hero.meters.push_back({ "Happiness", std::to_string(happy) + "%", happy, happy >= 60 ? "{POSITIVE}" : happy < 30 ? "{DANGER}" : "{WHITE}" });
+            hero.meters.push_back({ "Energy", std::to_string(energy) + "%", energy, energy < 25 ? "{CAUTION}" : "{WHITE}" });
+            hero.meters.push_back({ "Nausea", std::to_string(nausea) + "%", nausea, nausea >= 50 ? "{DANGER}" : "{WHITE}" });
+            return hero;
+        }
+        // The ride's own picture, its state as a switch, and its ratings: what makes a ride a ride.
+        static Handheld::ManagementPresentation::Hero rideHero(const Ride& ride)
+        {
+            Handheld::ManagementPresentation::Hero hero;
+            const auto subtype = ride.subtype;
+            hero.picture = [subtype](RenderTarget& rt) {
+                if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject(ObjectType::ride, subtype))
+                {
+                    rt.zoom_level = ZoomLevel{ 1 };
+                    object->DrawPreview(rt, 128, 120);
+                }
+            };
+            hero.states = { "Closed" };
+            if (ride.supportsStatus(RideStatus::testing)) hero.states.push_back("Testing");
+            hero.states.push_back("Open");
+            const auto current = ride.status == RideStatus::open ? "Open" : ride.status == RideStatus::testing ? "Testing" : "Closed";
+            hero.state = static_cast<size_t>(std::find(hero.states.begin(), hero.states.end(), current) - hero.states.begin());
+            auto rating = [](RideRating_t value) {
+                char text[16];
+                std::snprintf(text, sizeof(text), "%d.%02d", value / 100, value % 100);
+                return std::string(text);
+            };
+            if (!ride.ratings.isNull())
+            {
+                const auto& r = ride.ratings;
+                hero.meters.push_back({ "Excitement", rating(r.excitement), std::min(100, r.excitement / 10),
+                                        r.excitement >= 500 ? "{POSITIVE}" : "{WHITE}" });
+                hero.meters.push_back({ "Intensity", rating(r.intensity), std::min(100, r.intensity / 10),
+                                        r.intensity >= 1000 ? "{DANGER}" : r.intensity >= 700 ? "{CAUTION}" : "{WHITE}" });
+                hero.meters.push_back({ "Nausea", rating(r.nausea), std::min(100, r.nausea / 10),
+                                        r.nausea >= 700 ? "{DANGER}" : r.nausea >= 500 ? "{CAUTION}" : "{WHITE}" });
+            }
+            else
+                hero.meters.push_back({ "Ratings", "Test the ride to rate it", 0, "{MUTED}" });
+            return hero;
+        }
         Handheld::ManagementPresentation ridesPresentationFor(Page current, size_t selected) const
         {
             using Handheld::RideManagement::View;
@@ -892,7 +954,14 @@ namespace OpenRCT2::Ui::Windows
                 model = Handheld::RideTabs::Compose(model,stats,_rideTabs,selected);
                 if (_ridesTarget && Handheld::RideAccess::Supported(*_ridesTarget)) model.contextualAction = "Access";
                 if(const auto* ride=_ridesTarget?Handheld::RideManagement::Resolve(*_ridesTarget):nullptr)
+                {
                     model.headerInk=ride->status==RideStatus::open?"{POSITIVE}":ride->status==RideStatus::testing?"{CAUTION}":"{MUTED}";
+                    if(_rideTabs.tab==Handheld::RideTabs::overview)
+                    {
+                        model.hero=rideHero(*ride);
+                        if(selected==0) {model.navigationHint="Change";model.primaryAction="Next";}
+                    }
+                }
             }
             if (current == Page::ridesConfirm && _ridesDraft && _ridesDraft->demolition) model.destructive=true;
             if (current == Page::ridesRoster) model.contentSized = true;
@@ -1047,7 +1116,13 @@ namespace OpenRCT2::Ui::Windows
                                                       : View::text;
             auto model = Handheld::GuestManagement::Presentation(
                 view, selected, _guestRoster, _guestTarget, _status, _guestText, _guestTextPage);
-            if(current==Page::guestInspect && _guestTarget){model=Handheld::PeopleTabs::Guest(*_guestTarget,_guestTabs,selected);model.status=_status;}
+            if(current==Page::guestInspect && _guestTarget){model=Handheld::PeopleTabs::Guest(*_guestTarget,_guestTabs,selected);model.status=_status;
+                if(_guestTabs.tab==0) if(const auto* guest=Handheld::GuestManagement::Resolve(*_guestTarget)) {
+                    model.hero=guestHero(*guest);
+                    // The hero shows happiness and what they are doing; the cards keep the rest.
+                    if(!model.bodyLines.empty()) {model.hero->caption=model.bodyLines.front();model.bodyLines.erase(model.bodyLines.begin());}
+                    std::erase_if(model.stats,[](const auto& stat){return stat.first=="Happiness";});
+                }}
             if (current == Page::guestRoster)
             {
                 model.title = Handheld::GuestManagement::FilterName(_guestFilter);
@@ -2674,6 +2749,31 @@ namespace OpenRCT2::Ui::Windows
                 || _page == Page::ridesAppearance || _page == Page::ridesMusic || _page == Page::ridesDispatch
                 || _page == Page::ridesOperations || _page == Page::ridesMaintenance;
         }
+        // Changes a ride's state straight away: opening, testing and closing are free and can be
+        // undone with the same switch, so they need no review screen.
+        void stepRideState(int direction, bool wrap)
+        {
+            const auto* ride = _ridesTarget ? Handheld::RideManagement::Resolve(*_ridesTarget) : nullptr;
+            if (!ride) return;
+            std::vector<RideStatus> states{ RideStatus::closed };
+            if (ride->supportsStatus(RideStatus::testing)) states.push_back(RideStatus::testing);
+            states.push_back(RideStatus::open);
+            const auto found = std::find(states.begin(), states.end(), ride->status);
+            const int current = found == states.end() ? 0 : static_cast<int>(found - states.begin());
+            int next = current + direction;
+            const int size = static_cast<int>(states.size());
+            next = wrap ? (next % size + size) % size : std::clamp(next, 0, size - 1);
+            if (next == current) return;
+            if (auto draft = Handheld::RideManagement::Begin(*_ridesTarget, states[next]))
+            {
+                const auto result = Handheld::RideManagement::Action(*draft, true);
+                if (result.error != GameActions::Status::ok)
+                    _status = result.getErrorMessage().empty() ? result.getErrorTitle() : result.getErrorMessage();
+                else
+                    _status.clear();
+            }
+            invalidate();
+        }
         void enterDashboardContent()
         {
             using Handheld::Dashboard::Section;
@@ -2759,6 +2859,33 @@ namespace OpenRCT2::Ui::Windows
             {
                 if(x) _focus.move(std::clamp<int>(static_cast<int>(_focus.index())+x,0,2)-static_cast<int>(_focus.index()),rows().size());
                 if(y>0) move(static_cast<int>(3-_focus.index()));
+                invalidate();
+            }
+            else if (_page == Page::ridesInspect && _rideTabs.tab == Handheld::RideTabs::overview)
+            {
+                // Row 0 is the hero's state switch, above a two-column grid of the remaining rows.
+                const auto count = rows().size();
+                const auto current = _focus.index();
+                size_t next = current;
+                if (current == 0)
+                {
+                    if (x) stepRideState(x, false);
+                    else if (y > 0 && count > 1) next = 1;
+                }
+                else
+                {
+                    const size_t grid = current - 1, cells = count - 1;
+                    if (y < 0 && grid < 2) next = 0;
+                    else if (y)
+                    {
+                        const auto candidate = static_cast<int>(grid) + y * 2;
+                        if (candidate >= 0 && candidate < static_cast<int>(cells)) next = static_cast<size_t>(candidate) + 1;
+                        else if (y > 0 && grid / 2 < (cells - 1) / 2) next = cells;
+                    }
+                    else if (x < 0 && grid % 2) --next;
+                    else if (x > 0 && grid % 2 == 0 && grid + 1 < cells) ++next;
+                }
+                _focus.move(static_cast<int>(next) - static_cast<int>(current), count);
                 invalidate();
             }
             else if (_page == Page::ridesInspect || _page == Page::overview || _page==Page::finances || _page==Page::research
@@ -5012,6 +5139,12 @@ namespace OpenRCT2::Ui::Windows
                         if (choice == 2) Handheld::RideManagement::BeginGraphs(*_ridesTarget);
                         page(choice == 0 ? Page::ridesCustomers : choice == 1 ? Page::ridesEarnings : Page::ridesGraphs);
                         break;
+                    }
+                    if (_rideTabs.tab == Handheld::RideTabs::overview)
+                    {
+                        // Row 0 is the state switch: A steps to the next state, wrapping round.
+                        if (choice == 0) { stepRideState(1, true); break; }
+                        --choice;
                     }
                     auto nativeModel = Handheld::RideManagement::Presentation(
                         Handheld::RideManagement::View::inspection,0,_ridesRoster,_ridesTarget);
