@@ -13,7 +13,9 @@
 #include <openrct2/drawing/Palette.h>
 #include <openrct2/drawing/RenderTarget.h>
 #include <openrct2/drawing/Text.h>
+#include <optional>
 #include <string>
+#include <vector>
 #include <string_view>
 #include <utility>
 
@@ -100,13 +102,74 @@ namespace OpenRCT2::Ui::Handheld
         return text;
     }
 
+    // Glyph index for a code point: 0-94 printable ASCII, then the extra glyphs (currency etc.).
+    inline int GlyphIndex(char32_t code)
+    {
+        if (code >= 32 && code < 127)
+            return static_cast<int>(code - 32);
+        for (size_t i = 0; i < PocketSans::kExtraCodes.size(); ++i)
+            if (PocketSans::kExtraCodes[i] == code)
+                return 95 + static_cast<int>(i);
+        return -1;
+    }
+    // Decodes UTF-8 into glyph indices; empty optional if any character has no Pocket glyph.
+    inline std::optional<std::vector<int>> Glyphs(const std::string& text)
+    {
+        std::vector<int> glyphs;
+        glyphs.reserve(text.size());
+        for (size_t i = 0; i < text.size();)
+        {
+            const auto lead = static_cast<unsigned char>(text[i]);
+            const int length = lead < 0x80 ? 1 : (lead >> 5) == 0x6 ? 2 : (lead >> 4) == 0xE ? 3 : (lead >> 3) == 0x1E ? 4 : 0;
+            if (length == 0 || i + length > text.size())
+                return std::nullopt;
+            char32_t code = length == 1 ? lead : lead & (0x7F >> length);
+            for (int k = 1; k < length; ++k)
+                code = (code << 6) | (static_cast<unsigned char>(text[i + k]) & 0x3F);
+            const int index = GlyphIndex(code);
+            if (index < 0)
+                return std::nullopt;
+            glyphs.push_back(index);
+            i += length;
+        }
+        return glyphs;
+    }
+    inline int GlyphAdvance(int index, bool strong, bool heading)
+    {
+        if (index < 95)
+            return heading ? PocketSansHeading::kAdvance[index] : strong ? PocketSansStrong::kAdvance[index] : PocketSans::kAdvance[index];
+        const auto extra = static_cast<size_t>(index - 95);
+        return heading ? PocketSansHeading::kExtraAdvance[extra] : strong ? PocketSansStrong::kExtraAdvance[extra] : PocketSans::kExtraAdvance[extra];
+    }
+    inline const char* GlyphCoverage(int index, bool strong, bool heading)
+    {
+        if (index < 95)
+            return heading ? PocketSansHeading::kCoverage[index] : strong ? PocketSansStrong::kCoverage[index] : PocketSans::kCoverage[index];
+        const auto extra = static_cast<size_t>(index - 95);
+        return heading ? PocketSansHeading::kExtraCoverage[extra] : strong ? PocketSansStrong::kExtraCoverage[extra] : PocketSans::kExtraCoverage[extra];
+    }
+    // Removes the last whole UTF-8 character.
+    inline void PopCharacter(std::string& text)
+    {
+        while (!text.empty() && (static_cast<unsigned char>(text.back()) & 0xC0) == 0x80)
+            text.pop_back();
+        if (!text.empty())
+            text.pop_back();
+    }
+
     inline int TextWidth(const std::string& rawText, bool strong = false, bool heading = false)
     {
         const auto text = PlainPunctuation(rawText);
         int width = 0;
+        if (const auto glyphs = Glyphs(text))
+        {
+            for (const int index : *glyphs)
+                width += GlyphAdvance(index, strong, heading);
+            return width;
+        }
         for (const unsigned char c : text)
             if (c >= 32 && c < 127)
-                width += heading ? PocketSansHeading::kAdvance[c - 32] : strong ? PocketSansStrong::kAdvance[c - 32] : PocketSans::kAdvance[c - 32];
+                width += GlyphAdvance(c - 32, strong, heading);
         return width;
     }
 
@@ -132,8 +195,9 @@ namespace OpenRCT2::Ui::Handheld
                 break;
             }
         text = PlainPunctuation(std::move(text));
-        // Localised names and native error formatting keep the complete engine fallback.
-        if (std::any_of(text.begin(), text.end(), [](unsigned char c) { return c < 32 || c >= 127 || c == '{'; }))
+        // Localised names and native error formatting keep the complete engine fallback; currency
+        // symbols and the other extra glyphs stay in Pocket Sans.
+        if (text.find('{') != std::string::npos || !Glyphs(text))
         {
             // Localised currency and names use native glyphs too. Match the
             // light theme's ink polarity instead of forcing white on ivory.
@@ -151,7 +215,7 @@ namespace OpenRCT2::Ui::Handheld
         if (maxWidth > 0 && TextWidth(text, strong, heading) > maxWidth)
         {
             while (!text.empty() && TextWidth(text + "...", strong, heading) > maxWidth)
-                text.pop_back();
+                PopCharacter(text);
             text += "...";
         }
         const int width = TextWidth(text, strong, heading);
@@ -159,9 +223,9 @@ namespace OpenRCT2::Ui::Handheld
             pos.x -= width / 2;
         else if (paint.alignment == TextAlignment::right)
             pos.x -= width;
-        for (const unsigned char c : text)
+        for (const int index : Glyphs(text).value_or(std::vector<int>{}))
         {
-            const auto glyph = heading ? PocketSansHeading::kCoverage[c - 32] : strong ? PocketSansStrong::kCoverage[c - 32] : PocketSans::kCoverage[c - 32];
+            const auto glyph = GlyphCoverage(index, strong, heading);
             const auto glyphWidth = heading ? PocketSansHeading::kWidth : strong ? PocketSansStrong::kWidth : PocketSans::kWidth;
             const auto glyphHeight = heading ? PocketSansHeading::kHeight : PocketSans::kHeight;
             for (int y = 0; y < glyphHeight; ++y)
@@ -177,7 +241,7 @@ namespace OpenRCT2::Ui::Handheld
                     auto& pixel = rt.bits[(py - rt.y) * rt.LineStride() + px - rt.x];
                     pixel = BlendGlyph(ink, pixel, coverage);
                 }
-            pos.x += heading ? PocketSansHeading::kAdvance[c - 32] : strong ? PocketSansStrong::kAdvance[c - 32] : PocketSans::kAdvance[c - 32];
+            pos.x += GlyphAdvance(index, strong, heading);
         }
     }
 

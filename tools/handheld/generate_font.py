@@ -24,5 +24,17 @@ for code in range(32, 127):
     image = Image.new("L", (args.width, args.height))
     ImageDraw.Draw(image).text((0, args.size), chr(code), font=font, fill=255, anchor="ls")
     lines.append('"' + ''.join(format(round(value / 17), 'x') for value in image.tobytes()) + '",')
+# Characters beyond ASCII that appear in ordinary play: currency symbols (so money stays in
+# Pocket Sans), the degree sign and the multiplication sign.
+EXTRAS = [0xA3, 0x20AC, 0xA5, 0x20A9, 0x20B9, 0xB0, 0xD7]
+lines += ["};", f"inline constexpr std::array<char32_t, {len(EXTRAS)}> kExtraCodes = {{",
+          ",".join(f"0x{code:X}" for code in EXTRAS), "};",
+          f"inline constexpr std::array<uint8_t, {len(EXTRAS)}> kExtraAdvance = {{",
+          ",".join(str(round(font.getlength(chr(code)))) for code in EXTRAS), "};",
+          f"inline constexpr std::array<const char*, {len(EXTRAS)}> kExtraCoverage = {{"]
+for code in EXTRAS:
+    image = Image.new("L", (args.width, args.height))
+    ImageDraw.Draw(image).text((0, args.size), chr(code), font=font, fill=255, anchor="ls")
+    lines.append('"' + ''.join(format(round(value / 17), 'x') for value in image.tobytes()) + '",')
 lines += ["};", "}"]
 args.output.write_text('\n'.join(lines) + '\n')

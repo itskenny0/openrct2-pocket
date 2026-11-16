@@ -116,7 +116,7 @@ int main(int argc, char** argv)
         WindowGetMain()->savedViewPos = viewport->viewPos;
         auto menu = [&] { return wm->FindByClass(WindowClass::handheldMenu); };
         auto noDesktop = [&] { Check(!wm->FindByClass(WindowClass::savePrompt), "Desktop quit prompt opened"); };
-        // Currency's non-ASCII symbol takes the native font fallback. It must
+        // Currency symbols draw in Pocket Sans (extra glyphs). Amounts must
         // remain readable on ivory cards and teal selections in the light theme.
         {
             Drawing::X8DrawingEngine engine(context->GetUiContext());engine.Resize(80,24);engine.BeginDraw();
