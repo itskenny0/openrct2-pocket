@@ -180,11 +180,17 @@ namespace OpenRCT2::Ui::Handheld
             }
             else
             {
-                if (highlight) Fill(rt, p + ScreenCoordsXY{8, y}, {width - 16, 23}, Theme::gold);
-                DrawModernEllipsised(rt, p + ScreenCoordsXY{12, y + 6}, valueX - 24,
-                    std::string(highlight ? "{BLACK}" : "{MUTED}") + model.stats[i].first);
-                DrawModernEllipsised(rt, p + ScreenCoordsXY{valueX, y + 6}, width - valueX - 12,
-                    std::string(highlight ? "{BLACK}" : "{WHITE}") + model.stats[i].second);
+                // Label left, value right-aligned in strong ink, each on its own soft card: a
+                // review reads as a short receipt rather than a two-column table.
+                const auto origin = p + ScreenCoordsXY{ 12, y };
+                FillRound(rt, origin, { width - 24, 21 }, Theme::raised);
+                DrawModernEllipsised(rt, origin + ScreenCoordsXY{ 8, 5 }, valueX - 24, "{MUTED}" + model.stats[i].first);
+                const auto& value = model.stats[i].second;
+                const int valueWidth = std::min(width - valueX - 20, TextWidth(value, true));
+                DrawStrongText(rt, origin + ScreenCoordsXY{ width - 32 - valueWidth, 5 },
+                    (i < model.statInk.size() ? model.statInk[i] : std::string("{WHITE}")) + value, width - valueX - 20);
+                if (highlight)
+                    DrawFocusRing(rt, origin, { width - 24, 21 });
             }
         }
         const int statRows = (static_cast<int>(model.stats.size()) + statColumns - 1) / statColumns;
