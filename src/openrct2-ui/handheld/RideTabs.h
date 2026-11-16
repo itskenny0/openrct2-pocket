@@ -75,6 +75,25 @@ namespace OpenRCT2::Ui::Handheld::RideTabs
         }
         model.actionGrid = true;
         model.summaryMetrics = true;
+        if (state.tab == overview)
+        {
+            // The header already shows the status; the stat card would say it twice.
+            std::erase_if(model.stats, [](const auto& stat) { return stat.first == "Status"; });
+            // The one obvious next step: finish an unfinished ride, otherwise open a closed one.
+            for (const auto* wanted : { "Place entrance / exit...", "Open..." })
+            {
+                const auto found = std::find(model.rows.begin(), model.rows.end(), wanted);
+                if (found == model.rows.end())
+                    continue;
+                const auto index = static_cast<size_t>(found - model.rows.begin());
+                const bool enabled = index >= model.rowEnabled.size() || model.rowEnabled[index];
+                if (enabled && (std::string_view(wanted) != "Open..." || model.headerStatus == "Closed"))
+                {
+                    model.primaryRow = index;
+                    break;
+                }
+            }
+        }
         return model;
     }
 } // namespace OpenRCT2::Ui::Handheld::RideTabs

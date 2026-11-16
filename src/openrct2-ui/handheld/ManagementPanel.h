@@ -71,7 +71,21 @@ namespace OpenRCT2::Ui::Handheld
             std::vector<std::string> columnLabels;
         };
         std::optional<Chart> chart;
+        // Before -> after rows for drafts and reviews ("Loan £2,000 > £3,000"), so a decision shows
+        // what changes instead of a table of every related number.
+        struct Change
+        {
+            std::string label, before, after;
+            std::string afterInk = "{WHITE}";
+            int meter = -1; // Optional 0-100 bar for the "after" value against a limit.
+        };
+        std::vector<Change> changes;
+        std::optional<size_t> highlightedChange; // The value the D-pad is adjusting.
     };
+    inline int ChangeHeight(const ManagementPresentation::Change& change)
+    {
+        return change.meter >= 0 ? 34 : 24;
+    }
     inline constexpr int kChartHeight = 84;
     inline std::optional<size_t> PrimaryRow(const ManagementPresentation& model)
     {
@@ -97,7 +111,8 @@ namespace OpenRCT2::Ui::Handheld
         const int statHeight = model.summaryMetrics ? std::max(model.metricHeight, model.meterDirections.empty() ? 0 : 66) : 24;
         const int statRows = (static_cast<int>(model.stats.size()) + statColumns - 1) / statColumns;
         const int rowStart = kHeaderHeight + (model.tabs.empty() ? 0 : kTabsHeight) + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16
-            + model.reservedHeight + (model.graph.empty() ? 0 : 110) + (model.chart ? kChartHeight + 6 : 0) + (model.rows.empty() ? 0 : 11) + (model.toolbarCount ? 36 : 0);
+            + model.reservedHeight + (model.graph.empty() ? 0 : 110) + (model.chart ? kChartHeight + 6 : 0)
+            + [&] { int h = model.changes.empty() ? 0 : 8; for (const auto& c : model.changes) h += ChangeHeight(c); return h; }() + (model.rows.empty() ? 0 : 11) + (model.toolbarCount ? 36 : 0);
         const int rowHeight = model.rowHeight ? model.rowHeight : model.denseRoster ? 38 : model.rosterCards ? 46 : model.actionGrid ? 30 : columns > 1 ? 24 : 30;
         const size_t capacity = std::max(1, (size.height - rowStart - 34) / rowHeight) * columns;
         return {columns, rowHeight, rowStart, statColumns, statHeight, capacity};
@@ -195,6 +210,41 @@ namespace OpenRCT2::Ui::Handheld
         for (size_t i = 0; i < model.bodyLines.size(); ++i)
             DrawModernEllipsised(rt, p + ScreenCoordsXY{12, contentTop + 4 + statRows * statHeight + static_cast<int>(i) * 16},
                 width - 24, model.bodyLines[i].starts_with("{") ? model.bodyLines[i] : "{WHITE}" + model.bodyLines[i]);
+        if (!model.changes.empty())
+        {
+            int y = contentTop + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16 + 2;
+            for (size_t i = 0; i < model.changes.size(); ++i)
+            {
+                const auto& change = model.changes[i];
+                const auto origin = p + ScreenCoordsXY{ 12, y };
+                const int h = ChangeHeight(change) - 4;
+                const bool adjusting = focused && model.highlightedChange == i;
+                FillRound(rt, origin, { width - 24, h }, Theme::raised);
+                DrawModernEllipsised(rt, origin + ScreenCoordsXY{ 8, 6 }, width / 3, "{MUTED}" + change.label);
+                // Right-aligned "before  >  after": the eye lands on the new value.
+                const int afterWidth = TextWidth(change.after, true);
+                const int afterX = width - 24 - 10 - afterWidth;
+                DrawStrongText(rt, origin + ScreenCoordsXY{ afterX, 6 }, change.afterInk + change.after);
+                if (!change.before.empty() && change.before != change.after)
+                {
+                    const int arrowX = afterX - 12;
+                    for (int r = 0; r < 4; ++r)
+                        Fill(rt, origin + ScreenCoordsXY{ arrowX + r, 7 + r }, { 1, 9 - 2 * r }, Theme::text);
+                    const int beforeWidth = TextWidth(change.before);
+                    DrawModernText(rt, origin + ScreenCoordsXY{ arrowX - 8 - beforeWidth, 6 }, "{MUTED}" + change.before);
+                }
+                if (change.meter >= 0)
+                    DrawMeter(rt, origin + ScreenCoordsXY{ 8, h - 9 }, width - 40, change.meter, Theme::gold, 4);
+                if (adjusting)
+                {
+                    // Not a focus ring: A still acts on the focused button below. A bar and arrows
+                    // say "left/right changes this".
+                    FillRound(rt, origin, { 3, h }, Theme::gold);
+                    DrawStrongText(rt, origin + ScreenCoordsXY{ width / 3 + 12, 6 }, "{GOLD}<  >");
+                }
+                y += ChangeHeight(change);
+            }
+        }
         if (model.chart)
         {
             const auto& chart = *model.chart;

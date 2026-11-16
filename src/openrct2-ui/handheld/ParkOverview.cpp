@@ -127,6 +127,8 @@ namespace OpenRCT2::Ui::Handheld::ParkOverview
                                              : "Park status locked",
                            Finances::Available(Finances::Field::admission) ? "Admission..." : "Admission unavailable",
                            "Park map...", "Park news...", "Park awards...", "Park history..." };
+            if (StatusPermitted() && !park.flags.has(ParkFlag::parkOpen))
+                model.primaryRow = 0;
             return model;
         }
         model.bodyLines.push_back("{POSITIVE}All clear - nothing needs you right now");
@@ -147,6 +149,8 @@ namespace OpenRCT2::Ui::Handheld::ParkOverview
         model.rows = { StatusPermitted() ? (park.flags.has(ParkFlag::parkOpen) ? "Close park..." : "Open park...")
                                          : "Park status locked",
                        Finances::Available(Finances::Field::admission) ? "Admission..." : "Admission unavailable", "Park map...", "Park news...", "Park awards...", "Park history..." };
+        if (StatusPermitted() && !park.flags.has(ParkFlag::parkOpen))
+            model.primaryRow = 0; // A closed park has one obvious next step.
         return model;
     }
 } // namespace OpenRCT2::Ui::Handheld::ParkOverview
