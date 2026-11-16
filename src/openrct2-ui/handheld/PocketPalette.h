@@ -18,12 +18,13 @@ namespace OpenRCT2::Ui::Handheld::PocketPalette
         style=value;
         const bool light=value==Style::daylight;
         panel=light?20:12; border=light?16:15; separator=light?17:14;
-        selection=light?194:19; primary=light?10:21; secondary=light?13:20;
-        // Existing selected labels use the dark ink role. On teal, use light ink.
-        dark=light?21:10; positive=light?194:151; caution=light?180:43;
+        // Both themes select with a saturated colour and light label ink, so the highlight
+        // reads at a glance (and section colours can replace it) on ivory or slate panels.
+        selection=194; primary=light?10:21; secondary=light?13:20;
+        dark=21; positive=light?194:151; caution=light?180:43;
         destructive=light?62:68; disabled=light?16:19;
         body=light?19:10; raised=light?225:13; edge=light?16:14;
-        highlight=light?21:17; selectionLight=light?198:20; shadow=light?17:16;
+        highlight=light?21:17; selectionLight=198; shadow=light?17:16;
         accent=light?180:19;
     }
 }

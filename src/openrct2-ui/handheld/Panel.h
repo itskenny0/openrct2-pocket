@@ -144,7 +144,7 @@ namespace OpenRCT2::Ui::Handheld
     };
     inline void ApplyAccent(Accent accent)
     {
-        if (accent == Accent::standard || PocketPalette::style != PocketPalette::Style::daylight)
+        if (accent == Accent::standard)
             return;
         struct Rgb
         {

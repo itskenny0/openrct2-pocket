@@ -204,7 +204,7 @@ namespace OpenRCT2::Ui::Handheld
             const char* nativeInk = PocketPalette::style == PocketPalette::Style::daylight
                 ? (ink == Ink::dark ? "{WHITE}" : ink == Ink::destructive ? "{RED}"
                     : "{BLACK}")
-                : (ink == Ink::dark ? "{BLACK}" : ink == Ink::gold ? "{YELLOW}" : "{WHITE}");
+                : (ink == Ink::gold ? "{YELLOW}" : "{WHITE}");
             text = nativeInk + text;
             if (maxWidth > 0)
                 drawTextEllipsised(rt, pos, maxWidth, text, paint);
