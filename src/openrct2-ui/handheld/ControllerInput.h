@@ -49,6 +49,8 @@ namespace OpenRCT2::Ui::Handheld
         int32_t heldX{}, heldY{};
         // The Back button (B, or A when swapped) is still down: holding it in a tool undoes.
         bool backHeld{};
+        // Y (the secondary context button) is still down: holding it in the park opens the inbox.
+        bool secondaryHeld{};
         std::vector<Action> actions;
     };
 

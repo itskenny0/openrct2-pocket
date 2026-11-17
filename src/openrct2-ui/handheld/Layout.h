@@ -61,12 +61,15 @@ namespace OpenRCT2::Ui::Handheld::Layout
     }
     struct HudCells
     {
-        int width, cashEnd, dateEnd, guestsEnd;
+        int width, cashEnd, dateEnd, guestsEnd, clockEnd;
     };
-    constexpr HudCells HudLayout(ScreenSize screen)
+    constexpr HudCells HudLayout(ScreenSize screen, bool clock = false)
     {
         const int width = std::max(0, screen.width - 2 * margin);
         // Keep cash dominant; date/count are secondary. Last cell is always simulation state.
-        return { width, width * 38 / 100, width * 69 / 100, width * 89 / 100 };
+        // With the clock, each cell gives up a little so the time and battery fit before it.
+        if (clock)
+            return { width, width * 31 / 100, width * 55 / 100, width * 71 / 100, width * 89 / 100 };
+        return { width, width * 38 / 100, width * 69 / 100, width * 89 / 100, width * 89 / 100 };
     }
 } // namespace OpenRCT2::Ui::Handheld::Layout

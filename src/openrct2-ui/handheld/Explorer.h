@@ -4,6 +4,7 @@
  *****************************************************************************/
 
 #pragma once
+#include "Alerts.h"
 #include "QuickWheel.h"
 #include <openrct2/object/Object.h>
 #include "PeepPlacement.h"
@@ -36,6 +37,8 @@ namespace OpenRCT2::Ui::Handheld
     // Y in the park: moves the camera to the next alert and shows what usually fixes it. Returns
     // false when nothing needs attention.
     bool JumpToNextAlert();
+    // Glide to one alert and say what fixes it (the inbox's A).
+    void JumpToAlert(const Alerts::Alert& alert);
     void UpdateExplorer(ControllerInput& input);
     bool QuickWheelOpen();
     void HandleExplorerInput(ControllerInput& input, const Frame& frame);
@@ -112,6 +115,7 @@ namespace OpenRCT2::Ui::Windows
     bool HandheldToolSettingsPage(int direction);
     std::string HandheldNewsText(const std::string& text);
     void HandheldNewsOpen();
+    void HandheldInboxOpen();
     void HandheldObjectivesOpen();
     bool HandheldDashboardNews();
     void HandheldPeepPlacementOptionsOpen();

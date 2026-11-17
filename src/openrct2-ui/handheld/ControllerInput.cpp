@@ -194,6 +194,9 @@ namespace OpenRCT2::Ui::Handheld
         result.heldX = x;
         result.heldY = y;
         result.backHeld = held(ButtonAction(SDL_CONTROLLER_BUTTON_B) == Action::back ? SDL_CONTROLLER_BUTTON_B : SDL_CONTROLLER_BUTTON_A);
+        for (const auto button : { SDL_CONTROLLER_BUTTON_X, SDL_CONTROLLER_BUTTON_Y })
+            if (ButtonAction(button) == Action::contextSecondary && held(button))
+                result.secondaryHeld = true;
         if (x != _navigationX || y != _navigationY)
         {
             result.navigateX = x;

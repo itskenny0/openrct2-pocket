@@ -1353,6 +1353,20 @@ namespace OpenRCT2::Ui::Handheld
         Audio::Play(Audio::SoundId::click1, -400, Audio::kAudioPlayAtCentre);
         input.suspend(); // The held B must not also leave the tool on release.
     }
+    // Y in the park with alerts: a tap glides to the next one, a hold opens the inbox.
+    static constexpr uint64_t kInboxHoldMs = 400;
+    static uint64_t _alertHold{};
+    static void HandleAlertHold(ControllerInput& input, const Frame& frame)
+    {
+        if (frame.secondaryHeld && MenuFeel::Clock() - _alertHold < kInboxHoldMs)
+            return;
+        _alertHold = 0;
+        if (frame.secondaryHeld)
+            Windows::HandheldInboxOpen();
+        else if (!JumpToNextAlert())
+            Windows::HandheldNewsOpen();
+        input.suspend();
+    }
     static QuickWheel::State _wheel;
     static void ChooseWheel(ControllerInput& input, size_t slot)
     {
@@ -1419,6 +1433,8 @@ namespace OpenRCT2::Ui::Handheld
             return HandleWheel(input, frame);
         if (_backHold)
             return HandleBackHold(input, frame);
+        if (_alertHold)
+            return HandleAlertHold(input, frame);
         if (_ridePathAccess && !AccessTargetValid())
         {
             EndTerrain();
@@ -2049,7 +2065,14 @@ namespace OpenRCT2::Ui::Handheld
                             _terrainStatus.clear();
                             _scatterFeedback = false;
                         }
-                        else if (!JumpToNextAlert())
+                        else if (!Alerts::Current().empty())
+                        {
+                            // Decide on release (or after the hold time): return without
+                            // suspending so the held button stays visible.
+                            _alertHold = MenuFeel::Clock();
+                            return;
+                        }
+                        else
                             Windows::HandheldNewsOpen();
                         break;
                     case Action::back:
@@ -2125,6 +2148,10 @@ namespace OpenRCT2::Ui::Handheld
         const auto context = _terrainActive || Paths::IsActive() ? Layout::Context::construction : Layout::Context::park;
         if (Layout::ShowsHud(context) && rt.y < Layout::hudTop + Layout::hudHeight && rt.y + rt.height > Layout::hudTop)
             DrawHud(rt, { ContextGetWidth(), height }, NativeHud());
+        // The goal ticker shares the space under the HUD with toasts, which win while they show.
+        if (context == Layout::Context::park && preferences.hudGoal && !_wheel.open && !ToastVisible())
+            if (const auto goal = Goal::Current())
+                DrawGoal(rt, { ContextGetWidth(), height }, *goal);
         // Completion can arrive after UpdateExplorer but before this frame is drawn.
         // Never fall through to terrain controls while waiting for the next update to end the tool.
         if (Designs::Completed()
@@ -2358,16 +2385,23 @@ namespace OpenRCT2::Ui::Handheld
         if (alerts.empty() || main == nullptr)
             return false;
         const auto& alert = alerts[_alertIndex++ % alerts.size()];
+        JumpToAlert(alert);
+        if (alerts.size() > 1)
+            _toast.message = std::to_string((_alertIndex - 1) % alerts.size() + 1) + " of " + std::to_string(alerts.size())
+                + "  |  " + _toast.message;
+        return true;
+    }
+    void JumpToAlert(const Alerts::Alert& alert)
+    {
+        auto* main = WindowGetMain();
+        if (main == nullptr)
+            return;
         WindowScrollToLocation(*main, alert.location);
         Audio::Play(Audio::SoundId::click1, -400, Audio::kAudioPlayAtCentre);
         _toast.title = Windows::HandheldNewsText(alert.title);
-        _toast.message = (alerts.size() > 1 ? std::to_string((_alertIndex - 1) % alerts.size() + 1) + " of "
-                                  + std::to_string(alerts.size()) + "  |  "
-                                            : std::string())
-            + alert.fix;
+        _toast.message = Windows::HandheldNewsText(alert.fix);
         _toast.shown = MenuFeel::Clock();
         _toast.notice = true;
-        return true;
     }
 } // namespace OpenRCT2::Ui::Handheld
 

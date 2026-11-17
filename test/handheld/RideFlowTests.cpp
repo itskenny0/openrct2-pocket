@@ -6,6 +6,8 @@
 #include <openrct2/management/Research.h>
 #include <openrct2/interface/Viewport.h>
 #include <filesystem>
+#include <thread>
+#include <chrono>
 #include <iostream>
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/handheld/ControllerInput.h>
@@ -259,13 +261,26 @@ int main(int argc, char** argv)
             Check(!alerts.empty()&&alerts.front().kind==H::Alerts::Kind::breakdown&&alerts.front().ride==target.id.ToUnderlying(),"Broken ride is not the first alert");
             Check(H::Alerts::HintLabel().starts_with("Alerts ("),"Footer does not advertise alerts");
             auto* main=WindowGetMain();main->savedViewPos={};main->flags.unset(WindowFlag::scrollingToLocation);
-            press(H::Action::contextSecondary);
+            press(H::Action::contextSecondary);{H::Frame release;H::HandleExplorerInput(input,release);} // Tap: decided on release.
             Check(main->flags.has(WindowFlag::scrollingToLocation)&&main->savedViewPos!=ScreenCoordsXY{},"Y did not glide to the alert");
             main->viewport->viewPos=main->savedViewPos;main->flags.unset(WindowFlag::scrollingToLocation);
             capture("06a-alert-jump.png");
             const auto home=H::ParkOverview::Presentation(0);
             Check(home.bodyLines.size()>=2&&home.bodyLines.front().find("broke down")!=std::string::npos,"Overview does not lead with alerts");
             press(H::Action::openMenu);capture("06b-overview-alerts.png");closeMenu();
+            {
+                // Hold Y: the inbox, alerts above the news; A on an alert glides there.
+                press(H::Action::contextSecondary);
+                std::this_thread::sleep_for(std::chrono::milliseconds(450));
+                H::Frame held;held.secondaryHeld=true;H::HandleExplorerInput(input,held);
+                const auto inbox=W::HandheldManagementPresentation();
+                Check(inbox.title=="Inbox"&&!inbox.rows.empty()&&inbox.rows.front().find("broke down")!=std::string::npos,"Hold Y did not open the inbox");
+                capture("06b2-inbox.png");
+                main->savedViewPos={};main->flags.unset(WindowFlag::scrollingToLocation);
+                W::HandheldMenuConfirm();WindowCullDead();
+                Check(!wm->FindByClass(WindowClass::handheldMenu)&&main->flags.has(WindowFlag::scrollingToLocation),"Inbox A did not glide to the alert");
+                {H::Frame release;H::HandleExplorerInput(input,release);}
+            }
             ride->flags.unset(RideFlag::brokenDown);H::Alerts::Invalidate();
         }
         {

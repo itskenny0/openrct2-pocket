@@ -10,6 +10,7 @@
 #include "Dashboard.h"
 #include "QuickWheel.h"
 #include "RideFollow.h"
+#include "Alerts.h"
 #include "ChoiceCards.h"
 #include "Designs.h"
 #include "DesignAuthoring.h"
@@ -433,6 +434,9 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::ParkOverview::Draft> _overviewDraft;
         Handheld::ParkMap::State _parkMap;
         std::vector<Handheld::ParkInformation::NewsTarget> _parkNews;
+        // The inbox: what needs attention now, listed above the news. A snapshot taken when it
+        // opens, so the rows do not shift under the cursor as alerts come and go.
+        std::vector<Handheld::Alerts::Alert> _parkAlerts;
         std::optional<Handheld::ParkInformation::NewsTarget> _parkNewsTarget;
         size_t _parkNewsPage{}, _parkNewsFocus{};
         bool _newsFromPark{}, _newsFromDashboard{};
@@ -552,7 +556,23 @@ namespace OpenRCT2::Ui::Windows
             if (_page == Page::financeLedger) return Handheld::FinanceInformation::LedgerPresentation(_ledger, _focus.index());
             if (_page == Page::mapSubjects) return Handheld::MapSubjects::Presentation(_mapSubjects, _parkMap.mode, _parkMap.filter, _focus.index(), _parkMap.guestFilter);
             if (_page == Page::mapSubject && _mapTarget) return Handheld::MapSubjects::Detail(*_mapTarget, _focus.index(), _status);
-            if (_page == Page::parkNews) return NewsPresentation(_parkNews, _focus.index());
+            if (_page == Page::parkNews)
+            {
+                auto model = NewsPresentation(_parkNews, _focus.index());
+                if (!_parkAlerts.empty())
+                {
+                    model.title = "Inbox";
+                    model.breadcrumb = "Park / Inbox";
+                    std::vector<std::string> alerts;
+                    for (const auto& alert : _parkAlerts) alerts.push_back(alert.title);
+                    if (_parkNews.empty()) model.rows.clear();
+                    model.rows.insert(model.rows.begin(), alerts.begin(), alerts.end());
+                    const auto focused = _focus.index();
+                    model.status = focused < _parkAlerts.size() ? _parkAlerts[focused].fix + "  |  A: go there"
+                                                                : std::to_string(_parkAlerts.size()) + (_parkAlerts.size() == 1 ? " thing needs" : " things need") + " attention";
+                }
+                return model;
+            }
             if (_page == Page::parkNewsDetail && _parkNewsTarget) {
                 auto model=NewsDetail(*_parkNewsTarget,_parkNewsPage,_focus.index(),_status);
                 model.rows[2]=Handheld::ManagementNews::Label(*_parkNewsTarget);
@@ -2621,12 +2641,19 @@ namespace OpenRCT2::Ui::Windows
         {
             _newsDashboard=_dashboard;_newsFromPark=fromPark;_newsFromDashboard=!fromPark;
             _parkNews=Handheld::ParkInformation::NewsList();_parkNewsFocus=0;_parkNewsPage=0;
+            Handheld::Alerts::Invalidate();_parkAlerts=Handheld::Alerts::Current();
             _dashboard.section=Handheld::Dashboard::Section::overview;_dashboard.focus=Handheld::Dashboard::Focus::content;
             if(fromPark && !_parkNews.empty()) {
                 _parkNewsTarget=_parkNews.front();page(Page::parkNewsDetail);
                 if(Handheld::ParkInformation::SubjectCurrent(*_parkNewsTarget) || Handheld::ManagementNews::Available(*_parkNewsTarget)!=Handheld::ManagementNews::Link::none)
                     _focus.move(0,rows().size());
             } else page(Page::parkNews);
+        }
+        // Hold Y in the park: the inbox list itself, alerts first, rather than the latest item.
+        void openInbox()
+        {
+            openNews(false);
+            _newsFromDashboard=false;_newsFromPark=true;
         }
         // Scenario start shows the objective as a Pocket page instead of the desktop window;
         // B from it returns straight to the park, matching news opened from the park.
@@ -5222,9 +5249,17 @@ namespace OpenRCT2::Ui::Windows
                     else back();
                     break;
                 case Page::parkNews:
+                    if (choice < _parkAlerts.size())
+                    {
+                        const auto index = choice;
+                        close();
+                        Handheld::JumpToAlert(_parkAlerts[index]);
+                        break;
+                    }
+                    choice -= _parkAlerts.size();
                     if (choice < _parkNews.size())
                     {
-                        _parkNewsTarget = _parkNews[choice]; _parkNewsFocus = choice; _parkNewsPage = 0;
+                        _parkNewsTarget = _parkNews[choice]; _parkNewsFocus = choice + _parkAlerts.size(); _parkNewsPage = 0;
                         page(Page::parkNewsDetail);
                     }
                     else { _parkNews = Handheld::ParkInformation::NewsList(); invalidate(); }
@@ -7943,6 +7978,7 @@ namespace OpenRCT2::Ui::Windows
 namespace OpenRCT2::Ui::Windows
 {
     std::string HandheldNewsText(const std::string& text){return Handheld::ParkInformation::PlainText(text);}
+    void HandheldInboxOpen(){HandheldDashboardOpen();auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);if(w)static_cast<HandheldMenuWindow*>(w)->openInbox();}
     void HandheldNewsOpen(){HandheldDashboardOpen();auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);if(w)static_cast<HandheldMenuWindow*>(w)->openNews(true);}
     void HandheldObjectivesOpen(){HandheldDashboardOpen();auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);if(w)static_cast<HandheldMenuWindow*>(w)->openObjectives();}
     bool HandheldDashboardNews(){auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);return w&&static_cast<HandheldMenuWindow*>(w)->dashboardNews();}
