@@ -50,6 +50,12 @@ if [ -z "${OPENRCT2_BRICK_KEEP_MAPPING:-}" ]; then
 fi
 printf 'Platform=%s Device=%s Assets=%s User=%s\n' "${PLATFORM:-unset}" "${DEVICE:-unset}" "$RCT2_DIR" "$USER_DIR"
 printf 'SDL video=%s audio=%s\n' "${SDL_VIDEODRIVER:-auto}" "${SDL_AUDIODRIVER:-auto}"
+# Some frontends (NX Redux among them) preload their own hooks. Preloads load before the Pak's
+# private libraries are searched, so a preload that depends on the system libstdc++ drags in
+# that older copy and the game refuses to start. The game gets the Pak's runtime only.
+printf 'LD_PRELOAD=%s\n' "${LD_PRELOAD:-unset}"
+[ ! -s /etc/ld.so.preload ] || { printf '/etc/ld.so.preload: '; tr '\n' ' ' < /etc/ld.so.preload; echo; }
+unset LD_PRELOAD
 cd "$GAME_DIR"
 # A private glibc runtime avoids imposing a newer libc on NextUI itself.
 # The loader affects this child only. Exiting returns normally to NextUI.
