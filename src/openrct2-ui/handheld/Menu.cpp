@@ -888,13 +888,13 @@ namespace OpenRCT2::Ui::Windows
             {
                 Handheld::ManagementPresentation model;
                 model.breadcrumb = "Name / Keyboard";
-                model.title = _nameEntry.text.empty() ? "Default name" : _nameEntry.text;
+                model.title = current == Page::designName ? "Design name" : "Default name";
+                model.keyboard = _nameEntry;
+                model.keyboardHeading = current == Page::designName ? "Name this design" : "Rename ride";
                 model.rows = _nameEntry.Keys();
                 model.columns = Handheld::TextEntry::columns;
                 model.selected = selected;
-                model.status = std::to_string(_nameEntry.Length()) + " / 32 characters";
-                if (!_status.empty())
-                    model.status = _status;
+                model.status = _status;
                 model.primaryAction = "Type";
                 return model;
             }
@@ -1097,8 +1097,9 @@ namespace OpenRCT2::Ui::Windows
             {
                 auto model = Handheld::StaffManagement::NamePresentation(_nameEntry, selected, false, _status);
                 model.breadcrumb = "Guests / Filter by name";
-                model.title = _nameEntry.text.empty() ? "All guest names" : _nameEntry.text;
-                model.status = "Case insensitive / OK Apply / Clr Remove";
+                model.title = "All guests";
+                model.keyboardHeading = "Find guests by name";
+                model.status = _status.empty() ? "Matches any part of a name, in any case" : _status;
                 return model;
             }
             if (current == Page::guestName || current == Page::guestNameConfirm)
@@ -1106,6 +1107,7 @@ namespace OpenRCT2::Ui::Windows
                 auto model = Handheld::StaffManagement::NamePresentation(
                     _nameEntry, selected, current == Page::guestNameConfirm, _status);
                 model.breadcrumb = current == Page::guestName ? "Guests / Name keyboard" : "Guests / Review name";
+                model.keyboardHeading = "Rename guest";
                 return model;
             }
             if (current == Page::guestTracking && _guestTarget)
@@ -3393,6 +3395,33 @@ namespace OpenRCT2::Ui::Windows
             if(_civicBusy)return;
             if (financeManagement())
                 page(Page::park);
+        }
+        bool keyboardPage() const
+        {
+            return _page == Page::saveName || _page == Page::sceneryName || _page == Page::scenerySearch || _page == Page::ridesName
+                || _page == Page::designName || _page == Page::staffName || _page == Page::guestName || _page == Page::guestFilterName;
+        }
+        // Console keyboards put the common keys on face buttons. Each shortcut presses the real key
+        // (focus it, confirm, restore focus), so every screen's own handling still runs.
+        bool textEntryKey(Handheld::Action action)
+        {
+            if (!keyboardPage()) return false;
+            using T = Handheld::TextEntry;
+            const size_t key = action == Handheld::Action::contextSecondary ? T::kDelete
+                : action == Handheld::Action::contextPrimary                ? T::kSpace
+                : action == Handheld::Action::previousOption                ? T::kCase
+                : action == Handheld::Action::openMenu                      ? T::kDone
+                                                                            : SIZE_MAX;
+            if (key == SIZE_MAX) return false;
+            const auto count = rows().size();
+            if (key >= count) return false;
+            const auto saved = _focus.index();
+            _focus.move(static_cast<int>(key) - static_cast<int>(saved), count);
+            confirm();
+            if (keyboardPage() && key != T::kDone)
+                _focus.move(static_cast<int>(saved) - static_cast<int>(_focus.index()), rows().size());
+            invalidate();
+            return true;
         }
         bool shopIsOpen() const
         {
@@ -6913,10 +6942,11 @@ namespace OpenRCT2::Ui::Windows
             {
                 auto model = Handheld::StaffManagement::NamePresentation(_nameEntry,_focus.index(),false,_status);
                 model.breadcrumb = _page == Page::saveName ? "Save As / Filename" : "Scenery / Search";
-                model.title = _nameEntry.text.empty() ? (_page == Page::saveName ? "Enter park filename" : "All eligible objects") : _nameEntry.text;
-                model.status = _status.empty() ? "Done applies / B cancels" : _status;
+                model.title = _page == Page::saveName ? "Park filename" : "All eligible objects";
+                model.keyboardHeading = _page == Page::saveName ? "Save park as" : "Search scenery";
+                model.status = _status;
                 Handheld::DrawManagementContent(rt,{8,8},{ContextGetWidth()-16,Handheld::Layout::ContentHeight({ContextGetWidth(),ContextGetHeight()})},model);
-                Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Choose"},{"A","Type"},{"B","Back"}});
+                Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},Handheld::KeyboardHints());
                 return;
             }
             if (_page == Page::parkMap) { Handheld::ParkMap::Draw(rt, _parkMap); return; }
@@ -7155,14 +7185,21 @@ namespace OpenRCT2::Ui::Windows
                 model.selected = _focus.index();
                 model.columns = _page == Page::sceneryName ? Handheld::TextEntry::columns : 1;
                 model.confirmation = _page == Page::sceneryConfirm;
-                model.status = _status.empty() ? "Up to 32 characters" : _status;
+                if (_page == Page::sceneryName)
+                {
+                    model.keyboard = _nameEntry;
+                    model.keyboardHeading = "Sign text";
+                    model.title = "Empty sign";
+                }
+                model.status = _status;
                 Handheld::DrawManagementContent(
                     rt, Handheld::Concept::kMenuOrigin,
                     { 324, Handheld::Layout::ContentHeight({ ContextGetWidth(), ContextGetHeight() }) }, model);
                 Handheld::DrawActionStrip(rt, { ContextGetWidth(), ContextGetHeight() });
                 Handheld::DrawFooter(
                     rt, { ContextGetWidth(), ContextGetHeight() },
-                    { { "D-pad", "Choose" }, { "A", "Select" }, { "B", "Back" } });
+                    _page == Page::sceneryName ? Handheld::KeyboardHints()
+                                               : std::vector<Handheld::ControlHint>{ { "D-pad", "Choose" }, { "A", "Select" }, { "B", "Back" } });
                 return;
             }
             if (_page == Page::sceneryPicker)
@@ -7482,6 +7519,11 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->move(direction);
+    }
+    bool HandheldTextEntryKey(int action)
+    {
+        auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window && static_cast<HandheldMenuWindow*>(window)->textEntryKey(static_cast<Handheld::Action>(action));
     }
     void HandheldMenuConfirm()
     {

@@ -840,7 +840,8 @@ namespace OpenRCT2::Ui::Handheld
                 Windows::HandheldMenuMove(frame.navigateY);
             for (const auto action : frame.actions)
             {
-                if ((action==Action::previousOption || action==Action::nextOption)
+                if (Windows::HandheldTextEntryKey(static_cast<int>(action))) {}
+                else if ((action==Action::previousOption || action==Action::nextOption)
                     && Windows::HandheldToolSettingsPage(action==Action::previousOption ? -1 : 1)) {}
                 else if ((action==Action::previousOption || action==Action::nextOption)
                     && Windows::HandheldTrackSelectionMove(action==Action::previousOption ? -1 : 1,0)) {}

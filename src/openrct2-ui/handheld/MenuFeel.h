@@ -43,7 +43,7 @@ namespace OpenRCT2::Ui::Handheld
         int _pageId{ -1 };
         size_t _selection{};
         uint64_t _focusTime{}, _pressTime{}, _spriteTick{}, _pageTime{}, _glideTime{};
-        bool _ready{}, _pressed{}, _animated{}, _moving{}, _backPending{};
+        bool _ready{}, _pressed{}, _animated{}, _moving{}, _backPending{}, _hidePointer{};
         Event _pageKind{ Event::none };
         int _pageDirection{};
         std::vector<Rect> _frameSelected, _lastSelected;
@@ -204,8 +204,19 @@ namespace OpenRCT2::Ui::Handheld
             return reduceMotion ? 0 : kSteps[(now / 160) % 4];
         }
 
+        // Dense grids (the keyboard) have neighbours where the pointer would sit: they keep the ring
+        // and the glide but ask for no pointer this frame.
+        void HidePointer()
+        {
+            _hidePointer = true;
+        }
+        bool PointerHidden() const
+        {
+            return _hidePointer;
+        }
         void BeginDraw()
         {
+            _hidePointer = false;
             _animated = false;
             _frameSelected.clear();
         }

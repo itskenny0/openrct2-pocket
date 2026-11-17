@@ -96,6 +96,8 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
     }
     inline std::vector<ControlHint> Hints(const State& state, const ManagementPresentation& model, bool sectionRoot)
     {
+        if (model.keyboard && state.focus == Focus::content)
+            return KeyboardHints();
         std::vector<ControlHint> hints{ { "D-pad",
                                           state.focus == Focus::rail         ? "Navigate"
                                               : model.navigationHint.empty() ? model.editing ? "Adjust" : "Choose"

@@ -51,7 +51,7 @@ using namespace OpenRCT2;
 namespace H = Ui::Handheld;
 namespace C = H::CustomTracks;
 namespace W = Ui::Windows;
-static void Check(bool ok, const char* message)
+static void Check(bool ok, const std::string& message)
 {
     if (!ok)
         throw std::runtime_error(message);
@@ -132,6 +132,22 @@ int main(int argc, char** argv)
         Check(sm().tabs.size()==4,"Hire did not open employee workspace");const auto employee=S::Roster().front();capture("03-employee-overview.png");
         for(int i=0;i<3;++i)press(H::Action::nextOption);
         capture("03a-employee-details.png");
+        select(sm,"Name...");press(H::Action::confirm);Check(sm().keyboard.has_value(),"Name page is not a keyboard");capture("03b-name-keyboard.png");
+        {
+            // Face buttons: Y deletes, X types a space, START finishes. Case follows the text:
+            // a capital to start and after a space.
+            auto type=[&](size_t key){W::HandheldMenuMove(static_cast<int>(key)-static_cast<int>(sm().selected));press(H::Action::confirm);};
+            for(int i=0;i<40;++i)press(H::Action::contextSecondary);
+            Check(sm().keyboard->text.empty()&&sm().rows[0]=="A","Y did not delete, or an empty field is not capitalised");
+            capture("03c-keyboard-empty.png");
+            type(1);Check(sm().rows[0]=="a","Keyboard did not drop to lower case after the first letter");
+            type('O'-'A');press(H::Action::contextPrimary);Check(sm().rows[0]=="A","Space did not capitalise the next word");
+            type(1);Check(sm().keyboard->text=="Bo B","Typed text wrong: "+sm().keyboard->text);
+            Check(H::TextEntry{}.Move(H::TextEntry::kSpace,0,-1)=='N'-'A',"Up from Space did not land under its centre");
+            capture("03d-keyboard-typed.png");
+            press(H::Action::openMenu);GameActions::ProcessQueue(state);
+            Check(!sm().keyboard&&sm().tabs.size()==4&&S::Resolve(employee)->getName()=="Bo B","START did not apply the name and return");
+        }
         for(int i=0;i<3;++i)press(H::Action::previousOption);
         press(H::Action::nextOption);const auto baseline=S::Resolve(employee)->staffOrders;press(H::Action::confirm);
         Check(S::Resolve(employee)->staffOrders==baseline,"Duties draft changed native orders");Check(sm().headerStatus=="Unsaved duties"&&sm().headerInk=="{CAUTION}","Duty draft not visibly unsaved");capture("04-employee-duties.png");

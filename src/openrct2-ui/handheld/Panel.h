@@ -304,6 +304,8 @@ namespace OpenRCT2::Ui::Handheld
             Fill(rt, { rect.x, rect.y + 4 }, { 1, rect.height - 8 }, ghost);
             Fill(rt, { rect.x + rect.width - 1, rect.y + 4 }, { 1, rect.height - 8 }, ghost);
         }
+        if (feel.PointerHidden())
+            return;
         if (PocketPalette::Pixel())
         {
             // Pixel theme: the classic menu cursor, a solid triangle that nudges toward the choice.

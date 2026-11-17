@@ -337,7 +337,11 @@ namespace OpenRCT2::Ui::Handheld
     {
         return (height - 12 + 1) / 2 - 2;
     }
-    inline void DrawButtonLabel(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, const std::string& text)
+    // onAccent: light ink for a filled badge or key; otherwise the normal text ink (keycaps).
+    // sharedBaseline: centre across by optical weight but sit every label on the same baseline,
+    // so a row of keys reads as a line of text ('q' and 'e' level, not each centred on its ink).
+    inline void DrawButtonLabel(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, const std::string& text,
+        bool onAccent = true, bool sharedBaseline = false)
     {
         if (PocketPalette::Pixel())
         {
@@ -347,7 +351,7 @@ namespace OpenRCT2::Ui::Handheld
             // The bold advance includes a trailing spacing column; centre the inked part.
             const int width = PixelFont::Width(text, style) - (style == PixelFont::Style::bold ? 1 : 0);
             PixelFont::Draw(rt, pos + ScreenCoordsXY{ (size.width - width + 1) / 2, (size.height - 8) / 2 }, text, style,
-                InkColour(Ink::dark));
+                InkColour(onAccent ? Ink::dark : Ink::light));
             return;
         }
         // Centre by optical weight, not by the advance box: the coverage-weighted centre of the
@@ -392,10 +396,12 @@ namespace OpenRCT2::Ui::Handheld
             return;
         const double targetX = (size.width - 1) / 2.0, targetY = (size.height - 1) / 2.0;
         const ScreenCoordsXY at = pos
-            + ScreenCoordsXY{ static_cast<int>(std::lround(targetX - cx)), static_cast<int>(std::lround(targetY - cy)) + 3 };
+            + ScreenCoordsXY{ static_cast<int>(std::lround(targetX - cx)),
+                              sharedBaseline ? CapCentre(size.height) : static_cast<int>(std::lround(targetY - cy)) + 3 };
+        const std::string ink = onAccent ? "{BLACK}" : "{WHITE}";
         if (strong)
-            DrawStrongText(rt, at, "{BLACK}" + text);
+            DrawStrongText(rt, at, ink + text);
         else
-            DrawModernText(rt, at, "{BLACK}" + text);
+            DrawModernText(rt, at, ink + text);
     }
 } // namespace OpenRCT2::Ui::Handheld

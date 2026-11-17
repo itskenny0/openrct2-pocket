@@ -127,7 +127,13 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         model.columns = review ? 1 : TextEntry::columns;
         model.confirmation = review;
         model.primaryAction = review ? "Confirm" : "Type";
-        model.status = status.empty() ? std::to_string(entry.Length()) + " / 32 characters" : status;
+        model.status = status;
+        if (!review)
+        {
+            model.keyboard = entry;
+            model.keyboardHeading = "Rename employee";
+            model.title = "Default name";
+        }
         return model;
     }
     std::optional<Target> Identify(EntityId id)

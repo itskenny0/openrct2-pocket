@@ -4,6 +4,7 @@
 #include "Panel.h"
 #include "ColourGrid.h"
 #include "ListScroll.h"
+#include "TextEntry.h"
 
 #include <optional>
 
@@ -100,6 +101,10 @@ namespace OpenRCT2::Ui::Handheld
             std::string caption; // What they are doing right now, under the meters.
         };
         std::optional<Hero> hero;
+        // A text field and controller keyboard instead of rows. rows still holds TextEntry::Keys()
+        // and selected is a logical key index, so screens confirm keys as before.
+        std::optional<TextEntry> keyboard;
+        std::string keyboardHeading; // "Rename ride"; the title is the field's placeholder.
         std::optional<size_t> heroRow; // A row that is the hero's switch: not drawn as a button.
         // Rows that are values you change in place with Left/Right (a price, say): drawn full width
         // as "label  < value >" above the buttons instead of as a button that opens an editor.
@@ -199,9 +204,100 @@ namespace OpenRCT2::Ui::Handheld
             filtered.selected = filtered.rows.size(); // Focus is on a hidden row: draw none focused.
         return filtered;
     }
+    inline std::vector<ControlHint> KeyboardHints()
+    {
+        return { { "D-pad", "Move" }, { "A", "Type" }, { "Y", "Delete" }, { "X", "Space" }, { "START", "Done" }, { "B", "Cancel" } };
+    }
+    inline const char* KeyLabel(const TextEntry& entry, size_t key)
+    {
+        switch (key)
+        {
+            case TextEntry::kCase: return entry.Lower() ? "ABC" : "abc"; // What Shift will switch to.
+            case TextEntry::kSpace: return "Space";
+            case TextEntry::kDelete: return "Delete";
+            case TextEntry::kClear: return "Clear";
+            case TextEntry::kDone: return "Done";
+            default: return nullptr;
+        }
+    }
+    // A console-style keyboard: a real text field (text, caret, count) over QWERTY keycaps. The
+    // focused key is the only ringed key; Done is the one filled key, since it is where you finish.
+    inline void DrawKeyboardContent(
+        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const ManagementPresentation& model, bool focused, bool drawSurface)
+    {
+        const auto& entry = *model.keyboard;
+        const int width = size.width;
+        if (activeMenuFeel)
+            activeMenuFeel->HidePointer();
+        if (drawSurface)
+            DrawSurface(rt, p, size);
+        DrawHeadingText(rt, p + ScreenCoordsXY{ 12, 11 },
+            "{WHITE}" + (model.keyboardHeading.empty() ? std::string("Enter a name") : model.keyboardHeading), width - 24);
+        Fill(rt, p + ScreenCoordsXY{ 12, 37 }, { width - 24, 1 }, Theme::edge);
+
+        const auto field = p + ScreenCoordsXY{ 12, 46 };
+        const int fieldWidth = width - 24, fieldHeight = 28;
+        FillRound(rt, field, { fieldWidth, fieldHeight }, Theme::edge);
+        FillRound(rt, field + ScreenCoordsXY{ 1, 1 }, { fieldWidth - 2, fieldHeight - 2 }, Theme::raised);
+        const auto counter = std::to_string(entry.Length()) + " / " + std::to_string(TextEntry::limit);
+        const int counterWidth = TextWidth(counter);
+        DrawModernText(rt, field + ScreenCoordsXY{ fieldWidth - 10 - counterWidth, CapCentre(fieldHeight) },
+            (entry.Length() >= TextEntry::limit ? "{CAUTION}" : "{MUTED}") + counter);
+        const int room = fieldWidth - 30 - counterWidth;
+        int caret = 10;
+        if (entry.text.empty())
+            DrawModernEllipsised(rt, field + ScreenCoordsXY{ 14, CapCentre(fieldHeight) }, room - 4, "{MUTED}" + model.title);
+        else
+        {
+            // Long names scroll: the end you are typing at stays visible.
+            std::string shown = entry.text;
+            while (!shown.empty() && TextWidth(shown, true) > room)
+            {
+                size_t cut = 1;
+                while (cut < shown.size() && (static_cast<unsigned char>(shown[cut]) & 0xc0) == 0x80)
+                    ++cut;
+                shown.erase(0, cut);
+            }
+            DrawStrongText(rt, field + ScreenCoordsXY{ 10, CapCentre(fieldHeight) }, "{WHITE}" + shown, room + 4);
+            caret = 10 + TextWidth(shown, true) + 1;
+        }
+        Fill(rt, field + ScreenCoordsXY{ caret, (fieldHeight - 14) / 2 }, { 2, 14 }, Theme::gold);
+
+        const auto& layout = TextEntry::Layout();
+        const auto keys = entry.Keys();
+        constexpr int gap = 3;
+        const int top = 46 + fieldHeight + 10;
+        const int bottom = size.height - (model.status.empty() ? 10 : 24);
+        const int rowCount = static_cast<int>(layout.size());
+        const int keyHeight = std::clamp((bottom - top - (rowCount - 1) * gap) / rowCount, 18, 26);
+        const int unit = (fieldWidth - 9 * gap) / 10;
+        const int left = 12 + (fieldWidth - (unit * 10 + 9 * gap)) / 2;
+        const size_t focusKey = model.selected == TextEntry::kBack ? TextEntry::kDone : model.selected;
+        for (size_t r = 0; r < layout.size(); ++r)
+            for (const auto& slot : layout[r])
+            {
+                const auto pos = p + ScreenCoordsXY{ left + slot.column * (unit + gap), top + static_cast<int>(r) * (keyHeight + gap) };
+                const ScreenSize keySize{ slot.span * unit + (slot.span - 1) * gap, keyHeight };
+                const bool done = slot.key == TextEntry::kDone;
+                const bool isFocus = focused && slot.key == focusKey;
+                DrawButtonFace(rt, pos, keySize, done ? ButtonKind::primary : ButtonKind::secondary, isFocus);
+                if (const auto* label = KeyLabel(entry, slot.key))
+                {
+                    const int w = TextWidth(label, true);
+                    DrawStrongText(rt, pos + ScreenCoordsXY{ (keySize.width - w) / 2, CapCentre(keyHeight - 2) },
+                        std::string(done ? "{BLACK}" : "{WHITE}") + label);
+                }
+                else if (slot.key < keys.size())
+                    DrawButtonLabel(rt, pos, { keySize.width, keyHeight - 2 }, keys[slot.key], false, true);
+            }
+        if (!model.status.empty())
+            DrawModernEllipsised(rt, p + ScreenCoordsXY{ 12, size.height - 16 }, width - 24, "{MUTED}" + model.status);
+    }
     inline void DrawManagementContent(
         Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const ManagementPresentation& model, bool focused = true, bool drawSurface = true)
     {
+        if (model.keyboard)
+            return DrawKeyboardContent(rt, p, size, model, focused, drawSurface);
         if (const auto filtered = WithoutBackRows(model))
             return DrawManagementContent(rt, p, size, *filtered, focused, drawSurface);
         if (model.confirmation || model.contentSized)

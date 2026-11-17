@@ -63,6 +63,8 @@ namespace OpenRCT2::Ui::Windows
     void HandheldMenuBack();
     void HandheldMenuMove(int32_t direction);
     void HandheldMenuConfirm();
+    // Face-button shortcuts on keyboard pages (Y delete, X space, L1 shift, START done).
+    bool HandheldTextEntryKey(int action);
     constexpr int32_t kTabBarHeight = 43;
 
     extern bool gWindowSceneryScatterEnabled;
