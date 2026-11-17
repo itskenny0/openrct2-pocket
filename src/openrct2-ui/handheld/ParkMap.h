@@ -56,9 +56,9 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
             focus += CoordsXY{ y * 32, x * 32 }.rotate(-GetCurrentRotation());
             Clamp();
         }
-        void Mode()
+        void Mode(int direction = 1)
         {
-            mode = (mode + 1) % 4;
+            mode = (mode + direction + 4) % 4;
             rides = mode == 1;
             filter = 0;
             guestFilter.reset();
@@ -99,12 +99,15 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
     };
     inline void Draw(Drawing::RenderTarget& rt, const State& state)
     {
-        Concept::Box(rt, { 8, 8 }, { 496, 348 });
-        DrawModernText(rt, {20,23}, "{GOLD}Park map", {}, 120, true);
-        DrawTabs(rt, {150,10}, 342, {"Terrain","Rides","Guests","Staff"}, state.mode);
-        const ScreenCoordsXY origin{20,44};
-        constexpr int width = 472, height = 304;
-        Concept::Box(rt, origin - ScreenCoordsXY{2,2}, {width+4,height+4});
+        // Laid out like the other screens: heading, then the view tabs (L1/R1), then the map on the
+        // left with a card on the right for this tile, the legend, the subject and details. Those
+        // used to be boxes drawn over the map itself.
+        DrawSurface(rt, { 8, 8 }, { 496, 348 });
+        DrawHeadingText(rt, { 20, 19 }, "{WHITE}Park map", 300);
+        DrawTabs(rt, { 18, 46 }, 476, { "Terrain", "Rides", "Guests", "Staff" }, state.mode);
+        const ScreenCoordsXY origin{ 20, 80 };
+        constexpr int width = 318, height = 266;
+        FillRound(rt, origin - ScreenCoordsXY{ 2, 2 }, { width + 4, height + 4 }, Theme::edge);
         const auto focus = Windows::NativeMiniMapCoords(state.focus);
         // Fit the native raster at overview; zoom crops around the selected native tile.
         const int denominator = std::max(1, state.extent);
@@ -176,28 +179,47 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
             : surface->hasOwnership(OwnershipFlag::constructionRightsOwned) ? "Rights owned"
             : surface->hasOwnership(OwnershipFlag::landForSale) ? "Land for sale"
             : surface->hasOwnership(OwnershipFlag::constructionRightsForSale) ? "Rights for sale" : "Land unavailable";
-        Concept::Box(rt,{24,262},{180,82});
-        DrawModernEllipsised(rt,{32,274},164,"{WHITE}"+std::string(ownership));
+        const ScreenCoordsXY card{ origin.x + width + 10, origin.y - 2 };
+        const int cardW = 494 - card.x, cardH = height + 4;
+        FillRound(rt, card, { cardW, cardH }, Theme::raised);
+        int y = card.y + 8;
+        DrawSectionLabel(rt, card + ScreenCoordsXY{ 10, y - card.y }, cardW - 20, "THIS TILE");
+        y += 14;
+        DrawStrongText(rt, { card.x + 10, y }, "{WHITE}" + std::string(ownership), cardW - 20);
+        y += 20;
+        DrawSectionLabel(rt, { card.x + 10, y }, cardW - 20, "KEY");
+        y += 15;
         const std::array<std::pair<int,std::string>,3> legend = state.rides
             ? std::array<std::pair<int,std::string>,3>{{{61,"Rides"},{14,"Paths"},{195,"Water"}}}
             : std::array<std::pair<int,std::string>,3>{{{state.mode==3?138:state.mode==2?172:98,
                 state.mode==3?"Staff":state.mode==2?"Guests":"Land"},{14,"Paths"},{195,"Water"}}};
-        for (size_t i=0;i<legend.size();++i) {
-            Fill(rt,{32,292+static_cast<int>(i)*15},{9,9},static_cast<Drawing::PaletteIndex>(legend[i].first));
-            DrawModernText(rt,{47,293+static_cast<int>(i)*15},legend[i].second,{},148);
+        for (const auto& [colour, label] : legend)
+        {
+            FillRound(rt, { card.x + 10, y + 1 }, { 9, 9 }, static_cast<Drawing::PaletteIndex>(colour));
+            DrawModernText(rt, { card.x + 26, y }, "{WHITE}" + label, {}, cardW - 36);
+            y += 15;
         }
-        if (state.subject) {
-            Concept::Box(rt,{210,316},{278,28});
-            DrawModernEllipsised(rt,{218,326},260,MapSubjects::Name(*state.subject));
+        y += 6;
+        if (state.subject)
+        {
+            DrawSectionLabel(rt, { card.x + 10, y }, cardW - 20, "SHOWING");
+            DrawWrappedLabel(rt, { card.x + 10, y + 14 }, cardW - 20, "{WHITE}" + MapSubjects::Name(*state.subject), 2);
+            y += 48;
         }
-        if (state.details) {
-            Concept::Box(rt,{24,50},{230,104});
-            DrawModernText(rt,{34,63},"Tile "+std::to_string(state.focus.x/32)+", "+std::to_string(state.focus.y/32),{},210);
-            DrawModernText(rt,{34,85},"Map "+std::to_string(state.size.x)+" x "+std::to_string(state.size.y),{},210);
-            DrawModernText(rt,{34,107},"Rotation "+std::to_string(state.rotation+1)+" / Zoom "+std::to_string(state.zoom),{},210);
-            DrawModernEllipsised(rt,{34,129},210,MapSubjects::FilterName(state.mode,state.filter,state.guestFilter));
+        if (state.details)
+        {
+            DrawSectionLabel(rt, { card.x + 10, y }, cardW - 20, "DETAILS");
+            y += 14;
+            for (const auto& line : { "Tile " + std::to_string(state.focus.x / 32) + ", " + std::to_string(state.focus.y / 32),
+                                      "Map " + std::to_string(state.size.x) + " x " + std::to_string(state.size.y),
+                                      "Zoom " + std::to_string(state.zoom) + "x",
+                                      MapSubjects::FilterName(state.mode, state.filter, state.guestFilter) })
+            {
+                DrawModernEllipsised(rt, { card.x + 10, y }, cardW - 20, "{MUTED}" + line);
+                y += 14;
+            }
         }
-        DrawFooter(rt,{512,384},{{"D-pad","Move"},{"A","Locate"},{"Y","Map"},{"SEL","Subjects"},{"R2","Details"},{"B","Back"},
-            {"X","Rotate",HintPriority::guide},{"L1/R1","Zoom",HintPriority::guide}});
+        DrawFooter(rt,{512,384},{{"D-pad","Move"},{"A","Locate"},{"Y","Zoom"},{"SEL","Subjects"},{"R2","Details"},{"B","Back"},
+            {"X","Rotate",HintPriority::guide},{"L1/R1","View",HintPriority::guide}});
     }
 } // namespace OpenRCT2::Ui::Handheld::ParkMap

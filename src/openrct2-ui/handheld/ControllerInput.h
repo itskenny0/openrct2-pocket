@@ -42,6 +42,15 @@ namespace OpenRCT2::Ui::Handheld
         int32_t panY{};
         int32_t navigateX{};
         int32_t navigateY{};
+        // True when navigateX/Y comes from holding the D-pad (auto-repeat), not a fresh press.
+        bool navigateRepeat{};
+        // L2 is still down (the quick wheel picks on release), and the D-pad as held right now.
+        bool leftTrigger{};
+        int32_t heldX{}, heldY{};
+        // The Back button (B, or A when swapped) is still down: holding it in a tool undoes.
+        bool backHeld{};
+        // Y (the secondary context button) is still down: holding it in the park opens the inbox.
+        bool secondaryHeld{};
         std::vector<Action> actions;
     };
 

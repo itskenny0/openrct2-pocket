@@ -102,7 +102,7 @@ namespace OpenRCT2::Ui::Handheld::MapSubjects
         if (mode == 2 || mode == 3)
             model.rows.push_back(mode == 2 && guestFilter ? "Toggle tracked guests" : "Change native filter");
         model.rows.push_back("Return to map");
-        model.status = roster.empty() ? "No eligible subjects in this filter" : "A Select subject  B Map";
+        model.status = roster.empty() ? "No eligible subjects in this filter" : "";
         return model;
     }
     inline ManagementPresentation Detail(const Target& target, size_t selected, const std::string& status)

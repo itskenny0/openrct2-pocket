@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "GuestManagement.h"
+#include <openrct2/SpriteIds.h>
+#include <openrct2/drawing/Drawing.Sprite.h>
 #include <openrct2/Context.h>
 #include "GuestFollow.h"
 
@@ -342,7 +344,7 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
             model.rows.push_back(HistoryRideCurrent(target, rideTarget) ? ride->getName() : "Ride unavailable");
         }
         model.rows.push_back("Back to guest");
-        model.status = !guest ? "Guest no longer in park" : list.empty() ? "No ride history yet" : "A Inspect ride";
+        model.status = !guest ? "Guest no longer in park" : list.empty() ? "No ride history yet" : "";
         return model;
     }
     ManagementPresentation Presentation(
@@ -364,12 +366,34 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
                     happiness += guest->happiness;
                     ++count;
                 }
-            model.stats = { { "In park", std::to_string(getGameState().park.numGuestsInPark) },
-                            { "Heading here", std::to_string(getGameState().park.numGuestsHeadingForPark) },
-                            { "Avg happiness",
-                              count == 0 ? "Unavailable" : std::to_string(happiness * 100 / (count * 255)) + "%" } };
-            model.rows = { "Guest roster...", "Back to dashboard", "Action groups...", "Thought groups...",
-                           "Tracked guests..." };
+            // The crowd at a glance: how happy they are, then what they are saying most, so the
+            // home screen answers "what do my guests want?" before you open a list.
+            const auto& park = getGameState().park;
+            const int happy = count == 0 ? 0 : static_cast<int>(happiness * 100 / (count * 255));
+            ManagementPresentation::Hero hero;
+            hero.picture = [](Drawing::RenderTarget& rt) { GfxDrawSprite(rt, ImageId(SPR_TAB_GUESTS_0), { 18, 18 }); };
+            hero.meters.push_back({ "Average happiness", count == 0 ? "-" : std::to_string(happy) + "%", happy,
+                                    happy >= 60 ? "{POSITIVE}" : happy < 30 ? "{DANGER}" : "{WHITE}" });
+            hero.caption = std::to_string(park.numGuestsInPark) + " in the park, " + std::to_string(park.numGuestsHeadingForPark)
+                + " on the way";
+            model.hero = hero;
+            auto thoughts = Groups(GroupMode::thoughts);
+            std::stable_sort(thoughts.begin(), thoughts.end(), [](const auto& a, const auto& b) { return a.count > b.count; });
+            if (!thoughts.empty())
+            {
+                ManagementPresentation::Chart chart;
+                chart.splitTitle = "What guests are thinking";
+                for (size_t i = 0; i < std::min<size_t>(3, thoughts.size()); ++i)
+                {
+                    chart.split.emplace_back(thoughts[i].label, static_cast<int64_t>(thoughts[i].count), "{POSITIVE}");
+                    chart.splitValues.push_back(std::to_string(thoughts[i].count));
+                }
+                model.chart = chart;
+            }
+            model.rows = { "Guest roster...", "Thought groups...", "Action groups...", "Tracked guests...",
+                           "Back to dashboard" };
+            model.actionGrid = true;
+            model.primaryRow = 0;
             return model;
         }
         if (view == View::roster)

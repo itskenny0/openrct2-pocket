@@ -65,6 +65,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     static std::optional<CoordsXY> previewTile;
     static bool previewWanted{};
     static PieceGroup pieceGroup{PieceGroup::all};
+    static int turnSize{ 1 }; // 0 tight, 1 normal, 2 wide
     static std::string feedback;
     static GA::Result Invalid(const char* text)
     {
@@ -224,15 +225,26 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             current = next;
         }
     }
-    static void FocusEndpoint()
+    // Keeps the end of the track in the middle of the screen. The slim build strip sits at the top,
+    // so the end lands a little below centre. Smooth follow uses the engine's scroll-to-location
+    // easing; the first focus of a session snaps so the player never watches a long fly-in.
+    static void FocusEndpoint(bool smooth = false)
     {
         auto* main = WindowGetMain();
         if (endpoint && main && main->viewport)
         {
-            auto& view=*main->viewport;
-            main->savedViewPos=Translate3DTo2DWithZ(view.rotation,{endpoint->x+16,endpoint->y+16,endpoint->z})
-                - ScreenCoordsXY{view.zoom.ApplyTo(ContextGetWidth()*3/4-view.pos.x),view.zoom.ApplyTo(ContextGetHeight()/2-view.pos.y)};
-            view.viewPos=main->savedViewPos;main->flags.unset(WindowFlag::scrollingToLocation);main->invalidate();
+            auto& view = *main->viewport;
+            main->savedViewPos = Translate3DTo2DWithZ(view.rotation, { endpoint->x + 16, endpoint->y + 16, endpoint->z })
+                - ScreenCoordsXY{ view.zoom.ApplyTo(ContextGetWidth() / 2 - view.pos.x),
+                                  view.zoom.ApplyTo(ContextGetHeight() * 11 / 20 - view.pos.y) };
+            if (smooth)
+                main->flags.set(WindowFlag::scrollingToLocation);
+            else
+            {
+                view.viewPos = main->savedViewPos;
+                main->flags.unset(WindowFlag::scrollingToLocation);
+            }
+            main->invalidate();
         }
     }
     bool Active()
@@ -418,6 +430,122 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     PieceGroup CurrentGroup(){return pieceGroup;}
     std::string GroupName(PieceGroup group){static const char* names[]{"All","Straight","Stations","Turns","Slopes","Banking","Special"};return names[static_cast<size_t>(group)];}
     void NextGroup(){for(int n=0;n<static_cast<int>(PieceGroup::count);++n){pieceGroup=static_cast<PieceGroup>((static_cast<int>(pieceGroup)+1)%static_cast<int>(PieceGroup::count));if(pieceGroup==PieceGroup::all)return;for(const auto& e:Pieces())if(!e.identity.key.empty()&&std::isdigit(static_cast<unsigned char>(e.identity.key[0]))&&GroupOf(static_cast<TrackElemType>(std::stoi(e.identity.key)))==pieceGroup)return;}}
+    // Steering works on shape rather than piece names: every ordinary piece is a turn (left or right)
+    // or not, has an end slope, and has a footprint. The D-pad picks the shape and the game finds the
+    // piece. Only plain track takes part; loops, helixes, diagonals and S-bends stay in the catalog.
+    static bool Steerable(TrackElemType type)
+    {
+        switch (GetTrackElementDescriptor(type).definition.group)
+        {
+            case TrackGroup::flat: case TrackGroup::straight: case TrackGroup::liftHill: case TrackGroup::liftHillSteep:
+            case TrackGroup::liftHillCurve: case TrackGroup::flatRollBanking: case TrackGroup::slope:
+            case TrackGroup::slopeSteepDown: case TrackGroup::slopeSteepUp: case TrackGroup::flatToSteepSlope:
+            case TrackGroup::slopeToFlat: case TrackGroup::slopeCurve: case TrackGroup::slopeCurveSteep:
+            case TrackGroup::curveVerySmall: case TrackGroup::curveSmall: case TrackGroup::curve:
+            case TrackGroup::curveLarge: case TrackGroup::slopeCurveBanked: case TrackGroup::slopeRollBanking:
+                return true;
+            default:
+                return false;
+        }
+    }
+    // -1 left, 0 straight, 1 right, 2 anything else. Building backward mirrors the turn, because the
+    // player is driving the other way along the piece.
+    static int TurnOf(TrackElemType type)
+    {
+        const auto& c = GetTrackElementDescriptor(type).coordinates;
+        if ((c.rotationBegin & 4) != (c.rotationEnd & 4))
+            return 2;
+        const int delta = (c.rotationEnd - c.rotationBegin) & 3;
+        const int turn = delta == 0 ? (c.y == 0 ? 0 : 2) : delta == 3 ? -1 : delta == 1 ? 1 : 2;
+        return backward && turn != 2 ? -turn : turn;
+    }
+    static TrackPitch EndPitch(TrackElemType type)
+    {
+        const auto& d = GetTrackElementDescriptor(type).definition;
+        return backward ? d.pitchStart : d.pitchEnd;
+    }
+    static bool KeepsBank(TrackElemType type)
+    {
+        const auto& d = GetTrackElementDescriptor(type).definition;
+        return d.rollStart == d.rollEnd;
+    }
+    static std::optional<TrackElemType> FindShape(int turn, TrackPitch wantPitch, int size)
+    {
+        const bool covered = TrackConstructionSupport::CoveredBase(selected).has_value();
+        std::vector<std::pair<int, TrackElemType>> found;
+        for (int pass = 0; pass < 2 && found.empty(); ++pass)
+            for (int i = 0; i < static_cast<int>(TrackElemType::count); ++i)
+            {
+                const auto type = static_cast<TrackElemType>(i);
+                if (!Steerable(type) || !Supported(type) || TurnOf(type) != turn || EndPitch(type) != wantPitch
+                    || !KeepsBank(type))
+                    continue;
+                // Prefer the covered/open look the player already has, but don't let it block a turn.
+                if (pass == 0 && TrackConstructionSupport::CoveredBase(type).has_value() != covered)
+                    continue;
+                found.emplace_back(GetTrackElementDescriptor(type).sequenceData.numSequences, type);
+            }
+        if (found.empty())
+            return std::nullopt;
+        std::stable_sort(found.begin(), found.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+        if (turn == 0)
+            return found.front().second;
+        std::vector<int> sizes;
+        for (const auto& [footprint, type] : found)
+            if (sizes.empty() || sizes.back() != footprint)
+                sizes.push_back(footprint);
+        // Normal is the middle size, rounding down: with only small and large turns, normal is the
+        // small one (RCT's usual 3-tile quarter turn) and wide is the large one.
+        const size_t pick = size <= 0 ? 0 : size >= 2 ? sizes.size() - 1 : (sizes.size() - 1) / 2;
+        for (const auto& [footprint, type] : found)
+            if (footprint == sizes[pick])
+                return type;
+        return found.front().second;
+    }
+    int CurrentTurn()
+    {
+        const int turn = TurnOf(selected);
+        return turn == 2 ? 0 : turn;
+    }
+    int TurnSize()
+    {
+        return turnSize;
+    }
+    std::string TurnSizeName()
+    {
+        static const char* names[]{ "Tight", "Normal", "Wide" };
+        return names[std::clamp(turnSize, 0, 2)];
+    }
+    bool Steer(int direction)
+    {
+        if (!active || busy || StationPlacement() || direction == 0)
+            return false;
+        const int current = CurrentTurn();
+        // Same direction again tightens the bend; the opposite direction straightens it out.
+        int turn = current == 0 ? direction : current == direction ? direction : 0;
+        if (current == direction && turnSize > 0)
+            --turnSize;
+        auto pitchNow = Steerable(selected) ? EndPitch(selected) : pitch;
+        auto found = FindShape(turn, pitchNow, turnSize);
+        if (!found && turn != 0)
+            found = FindShape(turn, pitch, turnSize);
+        if (!found)
+        {
+            ShowToast("Can't turn here", pitch == TrackPitch::none ? "This ride has no turn that fits."
+                                                                   : "Level out first, then turn.");
+            return false;
+        }
+        return Select(*found);
+    }
+    void SetTurnSize(int direction)
+    {
+        if (!active || busy)
+            return;
+        turnSize = std::clamp(turnSize + (direction > 0 ? 1 : -1), 0, 2);
+        if (const int turn = CurrentTurn(); turn != 0)
+            if (const auto found = FindShape(turn, EndPitch(selected), turnSize))
+                Select(*found);
+    }
     std::vector<PickerEntry> Pieces(bool filtered)
     {
         std::vector<PickerEntry> result;
@@ -683,24 +811,26 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             return;
         }
         const std::array slopes{ TrackPitch::down60, TrackPitch::down25, TrackPitch::none, TrackPitch::up25, TrackPitch::up60 };
-        const auto current = backward ? GetTrackElementDescriptor(selected).definition.pitchStart
-                                      : GetTrackElementDescriptor(selected).definition.pitchEnd;
+        const auto current = EndPitch(selected);
         auto it = std::find(slopes.begin(), slopes.end(), current);
         int index = it == slopes.end() ? 2 : it - slopes.begin();
-        const auto desired = slopes[std::clamp(index + (direction > 0 ? 1 : -1), 0, 4)];
-        for (const auto& e : Pieces())
-            if (e.identity.key.front() >= '0' && e.identity.key.front() <= '9')
+        // Step one notch at a time; if this ride can't climb that way, try the next notch so a press
+        // never silently does nothing.
+        for (int step = 1; step <= 2; ++step)
+        {
+            const int next = index + (direction > 0 ? step : -step);
+            if (next < 0 || next > 4)
+                break;
+            // Keep turning if the ride has a climbing turn; otherwise climb straight.
+            auto found = FindShape(CurrentTurn(), slopes[next], turnSize);
+            if (!found && CurrentTurn() != 0)
+                found = FindShape(0, slopes[next], turnSize);
+            if (found)
             {
-                auto type = static_cast<TrackElemType>(std::stoi(e.identity.key));
-                const auto& ted = GetTrackElementDescriptor(type);
-                if ((backward ? ted.definition.pitchStart : ted.definition.pitchEnd) == desired
-                    && (backward ? ted.definition.rollStart : ted.definition.rollEnd) == roll
-                    && !ted.flags.has(TrackElementFlag::turnLeft) && !ted.flags.has(TrackElementFlag::turnRight))
-                {
-                    Select(type);
-                    return;
-                }
+                Select(*found);
+                return;
             }
+        }
     }
     uint8_t PlacementSpeed()
     {
@@ -863,7 +993,12 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                     return;
                 }
                 if (!completed)
-                    FocusEndpoint();
+                    FocusEndpoint(true);
+                // Carry the player's intent onto the next piece: keep turning the same way and keep the
+                // slope the last piece finished on (a "flat to up" piece becomes a steady climb).
+                if (!completed && !Supported(selected) && Steerable(placed.type))
+                    if (const auto next = FindShape(TurnOf(placed.type) == 2 ? 0 : TurnOf(placed.type), pitch, turnSize))
+                        selected = *next;
                 if (!completed && !Supported(selected))
                 {
                     selected = TrackElemType::flat;
@@ -948,7 +1083,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                             break;
                         }
                 chain = false;
-                FocusEndpoint();
+                FocusEndpoint(true);
             }
         });
         auto r = GA::Execute(&remove, getGameState());
@@ -1020,29 +1155,57 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             DrawActionStrip(rt, screen);
             return;
         }
-        Box(rt, p, {216,230});
-        Heading(rt,p+ScreenCoordsXY{10,12},replacement ? "Rebuild removed" : StationPlacement() ? "Place station" : backward ? "Build backward" : "Build track");
-        Rule(rt,p+ScreenCoordsXY{8,38},200);
-        DrawWrappedLabel(rt,p+ScreenCoordsXY{10,48},196,"{WHITE}"+PieceName(selected),2);
+        // A slim strip instead of a half-screen panel: the track you are building is the interface, and
+        // the camera keeps its end in view, so the panel only needs to say what A will place.
+        const int width = std::min(screen.width - 2 * Layout::margin, 360);
+        Box(rt, p, { width, 66 });
         Drawing::RenderTarget preview;
-        if(ClipRenderTarget(preview,rt,p+ScreenCoordsXY{8,88},108,82))DrawPiecePreview(preview,selected);
-        const auto& d=GetTrackElementDescriptor(selected).definition;
-        const auto displayPitch=backward ? d.pitchStart : d.pitchEnd;
-        const auto bank=backward ? d.rollStart : d.rollEnd;
-        DrawModernText(rt,p+ScreenCoordsXY{120,96},"{MUTED}Slope");
-        DrawModernText(rt,p+ScreenCoordsXY{120,114},displayPitch==TrackPitch::none ? "Level" : displayPitch==TrackPitch::up25 ? "Up 25" : displayPitch==TrackPitch::up60 ? "Up 60" : displayPitch==TrackPitch::down25 ? "Down 25" : displayPitch==TrackPitch::down60 ? "Down 60" : "Special");
-        DrawModernText(rt,p+ScreenCoordsXY{120,140},trackTypeHasSpeedSetting(selected) ? "{MUTED}Speed" : "{MUTED}Bank");
-        DrawModernText(rt,p+ScreenCoordsXY{120,158},trackTypeHasSpeedSetting(selected) ? FormatStringID(STR_VELOCITY,static_cast<uint16_t>((placementSpeed*9)>>2)) : bank==TrackRoll::none ? "Level" : bank==TrackRoll::left ? "Left" : bank==TrackRoll::right ? "Right" : "Inverted");
-        DrawModernText(rt,p+ScreenCoordsXY{10,184},std::string("{MUTED}Chain ")+(ChainAllowed() ? chain ? "On" : "Off" : "N/A")+"   Height "+(endpoint ? std::to_string(endpoint->z/8) : "--"));
-        DrawModernEllipsised(rt,p+ScreenCoordsXY{10,208},196,camera ? "D-pad Pan / B Build" : SeatSupported() ? "Seat "+std::to_string(placementSeat)+(placementInverted?" / Inverted":" / Select options") : placementInverted ? "Inverted / Select pieces" : "L2/R2 Slope / Select Pieces");
-        DrawModeBadge(rt, p + ScreenCoordsXY{ 144, 8 }, camera ? "CAMERA" : "BUILD");
-        std::vector<ControlHint> hints{ { "D-pad", "Move", camera ? HintPriority::normal : HintPriority::guide },
+        if (ClipRenderTarget(preview, rt, p + ScreenCoordsXY{ 6, 6 }, 62, 54))
+            DrawPiecePreview(preview, selected);
+        const std::string mode = camera ? "CAMERA"
+            : replacement               ? "REBUILD"
+            : StationPlacement()        ? "STATION"
+            : backward                  ? "REVERSE"
+                                        : "BUILD";
+        const int badge = TextWidth(mode, true) + 12;
+        DrawModeBadge(rt, p + ScreenCoordsXY{ width - badge - 6, 6 }, mode);
+        const int textWidth = width - 80 - badge - 8;
+        DrawModernText(rt, p + ScreenCoordsXY{ 76, 9 }, "{WHITE}" + PieceName(selected), {}, textWidth, true);
+        const auto& d = GetTrackElementDescriptor(selected).definition;
+        const auto displayPitch = backward ? d.pitchStart : d.pitchEnd;
+        const auto bank = backward ? d.rollStart : d.rollEnd;
+        const std::string slope = displayPitch == TrackPitch::none ? "Level"
+            : displayPitch == TrackPitch::up25                     ? "Climb"
+            : displayPitch == TrackPitch::up60                     ? "Steep climb"
+            : displayPitch == TrackPitch::down25                   ? "Dive"
+            : displayPitch == TrackPitch::down60                   ? "Steep dive"
+                                                                   : "Special";
+        const int turn = TurnOf(selected);
+        const std::string direction = StationPlacement() ? "Station"
+            : turn == -1                                 ? "Left, " + TurnSizeName()
+            : turn == 1                                  ? "Right, " + TurnSizeName()
+            : turn == 0                                  ? "Straight"
+                                                         : "Special piece";
+        DrawModernEllipsised(rt, p + ScreenCoordsXY{ 76, 28 }, width - 84, "{MUTED}" + direction + "  |  " + slope);
+        std::string detail = trackTypeHasSpeedSetting(selected)
+            ? FormatStringID(STR_VELOCITY, static_cast<uint16_t>((placementSpeed * 9) >> 2))
+            : bank == TrackRoll::none ? "No bank" : bank == TrackRoll::left ? "Banked left" : bank == TrackRoll::right ? "Banked right" : "Inverted";
+        if (ChainAllowed())
+            detail += chain ? "  |  Chain lift" : "  |  No chain";
+        if (endpoint)
+            detail += "  |  Height " + std::to_string(endpoint->z / 8);
+        if (SeatSupported())
+            detail += "  |  Seat " + std::to_string(placementSeat);
+        DrawModernEllipsised(rt, p + ScreenCoordsXY{ 76, 46 }, width - 84, "{MUTED}" + detail);
+        const bool steering = !camera && !StationPlacement();
+        std::vector<ControlHint> hints{ { "D-pad", camera ? "Pan" : StationPlacement() ? "Move" : "Steer",
+                                          camera || steering ? HintPriority::normal : HintPriority::guide },
                                         { "A", camera ? "Build mode" : "Build" },
                                         { "B",
                                           camera                                  ? "Build"
                                               : replacement || StationPlacement() ? "Cancel"
                                                                                   : "Undo" },
-                                        { "L1/R1", camera ? "Zoom" : "Piece" },
+                                        { "L1/R1", camera ? "Zoom" : steering ? "Turn size" : "Piece" },
                                         { "X",
                                           camera                                   ? "Rotate"
                                               : trackTypeHasSpeedSetting(selected) ? "Speed +"

@@ -15,6 +15,9 @@ int main()
     MenuThemes::Settings reload;reload.Load(profile);
     Check(PocketPalette::style==PocketPalette::Style::slate);
     Check(reload.Toggle());
+    MenuThemes::Settings pixel;pixel.Load(profile);
+    Check(PocketPalette::style==PocketPalette::Style::pixel && PocketPalette::Pixel());
+    Check(pixel.Toggle());
     MenuThemes::Settings again;again.Load(profile);
     Check(PocketPalette::style==PocketPalette::Style::daylight);
     std::ofstream(profile/"pocket-theme.cfg")<<"future-theme\n";

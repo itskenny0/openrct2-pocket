@@ -4,6 +4,8 @@
  *****************************************************************************/
 
 #pragma once
+#include "Alerts.h"
+#include "QuickWheel.h"
 #include <openrct2/object/Object.h>
 #include "PeepPlacement.h"
 #include "RideManagement.h"
@@ -13,6 +15,7 @@
 #include <openrct2/ride/TrackConstructionSupport.h>
 
 #include <cstddef>
+#include <string_view>
 #include <openrct2/Identifiers.h>
 #include <openrct2/object/ObjectTypes.h>
 #include <openrct2/world/Location.hpp>
@@ -28,7 +31,18 @@ namespace OpenRCT2::Ui::Handheld
     struct ManagementPresentation;
     struct Frame;
     bool HandleMenuInput(ControllerInput& input, const Frame& frame);
+    // Shows an upstream error as a short Pocket notice under the HUD (sound only while a menu
+    // or build tool is open, since those already show the message in their own status line).
+    void ShowToast(std::string_view title, std::string_view message);
+    // Y in the park: moves the camera to the next alert and shows what usually fixes it. Returns
+    // false when nothing needs attention.
+    bool JumpToNextAlert();
+    // L2 then Y: the park with nothing drawn over it, for screenshots.
+    bool PhotoModeActive();
+    // Glide to one alert and say what fixes it (the inbox's A).
+    void JumpToAlert(const Alerts::Alert& alert);
     void UpdateExplorer(ControllerInput& input);
+    bool QuickWheelOpen();
     void HandleExplorerInput(ControllerInput& input, const Frame& frame);
     void EndTerrain();
     std::optional<CoordsXY> CurrentTerrainTile();
@@ -72,11 +86,15 @@ namespace OpenRCT2::Ui::Handheld
 namespace OpenRCT2::Ui::Windows
 {
     void HandheldRideOpen(RideId ride);
+    void HandheldRideReturnNotice(std::string notice);
     void HandheldRideReturn(const Handheld::RideManagement::Target& target, const std::optional<Handheld::RideNavigation::Context>& context = {});
     bool HandheldRideQuickAccess();
     void HandheldRideAccessOpen(const Handheld::RideManagement::Target& target);
     Handheld::ManagementPresentation HandheldDashboardPresentation(size_t selected);
     void HandheldDashboardOpen();
+    void HandheldQuickJump(Handheld::QuickWheel::Target target);
+    void HandheldSignEditOpen();
+    std::pair<std::string, uint32_t> HandheldLastBuild();
     void HandheldDashboardPause();
     bool HandheldDashboardIsOpen();
     bool HandheldDashboardRailFocused();
@@ -99,6 +117,10 @@ namespace OpenRCT2::Ui::Windows
     bool HandheldToolSettingsPage(int direction);
     std::string HandheldNewsText(const std::string& text);
     void HandheldNewsOpen();
+    void HandheldInboxOpen();
+    // Y on the controls guide plays the intro; the intro can also be opened directly.
+    bool HandheldControlsIntro();
+    void HandheldPrimerOpen();
     void HandheldObjectivesOpen();
     bool HandheldDashboardNews();
     void HandheldPeepPlacementOptionsOpen();

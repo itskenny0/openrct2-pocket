@@ -138,6 +138,7 @@ namespace OpenRCT2::Ui::Windows
         std::function<void(std::string_view)> _callback;
         std::vector<ScenarioListItem> _listItems;
         const ScenarioIndexEntry* _highlightedScenario = nullptr;
+        int32_t _handheldScroll = 0;
         ParkPreview _preview;
         BackgroundWorker::Job _previewLoadJob;
 
@@ -414,19 +415,245 @@ namespace OpenRCT2::Ui::Windows
             return frameEndPos;
         }
 
+        // Word wrap for the detail pane; the last line ends in "..." when the text runs over.
+        static std::vector<std::string> HandheldWrap(const std::string& text, int width, size_t maxLines, bool strong = false)
+        {
+            std::vector<std::string> lines;
+            std::string line, word;
+            auto flush = [&](bool last) {
+                if (!line.empty() || last)
+                    lines.push_back(line);
+                line.clear();
+            };
+            for (size_t i = 0; i <= text.size(); ++i)
+            {
+                const char c = i < text.size() ? text[i] : ' ';
+                if (c != ' ' && c != '\n')
+                {
+                    word += c;
+                    continue;
+                }
+                if (word.empty())
+                    continue;
+                const auto candidate = line.empty() ? word : line + " " + word;
+                if (!line.empty() && Handheld::TextWidth(candidate, strong) > width)
+                {
+                    flush(false);
+                    line = word;
+                }
+                else
+                    line = candidate;
+                word.clear();
+                if (c == '\n')
+                    flush(false);
+            }
+            flush(false);
+            if (lines.size() > maxLines)
+            {
+                lines.resize(maxLines);
+                auto& last = lines.back();
+                while (!last.empty() && Handheld::TextWidth(last + "...", strong) > width)
+                    last.pop_back();
+                last += "...";
+            }
+            return lines;
+        }
+        // RCT format strings can carry {COLOUR} tokens; the handheld text draws plain strings.
+        static std::string HandheldPlain(std::string text)
+        {
+            for (auto open = text.find('{'); open != std::string::npos; open = text.find('{', open))
+            {
+                const auto close = text.find('}', open);
+                if (close == std::string::npos)
+                    break;
+                text.erase(open, close - open + 1);
+            }
+            return text;
+        }
+
+        // Handheld layout: a source pager in the header (L1/R1), the scenario list on the left with
+        // difficulty labels, ticks and locks, and the chosen park's map, story and goal on the right.
+        // One footer covers the whole screen, so the title menu's footer never shows through.
+        void drawHandheld(RenderTarget& rt)
+        {
+            using namespace Handheld;
+            const ScreenSize screen{ ContextGetWidth(), ContextGetHeight() };
+            const auto p = windowPos + ScreenCoordsXY{ Layout::margin, Layout::margin };
+            const int w = width - 2 * Layout::margin;
+            const int h = height - 2 * Layout::margin - 30;
+            DrawSurface(rt, p, { w, h });
+
+            // Header: title, then the source as a pager with a dot per source.
+            std::vector<int32_t> sources;
+            for (int32_t i = 0; i < kNumTabs; ++i)
+                if (widgets[WIDX_TAB1 + i].isVisible())
+                    sources.push_back(i);
+            const int pagerWidth = std::min(230, w / 2);
+            const auto pager = p + ScreenCoordsXY{ w - 12 - pagerWidth, 8 };
+            DrawHeadingText(rt, p + ScreenCoordsXY{ 12, 11 }, "{WHITE}Choose a park", w - pagerWidth - 36);
+            FillRound(rt, pager, { pagerWidth, 22 }, Theme::edge);
+            FillRound(rt, pager + ScreenCoordsXY{ 1, 1 }, { pagerWidth - 2, 20 }, Theme::raised);
+            DrawModernText(rt, pager + ScreenCoordsXY{ 7, CapCentre(22) }, "{MUTED}L1");
+            DrawModernText(rt, pager + ScreenCoordsXY{ pagerWidth - 7 - TextWidth("R1"), CapCentre(22) }, "{MUTED}R1");
+            const std::string sourceName = selectedTab >= 0 && static_cast<size_t>(selectedTab) < std::size(kScenarioOriginStringIds)
+                ? LanguageGetString(kScenarioOriginStringIds[selectedTab])
+                : "";
+            const int nameRoom = pagerWidth - 44;
+            const int nameWidth = std::min(nameRoom, TextWidth(sourceName, true));
+            DrawStrongText(rt, pager + ScreenCoordsXY{ 22 + (nameRoom - nameWidth) / 2, CapCentre(22) }, "{WHITE}" + sourceName, nameRoom);
+            const int dotsWidth = static_cast<int>(sources.size()) * 6 - 2;
+            for (size_t i = 0; i < sources.size(); ++i)
+                Fill(rt, pager + ScreenCoordsXY{ (pagerWidth - dotsWidth) / 2 + static_cast<int>(i) * 6, 25 }, { 4, 2 },
+                    sources[i] == static_cast<int32_t>(selectedTab) ? Theme::gold : Theme::edge);
+            Fill(rt, p + ScreenCoordsXY{ 12, 37 }, { w - 24, 1 }, Theme::edge);
+
+            // List: headings 18 px, parks 24 px, scrolled to keep the highlighted park in view.
+            const int listX = 12, listY = 44, listW = w * 52 / 100, listH = h - listY - 8;
+            // Labels sit closer to the parks they head than to the row above them.
+            constexpr int rowHeight = 24, headingHeight = rowHeight;
+            int total = 0, selectedTop = 0;
+            bool selectedLocked = false;
+            for (const auto& item : _listItems)
+            {
+                if (item.type == ListItemType::scenario && item.scenario.scenario == _highlightedScenario)
+                {
+                    selectedTop = total;
+                    selectedLocked = item.scenario.is_locked;
+                }
+                total += rowHeight; // Headings and parks share one pitch.
+            }
+            // Keep one row of context above and below the highlight where the list allows.
+            if (selectedTop - rowHeight < _handheldScroll)
+                _handheldScroll = std::max(0, selectedTop - rowHeight);
+            else if (selectedTop + 2 * rowHeight > _handheldScroll + listH)
+                _handheldScroll = selectedTop + 2 * rowHeight - listH;
+            _handheldScroll = std::clamp(_handheldScroll, 0, std::max(0, total - listH));
+            RenderTarget list;
+            if (ClipRenderTarget(list, rt, p + ScreenCoordsXY{ listX - 4, listY }, listW + 8, listH))
+            {
+                const auto origin = ScreenCoordsXY{ 4, -_handheldScroll };
+                int y = 0;
+                for (const auto& item : _listItems)
+                {
+                    if (item.type == ListItemType::heading)
+                    {
+                        if (y + headingHeight > _handheldScroll && y < _handheldScroll + listH)
+                        {
+                            auto label = HandheldPlain(LanguageGetString(item.heading.string_id));
+                            std::transform(label.begin(), label.end(), label.begin(),
+                                [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+                            DrawSectionLabel(list, origin + ScreenCoordsXY{ 2, y + (y == 0 ? 4 : 10) }, listW - 4, label);
+                        }
+                        y += headingHeight;
+                        continue;
+                    }
+                    if (y + rowHeight > _handheldScroll && y < _handheldScroll + listH)
+                    {
+                        const auto* scenario = item.scenario.scenario;
+                        const bool focused = scenario == _highlightedScenario;
+                        const bool locked = item.scenario.is_locked;
+                        const auto at = origin + ScreenCoordsXY{ 0, y };
+                        DrawListRow(list, at, { listW, rowHeight }, scenario->Name, "", focused, !locked, false);
+                        const int markX = listW - (focused ? 34 : 20);
+                        if (locked)
+                            GfxDrawSprite(list, ImageId(SPR_G2_LOCKED), at + ScreenCoordsXY{ markX, 5 });
+                        else if (scenario->Highscore != nullptr)
+                            GfxDrawSprite(list, ImageId(SPR_MENU_CHECKMARK), at + ScreenCoordsXY{ markX, 4 });
+                    }
+                    y += rowHeight;
+                }
+            }
+            if (total > listH)
+            {
+                const int thumb = std::max(12, listH * listH / total);
+                const int thumbY = (listH - thumb) * _handheldScroll / std::max(1, total - listH);
+                Fill(rt, p + ScreenCoordsXY{ listX + listW + 4, listY }, { 2, listH }, Theme::edge);
+                FillRound(rt, p + ScreenCoordsXY{ listX + listW + 3, listY + thumbY }, { 4, thumb }, Theme::gold);
+            }
+
+            // Detail card: name, minimap, story, goal (or why it is locked), and any best result.
+            const int cardX = listX + listW + 14, cardW = w - cardX - 12;
+            const auto card = p + ScreenCoordsXY{ cardX, listY };
+            FillRound(rt, card, { cardW, listH }, Theme::raised);
+            const auto* scenario = _highlightedScenario;
+            const auto footer = std::vector<ControlHint>{ { "D-pad", "Choose" }, { "L1/R1", "Source" },
+                { "A", selectedLocked ? "Locked" : "Start" },
+                { "X", Config::Get().general.scenarioUnlockingEnabled ? "Unlock all" : "Lock order" }, { "B", "Back" } };
+            DrawFooter(rt, screen, footer);
+            if (scenario == nullptr)
+            {
+                DrawModernEllipsised(rt, card + ScreenCoordsXY{ 10, 12 }, cardW - 20, "{MUTED}No parks in this source");
+                return;
+            }
+            DrawStrongText(rt, card + ScreenCoordsXY{ 10, 9 }, "{WHITE}" + scenario->Name, cardW - 20);
+            int y = 26;
+            const PreviewImage* image = nullptr;
+            for (const auto& candidate : _preview.images)
+                if (candidate.type == PreviewImageType::miniMap)
+                    image = &candidate;
+            if (_previewLoadJob.isValid() || image == nullptr)
+            {
+                FillRound(rt, card + ScreenCoordsXY{ (cardW - 112) / 2, y }, { 112, 112 }, Theme::ink);
+                if (_previewLoadJob.isValid())
+                    DrawModernText(rt, card + ScreenCoordsXY{ (cardW - TextWidth("Loading")) / 2, y + 52 }, "{MUTED}Loading");
+                y += 118;
+            }
+            else
+            {
+                const int imageW = image->width, imageH = image->height;
+                const auto at = card + ScreenCoordsXY{ (cardW - imageW) / 2, y };
+                FillRound(rt, at - ScreenCoordsXY{ 2, 2 }, { imageW + 4, imageH + 4 }, Theme::edge);
+                drawPreviewImage(*image, rt, at);
+                y += imageH + 8;
+            }
+            const int textW = cardW - 20;
+            for (const auto& line : HandheldWrap(HandheldPlain(scenario->Details), textW, 3))
+            {
+                DrawModernText(rt, card + ScreenCoordsXY{ 10, y }, "{MUTED}" + line);
+                y += 13;
+            }
+            y += 6;
+            if (selectedLocked)
+            {
+                DrawSectionLabel(rt, card + ScreenCoordsXY{ 10, y }, textW, "LOCKED");
+                y += 15;
+                for (const auto& line : HandheldWrap("Finish earlier parks first, or press X to unlock every park.", textW, 3))
+                {
+                    DrawModernText(rt, card + ScreenCoordsXY{ 10, y }, "{CAUTION}" + line);
+                    y += 13;
+                }
+                return;
+            }
+            Scenario::Objective objective = { .Type = scenario->ObjectiveType,
+                                              .Year = scenario->ObjectiveArg1,
+                                              .NumGuests = static_cast<uint16_t>(scenario->ObjectiveArg3),
+                                              .Currency = scenario->ObjectiveArg2 };
+            auto ft = Formatter();
+            ft.Add<StringId>(kObjectiveNames[EnumValue(scenario->ObjectiveType)]);
+            formatObjective(ft, objective);
+            const auto goal = HandheldPlain(FormatStringIDLegacy(STR_STRINGID, ft.Data()));
+            DrawSectionLabel(rt, card + ScreenCoordsXY{ 10, y }, textW, "GOAL");
+            y += 15;
+            const int bottom = listH - (scenario->Highscore != nullptr ? 20 : 6);
+            const auto goalLines = HandheldWrap(goal, textW, std::max<size_t>(1, static_cast<size_t>((bottom - y) / 13)));
+            for (const auto& line : goalLines)
+            {
+                DrawModernText(rt, card + ScreenCoordsXY{ 10, y }, "{WHITE}" + line);
+                y += 13;
+            }
+            if (scenario->Highscore != nullptr)
+                DrawModernEllipsised(rt, card + ScreenCoordsXY{ 10, listH - 17 }, textW,
+                    "{POSITIVE}Completed  " + FormatStringIDLegacy(STR_CURRENCY2DP, &scenario->Highscore->company_value));
+        }
+
         void onDraw(RenderTarget& rt) override
         {
-            drawWidgets(rt);
             if (Handheld::IsEnabled())
             {
-                Handheld::Fill(rt, windowPos + ScreenCoordsXY{1, height - 35}, {width - 2, 34}, Handheld::Theme::raised);
-                Handheld::DrawModernText(rt, windowPos + ScreenCoordsXY{8, height - 30},
-                    std::string("{WHITE}D-pad Browse  L/R Source  X Unlocking ")
-                        + (Config::Get().general.scenarioUnlockingEnabled ? "On" : "Off"));
-                Handheld::DrawModernText(rt, windowPos + ScreenCoordsXY{8, height - 16},
-                    _showLockedInformation ? "{WHITE}Locked: complete earlier parks, or X turn unlocking off"
-                                           : "{WHITE}A Start park    B Back");
+                drawHandheld(rt);
+                return;
             }
+            drawWidgets(rt);
 
             StringId format = STR_WINDOW_COLOUR_2_STRINGID;
             FontStyle fontStyle = FontStyle::medium;
@@ -1011,7 +1238,11 @@ namespace OpenRCT2::Ui::Windows
         }
 
         window = windowMgr->Create<ScenarioSelectWindow>(
-            WindowClass::scenarioSelect, {}, Handheld::IsEnabled() ? ScreenSize{ 504, 360 } : kWindowSize,
+            WindowClass::scenarioSelect, {},
+            // Handheld: 504x360 on the Brick, shrinking to fit shorter or narrower canvases.
+            // Handheld: the whole canvas, so its footer covers the title menu's.
+            Handheld::IsEnabled() ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
+                                  : kWindowSize,
             { WindowFlag::autoPosition, WindowFlag::centreScreen }, callback);
         return window;
     }

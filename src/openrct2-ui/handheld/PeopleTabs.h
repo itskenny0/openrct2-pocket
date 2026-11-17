@@ -54,6 +54,8 @@ namespace OpenRCT2::Ui::Handheld::PeopleTabs
             Actions(model,native,StaffActions(tabs.tab));
             if(tabs.tab==0) {
                 Activity(model,native.stats.back().second);
+                // Labelled like the stat cards above it, so the activity reads as a field, not a stray caption.
+                if(!model.bodyLines.empty())model.bodyLines.front()="Now\t"+model.bodyLines.front();
                 model.stats.resize(2);
                 const auto counters=StaffManagement::Presentation(V::statistics,0,{},target);
                 for(size_t i=1;i<counters.stats.size();++i)model.stats.push_back(counters.stats[i]);

@@ -5,6 +5,8 @@
 
 #include "GuestFollow.h"
 #include "Explorer.h"
+#include "Alerts.h"
+#include "Landscape.h"
 
 #include "AreaTools.h"
 #include "ConstructionPanel.h"
@@ -19,6 +21,10 @@
 #include "Mazes.h"
 #include "Panel.h"
 #include "MenuThemes.h"
+#include "RideFollow.h"
+#include <openrct2/core/Path.hpp>
+#include <openrct2/interface/Screenshot.h>
+#include "Undo.h"
 #include <openrct2/PlatformEnvironment.h>
 #include "Paths.h"
 #include "RideAccess.h"
@@ -34,6 +40,7 @@
 #include "Water.h"
 
 #include <SDL_timer.h>
+#include <bit>
 #include <iomanip>
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/input/MouseInput.h>
@@ -46,6 +53,7 @@
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
+#include <openrct2/audio/Audio.h>
 #include <openrct2/entity/Peep.h>
 #include <openrct2/ride/Ride.h>
 #include <openrct2/ride/RideData.h>
@@ -70,6 +78,8 @@
 
 namespace OpenRCT2::Ui::Handheld
 {
+    // The Pixel theme's bitmap font reads glyphs from g1.dat through this hook.
+    static const bool kPixelFontReady = (PixelFont::glyphSource = [](uint32_t sprite) { return GfxGetG1Element(sprite); }, true);
     static ConstructionAdjust::State _constructionAdjust;
     static bool _terrainActive{};
     static bool _waterTool{};
@@ -170,14 +180,17 @@ namespace OpenRCT2::Ui::Handheld
         _sceneryTarget.reset();
         _surfaceIndex = kObjectEntryIndexNull;
         _raiseLand = raise;
+        Landscape::shape = raise ? Landscape::Shape::hill : Landscape::Shape::dig;
         _terrainStatus.clear();
         _scatterFeedback = false;
     }
 
+    // Water is a pond you dig, not a column you raise: the quick tool fills what it digs, so the
+    // water always sits inside its banks. Raw water levels remain in Build > Landscape.
     void BeginWater(bool raise)
     {
         BeginTerrain(raise);
-        _waterTool = true;
+        Landscape::shape = Landscape::Shape::pond;
     }
 
     void BeginSurface()
@@ -399,6 +412,7 @@ namespace OpenRCT2::Ui::Handheld
     std::optional<CoordsXY> CurrentTerrainTile() { return _terrainTile; }
     void EndTerrain()
     {
+        Undo::Clear(); // Undo belongs to the tool session it came from.
         RideNavigation::construction.reset();
         _constructionAdjust.reset();
         PeepPlacement::End();
@@ -495,16 +509,34 @@ namespace OpenRCT2::Ui::Handheld
             return Surface::Action(_terrainTile, _surfaceIndex, execute);
         if (_waterTool)
             return Water::Action(_terrainTile, _raiseLand, execute);
+        return Landscape::Action(_terrainTile, execute);
+    }
+
+    // Before A changes the park, remember enough to put it back (hold B). Land shaping covers a
+    // generous square, since smoothing reaches past the brush; placements cover the brush or the
+    // object's footprint. Painting, removal, colours and ride building have their own flows.
+    static bool PrepareUndo()
+    {
+        if (!_terrainTile || CustomTracks::Active() || Designs::Active() || FlatRides::CurrentStage() != FlatRides::Stage::inactive
+            || PeepPlacement::Active() || StaffPatrol::Active() || _rightsTool || _sceneryClearTool || _colourRide
+            || _sceneryRemovalTool || _surfaceTool)
+            return false;
         const auto tile = *_terrainTile;
-        const MapRange range{ tile.x, tile.y, tile.x, tile.y };
-        const CoordsXY centre{ tile.x + 16, tile.y + 16 };
-        if (_raiseLand)
+        if (_sceneryTool)
         {
-            auto action = GameActions::LandRaiseAction(centre, range, MapSelectType::full);
-            return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+            if (SceneryTools::Current().mode != SceneryTools::Mode::place)
+                return false;
+            Undo::Prepare(Undo::Kind::scenery, tile, 5, "scenery");
         }
-        auto action = GameActions::LandLowerAction(centre, range, MapSelectType::full);
-        return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
+        else if (_treeTool)
+            Undo::Prepare(Undo::Kind::trees, tile, 2, "tree");
+        else if (_shopTool)
+            Undo::Prepare(Undo::Kind::shop, tile, 1, "shop");
+        else if (_areaTool && AreaTools::settings.operation == AreaTools::Operation::paint)
+            return false;
+        else
+            Undo::Prepare(Undo::Kind::land, tile, 8, _waterTool ? "water change" : "land change");
+        return true;
     }
 
     static bool HasTextOrModalInput()
@@ -543,6 +575,122 @@ namespace OpenRCT2::Ui::Handheld
             shortcut->action();
     }
 
+    // What A would inspect at the fixed cursor, refreshed each update so the footer verb, the
+    // cursor colour and the name chip preview the press instead of leaving it to guesswork.
+    enum class InspectKind : uint8_t
+    {
+        none,
+        ride,
+        shop,
+        guest,
+        staff,
+        park,
+        path, // A extends it with the connected path tool.
+        sign, // A edits its text.
+    };
+    // The footer verb is one word (the chip beside the cursor names the target), so the park's
+    // footer stays on one row.
+    struct InspectTarget
+    {
+        std::string verb = "Inspect";
+        std::string name;
+        InspectKind kind = InspectKind::none;
+    };
+    static InspectTarget _inspect;
+    static InspectKind _drawnInspectKind = InspectKind::none;
+
+    static Drawing::PaletteIndex InspectColour(InspectKind kind)
+    {
+        switch (kind)
+        {
+            case InspectKind::ride: return NearestPaletteIndex(70, 200, 110);
+            case InspectKind::shop: return NearestPaletteIndex(245, 150, 40);
+            case InspectKind::guest: return NearestPaletteIndex(250, 215, 60);
+            case InspectKind::staff: return NearestPaletteIndex(90, 160, 245);
+            case InspectKind::park: return NearestPaletteIndex(225, 110, 220);
+            case InspectKind::path: return NearestPaletteIndex(170, 200, 230);
+            case InspectKind::sign: return NearestPaletteIndex(200, 170, 255);
+            default: return NearestPaletteIndex(240, 240, 240);
+        }
+    }
+    static constexpr int kCursorWindow = 41;
+    // Brackets breathe 0-3 px on a ~0.8 s cycle; still with reduced motion.
+    static int BracketPulse()
+    {
+        if (MenuFeel::reduceMotion)
+            return 1;
+        static constexpr int kSteps[] = { 0, 1, 2, 3, 2, 1 };
+        return kSteps[(MenuFeel::Clock() / 140) % 6];
+    }
+    static ScreenSize InspectChipSize()
+    {
+        return { std::min(ContextGetWidth() / 2, TextWidth(_inspect.name, true) + 24), 20 };
+    }
+    static ScreenCoordsXY InspectChipOrigin()
+    {
+        const auto size = InspectChipSize();
+        auto origin = Centre() + ScreenCoordsXY{ 16, 12 };
+        origin.x = std::min(origin.x, ContextGetWidth() - size.width - Layout::margin);
+        return origin;
+    }
+
+    struct Toast
+    {
+        std::string title, message;
+        uint64_t shown{};
+        bool notice{}; // An alert the player asked to see (Y), not an error: calmer colour and sound.
+    };
+    static Toast _toast;
+    static constexpr uint64_t kToastMs = 2600, kToastSlideMs = 150;
+    static bool ToastVisible(uint64_t now = MenuFeel::Clock())
+    {
+        return _toast.shown != 0 && now - _toast.shown < kToastMs;
+    }
+    static ScreenSize ToastSize()
+    {
+        const int text = std::max(TextWidth(_toast.title, true), TextWidth(_toast.message));
+        return { std::min(ContextGetWidth() - 2 * Layout::margin, text + 34), _toast.message.empty() ? 24 : 40 };
+    }
+    static ScreenCoordsXY ToastOrigin()
+    {
+        const auto size = ToastSize();
+        const int y = Layout::hudTop + Layout::hudHeight + 6;
+        const int width = ContextGetWidth();
+        // Tool panels dock on the left under the HUD. Centre the toast in the space to their right
+        // so it never covers the panel the player is working in.
+        int left = 0;
+        for (const auto& window : gWindowList)
+        {
+            if (window->flags.has(WindowFlag::dead) || window->classification == WindowClass::mainWindow
+                || (window->classification == WindowClass::handheldHud
+                    && (window->number == 5 || window->number == 3 || window->number == 0))
+                || window->classification == WindowClass::handheldFocus)
+                continue;
+            const bool docked = window->windowPos.x <= Layout::margin + 2;
+            const bool overlaps = window->windowPos.y < y + size.height && window->windowPos.y + window->height > y;
+            if (docked && overlaps)
+                left = std::max(left, window->windowPos.x + window->width + Layout::gutter);
+        }
+        const int room = width - Layout::margin - left;
+        const int x = left == 0 ? (width - size.width) / 2
+            : room >= size.width ? left + (room - size.width) / 2
+                                 : std::max(Layout::margin, width - Layout::margin - size.width);
+        return { x, y };
+    }
+    // Slides down from under the HUD, then back up before it disappears.
+    static int ToastOffset(uint64_t now = MenuFeel::Clock())
+    {
+        if (MenuFeel::reduceMotion || !ToastVisible(now))
+            return 0;
+        const auto age = now - _toast.shown;
+        const auto height = ToastSize().height + 8;
+        if (age < kToastSlideMs)
+            return -static_cast<int>(height * (kToastSlideMs - age) / kToastSlideMs);
+        if (age > kToastMs - kToastSlideMs)
+            return -static_cast<int>(height * (age - (kToastMs - kToastSlideMs)) / kToastSlideMs);
+        return 0;
+    }
+
     class FocusWindow final : public Window
     {
     public:
@@ -563,13 +711,14 @@ namespace OpenRCT2::Ui::Handheld
             wm->CloseByClass(WindowClass::handheldHud);
             return;
         }
-        const auto position = Centre() - ScreenCoordsXY{ 9, 9 };
+        const auto position = Centre() - ScreenCoordsXY{ kCursorWindow / 2, kCursorWindow / 2 };
         if (focus == nullptr)
         {
             // An empty, input-transparent widget list lets map hit testing pass through.
             // A real overlay window also keeps viewport scroll blits from smearing the reticle.
+            // Sized for the pulsing target brackets, not just the cross.
             wm->Create<FocusWindow>(
-                WindowClass::handheldFocus, position, { 19, 19 },
+                WindowClass::handheldFocus, position, { kCursorWindow, kCursorWindow },
                 { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
         }
         else if (focus->windowPos != position)
@@ -577,6 +726,65 @@ namespace OpenRCT2::Ui::Handheld
             focus->invalidate();
             focus->windowPos = position;
             focus->invalidate();
+        }
+        else if (_inspect.kind != _drawnInspectKind || (_inspect.kind != InspectKind::none && !MenuFeel::reduceMotion))
+            focus->invalidate(); // Target colour changed, or the brackets are pulsing.
+        _drawnInspectKind = _inspect.kind;
+        // Name chip beside the cursor, sized to the name; absent when nothing is under it.
+        auto* chip = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 4 });
+        if (_inspect.name.empty() || _terrainActive || Paths::IsActive())
+        {
+            if (chip != nullptr)
+                wm->Close(*chip);
+        }
+        else
+        {
+            const auto origin = InspectChipOrigin();
+            const auto size = InspectChipSize();
+            if (chip == nullptr)
+            {
+                chip = wm->Create<FocusWindow>(
+                    WindowClass::handheldHud, origin, size,
+                    { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
+                if (chip != nullptr)
+                    chip->number = 4;
+            }
+            else if (chip->windowPos != origin || chip->width != size.width)
+            {
+                chip->invalidate();
+                chip->windowPos = origin;
+                chip->width = size.width;
+                chip->height = size.height;
+            }
+            if (chip != nullptr)
+                chip->invalidate();
+        }
+        auto* toast = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 5 });
+        if (!ToastVisible())
+        {
+            if (toast != nullptr)
+                wm->Close(*toast);
+        }
+        else
+        {
+            const auto size = ToastSize();
+            if (toast == nullptr)
+            {
+                toast = wm->Create<FocusWindow>(
+                    WindowClass::handheldHud, ToastOrigin(), size,
+                    { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
+                if (toast != nullptr)
+                    toast->number = 5;
+            }
+            else
+            {
+                toast->invalidate();
+                toast->windowPos = ToastOrigin();
+                toast->width = size.width;
+                toast->height = size.height;
+            }
+            if (toast != nullptr)
+                toast->invalidate();
         }
         auto* hud = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 0 });
         if (hud == nullptr)
@@ -671,7 +879,8 @@ namespace OpenRCT2::Ui::Handheld
                 Windows::HandheldMenuMove(frame.navigateY);
             for (const auto action : frame.actions)
             {
-                if ((action==Action::previousOption || action==Action::nextOption)
+                if (Windows::HandheldTextEntryKey(static_cast<int>(action))) {}
+                else if ((action==Action::previousOption || action==Action::nextOption)
                     && Windows::HandheldToolSettingsPage(action==Action::previousOption ? -1 : 1)) {}
                 else if ((action==Action::previousOption || action==Action::nextOption)
                     && Windows::HandheldTrackSelectionMove(action==Action::previousOption ? -1 : 1,0)) {}
@@ -680,18 +889,19 @@ namespace OpenRCT2::Ui::Handheld
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::contextPrimary)
                     Invoke(ShortcutId::kViewGeneralRotateClockwise);
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::contextSecondary)
-                    Windows::HandheldParkMapControl(0);
+                    Windows::HandheldParkMapControl(4);
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::slopeUp)
                     Windows::HandheldParkMapControl(2);
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::previousOption)
-                    Windows::HandheldParkMapControl(-1);
+                    Windows::HandheldParkMapControl(3);
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::nextOption)
-                    Windows::HandheldParkMapControl(1);
+                    Windows::HandheldParkMapControl(0);
                 else if (action == Action::contextPrimary && Windows::HandheldObjectPickerCamera())
                 { /* Accessible without a stick-click; camera preserves the construction draft. */
                 }
                 else if (action==Action::contextSecondary && Windows::HandheldObjectPickerGroup()) {}
                 else if (action==Action::contextSecondary && Windows::HandheldDashboardNews()) {}
+                else if (action==Action::contextSecondary && Windows::HandheldControlsIntro()) {}
                 else if (
                     Windows::HandheldObjectPickerIsOpen() && (action == Action::previousOption || action == Action::nextOption))
                     Windows::HandheldObjectPickerMove(0, action == Action::nextOption ? 2 : -2);
@@ -741,22 +951,16 @@ namespace OpenRCT2::Ui::Handheld
 
     // What A would inspect at the fixed cursor, refreshed each update so the footer verb and the
     // name chip preview the press instead of leaving it to guesswork.
-    struct InspectTarget
-    {
-        std::string verb = "Inspect";
-        std::string name;
-    };
-    static InspectTarget _inspect;
-
-    static InspectTarget ResolveInspectTarget()
+    static InspectTarget ResolveInspectTarget(std::optional<ScreenCoordsXY> at = {})
     {
         const auto info = GetMapCoordinatesFromPos(
-            Centre(), { ViewportInteractionItem::entity, ViewportInteractionItem::ride, ViewportInteractionItem::parkEntrance });
+            at.value_or(Centre()), { ViewportInteractionItem::entity, ViewportInteractionItem::ride, ViewportInteractionItem::parkEntrance });
         const auto rideTarget = [](const Ride* ride) {
             if (ride == nullptr)
                 return InspectTarget{};
             const bool shop = ride->getRideTypeDescriptor().flags.has(RtdFlag::isShopOrFacility);
-            return InspectTarget{ shop ? "Inspect shop" : "Inspect ride", ride->getName() };
+            return InspectTarget{ "Open", ride->getName(),
+                                  shop ? InspectKind::shop : InspectKind::ride };
         };
         switch (info.interactionType)
         {
@@ -764,7 +968,11 @@ namespace OpenRCT2::Ui::Handheld
                 if (info.Entity == nullptr)
                     break;
                 if (const auto* peep = info.Entity->as<Peep>(); peep != nullptr)
-                    return { info.Entity->type == EntityType::staff ? "Inspect staff" : "Inspect guest", peep->getName() };
+                {
+                    const bool staff = info.Entity->type == EntityType::staff;
+                    return { "Inspect", peep->getName(),
+                             staff ? InspectKind::staff : InspectKind::guest };
+                }
                 if (const auto* vehicle = info.Entity->as<Vehicle>(); vehicle != nullptr && !vehicle->IsCableLift())
                     return rideTarget(GetRide(vehicle->ride));
                 break;
@@ -779,16 +987,37 @@ namespace OpenRCT2::Ui::Handheld
                     return rideTarget(GetRide(info.Element->asPath()->getRideIndex()));
                 break;
             case ViewportInteractionItem::parkEntrance:
-                return { "Inspect park", getGameState().park.name };
+                return { "Open", getGameState().park.name, InspectKind::park };
             default:
                 break;
         }
+        // Nothing to inspect: a sign can be edited, a plain path or queue extended.
+        const auto sign = SceneryTools::Capture(GetMapCoordinatesFromPos(at.value_or(Centre()),
+            { ViewportInteractionItem::banner, ViewportInteractionItem::wall, ViewportInteractionItem::largeScenery }));
+        if (sign && sign->banner != BannerIndex::GetNull())
+            return { "Edit", sign->text.empty() ? std::string("Sign") : sign->text, InspectKind::sign };
+        const auto path = GetMapCoordinatesFromPos(at.value_or(Centre()), { ViewportInteractionItem::footpath });
+        // Only path ends (at most one connected edge): every path tile would bracket most of a park.
+        if (path.Element && path.Element->getType() == TileElementType::path && !path.Element->isGhost()
+            && std::popcount(static_cast<unsigned>(path.Element->asPath()->getEdges() & 0x0F)) <= 1)
+            return { "Extend", path.Element->asPath()->isQueue() ? "Queue end" : "Path end", InspectKind::path };
         return {};
+    }
+
+    static void UpdatePhoto();
+    // Riding along with more than one train: A moves to the next.
+    static bool RideAlongCycles()
+    {
+        const auto riding = RideFollow::Current();
+        const auto* ride = riding ? GetRide(riding->ride) : nullptr;
+        return ride && RideFollow::Trains(*ride) > 1 && !_terrainActive && !Paths::IsActive();
     }
 
     void UpdateExplorer(ControllerInput& input)
     {
         GuestFollow::Update();
+        RideFollow::Update();
+        UpdatePhoto();
         _inspect = !_terrainActive && !Paths::IsActive() && CanExplore() && ContextHasFocus() ? ResolveInspectTarget()
                                                                                              : InspectTarget{};
         if (gLegacyScene != LegacyScene::playing)
@@ -855,7 +1084,7 @@ namespace OpenRCT2::Ui::Handheld
                 Paths::UpdatePreview();
             }
             auto coords = Paths::IsActive() ? Paths::TargetTile() : ScreenGetMapXY(Centre(), nullptr);
-            if (_waterTool)
+            if (_waterTool || (SimpleTerrain() && Landscape::shape == Landscape::Shape::pond))
             {
                 const auto info = GetMapCoordinatesFromPos(
                     Centre(), { ViewportInteractionItem::terrain, ViewportInteractionItem::water });
@@ -929,6 +1158,19 @@ namespace OpenRCT2::Ui::Handheld
                     const auto range=AreaTools::Range(_terrainTile,SceneryClear::settings.width,SceneryClear::settings.height);
                     if(!range)_terrainTile.reset(); else {gMapSelectPositionA={range->getX1(),range->getY1()};gMapSelectPositionB={range->getX2(),range->getY2()};}
                 }
+                if (SimpleTerrain())
+                {
+                    // Preview the whole brush so the player sees exactly what A will shape.
+                    if (const auto range = Landscape::Range(_terrainTile))
+                    {
+                        gMapSelectPositionA = { range->getX1(), range->getY1() };
+                        gMapSelectPositionB = { range->getX2(), range->getY2() };
+                        gMapSelectType = Landscape::shape == Landscape::Shape::pond ? MapSelectType::fullWater
+                                                                                    : MapSelectType::full;
+                    }
+                    else
+                        _terrainTile.reset();
+                }
                 if (_areaTool)
                 {
                     const auto range = AreaTools::Range(_terrainTile, AreaTools::settings.width, AreaTools::settings.height);
@@ -996,6 +1238,308 @@ namespace OpenRCT2::Ui::Handheld
         HandleExplorerInput(input, input.update(ContextHasFocus(), SDL_GetTicks()));
     }
 
+    // Smart cursor (Settings, off by default). Three small aids, no hard snapping:
+    // - friction: panning slows to under half speed over a ride, stall, guest or staff member you
+    //   are arriving at (not the one you set off from), so it is easy to stop on;
+    // - acceleration: after most of a second of holding, empty ground pans faster;
+    // - magnet: let go just short of something and the camera eases the last few pixels onto it.
+    static struct
+    {
+        float x{}, y{};
+        uint64_t started{};
+        bool panning{};
+        std::string leaving;
+        ScreenCoordsXY magnet{};
+    } _smart;
+    static ScreenCoordsXY SmartCursor(const Frame& frame, ScreenCoordsXY pan)
+    {
+        const bool held = frame.heldX != 0 || frame.heldY != 0;
+        const auto now = MenuFeel::Clock();
+        if (held)
+        {
+            _smart.magnet = {};
+            if (!_smart.panning)
+            {
+                _smart.panning = true;
+                _smart.started = now;
+                _smart.leaving = _inspect.name;
+            }
+            const bool arriving = !_inspect.name.empty() && _inspect.name != _smart.leaving;
+            if (_inspect.name.empty())
+                _smart.leaving.clear(); // Once clear of where you started, every target counts.
+            const float factor = arriving ? 0.4f : now - _smart.started > 800 ? 1.8f : 1.0f;
+            _smart.x += pan.x * factor;
+            _smart.y += pan.y * factor;
+            const ScreenCoordsXY step{ static_cast<int>(_smart.x), static_cast<int>(_smart.y) };
+            _smart.x -= step.x;
+            _smart.y -= step.y;
+            return step;
+        }
+        if (_smart.panning)
+        {
+            _smart.panning = false;
+            _smart.x = _smart.y = 0;
+            if (_inspect.kind == InspectKind::none)
+            {
+                // Nearest target in rings of 8 / 16 / 24 px around the cursor.
+                const auto centre = Centre();
+                for (int radius = 8; radius <= 24 && _smart.magnet == ScreenCoordsXY{}; radius += 8)
+                    for (const auto& [dx, dy] : std::array<std::pair<int, int>, 8>{
+                             { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 }, { 1, -1 }, { 1, 1 }, { -1, 1 }, { -1, -1 } } })
+                    {
+                        const ScreenCoordsXY offset{ dx * radius, dy * radius };
+                        if (ResolveInspectTarget(centre + offset).kind != InspectKind::none)
+                        {
+                            _smart.magnet = offset;
+                            break;
+                        }
+                    }
+            }
+        }
+        // Ease towards the magnet target: a third of the way each frame, at least a pixel.
+        if (_smart.magnet != ScreenCoordsXY{})
+        {
+            auto ease = [](int remaining) { return remaining == 0 ? 0 : remaining / 3 != 0 ? remaining / 3 : (remaining > 0 ? 1 : -1); };
+            const ScreenCoordsXY step{ ease(_smart.magnet.x), ease(_smart.magnet.y) };
+            _smart.magnet -= step;
+            return step;
+        }
+        return pan;
+    }
+    // Leaving a tool returns to wherever it was opened from (a ride, a guest, a staff member,
+    // the design browser), as B always has.
+    static void LeaveTool()
+    {
+        const bool designBrowser=Designs::Active() && Designs::BrowserReturn();
+        const auto access = _ridePathAccess;
+        const auto ride=ConstructionRide();
+        const auto context=RideNavigation::Take();
+        const auto person = PeepPlacement::target;
+        const auto employee = StaffPatrol::target;
+        EndTerrain();
+        if(designBrowser) Windows::HandheldDesignFilesOpen();
+        if (person && person->guest && GuestManagement::Resolve(*person->guest))
+            Windows::HandheldGuestOpen(*person->guest);
+        if (person && person->staff && StaffManagement::Resolve(*person->staff))
+            Windows::HandheldStaffOpen(*person->staff);
+        if (employee && StaffManagement::Resolve(*employee))
+            Windows::HandheldStaffOpen(employee);
+        if (ride && RideManagement::Resolve(*ride)) Windows::HandheldRideReturn(*ride,context);
+        else if (access && RideManagement::Resolve(*access)) Windows::HandheldRideAccessOpen(*access);
+    }
+    // Hold B in a tool to undo its last change; a tap still leaves the tool.
+    static constexpr uint64_t kUndoHoldMs = 450;
+    static uint64_t _backHold{};
+    static void HandleBackHold(ControllerInput& input, const Frame& frame)
+    {
+        const auto elapsed = MenuFeel::Clock() - _backHold;
+        if (frame.backHeld && elapsed < kUndoHoldMs)
+            return; // Still deciding.
+        _backHold = 0;
+        if (!frame.backHeld)
+        {
+            LeaveTool();
+            input.suspend();
+            return;
+        }
+        if (Undo::Available())
+        {
+            const auto result = Undo::Perform();
+            _terrainStatus = result.getErrorMessage();
+        }
+        else if (Paths::IsActive())
+        {
+            if (const auto draft = Paths::BeginUndo())
+            {
+                const auto result = Paths::Undo(*draft, true);
+                _terrainStatus = result.error == GameActions::Status::ok ? "Undone: last path section" : result.getErrorMessage();
+            }
+        }
+        Audio::Play(Audio::SoundId::click1, -400, Audio::kAudioPlayAtCentre);
+        input.suspend(); // The held B must not also leave the tool on release.
+    }
+    // Y in the park with alerts: a tap glides to the next one, a hold opens the inbox.
+    static constexpr uint64_t kInboxHoldMs = 400;
+    static uint64_t _alertHold{};
+    static void HandleAlertHold(ControllerInput& input, const Frame& frame)
+    {
+        if (frame.secondaryHeld && MenuFeel::Clock() - _alertHold < kInboxHoldMs)
+            return;
+        _alertHold = 0;
+        if (frame.secondaryHeld)
+            Windows::HandheldInboxOpen();
+        else if (!JumpToNextAlert())
+            Windows::HandheldNewsOpen();
+        input.suspend();
+    }
+    static QuickWheel::State _wheel;
+    static void ChooseWheel(ControllerInput& input, size_t slot)
+    {
+        const auto target = QuickWheel::kSlots[slot].target;
+        _wheel.Close();
+        Audio::Play(Audio::SoundId::click1, -400, Audio::kAudioPlayAtCentre);
+        if (target == QuickWheel::Target::pause)
+            PauseToggle();
+        else
+            Windows::HandheldQuickJump(target);
+        input.suspend(); // The releasing press must not also act on what just opened.
+    }
+    // While the wheel is open it owns the controller: the D-pad points, releasing L2 (after a
+    // hold) or A takes the highlighted slot, B or a second L2 closes it.
+    // Photo mode: everything Pocket draws goes away, leaving the park itself. The D-pad, zoom and
+    // rotation work as usual; A saves a screenshot, Y freezes time, B (or START) leaves. The
+    // shot is taken one drawn frame after A, so the frame on screen when A was pressed (which may
+    // still carry the hint) is never the one saved.
+    struct Photo
+    {
+        bool active{};
+        bool pending{};      // A pressed: waiting for a clean frame.
+        int cleanFrames{};   // Frames drawn with nothing on top since A.
+        bool pausedHere{};
+        uint64_t hintUntil{}; // The hint shows on entry and after each button, then fades away.
+        std::string note;
+    };
+    static Photo _photo;
+    static constexpr uint64_t kPhotoHintMs = 2500;
+    static void BeginPhoto()
+    {
+        EndTerrain();
+        GuestFollow::Stop();
+        _photo = {};
+        _photo.active = true;
+        _photo.hintUntil = MenuFeel::Clock() + kPhotoHintMs;
+    }
+    static void EndPhoto()
+    {
+        if (_photo.pausedHere && GameIsPaused())
+            PauseToggle();
+        _photo = {};
+    }
+    bool PhotoModeActive()
+    {
+        return _photo.active;
+    }
+    // Called each update: take the pending shot once a clean frame has been drawn.
+    static void UpdatePhoto()
+    {
+        if (!_photo.active || !_photo.pending || _photo.cleanFrames < 1)
+            return;
+        _photo.pending = false;
+        const auto path = ScreenshotDump();
+        Audio::Play(Audio::SoundId::windowOpen, 0, Audio::kAudioPlayAtCentre);
+        _photo.note = path.empty() ? "Could not save the photo" : "Saved " + Path::GetFileName(path);
+        _photo.hintUntil = MenuFeel::Clock() + kPhotoHintMs;
+    }
+    // True when photo mode handled the frame.
+    static bool HandlePhoto(ControllerInput& input, const Frame& frame)
+    {
+        if (!_photo.active)
+            return false;
+        for (const auto action : frame.actions)
+        {
+            switch (action)
+            {
+                case Action::confirm:
+                    _photo.pending = true;
+                    _photo.cleanFrames = 0;
+                    _photo.hintUntil = 0;
+                    input.suspend();
+                    return true;
+                case Action::back:
+                case Action::openMenu:
+                    EndPhoto();
+                    input.suspend();
+                    return true;
+                case Action::contextSecondary:
+                    if (GameIsPaused() && _photo.pausedHere)
+                    {
+                        PauseToggle();
+                        _photo.pausedHere = false;
+                    }
+                    else if (!GameIsPaused())
+                    {
+                        PauseToggle();
+                        _photo.pausedHere = true;
+                    }
+                    _photo.note = GameIsPaused() ? "Time frozen" : "Time running";
+                    _photo.hintUntil = MenuFeel::Clock() + kPhotoHintMs;
+                    input.suspend();
+                    return true;
+                case Action::openBuild:
+                case Action::slopeDown:
+                case Action::slopeUp:
+                    // Build and the quick menu wait until photo mode ends.
+                    input.suspend();
+                    return true;
+                default:
+                    break; // Zoom and rotate fall through to the park's own handling.
+            }
+        }
+        return false;
+    }
+    static void DrawPhoto(Drawing::RenderTarget& rt)
+    {
+        if (_photo.pending)
+        {
+            ++_photo.cleanFrames;
+            return;
+        }
+        if (MenuFeel::Clock() >= _photo.hintUntil)
+            return;
+        const ScreenSize screen{ ContextGetWidth(), ContextGetHeight() };
+        const std::string text = _photo.note.empty() ? "Photo mode" : _photo.note;
+        const int width = std::max(TextWidth(text, true), 200) + 24;
+        const ScreenCoordsXY at{ (screen.width - width) / 2, Layout::hudTop };
+        DrawCard(rt, at, { width, 40 });
+        DrawStrongText(rt, at + ScreenCoordsXY{ 12, 7 }, "{WHITE}" + text, width - 24);
+        DrawModernText(rt, at + ScreenCoordsXY{ 12, 23 },
+            std::string("{MUTED}") + ActionKey(Action::confirm).data() + " photo  " + ActionKey(Action::contextSecondary).data()
+                + (GameIsPaused() ? " resume  " : " freeze  ") + ActionKey(Action::back).data() + " done");
+    }
+
+    static void HandleWheel(ControllerInput& input, const Frame& frame)
+    {
+        if (!CanExplore())
+        {
+            _wheel.Close();
+            return;
+        }
+        _wheel.Point(frame.heldX, frame.heldY);
+        for (const auto action : frame.actions)
+        {
+            if (action == Action::confirm && _wheel.selected)
+                return ChooseWheel(input, *_wheel.selected);
+            if (action == Action::contextSecondary)
+            {
+                _wheel.Close();
+                BeginPhoto();
+                input.suspend();
+                return;
+            }
+            if (action == Action::back || (action == Action::slopeDown && !_wheel.selected))
+            {
+                _wheel.Close();
+                input.suspend();
+                return;
+            }
+            if (action == Action::slopeDown && _wheel.selected)
+                return ChooseWheel(input, *_wheel.selected);
+        }
+        if (!frame.leftTrigger && !_wheel.tapped)
+        {
+            if (MenuFeel::Clock() - _wheel.opened < QuickWheel::kHoldMs)
+                _wheel.tapped = true; // A quick tap: stay open for A / B.
+            else if (_wheel.selected)
+                return ChooseWheel(input, *_wheel.selected);
+            else
+                _wheel.Close();
+        }
+    }
+    bool QuickWheelOpen()
+    {
+        return _wheel.open;
+    }
+
     void HandleExplorerInput(ControllerInput& input, const Frame& frame)
     {
         auto* wm = GetWindowManager();
@@ -1008,6 +1552,14 @@ namespace OpenRCT2::Ui::Handheld
                 return;
             }
         }
+        if (_wheel.open)
+            return HandleWheel(input, frame);
+        if (HandlePhoto(input, frame))
+            return;
+        if (_backHold)
+            return HandleBackHold(input, frame);
+        if (_alertHold)
+            return HandleAlertHold(input, frame);
         if (_ridePathAccess && !AccessTargetValid())
         {
             EndTerrain();
@@ -1268,8 +1820,10 @@ namespace OpenRCT2::Ui::Handheld
                     {
                         if (CustomTracks::CameraMode())
                             Windows::MainWindowZoom(action == Action::nextOption, false);
-                        else
+                        else if (CustomTracks::StationPlacement())
                             CustomTracks::Cycle(action == Action::nextOption ? 1 : -1);
+                        else
+                            CustomTracks::SetTurnSize(action == Action::nextOption ? 1 : -1);
                     }
                     else if (action == Action::slopeDown || action == Action::slopeUp)
                     {
@@ -1279,6 +1833,20 @@ namespace OpenRCT2::Ui::Handheld
                 }
                 input.suspend();
                 break;
+            }
+            // While building, the D-pad drives the track like a car: left/right bend, up/down climb
+            // or dive. One press is one decision, so held repeats are ignored. The camera follows the
+            // end of the track on its own; camera mode (and station placement) still pan freely.
+            if (!CustomTracks::CameraMode() && !CustomTracks::StationPlacement())
+            {
+                if (!frame.navigateRepeat && !CustomTracks::Busy() && frame.actions.empty())
+                {
+                    if (frame.navigateX != 0)
+                        CustomTracks::Steer(frame.navigateX);
+                    else if (frame.navigateY != 0)
+                        CustomTracks::Slope(-frame.navigateY);
+                }
+                return;
             }
             if (frame.panX || frame.panY)
                 InputScrollViewportSmooth({ frame.panX, frame.panY }, WindowGetMain());
@@ -1357,25 +1925,22 @@ namespace OpenRCT2::Ui::Handheld
                     wm->CloseByClass(WindowClass::dropdown);
                 else if ((_terrainActive || Paths::IsActive()) && CanExplore())
                 {
-                    const bool designBrowser=Designs::Active() && Designs::BrowserReturn();
-                    const auto access = _ridePathAccess;
-                    const auto ride=ConstructionRide();
-                    const auto context=RideNavigation::Take();
-                    const auto person = PeepPlacement::target;
-                    const auto employee = StaffPatrol::target;
-                    EndTerrain();
-                    if(designBrowser) Windows::HandheldDesignFilesOpen();
-                    if (person && person->guest && GuestManagement::Resolve(*person->guest))
-                        Windows::HandheldGuestOpen(*person->guest);
-                    if (person && person->staff && StaffManagement::Resolve(*person->staff))
-                        Windows::HandheldStaffOpen(*person->staff);
-                    if (employee && StaffManagement::Resolve(*employee))
-                        Windows::HandheldStaffOpen(employee);
-                    if (ride && RideManagement::Resolve(*ride)) Windows::HandheldRideReturn(*ride,context);
-                    else if (access && RideManagement::Resolve(*access)) Windows::HandheldRideAccessOpen(*access);
+                    // With something to undo, B waits to see whether it is a tap (leave the tool)
+                    // or a hold (undo). Return without suspending, so the held button stays visible.
+                    if (Undo::Available() || (Paths::IsActive() && Paths::BeginUndo()))
+                    {
+                        _backHold = MenuFeel::Clock();
+                        return;
+                    }
+                    LeaveTool();
                 }
                 else if (const auto followed = GuestFollow::Current(); followed && CanExplore())
                     Windows::HandheldGuestOpen(*followed);
+                else if (const auto riding = RideFollow::Current(); riding && CanExplore())
+                {
+                    // Back to the ride; the camera stays with the train until something moves it.
+                    Windows::HandheldRideOpen(riding->ride);
+                }
                 else
                     wm->CloseTop();
             }
@@ -1426,6 +1991,12 @@ namespace OpenRCT2::Ui::Handheld
                 switch (action)
                 {
                     case Action::confirm:
+                        if (RideAlongCycles())
+                        {
+                            RideFollow::Next();
+                            input.suspend();
+                            return;
+                        }
                         if (Paths::IsActive())
                         {
                             const auto result = Paths::Action(true);
@@ -1455,7 +2026,10 @@ namespace OpenRCT2::Ui::Handheld
                                     return;
                                 }
                                 const bool picking = _sceneryTool && SceneryTools::Current().mode == SceneryTools::Mode::pick;
+                                const bool undoable = PrepareUndo();
                                 const auto result = TerrainAction(true);
+                                if (undoable && result.error == GameActions::Status::ok)
+                                    Undo::Commit(result.cost);
                                 if (picking && result.error == GameActions::Status::ok)
                                 {
                                     _terrainStatus = "Object selected / Move, then A Place";
@@ -1478,8 +2052,12 @@ namespace OpenRCT2::Ui::Handheld
                                            : _sceneryRemovalTool                               ? "Removed."
                                            : _surfaceTool                                      ? "Surface painted."
                                            : _waterTool                                        ? "Water level changed."
-                                                                                               : "Land changed.")
+                                           : Landscape::shape == Landscape::Shape::pond        ? "Pond dug / A again to go deeper"
+                                           : Landscape::shape == Landscape::Shape::flatten     ? "Levelled one step"
+                                                                                               : "Land shaped.")
                                     : result.getErrorMessage();
+                                if (undoable && result.error == GameActions::Status::ok && Undo::Available())
+                                    _terrainStatus += _terrainStatus.empty() ? "Hold B: undo" : "  |  Hold B: undo";
                             }
                         }
                         else
@@ -1492,6 +2070,30 @@ namespace OpenRCT2::Ui::Handheld
                                 const auto* ride = GetRide(info.Element->getRideIndex());
                                 if (ride && !ride->getRideTypeDescriptor().flags.has(RtdFlag::isShopOrFacility))
                                     Windows::HandheldRideOpen(ride->id);
+                            }
+                            else if (_inspect.kind == InspectKind::path)
+                            {
+                                // Start the connected path tool on this path, as if chosen from
+                                // Build > Paths > Extend and then pointed at.
+                                const auto pathInfo = GetMapCoordinatesFromPos(Centre(), { ViewportInteractionItem::footpath });
+                                const bool queue = pathInfo.Element && pathInfo.Element->getType() == TileElementType::path
+                                    && pathInfo.Element->asPath()->isQueue();
+                                EndTerrain();
+                                Paths::BeginConnected(queue);
+                                Paths::UpdateTarget(Centre());
+                                const auto result = Paths::Action(true);
+                                _terrainStatus = result.error == GameActions::Status::ok ? "Steer with the D-pad, A to lay path"
+                                                                                         : result.getErrorMessage();
+                                input.suspend();
+                                return;
+                            }
+                            else if (_inspect.kind == InspectKind::sign)
+                            {
+                                _sceneryEdit = SceneryTools::Capture(GetMapCoordinatesFromPos(Centre(),
+                                    { ViewportInteractionItem::banner, ViewportInteractionItem::wall, ViewportInteractionItem::largeScenery }));
+                                Windows::HandheldSignEditOpen();
+                                input.suspend();
+                                return;
                             }
                             else if (!info.Element || !info.Element->isGhost())
                                 ViewportInteractionLeftClick(Centre());
@@ -1534,7 +2136,18 @@ namespace OpenRCT2::Ui::Handheld
                             else if (FlatRides::CurrentStage() == FlatRides::Stage::ride && !FlatRides::Busy())
                                 Windows::HandheldRidePickerOpen();
                             else if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
-                                break;
+                            {
+                                // Entrance or exit: Y places both and lays their paths.
+                                // Success hands back to the ride overview once it is built, so the
+                                // summary travels with it; a refusal stays here in the status line.
+                                std::string summary;
+                                const auto placed = FlatRides::AutoPlace(summary);
+                                if (placed.error == GameActions::Status::ok)
+                                    Windows::HandheldRideReturnNotice(summary);
+                                _terrainStatus = summary;
+                                input.suspend();
+                                return;
+                            }
                             else if (_shopTool)
                                 Windows::HandheldShopPickerOpen();
                             else if (PeepPlacement::Active())
@@ -1563,6 +2176,8 @@ namespace OpenRCT2::Ui::Handheld
                                 _constructionAdjust.active=true;
                                 _constructionAdjust.focus.tab=2; _constructionAdjust.row=0;
                             }
+                            else if (SimpleTerrain())
+                                Landscape::Cycle(1);
                             else if (!_sceneryRemovalTool)
                             {
                                 _areaTool=true;
@@ -1575,7 +2190,15 @@ namespace OpenRCT2::Ui::Handheld
                             _terrainStatus.clear();
                             _scatterFeedback = false;
                         }
-                        else Windows::HandheldNewsOpen();
+                        else if (!Alerts::Current().empty())
+                        {
+                            // Decide on release (or after the hold time): return without
+                            // suspending so the held button stays visible.
+                            _alertHold = MenuFeel::Clock();
+                            return;
+                        }
+                        else
+                            Windows::HandheldNewsOpen();
                         break;
                     case Action::back:
                     case Action::openMenu:
@@ -1583,6 +2206,15 @@ namespace OpenRCT2::Ui::Handheld
                     case Action::quit:
                     case Action::slopeDown:
                     case Action::slopeUp:
+                        // L2 with no tool in hand opens the quick wheel. Return without the usual
+                        // suspend, which would make the still-held L2 read as released.
+                        if (action == Action::slopeDown && !_terrainActive && !Paths::IsActive() && !Designs::Active()
+                            && !StaffPatrol::Active())
+                        {
+                            _wheel.Open(MenuFeel::Clock());
+                            Audio::Play(Audio::SoundId::click1, -600, Audio::kAudioPlayAtCentre);
+                            return;
+                        }
                         if (Designs::Active())
                             Designs::SetScenery(action == Action::slopeUp);
                         else if (StaffPatrol::Active())
@@ -1596,7 +2228,7 @@ namespace OpenRCT2::Ui::Handheld
                         else if (_areaTool)
                             AreaTools::Configure(1,action == Action::slopeUp ? 1 : -1);
                         else if(SimpleTerrain())
-                            _raiseLand=action==Action::slopeUp;
+                            Landscape::Resize(action == Action::slopeUp ? 1 : -1);
                         break;
                     case Action::cameraMode:
                         break;
@@ -1606,14 +2238,18 @@ namespace OpenRCT2::Ui::Handheld
             input.suspend();
             return;
         }
-        if (CanExplore() && (frame.panX != 0 || frame.panY != 0))
+        auto pan = ScreenCoordsXY{ frame.panX, frame.panY };
+        if (preferences.smartCursor && CanExplore() && !_terrainActive && !Paths::IsActive())
+            pan = SmartCursor(frame, pan);
+        if (CanExplore() && (pan.x != 0 || pan.y != 0))
         {
             auto* main = WindowGetMain();
             _terrainStatus.clear();
             _scatterFeedback = false;
             GuestFollow::Stop();
+            RideFollow::Stop();
             WindowUnfollowSprite(*main);
-            InputScrollViewportSmooth({ frame.panX, frame.panY }, main);
+            InputScrollViewportSmooth(pan, main);
         }
     }
 
@@ -1623,6 +2259,8 @@ namespace OpenRCT2::Ui::Handheld
         Theme::Refresh();
         if (!IsEnabled() || !CanExplore())
             return;
+        if (_photo.active)
+            return DrawPhoto(rt);
         using namespace Drawing;
         const auto c = Centre();
         const auto height = ContextGetHeight();
@@ -1637,6 +2275,10 @@ namespace OpenRCT2::Ui::Handheld
         const auto context = _terrainActive || Paths::IsActive() ? Layout::Context::construction : Layout::Context::park;
         if (Layout::ShowsHud(context) && rt.y < Layout::hudTop + Layout::hudHeight && rt.y + rt.height > Layout::hudTop)
             DrawHud(rt, { ContextGetWidth(), height }, NativeHud());
+        // The goal ticker shares the space under the HUD with toasts, which win while they show.
+        if (context == Layout::Context::park && preferences.hudGoal && !_wheel.open && !ToastVisible())
+            if (const auto goal = Goal::Current())
+                DrawGoal(rt, { ContextGetWidth(), height }, *goal);
         // Completion can arrive after UpdateExplorer but before this frame is drawn.
         // Never fall through to terrain controls while waiting for the next update to end the tool.
         if (Designs::Completed()
@@ -1654,10 +2296,15 @@ namespace OpenRCT2::Ui::Handheld
         if (CustomTracks::Active())
         {
             CustomTracks::DrawPanel(rt, { ContextGetWidth(), height });
-            DrawMapFocus(rt, c);
+            // Steering builds from the end of the track, not from the screen centre, so the cross
+            // only appears where it means something: free camera and placing the station.
+            if (CustomTracks::CameraMode() || CustomTracks::StationPlacement())
+                DrawMapFocus(rt, c);
             return;
         }
-        std::string status = GuestFollow::Current() ? "Follow / B Guest / D-pad Stop" : "L/R: Zoom   X: Rotate";
+        std::string status = GuestFollow::Current() ? "Follow / B Guest / D-pad Stop"
+            : RideFollow::Current()                 ? RideFollow::Label()
+                                                    : "L/R: Zoom   X: Rotate";
         std::string costAmount;
         if (_terrainActive)
         {
@@ -1673,7 +2320,7 @@ namespace OpenRCT2::Ui::Handheld
                 : _sceneryRemovalTool                                     ? "REMOVE SCENERY"
                 : _surfaceTool                                            ? "PAINT SURFACE"
                 : _waterTool                                              ? (_raiseLand ? "RAISE WATER" : "LOWER WATER")
-                                                                          : (_raiseLand ? "RAISE LAND" : "LOWER LAND");
+                                                                          : std::string(Landscape::Name(Landscape::shape));
             if (_terrainTile)
             {
                 const auto result = TerrainAction(false);
@@ -1754,10 +2401,7 @@ namespace OpenRCT2::Ui::Handheld
                 else if (_surfaceTool)
                     DrawSurfaceOverlay(rt, Concept::kOrigin, Surface::Name(_surfaceIndex));
                 else
-                {
-                    DrawTerrainOverlay(rt, Concept::kOrigin, _raiseLand, _waterTool);
-                    DrawModernText(rt,Concept::kOrigin+ScreenCoordsXY{12,184},"{WHITE}L2 Lower | R2 Raise");
-                }
+                    DrawLandscapeOverlay(rt, Concept::kOrigin, static_cast<int>(Landscape::shape), Landscape::brush);
             }
             if (Designs::Active() || FlatRides::CurrentStage() != FlatRides::Stage::inactive)
             { /* The shared ride panel owns its action strip. */
@@ -1792,11 +2436,13 @@ namespace OpenRCT2::Ui::Handheld
             else if(_surfaceTool)
                 ConstructionAdjust::Footer(rt,{ContextGetWidth(),height},false,false,"Paint");
             else if(SimpleTerrain())
-                DrawConstructionFooter(rt,{ContextGetWidth(),height},"Apply","Adjust");
-            else
+                DrawFooter(rt, { ContextGetWidth(), height },
+                    { { "D-pad", "Move" }, { "A", Landscape::Name(Landscape::shape) }, { "Y", "Shape" },
+                      { "L2/R2", "Brush size" }, { "B", "Back" }, { "L1/R1", "Zoom", HintPriority::guide } });
+            else if (!_wheel.open) // The wheel draws its own footer.
                 DrawGameplayFooter(
                     rt, { ContextGetWidth(), height }, status, _terrainActive, _surfaceTool || _colourRide.has_value(),
-                    _inspect.verb);
+                    RideAlongCycles() ? "Next" : _inspect.verb, Alerts::HintLabel());
         }
         // A colour palette owns the D-pad; placement feedback/cursor is unrelated
         // here and suggested a placement error while merely choosing a colour.
@@ -1808,12 +2454,81 @@ namespace OpenRCT2::Ui::Handheld
             DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), status);
         else if (!costAmount.empty())
             DrawCostBadge(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), costAmount, Paths::BatchActive());
-        if (GuestFollow::Current() && !_terrainActive && !Paths::IsActive())
+        if ((GuestFollow::Current() || RideFollow::Current()) && !_terrainActive && !Paths::IsActive())
             DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), status);
-        else if (!_inspect.name.empty() && !_terrainActive && !Paths::IsActive())
-            DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), _inspect.name);
-        // High contrast, fixed map focus; this does not move the desktop pointer.
-        DrawMapFocus(rt, c);
+        else if (!_wheel.open && !_inspect.name.empty() && !_terrainActive && !Paths::IsActive())
+            DrawInspectChip(rt, InspectChipOrigin(), InspectChipSize(), _inspect.name, InspectColour(_inspect.kind));
+        if (ToastVisible())
+        {
+            // Clipped to its resting slot so it slides out from under the HUD rather than over it.
+            const auto size = ToastSize();
+            Drawing::RenderTarget slot;
+            if (ClipRenderTarget(slot, rt, ToastOrigin(), size.width, size.height))
+            {
+                const ScreenCoordsXY origin{ 0, ToastOffset() };
+                DrawCard(slot, origin, size);
+                Fill(slot, origin + ScreenCoordsXY{ 5, 4 }, { 4, size.height - 8 },
+                    static_cast<Drawing::PaletteIndex>(_toast.notice ? PocketPalette::caution : PocketPalette::destructive));
+                DrawStrongText(
+                    slot, origin + ScreenCoordsXY{ 16, 6 }, (_toast.notice ? "{CAUTION}" : "{DANGER}") + _toast.title,
+                    size.width - 24);
+                if (!_toast.message.empty())
+                    DrawModernEllipsised(slot, origin + ScreenCoordsXY{ 16, 23 }, size.width - 24, "{WHITE}" + _toast.message);
+            }
+        }
+        // High contrast, fixed map focus; this does not move the desktop pointer. While exploring
+        // it changes shape and colour over anything A can inspect; tools keep the precise cross.
+        if (!_terrainActive && !Paths::IsActive() && _inspect.kind != InspectKind::none)
+            DrawTargetBrackets(rt, c, InspectColour(_inspect.kind), BracketPulse());
+        else
+            DrawMapFocus(rt, c);
+        if (_wheel.open)
+        {
+            const auto [label, sprite] = Windows::HandheldLastBuild();
+            QuickWheel::Draw(rt, { ContextGetWidth(), ContextGetHeight() }, _wheel, label, sprite, gGamePaused != 0);
+        }
+    }
+
+    void ShowToast(std::string_view title, std::string_view message)
+    {
+        Audio::Play(Audio::SoundId::error, -300, Audio::kAudioPlayAtCentre);
+        if (!CanExplore() || _terrainActive || Paths::IsActive())
+            return;
+        _toast.title = Windows::HandheldNewsText(std::string(title));
+        _toast.message = Windows::HandheldNewsText(std::string(message));
+        _toast.shown = MenuFeel::Clock();
+        _toast.notice = false;
+    }
+
+    static size_t _alertIndex{};
+    // Y in the park: glide to the next thing that needs the player and say what usually fixes it.
+    // The camera stops with the problem under the cursor, so A opens that ride (or the guest there)
+    // exactly as if the player had walked over to it. With nothing to report, Y is News as before.
+    bool JumpToNextAlert()
+    {
+        Alerts::Invalidate();
+        const auto& alerts = Alerts::Current();
+        auto* main = WindowGetMain();
+        if (alerts.empty() || main == nullptr)
+            return false;
+        const auto& alert = alerts[_alertIndex++ % alerts.size()];
+        JumpToAlert(alert);
+        if (alerts.size() > 1)
+            _toast.message = std::to_string((_alertIndex - 1) % alerts.size() + 1) + " of " + std::to_string(alerts.size())
+                + "  |  " + _toast.message;
+        return true;
+    }
+    void JumpToAlert(const Alerts::Alert& alert)
+    {
+        auto* main = WindowGetMain();
+        if (main == nullptr)
+            return;
+        WindowScrollToLocation(*main, alert.location);
+        Audio::Play(Audio::SoundId::click1, -400, Audio::kAudioPlayAtCentre);
+        _toast.title = Windows::HandheldNewsText(alert.title);
+        _toast.message = Windows::HandheldNewsText(alert.fix);
+        _toast.shown = MenuFeel::Clock();
+        _toast.notice = true;
     }
 } // namespace OpenRCT2::Ui::Handheld
 

@@ -101,7 +101,7 @@ int main(int argc,char** argv)
         WindowCullDead();
         Check(!W::HandheldDashboardIsOpen(), "Dashboard rail Back did not return to park");
         open(4);Check(model().tabs.size()==4&&model().selectedTab==0,"Finance tabs missing");
-        Check(model().stats[2].second==H::FormatMoney(270.00_GBP),"Month net not native signed ledger total");capture("01-finance-overview.png");
+        Check(model().chart&&model().chart->splitValues.size()==2&&std::get<1>(model().chart->split[0])-std::get<1>(model().chart->split[1])==270.00_GBP,"Month in/out not native signed ledger totals");Check(model().heroStat&&model().primaryRow==0,"Finance overview lost its headline or primary action");capture("01-finance-overview.png");
         press(H::Action::nextOption);Check(model().rowValues.size()==14,"Ledger omitted categories/values");
         Check(model().rowValues[0]==H::FormatMoney(-120.00_GBP),"Ledger sign lost");capture("02-finance-ledger.png");
         nav(-1,0);Check(model().rowValues[6]==H::FormatMoney(280.00_GBP),"Ledger month selection failed");nav(1,0);
@@ -110,9 +110,15 @@ int main(int argc,char** argv)
         press(H::Action::confirm);Check(model().title=="Weekly profit history","Next native graph unavailable");nav(-1,0);capture("04-finance-profit-history.png");
         press(H::Action::previousOption);Check(model().selected==ledgerFocus,"Ledger focus lost across tabs");press(H::Action::nextOption);press(H::Action::nextOption);
         Check(model().selectedTab==3,"Financial controls unavailable");capture("05-finance-controls.png");
+        {
+            // Admission is a setting row on Controls: Left/Right applies one native step in place.
+            const auto fee=park.entranceFee;select("Admission");nav(1,0);GameActions::ProcessQueue(state);
+            Check(park.entranceFee>fee&&model().selectedTab==3&&!model().editing,"Controls admission did not change in place");
+            nav(-1,0);GameActions::ProcessQueue(state);Check(park.entranceFee==fee,"Controls admission did not step back");
+        }
         select("Borrow / repay...");const auto cash=park.cash;const auto loan=park.bankLoan;press(H::Action::confirm);nav(1,0);capture("06-finance-loan-draft.png");
-        Check(park.cash==cash&&park.bankLoan==loan,"Finance draft spent cash");press(H::Action::confirm);Check(model().confirmation&&model().selected==1,"Finance review not Cancel-first");
-        press(H::Action::confirm);Check(park.cash==cash,"Cancel applied loan");Check(model().selectedTab==3,"Cancel lost Controls tab");
+        Check(park.cash==cash&&park.bankLoan==loan,"Finance draft spent cash");press(H::Action::confirm);Check(model().confirmation&&model().selected==0,"Finance review does not start on Apply");
+        W::HandheldMenuMove(1);press(H::Action::confirm);Check(park.cash==cash,"Cancel applied loan");Check(model().selectedTab==3,"Cancel lost Controls tab");
         press(H::Action::confirm);nav(1,0);press(H::Action::confirm);capture("07-finance-review.png");select("Borrow");press(H::Action::confirm);
         Check(park.bankLoan==loan,"Finance bypassed native queue");press(H::Action::confirm);GameActions::ProcessQueue(state);
         Check(park.bankLoan==loan+1000.00_GBP&&park.cash==cash+1000.00_GBP,"Finance native callback charged incorrectly/twice");
@@ -129,7 +135,13 @@ int main(int argc,char** argv)
         select("Park news...");press(H::Action::confirm);press(H::Action::back);Check(model().selectedTab==2&&model().selected==0,"News return lost Records");
         press(H::Action::nextOption);select("Park map...");press(H::Action::confirm);Check(W::HandheldParkMapIsOpen(),"Native park map unavailable");press(H::Action::back);Check(model().tabs.size()==3,"Map Back lost park workspace");
         // Current native project, stage normalization, all seven priority categories, draft-only funding shortcut.
-        open(5);Check(model().tabs.size()==2&&model().meters[2]==50,"Research native stage progress incorrect");capture("13-research-project.png");
+        open(5);Check(model().tabs.size()==2&&model().hero&&model().hero->meters.front().percent==50&&model().hero->states.size()==4,"Research native stage progress incorrect");capture("13-research-project.png");
+        {
+            // Funding is the hero's switch on the project tab: Left/Right changes it in place.
+            const auto before=state.researchFundingLevel;W::HandheldMenuMove(-static_cast<int>(model().selected));
+            W::HandheldDashboardMove(1,0);GameActions::ProcessQueue(state);Check(state.researchFundingLevel==before+1,"In-place funding step failed");
+            W::HandheldDashboardMove(-1,0);GameActions::ProcessQueue(state);Check(state.researchFundingLevel==before,"In-place funding did not reverse");
+        }
         const auto funding=state.researchFundingLevel,priorities=state.researchPriorities;press(H::Action::nextOption);
         Check(model().rows.size()==9&&model().rowEnabled.size()==9,"Research priority group missing");capture("14-research-settings.png");
         press(H::Action::contextPrimary);Check(state.researchFundingLevel==funding,"X funding applied without review");
@@ -159,10 +171,11 @@ int main(int argc,char** argv)
         if (model().selectedTab != 1)
             press(H::Action::nextOption);
         Check(model().headerStatus == "Current settings", "Discard left stale research draft");
-        press(H::Action::contextPrimary);select("Review settings...");press(H::Action::confirm);Check(model().rows.size()==2&&model().selected==1,"Research review not compact/Cancel-first");capture("16-research-review.png");
+        press(H::Action::contextPrimary);select("Review settings...");press(H::Action::confirm);Check(model().rows.size()==2&&model().selected==0,"Research review not compact/action-first");capture("16-research-review.png");
         press(H::Action::back);Check(model().headerStatus=="Unsaved draft"&&model().selectedTab==1,"Research review Back lost draft");
         select("Review settings...");
         press(H::Action::confirm);
+        W::HandheldMenuMove(1); // the review starts on Apply; move to Cancel
         press(H::Action::confirm);
         Check(model().headerStatus == "Unsaved draft", "Explicit review Cancel discarded research draft");
         select("Review settings...");press(H::Action::confirm);select("Apply settings");press(H::Action::confirm);GameActions::ProcessQueue(state);
@@ -199,7 +212,7 @@ int main(int argc,char** argv)
         press(H::Action::nextOption);
         Check(state.researchFundingLevel == 2, "Research cycle fixture did not restore normal funding");
         const auto beforeResearch=park.cash;FinancePayResearch();Check(park.cash==beforeResearch-kResearchCosts[2]/4,"Native recurring research charge changed");
-        press(H::Action::previousOption);select("Invention catalog...");press(H::Action::confirm);capture("17-research-catalog.png");press(H::Action::back);Check(model().selectedTab==0&&model().selected==1,"Catalog return lost focus");
+        press(H::Action::previousOption);select("Invention catalog...");press(H::Action::confirm);capture("17-research-catalog.png");press(H::Action::back);Check(model().selectedTab==0&&model().selected==2,"Catalog return lost focus");
         // Campaign selection is now at the workspace root; target and duration adjust inline, full target browsing remains.
         open(6);Check(model().tabs.size()==2,"Marketing tabs absent");capture("18-marketing-empty.png");press(H::Action::nextOption);
         // Start a different native campaign first, so the next queued success must restore a nonzero active row.
@@ -210,7 +223,7 @@ int main(int argc,char** argv)
         Check(model().rows[0].find("Carousel")!=std::string::npos,"Inline target change failed");const auto selectedTarget=model().rows[0];capture("20-campaign-editor.png");
         press(H::Action::confirm);W::HandheldMenuMove(12);capture("21-campaign-targets.png");press(H::Action::back);Check(model().rows[0]==selectedTarget,"Target browsing Cancel changed draft");
         W::HandheldMenuMove(1);nav(1,0);Check(model().rows[1].find("3 weeks")!=std::string::npos,"Inline duration failed");
-        select("Review campaign...");press(H::Action::confirm);Check(model().confirmation&&model().selected==1,"Campaign confirmation not safe");capture("22-campaign-review.png");
+        select("Review campaign...");press(H::Action::confirm);Check(model().confirmation&&model().selected==0,"Campaign review does not start on Start campaign");capture("22-campaign-review.png");
         const auto marketingCash=park.cash;press(H::Action::back);Check(model().rows[1].find("3 weeks")!=std::string::npos,"Review Back lost duration");
         select("Review campaign...");press(H::Action::confirm);select("Start campaign");press(H::Action::confirm);GameActions::ProcessQueue(state);
         Check(MarketingGetCampaign(ADVERTISING_CAMPAIGN_RIDE)&&park.cash==marketingCash-AdvertisingCampaignPricePerWeek[ADVERTISING_CAMPAIGN_RIDE]*3,"Native campaign accounting/duration changed");

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "RideManagement.h"
+#include "RideFollow.h"
 
 #include "../interface/Dropdown.h"
 #include "CustomTracks.h"
@@ -1028,6 +1029,10 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.rows.insert(model.rows.begin() + (FlatRides::CanResume(*target) ? 1 : 0), "Entrances / exits...");
                 model.rows.push_back("Access / paths...");
             }
+            // Ride along sits beside Locate; the dispatcher takes it out by name before
+            // resolving the remaining rows by position.
+            if (RideFollow::Available(target->id))
+                model.rows.insert(model.rows.begin() + 1, "Ride along");
             if (CustomTracks::CanResume(*target))
                 model.rows.push_back("Continue track...");
             if (Mazes::CanResume(*target))
@@ -1246,7 +1251,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             if (draft->demolition)
             {
                 model.breadcrumb = "Rides / Demolish permanently";
-                model.stats.emplace_back("Removal", "Ride, track, entrances/exits");
+                model.stats.emplace_back("Removes", "Ride, track and exits");
                 model.stats.emplace_back(
                     "Refund",
                     draft->noMoney                                 ? "Not applicable"

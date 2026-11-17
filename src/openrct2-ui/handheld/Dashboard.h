@@ -66,7 +66,7 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         const auto index = static_cast<size_t>(section);
         model.title = index < kCategories.size() ? kCategories[index].name : "Unavailable";
         model.stats = { { "Availability", "Not implemented" } };
-        model.status = "Choose an available section";
+        model.status.clear();
         return model;
     }
     // Small semantic fallbacks also work without the original RCT2 tab sprites.
@@ -96,6 +96,8 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
     }
     inline std::vector<ControlHint> Hints(const State& state, const ManagementPresentation& model, bool sectionRoot)
     {
+        if (model.keyboard && state.focus == Focus::content)
+            return KeyboardHints();
         std::vector<ControlHint> hints{ { "D-pad",
                                           state.focus == Focus::rail         ? "Navigate"
                                               : model.navigationHint.empty() ? model.editing ? "Adjust" : "Choose"
@@ -145,28 +147,35 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         DrawSurface(rt, rail, { railWidth, height });
         DrawStrongText(rt, rail + ScreenCoordsXY{ 10, 14 }, "{WHITE}Your park", railWidth - 20);
         Rule(rt, rail + ScreenCoordsXY{ 10, 42 }, railWidth - 20);
+        // 40 px rows on the Brick; shorter canvases (16:9 panels) tighten the pitch so all
+        // sections stay on screen.
+        const int pitch = std::clamp((height - 56) / static_cast<int>(kCategories.size()), 30, 40);
         for (size_t i = 0; i < kCategories.size(); ++i)
         {
             const auto& category = kCategories[i];
-            const int y = 52 + static_cast<int>(i) * 40;
+            const int y = 52 + static_cast<int>(i) * pitch;
             const bool active = i == state.index();
             const bool focused = active && state.focus == Focus::rail;
             if (focused)
-                Fill(rt, rail + ScreenCoordsXY{ 6, y }, { railWidth - 12, 36 }, Theme::gold);
+            {
+                Fill(rt, rail + ScreenCoordsXY{ 6, y }, { railWidth - 12, pitch - 4 }, Theme::gold);
+                ReportSelected(rt, rail + ScreenCoordsXY{ 6, y }, { railWidth - 12, pitch - 4 });
+            }
             else if (active)
             {
                 for (int x = 6; x <= 8; ++x)
                     GfxDrawLine(
-                        rt, { rail + ScreenCoordsXY{ x, y + 3 }, rail + ScreenCoordsXY{ x, y + 31 } },
+                        rt, { rail + ScreenCoordsXY{ x, y + 3 }, rail + ScreenCoordsXY{ x, y + pitch - 9 } },
                         static_cast<Drawing::PaletteIndex>(PocketPalette::selection));
             }
             static constexpr std::array sprites{SPR_TAB_PARK_ENTRANCE, SPR_TAB_RIDE_0, SPR_TAB_GUESTS_0,
                 SPR_TAB_STAFF_OPTIONS_0, SPR_TAB_FINANCES_SUMMARY_0, SPR_TAB_FINANCES_RESEARCH_0, SPR_TAB_FINANCES_MARKETING_0};
             static constexpr std::array<uint8_t, 7> frames{ 1, 16, 8, 7, 8, 8, 19 };
-            if (!DrawNativeMenuArt(rt, rail + ScreenCoordsXY{ 7, y + 2 }, { 28, 32 }, { sprites[i], frames[i] }, focused))
-                DrawCategoryMark(rt, rail + ScreenCoordsXY{12, y + 7}, i, focused);
+            const int inset = (pitch - 40) / 2;
+            if (!DrawNativeMenuArt(rt, rail + ScreenCoordsXY{ 7, y + 2 + inset }, { 28, 32 }, { sprites[i], frames[i] }, focused))
+                DrawCategoryMark(rt, rail + ScreenCoordsXY{12, y + 7 + inset}, i, focused);
             DrawModernEllipsised(
-                rt, rail + ScreenCoordsXY{ 39, y + 13 }, railWidth - 45,
+                rt, rail + ScreenCoordsXY{ 39, y + 13 + inset }, railWidth - 45,
                 std::string(
                     focused                  ? "{BLACK}"
                         : active             ? "{GOLD}"
@@ -179,7 +188,33 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
                     std::string(focused ? "{BLACK}" : "{MUTED}") + "Unavailable");
         }
         }
-        const auto workspace = model.confirmation ? ScreenCoordsXY{(screen.width-360)/2, Layout::margin+20} : expanded ? rail : content;
+        // Inside a section the rail stays on screen, collapsed to its icons, so the frame never jumps
+        // and you can always see which section you are in.
+        constexpr int compactRail = 40;
+        if (expanded)
+        {
+            DrawSurface(rt, rail, { compactRail, height });
+            const int pitch = std::clamp((height - 16) / static_cast<int>(kCategories.size()), 30, 44);
+            static constexpr std::array sprites{SPR_TAB_PARK_ENTRANCE, SPR_TAB_RIDE_0, SPR_TAB_GUESTS_0,
+                SPR_TAB_STAFF_OPTIONS_0, SPR_TAB_FINANCES_SUMMARY_0, SPR_TAB_FINANCES_RESEARCH_0, SPR_TAB_FINANCES_MARKETING_0};
+            static constexpr std::array<uint8_t, 7> frames{ 1, 16, 8, 7, 8, 8, 19 };
+            for (size_t i = 0; i < kCategories.size(); ++i)
+            {
+                const int y = 8 + static_cast<int>(i) * pitch;
+                const bool active = i == state.index();
+                if (active)
+                {
+                    // The section colour as a ring around a light tile: the icon keeps its contrast
+                    // even when it shares the section's colour (the gold coin on Finances).
+                    FillRound(rt, rail + ScreenCoordsXY{ 4, y }, { compactRail - 8, pitch - 4 }, Theme::gold);
+                    FillRound(rt, rail + ScreenCoordsXY{ 6, y + 2 }, { compactRail - 12, pitch - 8 }, Theme::raised);
+                }
+                if (!DrawNativeMenuArt(rt, rail + ScreenCoordsXY{ 6, y + (pitch - 4 - 30) / 2 }, { 28, 30 }, { sprites[i], frames[i] }, active))
+                    DrawCategoryMark(rt, rail + ScreenCoordsXY{ 11, y + 6 }, i, active);
+            }
+        }
+        const auto inner = rail + ScreenCoordsXY{ compactRail + Layout::gutter, 0 };
+        const auto workspace = model.confirmation ? ScreenCoordsXY{(screen.width-360)/2, Layout::margin+20} : expanded ? inner : content;
         DrawManagementContent(
             rt, workspace, {model.confirmation ? 360 : screen.width - workspace.x - Layout::margin,
                 model.confirmation ? height-20 : height}, model, state.focus == Focus::content);

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
+#include "PixelFont.h"
+#include <cmath>
 #include "PocketPalette.h"
 #include "PocketSansData.h"
 #include "PocketSansStrongData.h"
@@ -11,9 +13,12 @@
 #include <openrct2/drawing/Drawing.Sprite.h>
 #include <openrct2/drawing/G1Element.h>
 #include <openrct2/drawing/Palette.h>
+#include <openrct2/drawing/Drawing.h>
 #include <openrct2/drawing/RenderTarget.h>
 #include <openrct2/drawing/Text.h>
+#include <optional>
 #include <string>
+#include <vector>
 #include <string_view>
 #include <utility>
 
@@ -38,8 +43,8 @@ namespace OpenRCT2::Ui::Handheld
             bool ready{};
             std::array<Drawing::PaletteIndex, 16> colours{};
         };
-        static std::array<std::array<std::array<Ramp, 256>, 8>, 2> ramps;
-        auto& ramp = ramps[PocketPalette::style == PocketPalette::Style::daylight ? 1 : 0][static_cast<size_t>(ink)][static_cast<uint8_t>(background)];
+        static std::array<std::array<std::array<Ramp, 256>, 8>, 3> ramps;
+        auto& ramp = ramps[static_cast<size_t>(PocketPalette::style)][static_cast<size_t>(ink)][static_cast<uint8_t>(background)];
         if (!ramp.ready)
         {
             const auto* palette = GfxGetG1Palette(SPR_GAME_DEFAULT_PALETTE);
@@ -100,13 +105,93 @@ namespace OpenRCT2::Ui::Handheld
         return text;
     }
 
+    // Glyph index for a code point: 0-94 printable ASCII, then the extra glyphs (currency etc.).
+    inline int GlyphIndex(char32_t code)
+    {
+        if (code >= 32 && code < 127)
+            return static_cast<int>(code - 32);
+        for (size_t i = 0; i < PocketSans::kExtraCodes.size(); ++i)
+            if (PocketSans::kExtraCodes[i] == code)
+                return 95 + static_cast<int>(i);
+        return -1;
+    }
+    // Decodes UTF-8 into glyph indices; empty optional if any character has no Pocket glyph.
+    inline std::optional<std::vector<int>> Glyphs(const std::string& text)
+    {
+        std::vector<int> glyphs;
+        glyphs.reserve(text.size());
+        for (size_t i = 0; i < text.size();)
+        {
+            const auto lead = static_cast<unsigned char>(text[i]);
+            const int length = lead < 0x80 ? 1 : (lead >> 5) == 0x6 ? 2 : (lead >> 4) == 0xE ? 3 : (lead >> 3) == 0x1E ? 4 : 0;
+            if (length == 0 || i + length > text.size())
+                return std::nullopt;
+            char32_t code = length == 1 ? lead : lead & (0x7F >> length);
+            for (int k = 1; k < length; ++k)
+                code = (code << 6) | (static_cast<unsigned char>(text[i + k]) & 0x3F);
+            const int index = GlyphIndex(code);
+            if (index < 0)
+                return std::nullopt;
+            glyphs.push_back(index);
+            i += length;
+        }
+        return glyphs;
+    }
+    inline int GlyphAdvance(int index, bool strong, bool heading)
+    {
+        if (index < 95)
+            return heading ? PocketSansHeading::kAdvance[index] : strong ? PocketSansStrong::kAdvance[index] : PocketSans::kAdvance[index];
+        const auto extra = static_cast<size_t>(index - 95);
+        return heading ? PocketSansHeading::kExtraAdvance[extra] : strong ? PocketSansStrong::kExtraAdvance[extra] : PocketSans::kExtraAdvance[extra];
+    }
+    inline const char* GlyphCoverage(int index, bool strong, bool heading)
+    {
+        if (index < 95)
+            return heading ? PocketSansHeading::kCoverage[index] : strong ? PocketSansStrong::kCoverage[index] : PocketSans::kCoverage[index];
+        const auto extra = static_cast<size_t>(index - 95);
+        return heading ? PocketSansHeading::kExtraCoverage[extra] : strong ? PocketSansStrong::kExtraCoverage[extra] : PocketSans::kExtraCoverage[extra];
+    }
+    // Removes the last whole UTF-8 character.
+    inline void PopCharacter(std::string& text)
+    {
+        while (!text.empty() && (static_cast<unsigned char>(text.back()) & 0xC0) == 0x80)
+            text.pop_back();
+        if (!text.empty())
+            text.pop_back();
+    }
+
+    // Solid ink for the Pixel theme's bitmap font (no anti-aliasing to blend).
+    inline Drawing::PaletteIndex InkColour(Ink ink)
+    {
+        return static_cast<Drawing::PaletteIndex>(
+            ink == Ink::caution           ? PocketPalette::caution
+                : ink == Ink::destructive ? PocketPalette::destructive
+                : ink == Ink::disabled    ? PocketPalette::disabled
+                : ink == Ink::positive    ? PocketPalette::positive
+                : ink == Ink::muted       ? PocketPalette::secondary
+                : ink == Ink::dark        ? PocketPalette::dark
+                : ink == Ink::gold        ? PocketPalette::accent
+                                          : PocketPalette::primary);
+    }
+    inline PixelFont::Style PixelStyle(bool strong, bool heading)
+    {
+        return strong || heading ? PixelFont::Style::bold : PixelFont::Style::regular;
+    }
     inline int TextWidth(const std::string& rawText, bool strong = false, bool heading = false)
     {
         const auto text = PlainPunctuation(rawText);
+        if (PocketPalette::Pixel())
+            return PixelFont::Width(text, PixelStyle(strong, heading), heading ? 2 : 1);
         int width = 0;
+        if (const auto glyphs = Glyphs(text))
+        {
+            for (const int index : *glyphs)
+                width += GlyphAdvance(index, strong, heading);
+            return width;
+        }
         for (const unsigned char c : text)
             if (c >= 32 && c < 127)
-                width += heading ? PocketSansHeading::kAdvance[c - 32] : strong ? PocketSansStrong::kAdvance[c - 32] : PocketSans::kAdvance[c - 32];
+                width += GlyphAdvance(c - 32, strong, heading);
         return width;
     }
 
@@ -132,15 +217,35 @@ namespace OpenRCT2::Ui::Handheld
                 break;
             }
         text = PlainPunctuation(std::move(text));
-        // Localised names and native error formatting keep the complete engine fallback.
-        if (std::any_of(text.begin(), text.end(), [](unsigned char c) { return c < 32 || c >= 127 || c == '{'; }))
+        if (PocketPalette::Pixel() && text.find('{') == std::string::npos)
+        {
+            const auto style = PixelStyle(strong, heading);
+            const int scale = heading ? 2 : 1;
+            if (maxWidth > 0 && PixelFont::Width(text, style, scale) > maxWidth)
+            {
+                while (!text.empty() && PixelFont::Width(text + "...", style, scale) > maxWidth)
+                    PopCharacter(text);
+                text += "...";
+            }
+            const int width = PixelFont::Width(text, style, scale);
+            if (paint.alignment == TextAlignment::centre)
+                pos.x -= width / 2;
+            else if (paint.alignment == TextAlignment::right)
+                pos.x -= width;
+            // Pocket Sans boxes put the cap line a few pixels down; match it so layouts line up.
+            PixelFont::Draw(rt, pos + ScreenCoordsXY{ 0, heading || strong ? 1 : 2 }, text, style, InkColour(ink), scale);
+            return;
+        }
+        // Localised names and native error formatting keep the complete engine fallback; currency
+        // symbols and the other extra glyphs stay in Pocket Sans.
+        if (text.find('{') != std::string::npos || !Glyphs(text))
         {
             // Localised currency and names use native glyphs too. Match the
             // light theme's ink polarity instead of forcing white on ivory.
-            const char* nativeInk = PocketPalette::style == PocketPalette::Style::daylight
+            const char* nativeInk = PocketPalette::style != PocketPalette::Style::slate
                 ? (ink == Ink::dark ? "{WHITE}" : ink == Ink::destructive ? "{RED}"
                     : "{BLACK}")
-                : (ink == Ink::dark ? "{BLACK}" : ink == Ink::gold ? "{YELLOW}" : "{WHITE}");
+                : (ink == Ink::gold ? "{YELLOW}" : "{WHITE}");
             text = nativeInk + text;
             if (maxWidth > 0)
                 drawTextEllipsised(rt, pos, maxWidth, text, paint);
@@ -151,7 +256,7 @@ namespace OpenRCT2::Ui::Handheld
         if (maxWidth > 0 && TextWidth(text, strong, heading) > maxWidth)
         {
             while (!text.empty() && TextWidth(text + "...", strong, heading) > maxWidth)
-                text.pop_back();
+                PopCharacter(text);
             text += "...";
         }
         const int width = TextWidth(text, strong, heading);
@@ -159,9 +264,9 @@ namespace OpenRCT2::Ui::Handheld
             pos.x -= width / 2;
         else if (paint.alignment == TextAlignment::right)
             pos.x -= width;
-        for (const unsigned char c : text)
+        for (const int index : Glyphs(text).value_or(std::vector<int>{}))
         {
-            const auto glyph = heading ? PocketSansHeading::kCoverage[c - 32] : strong ? PocketSansStrong::kCoverage[c - 32] : PocketSans::kCoverage[c - 32];
+            const auto glyph = GlyphCoverage(index, strong, heading);
             const auto glyphWidth = heading ? PocketSansHeading::kWidth : strong ? PocketSansStrong::kWidth : PocketSans::kWidth;
             const auto glyphHeight = heading ? PocketSansHeading::kHeight : PocketSans::kHeight;
             for (int y = 0; y < glyphHeight; ++y)
@@ -177,7 +282,7 @@ namespace OpenRCT2::Ui::Handheld
                     auto& pixel = rt.bits[(py - rt.y) * rt.LineStride() + px - rt.x];
                     pixel = BlendGlyph(ink, pixel, coverage);
                 }
-            pos.x += heading ? PocketSansHeading::kAdvance[c - 32] : strong ? PocketSansStrong::kAdvance[c - 32] : PocketSans::kAdvance[c - 32];
+            pos.x += GlyphAdvance(index, strong, heading);
         }
     }
 
@@ -197,33 +302,106 @@ namespace OpenRCT2::Ui::Handheld
         DrawModernText(rt, pos, text, paint, width);
     }
 
-    // Button labels centre the visible ink, rather than the font advance/baseline.
-    inline void DrawButtonLabel(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, const std::string& text)
+    // Console-style marquee for a focused label that does not fit: pauses, scrolls to the end,
+    // pauses, and repeats. Falls back to an ellipsis for text the Pocket fonts cannot draw.
+    // The caller's redraw cadence (the menu pointer's idle tick) drives the motion.
+    inline void DrawMarquee(
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, int width, const std::string& ink, const std::string& text, uint64_t now,
+        bool strong = false)
     {
-        int left = 10000, top = 10000, right = -1, bottom = -1, advance = 0;
-        for (const unsigned char c : text)
+        const int overflow = TextWidth(text, strong) - width;
+        if (overflow <= 0 || !Glyphs(PlainPunctuation(text)))
         {
-            if (c < 32 || c >= 127)
-                return;
-            const auto glyph = PocketSans::kCoverage[c - 32];
-            for (int y = 0; y < PocketSans::kHeight; ++y)
-                for (int x = 0; x < PocketSans::kWidth; ++x)
-                    if (glyph[y * PocketSans::kWidth + x] != '0')
+            DrawModernText(rt, pos, ink + text, {}, width, strong);
+            return;
+        }
+        constexpr int kPauseMs = 900, kPixelMs = 28;
+        const int travel = overflow * kPixelMs;
+        const int cycle = 2 * kPauseMs + travel;
+        const int phase = static_cast<int>(now % static_cast<uint64_t>(cycle));
+        const int shift = phase < kPauseMs ? 0 : phase < kPauseMs + travel ? (phase - kPauseMs) / kPixelMs : overflow;
+        Drawing::RenderTarget clip;
+        if (ClipRenderTarget(clip, rt, pos - ScreenCoordsXY{ 0, 3 }, width, 18))
+            DrawModernText(clip, { -shift, 3 }, ink + text, {}, 0, strong);
+    }
+
+    // Button labels centre the visible ink, rather than the font advance/baseline.
+    // Pocket Sans capitals sit on rows 0-8 below a text position (heading caps on rows 2-13). These
+    // return the y offset that centres capitals in a box of the given height, so labels are
+    // optically centred instead of riding low.
+    inline int CapCentre(int height)
+    {
+        return (height - 9 + 1) / 2;
+    }
+    inline int HeadingCapCentre(int height)
+    {
+        return (height - 12 + 1) / 2 - 2;
+    }
+    // onAccent: light ink for a filled badge or key; otherwise the normal text ink (keycaps).
+    // sharedBaseline: centre across by optical weight but sit every label on the same baseline,
+    // so a row of keys reads as a line of text ('q' and 'e' level, not each centred on its ink).
+    inline void DrawButtonLabel(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, const std::string& text,
+        bool onAccent = true, bool sharedBaseline = false)
+    {
+        if (PocketPalette::Pixel())
+        {
+            // Bold when it fits; shoulder labels like "L1/R1" drop to the regular weight.
+            const auto style = PixelFont::Width(text, PixelFont::Style::bold) <= size.width - 2 ? PixelFont::Style::bold
+                                                                                               : PixelFont::Style::regular;
+            // The bold advance includes a trailing spacing column; centre the inked part.
+            const int width = PixelFont::Width(text, style) - (style == PixelFont::Style::bold ? 1 : 0);
+            PixelFont::Draw(rt, pos + ScreenCoordsXY{ (size.width - width + 1) / 2, (size.height - 8) / 2 }, text, style,
+                InkColour(onAccent ? Ink::dark : Ink::light));
+            return;
+        }
+        // Centre by optical weight, not by the advance box: the coverage-weighted centre of the
+        // inked pixels lands on the badge's centre pixel. Advance boxes carry side bearings, so
+        // box centring left single letters like A or Y sitting a pixel left of centre. Bold
+        // glyphs read better at this size; long labels drop to regular so they still fit.
+        auto measure = [&](bool strong, double& cx, double& cy, int& inkWidth) {
+            const int glyphWidth = strong ? PocketSansStrong::kWidth : PocketSans::kWidth;
+            double sum = 0, sx = 0, sy = 0;
+            int left = 10000, right = -1, advance = 0;
+            for (const unsigned char c : text)
+            {
+                if (c < 32 || c >= 127)
+                    return false;
+                const auto glyph = GlyphCoverage(c - 32, strong, false);
+                for (int y = 0; y < PocketSans::kHeight; ++y)
+                    for (int x = 0; x < glyphWidth; ++x)
                     {
+                        const char value = glyph[y * glyphWidth + x];
+                        const int w = value <= '9' ? value - '0' : value - 'a' + 10;
+                        if (!w)
+                            continue;
+                        sum += w;
+                        sx += w * (advance + x);
+                        sy += w * y;
                         left = std::min(left, advance + x);
                         right = std::max(right, advance + x);
-                        top = std::min(top, y);
-                        bottom = std::max(bottom, y);
                     }
-            advance += PocketSans::kAdvance[c - 32];
-        }
-        if (right < left)
+                advance += GlyphAdvance(c - 32, strong, false);
+            }
+            if (sum <= 0)
+                return false;
+            cx = sx / sum;
+            cy = sy / sum;
+            inkWidth = right - left + 1;
+            return true;
+        };
+        double cx = 0, cy = 0;
+        int inkWidth = 0;
+        bool strong = measure(true, cx, cy, inkWidth) && inkWidth <= size.width - 2;
+        if (!strong && !measure(false, cx, cy, inkWidth))
             return;
-        DrawModernText(
-            rt,
-            pos
-                + ScreenCoordsXY{ (size.width - (right - left + 1)) / 2 - left,
-                                  (size.height - (bottom - top + 1)) / 2 - top + 3 },
-            "{BLACK}" + text);
+        const double targetX = (size.width - 1) / 2.0, targetY = (size.height - 1) / 2.0;
+        const ScreenCoordsXY at = pos
+            + ScreenCoordsXY{ static_cast<int>(std::lround(targetX - cx)),
+                              sharedBaseline ? CapCentre(size.height) : static_cast<int>(std::lround(targetY - cy)) + 3 };
+        const std::string ink = onAccent ? "{BLACK}" : "{WHITE}";
+        if (strong)
+            DrawStrongText(rt, at, ink + text);
+        else
+            DrawModernText(rt, at, ink + text);
     }
 } // namespace OpenRCT2::Ui::Handheld

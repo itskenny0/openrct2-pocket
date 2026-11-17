@@ -107,18 +107,25 @@ namespace OpenRCT2::Ui::Handheld::Finances
         model.editing = view == View::editor;
         model.contentSized=true;
         model.confirmation = view == View::confirmation;
-        model.stats = { { "Current", FormatMoney(draft->baseline) },
-                        { "New value", FormatMoney(draft->value) } };
-        if (model.editing)
-            model.highlightedStat = 1;
+        // Show what the decision changes, not every related number: the value itself (with the
+        // loan against its limit), what it does to cash, and the ongoing cost.
         if (loan)
         {
             const auto change = draft->value - draft->baseline;
-            model.stats.push_back({ "Cash change", FormatMoney(change) });
-            model.stats.push_back(
-                { "Cash after", FormatMoney(park.cash == kMoney64Undefined ? kMoney64Undefined : park.cash + change) });
-            model.stats.push_back({ "Loan limit", FormatMoney(park.maxBankLoan) });
-            model.stats.push_back({ "Interest", std::to_string(park.bankLoanInterestRate) + "%" });
+            const int meter = park.maxBankLoan > 0 ? static_cast<int>(draft->value * 100 / park.maxBankLoan) : -1;
+            model.changes.push_back({ "Loan, limit " + FormatMoney(park.maxBankLoan), FormatMoney(draft->baseline),
+                                      FormatMoney(draft->value), "{WHITE}", meter });
+            if (park.cash != kMoney64Undefined)
+                model.changes.push_back({ "Cash", FormatMoney(park.cash), FormatMoney(park.cash + change),
+                                          change > 0 ? "{POSITIVE}" : change < 0 ? "{DANGER}" : "{WHITE}" });
+            model.changes.push_back({ "Interest", "", std::to_string(park.bankLoanInterestRate) + "% a year" });
+        }
+        else
+            model.changes.push_back({ "Admission", FormatMoney(draft->baseline), FormatMoney(draft->value) });
+        if (model.editing)
+        {
+            model.highlightedChange = 0;
+            model.primaryRow = 0;
         }
         model.rows = model.editing
             ? std::vector<std::string>{ loan ? "Review loan change" : "Apply price", "Cancel" }

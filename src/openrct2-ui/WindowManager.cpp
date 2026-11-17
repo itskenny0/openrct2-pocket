@@ -896,7 +896,8 @@ public:
         auto screenWidth = uiContext.GetWidth();
         auto screenHeight = uiContext.GetHeight();
         return ScreenCoordsXY{ (screenWidth - size.width) / 2,
-                               std::max(kTopToolbarHeight + 1, (screenHeight - size.height) / 2) };
+                               // Handheld hides the desktop toolbar, so centre in the full height.
+                               std::max(Handheld::IsEnabled() ? 0 : kTopToolbarHeight + 1, (screenHeight - size.height) / 2) };
     }
 
     WindowBase* Create(

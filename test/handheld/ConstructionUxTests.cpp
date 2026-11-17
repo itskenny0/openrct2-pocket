@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include <SDL.h>
 #include <openrct2/Input.h>
+#include <openrct2-ui/handheld/Landscape.h>
 #include <openrct2-ui/handheld/ControllerInput.h>
 #include "RideTabNavigation.h"
 #include <openrct2-ui/handheld/RideTabs.h>
@@ -39,6 +40,7 @@
 using namespace OpenRCT2;
 namespace H=Ui::Handheld;namespace W=Ui::Windows;
 static void Check(bool b,const char* s){if(!b)throw std::runtime_error(s);}
+static void Check(bool b,const std::string& s){if(!b)throw std::runtime_error(s);}
 #include <fstream>
 #include <openrct2-ui/handheld/ConstructionPanel.h>
 #include <openrct2-ui/handheld/Dashboard.h>
@@ -177,9 +179,40 @@ int main(int argc,char** argv) { try {
  Check(H::AreaTools::Action(CoordsXY{960,960},H::AreaTools::settings,true).error==GameActions::Status::ok,"Native brush action failed");GameActions::ProcessQueue(getGameState());
  Check(getGameState().park.cash==navigationCash-terrainQuote.cost&&MapGetSurfaceElementAt(CoordsXY{960,960})->getBaseZ()>terrainBefore,"Native terrain/cost not preserved");
  press(H::Action::back);Check(!wm->FindByClass(WindowClass::handheldMenu),"Build Back opened an unexpected menu");
- H::BeginWater(true);press(H::Action::slopeDown);press(H::Action::contextSecondary);
- Check(H::AreaTools::settings.operation==H::AreaTools::Operation::waterLower,"Quick water trigger/promotion lost current operation");
- press(H::Action::back);H::EndTerrain();
+ {
+  // Quick landscaping: shapes named by intent, Y cycles them, L2/R2 sizes the brush, and each
+  // shape is exact native terraforming (cost and heights checked against the map).
+  namespace L=H::Landscape;
+  H::BeginWater(true);Check(L::shape==L::Shape::pond,"Water entry is not the pond tool");
+  L::brush=1;press(H::Action::slopeUp);Check(L::brush==3,"R2 did not grow the brush");
+  press(H::Action::slopeUp);press(H::Action::slopeUp);Check(L::brush==5,"Brush grew past 5");
+  press(H::Action::slopeDown);Check(L::brush==3,"L2 did not shrink the brush");
+  press(H::Action::contextSecondary);Check(L::shape==L::Shape::flatten,"Y did not cycle to Flatten");
+  press(H::Action::contextSecondary);press(H::Action::contextSecondary);Check(L::shape==L::Shape::dig,"Y did not wrap through the shapes");
+  press(H::Action::contextSecondary);Check(L::shape==L::Shape::pond,"Shape cycle order changed");
+  const CoordsXY pond{1600,1600};
+  const auto groundBefore=MapGetSurfaceElementAt(pond)->getBaseZ();
+  const auto cashBefore=getGameState().park.cash;
+  const auto quote=L::Action(pond,false);Check(quote.error==GameActions::Status::ok,"Pond query failed");
+  const auto dug=L::Action(pond,true);GameActions::ProcessQueue(getGameState());GameActions::ProcessQueue(getGameState());
+  Check(dug.error==GameActions::Status::ok,"Pond dig failed");
+  for(int dy=-1;dy<=1;++dy)for(int dx=-1;dx<=1;++dx){const auto* t=MapGetSurfaceElementAt(pond+CoordsXY{dx*32,dy*32});
+   Check(t->getBaseZ()<groundBefore&&t->getWaterHeight()==groundBefore,"Pond tile not dug and filled to the bank: before "+std::to_string(groundBefore)+" base "+std::to_string(t->getBaseZ())+" water "+std::to_string(t->getWaterHeight())+" slope "+std::to_string(t->getSlope()));}
+  Check(getGameState().park.cash<cashBefore,"Pond was free");
+  {auto* m=WindowGetMain();auto& v=*m->viewport;v.viewPos=Translate3DTo2DWithZ(v.rotation,CoordsXYZ{1700,1616,groundBefore})-ScreenCoordsXY{v.zoom.ApplyTo(v.width/2),v.zoom.ApplyTo(v.height/2)};m->invalidate();}
+  H::UpdateExplorer(input);capture("10a-landscape-pond.ppm",true);
+  L::shape=L::Shape::hill;const CoordsXY hill{1760,1600};const auto hillBefore=MapGetSurfaceElementAt(hill)->getBaseZ();
+  Check(L::Action(hill,true).error==GameActions::Status::ok,"Hill failed");GameActions::ProcessQueue(getGameState());
+  Check(MapGetSurfaceElementAt(hill)->getBaseZ()>hillBefore,"Hill did not raise the middle");
+  H::UpdateExplorer(input);capture("10b-landscape-hill.ppm",true);
+  L::shape=L::Shape::flatten;L::brush=5; // a 3x3 hill is a flat top with slopes around it; 5x5 takes in the slopes
+  {const auto r=L::Action(hill,true);Check(r.error==GameActions::Status::ok,"Flatten failed: "+r.getErrorMessage()+" / "+r.getErrorTitle());}GameActions::ProcessQueue(getGameState());int steps=1;
+  bool flat=true;for(int dy=-2;dy<=2;++dy)for(int dx=-2;dx<=2;++dx){const auto* t=MapGetSurfaceElementAt(hill+CoordsXY{dx*32,dy*32});flat&=t->getSlope()==0&&t->getBaseZ()==MapGetSurfaceElementAt(hill)->getBaseZ();}
+  Check(steps>0&&flat,"Flatten did not level the brush");
+  Check(std::string(L::Action(hill,false).getErrorMessage()).find("flat")!=std::string::npos,"Flat ground not reported");
+  H::UpdateExplorer(input);capture("10c-landscape-flatten.ppm",true);
+  L::brush=1;press(H::Action::back);H::EndTerrain();
+ }
  H::BeginSurface();press(H::Action::openBuild);
  Check(W::HandheldObjectPickerIsOpen(),"Quick surface Select did not reach material picker");press(H::Action::back);WindowCullDead();H::EndTerrain();
  // A real mapped controller must release Y before another transition is armed.

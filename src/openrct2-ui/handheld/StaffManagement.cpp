@@ -127,7 +127,13 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         model.columns = review ? 1 : TextEntry::columns;
         model.confirmation = review;
         model.primaryAction = review ? "Confirm" : "Type";
-        model.status = status.empty() ? std::to_string(entry.Length()) + " / 32 characters" : status;
+        model.status = status;
+        if (!review)
+        {
+            model.keyboard = entry;
+            model.keyboardHeading = "Rename employee";
+            model.title = "Default name";
+        }
         return model;
     }
     std::optional<Target> Identify(EntityId id)
@@ -243,9 +249,9 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         };
         if (view == View::roster)
         {
-            model.rows = { "Hire employee...", "Filter role...", "Counts / wages..." };
+            model.rows = { "Hire staff...", "Filter role...", "Wages..." };
             model.rowDetails.resize(3);
-            model.toolbarCount=3;model.denseRoster=true;model.listLabel="EMPLOYEES / ROLE / CURRENT ACTIVITY";
+            model.toolbarCount=3;model.denseRoster=true;model.listLabel=std::to_string(roster.size())+(roster.size()==1?" EMPLOYEE":" EMPLOYEES")+" / ROLE / CURRENT ACTIVITY";
             const auto capacity=MeasureManagement({ContextGetWidth()-16,Layout::ContentHeight({ContextGetWidth(),ContextGetHeight()})},model).capacity;
             for (const auto& entry : roster)
             {

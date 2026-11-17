@@ -956,14 +956,7 @@ namespace OpenRCT2::Ui::Handheld::Paths
             : IsRemoving() ? "{WHITE}Remove path" : IsQueue() ? "{WHITE}Queue" : "{WHITE}Footpath",192);
         if (!IsConnected())
         {
-            static constexpr std::array names{"Single","Line","Fill"};
-            for (size_t i=0;i<names.size();++i)
-            {
-                const auto cell=p+ScreenCoordsXY{12+static_cast<int>(i)*65,36};
-                const bool selected=static_cast<size_t>(Mode())==i;
-                Fill(rt,cell,{61,24},selected ? Theme::gold : Theme::raised);
-                DrawModernText(rt,cell+ScreenCoordsXY{6,7},std::string(selected ? "{BLACK}" : "{MUTED}")+names[i]);
-            }
+            DrawSegmented(rt,p+ScreenCoordsXY{12,36},{192,24},{"Single","Line","Fill"},static_cast<size_t>(Mode()));
         }
         else DrawStrongText(rt,p+ScreenCoordsXY{12,42},"{WHITE}EXTEND",192);
         if (const auto current=PathSurfaces::Current())

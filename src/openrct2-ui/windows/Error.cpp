@@ -8,6 +8,8 @@
  *****************************************************************************/
 
 #include <algorithm>
+#include <openrct2-ui/handheld/ControllerInput.h>
+#include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
@@ -113,6 +115,13 @@ namespace OpenRCT2::Ui::Windows
         // Don't do unnecessary work in headless. Also saves checking if cursor state is null.
         if (gOpenRCT2Headless)
         {
+            return nullptr;
+        }
+
+        // Handheld errors appear as a Pocket toast that leaves the HUD and controls visible.
+        if (Handheld::IsEnabled())
+        {
+            Handheld::ShowToast(title, message);
             return nullptr;
         }
 

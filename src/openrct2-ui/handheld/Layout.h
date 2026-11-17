@@ -13,6 +13,18 @@ namespace OpenRCT2::Ui::Handheld::Layout
     inline constexpr ScreenCoordsXY menuOrigin{ margin, margin };
     inline constexpr ScreenCoordsXY toolOrigin{ margin, hudTop + hudHeight + gutter };
 
+    // The Pocket layouts are designed for a canvas of at least 480x360. Pick the largest whole
+    // pixel scale that keeps the canvas at least that big, so the pixel art stays sharp on any
+    // panel: 1024x768 -> 2x (512x384), 640x480 -> 1x, 1280x720 -> 2x (640x360),
+    // 1920x1080 -> 3x (640x360), 720x720 -> 1x.
+    inline constexpr int minCanvasWidth = 480, minCanvasHeight = 360;
+    constexpr int AutoScale(int physicalWidth, int physicalHeight)
+    {
+        return std::max(1, std::min(physicalWidth / minCanvasWidth, physicalHeight / minCanvasHeight));
+    }
+    static_assert(AutoScale(1024, 768) == 2 && AutoScale(640, 480) == 1 && AutoScale(1280, 720) == 2);
+    static_assert(AutoScale(1920, 1080) == 3 && AutoScale(720, 720) == 1 && AutoScale(320, 240) == 1);
+
     // Menus own their entire content area; HUD windows only exist in park contexts.
     enum class Context
     {
@@ -49,12 +61,15 @@ namespace OpenRCT2::Ui::Handheld::Layout
     }
     struct HudCells
     {
-        int width, cashEnd, dateEnd, guestsEnd;
+        int width, cashEnd, dateEnd, guestsEnd, clockEnd;
     };
-    constexpr HudCells HudLayout(ScreenSize screen)
+    constexpr HudCells HudLayout(ScreenSize screen, bool clock = false)
     {
         const int width = std::max(0, screen.width - 2 * margin);
         // Keep cash dominant; date/count are secondary. Last cell is always simulation state.
-        return { width, width * 38 / 100, width * 69 / 100, width * 89 / 100 };
+        // With the clock, each cell gives up a little so the time and battery fit before it.
+        if (clock)
+            return { width, width * 31 / 100, width * 55 / 100, width * 71 / 100, width * 89 / 100 };
+        return { width, width * 38 / 100, width * 69 / 100, width * 89 / 100, width * 89 / 100 };
     }
 } // namespace OpenRCT2::Ui::Handheld::Layout

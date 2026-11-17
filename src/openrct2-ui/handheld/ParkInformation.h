@@ -154,7 +154,7 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
             model.status = "No park news yet";
         }
         else
-            model.status = "A Details  B Overview";
+            model.status.clear();
 
         return model;
     }

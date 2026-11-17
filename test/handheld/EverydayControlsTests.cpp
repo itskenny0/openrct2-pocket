@@ -4,8 +4,10 @@
 #include <SDL.h>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <thread>
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/handheld/Explorer.h>
@@ -109,14 +111,18 @@ int main(int argc, char** argv)
         Check(W::HandheldOverviewIsOpen(), "Scenario start did not open the Pocket objectives page");
         wm->CloseByClass(WindowClass::progressWindow); WindowCullDead();
         WindowGetMain()->onResize(); InputSetState(InputState::normal);
+        // The very first scenario: the controls intro follows the goal, and B skips it.
+        Check(!H::preferences.primerSeen,"Fresh profile has already seen the intro");
         press(H::Action::back);
-        Check(!wm->FindByClass(WindowClass::handheldMenu), "B from scenario objectives did not return to the park");
+        Check(wm->FindByClass(WindowClass::handheldMenu)&&!H::preferences.primerSeen,"First scenario did not show the controls intro");
+        press(H::Action::back);
+        Check(!wm->FindByClass(WindowClass::handheldMenu)&&H::preferences.primerSeen, "B from scenario objectives did not return to the park");
         auto* viewport = WindowGetMain()->viewport;
         viewport->viewPos = Translate3DTo2DWithZ(viewport->rotation, {1504, 1504, 32}) - ScreenCoordsXY{256,192};
         WindowGetMain()->savedViewPos = viewport->viewPos;
         auto menu = [&] { return wm->FindByClass(WindowClass::handheldMenu); };
         auto noDesktop = [&] { Check(!wm->FindByClass(WindowClass::savePrompt), "Desktop quit prompt opened"); };
-        // Currency's non-ASCII symbol takes the native font fallback. It must
+        // Currency symbols draw in Pocket Sans (extra glyphs). Amounts must
         // remain readable on ivory cards and teal selections in the light theme.
         {
             Drawing::X8DrawingEngine engine(context->GetUiContext());engine.Resize(80,24);engine.BeginDraw();
@@ -142,7 +148,11 @@ int main(int argc, char** argv)
         press(H::Action::confirm);
         Check(H::PocketPalette::style!=originalTheme,"Theme action did not switch");
         capture("00b-slate-choice.png");
-        press(H::Action::confirm); // same focused row switches back
+        const auto secondTheme=H::PocketPalette::style;
+        press(H::Action::confirm); // same focused row moves on to the third theme
+        Check(H::PocketPalette::style!=originalTheme&&H::PocketPalette::style!=secondTheme,"Theme cycle skipped a theme");
+        capture("00b2-pixel-choice.png");
+        press(H::Action::confirm); // and back round to where it started
         Check(H::PocketPalette::style==originalTheme,"Theme focus or round trip lost");
         capture("00c-daylight-restored.png");
         H::MenuThemes::Settings reloaded;
@@ -150,6 +160,59 @@ int main(int argc, char** argv)
         Check(H::PocketPalette::style==originalTheme,"Theme preference did not survive reload");
         press(H::Action::back);
         Check(gGamePaused==0 && state.park.cash==themeCash,"Theme altered simulation or money");
+        {
+            // Settings: "More settings..." under Display opens the toggles; Smart cursor saves.
+            W::HandheldMenuOpen();nav(14);press(H::Action::confirm);
+            const bool before=H::preferences.smartCursor;
+            nav(2);press(H::Action::confirm);
+            Check(H::preferences.smartCursor!=before,"Smart cursor did not toggle");
+            capture("00c2-settings.png");
+            std::ifstream file(std::filesystem::path(context->GetPlatformEnvironment().GetDirectoryPath(DirBase::user))/"pocket-prefs.cfg");
+            std::string saved((std::istreambuf_iterator<char>(file)),std::istreambuf_iterator<char>());
+            Check(saved.find(std::string("smartCursor=")+(H::preferences.smartCursor?"1":"0"))!=std::string::npos,"Smart cursor was not saved");
+            press(H::Action::confirm);Check(H::preferences.smartCursor==before,"Smart cursor did not toggle back");
+            press(H::Action::back);press(H::Action::back);Check(!menu(),"Settings did not back out to the park");
+        }
+        {
+            // Controls: the guide has four sections, Y plays the intro from it, and finishing the
+            // intro returns to the guide and marks it seen.
+            W::HandheldMenuOpen();nav(7);press(H::Action::confirm);capture("00c3-controls-park.png");
+            for(const char* name:{"00c4-controls-build.png","00c5-controls-menus.png","00c6-controls-shortcuts.png"})
+            {button(SDL_CONTROLLER_BUTTON_DPAD_RIGHT);capture(name);}
+            H::preferences.primerSeen=false;
+            press(H::Action::contextSecondary);capture("00c7-intro-1.png");
+            for(int i=0;i<3;++i){press(H::Action::confirm);}
+            capture("00c8-intro-4.png");
+            press(H::Action::confirm);
+            Check(menu()&&H::preferences.primerSeen,"Finishing the intro did not return to the guide and mark it seen");
+            std::ifstream prefs(std::filesystem::path(context->GetPlatformEnvironment().GetDirectoryPath(DirBase::user))/"pocket-prefs.cfg");
+            std::string saved((std::istreambuf_iterator<char>(prefs)),std::istreambuf_iterator<char>());
+            Check(saved.find("primerSeen=1")!=std::string::npos,"Intro seen was not saved");
+            press(H::Action::back);press(H::Action::back);Check(!menu(),"Controls did not back out to the park");
+        }
+        {
+            // Quick wheel: hold L2, point with the D-pad, release (after the hold time) to choose.
+            // A quick tap keeps it open for A / B instead.
+            auto step=[&]{pump();H::HandleExplorerInput(input,input.update(true,now+=20));WindowCullDead();};
+            auto trigger=[&](bool down){SDL_JoystickSetVirtualAxis(joystick,SDL_CONTROLLER_AXIS_TRIGGERLEFT,down?32767:-32768);step();};
+            auto dpad=[&](SDL_GameControllerButton key,bool down){SDL_JoystickSetVirtualButton(joystick,key,down);step();};
+            trigger(false);step();
+            trigger(true);Check(H::QuickWheelOpen(),"L2 did not open the quick wheel");
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT,true);capture("00d-quick-wheel.png");
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_UP,true);dpad(SDL_CONTROLLER_BUTTON_DPAD_UP,false); // Leaving a diagonal keeps it.
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT,false);
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT,true);dpad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT,false); // Back to Rides.
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+            trigger(false);
+            Check(!H::QuickWheelOpen()&&W::HandheldRidesIsOpen(),"Releasing L2 did not open Rides");
+            capture("00e-wheel-rides.png");
+            wm->CloseByClass(WindowClass::handheldMenu);step();step();
+            trigger(true);trigger(false);Check(H::QuickWheelOpen(),"A tapped wheel did not stay open");
+            press(H::Action::back);Check(!H::QuickWheelOpen()&&!menu(),"B did not close the wheel");
+            trigger(true);trigger(false);dpad(SDL_CONTROLLER_BUTTON_DPAD_DOWN,true);dpad(SDL_CONTROLLER_BUTTON_DPAD_DOWN,false);
+            press(H::Action::confirm);Check(!H::QuickWheelOpen()&&menu(),"A on a pointed slot did not open it");
+            wm->CloseByClass(WindowClass::handheldMenu);step();step();
+        }
         // B preserves the state before entry, including external native reasons.
         for (int initial : std::array<int, 4>{0, GAME_PAUSED_NORMAL, GAME_PAUSED_MODAL, GAME_PAUSED_NORMAL | GAME_PAUSED_MODAL}) {
             gGamePaused = initial; W::HandheldMenuOpen(); press(H::Action::back);

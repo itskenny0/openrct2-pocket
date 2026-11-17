@@ -59,7 +59,7 @@ int main(int argc,char** argv)
   Check(gGamePaused==GAME_PAUSED_MODAL,"Owned-menu cleanup reintroduced normal pause");WindowCullDead();
   gGamePaused=GAME_PAUSED_NORMAL;W::HandheldPathOptionsOpen();wm->CloseByClass(WindowClass::handheldMenu);
   Check(gGamePaused==GAME_PAUSED_NORMAL,"Non-Resume close changed an existing pause");WindowCullDead();
-  gGamePaused=0;W::HandheldBuildOpen();W::HandheldMenuMove(2);W::HandheldMenuConfirm();
+  gGamePaused=0;W::HandheldBuildOpen();W::HandheldMenuMove(2-8);W::HandheldMenuConfirm(); // Build opens on Rides (8); Paths is action 2.
   W::HandheldMenuMove(1); // Queue mode; remember this focus on returning.
   W::HandheldMenuBack();W::HandheldMenuConfirm(); // Returns to Paths, not a different build tool.
   W::HandheldMenuConfirm();

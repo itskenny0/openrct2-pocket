@@ -8,6 +8,11 @@
 #include "Currency.h"
 #include "CustomTracks.h"
 #include "Dashboard.h"
+#include "QuickWheel.h"
+#include "RideFollow.h"
+#include "Alerts.h"
+#include "Resume.h"
+#include "Guide.h"
 #include "ChoiceCards.h"
 #include "Designs.h"
 #include "DesignAuthoring.h"
@@ -20,10 +25,19 @@
 #include "GuestFollow.h"
 #include "ListFocus.h"
 #include <map>
+#include <openrct2/object/RideObject.h>
+#include <openrct2/ride/Ride.h>
+#include <openrct2/ride/RideData.h>
 #include "MarketingManagement.h"
 #include "Mazes.h"
 #include "Panel.h"
 #include "MenuThemes.h"
+#include "FeelSound.h"
+#include "Hud.h"
+#include <openrct2/entity/Guest.h>
+#include <openrct2/entity/Peep.h>
+#include <openrct2/object/PeepAnimationsObject.h>
+#include <openrct2/object/ObjectManager.h>
 #include "ParkOverview.h"
 #include "ParkMap.h"
 #include "ParkInformation.h"
@@ -98,6 +112,8 @@ namespace OpenRCT2::Ui::Windows
     {
         park,
         controls,
+        primer,
+        settings,
         build,
         paths,
         pathOptions,
@@ -216,7 +232,6 @@ namespace OpenRCT2::Ui::Windows
         marketingConfirm,
         ride,
         shop,
-        shopPrices,
         shopAppearance,
         shopAppearanceEditor,
         shopAppearanceReview,
@@ -249,6 +264,12 @@ namespace OpenRCT2::Ui::Windows
         return model;
     }
 
+    // The last Build card confirmed, kept beyond the menu window: Build reopens on it and the
+    // quick wheel's "Again" repeats it.
+    static size_t sLastBuildCard = 8;
+    static std::string sRideReturnNotice; // Set by a tool just before it hands back to the ride.
+    static std::string sLastBuildLabel;
+    static uint32_t sLastBuildSprite{};
     static fs::path SlotPath(size_t slot)
     {
         return fs::u8path(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user, DirId::saves))
@@ -266,7 +287,7 @@ namespace OpenRCT2::Ui::Windows
         std::array<std::array<size_t,5>,2> _toolGroupRows{};
         Handheld::ObjectPicker _picker;
         bool _pausedHere{};
-        size_t _buildFocus{}, _pathModeFocus{};
+        size_t _buildFocus{sLastBuildCard}, _pathModeFocus{}; // Build opens on the card used last (Rides at first).
         std::array<size_t, 2> _pathOptionsFocus{};
         bool _shopPickerFromBuild{};
         bool _ridePickerFromBuild{};
@@ -341,7 +362,7 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::NamedSave::Draft> _saveDraft;
         std::string fileDetailPath() const
         {
-            const size_t offset=_page==Page::saveFiles ? 3 : 2;
+            const size_t offset=(_page==Page::saveFiles ? 1 : 0)+Handheld::FileBrowsing::kFirst;
             return _focus.index()>=offset && _focus.index()-offset<_files.entries.size()
                 ? _files.entries[_focus.index()-offset].path.u8string() : _files.directory.u8string();
         }
@@ -376,7 +397,6 @@ namespace OpenRCT2::Ui::Windows
         std::string _status;
         RideId _rideId = RideId::GetNull();
         std::optional<Handheld::ShopManagement::Target> _shop;
-        std::optional<money64> _priceDraft;
         std::optional<Handheld::Finances::Draft> _financeDraft;
         Handheld::TabFocus<4> _financeTabs;
         Handheld::TabFocus<2> _researchTabs, _marketingTabs;
@@ -417,10 +437,71 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::ParkOverview::Draft> _overviewDraft;
         Handheld::ParkMap::State _parkMap;
         std::vector<Handheld::ParkInformation::NewsTarget> _parkNews;
+        // The inbox: what needs attention now, listed above the news. A snapshot taken when it
+        // opens, so the rows do not shift under the cursor as alerts come and go.
+        std::vector<Handheld::Alerts::Alert> _parkAlerts;
         std::optional<Handheld::ParkInformation::NewsTarget> _parkNewsTarget;
         size_t _parkNewsPage{}, _parkNewsFocus{};
         bool _newsFromPark{}, _newsFromDashboard{};
         bool _objectivesFromPark{};
+        bool _feelBack{};
+        size_t _rideCategory{}; // Ride picker filter: index into kRideCategories.
+        static constexpr std::array<std::pair<const char*, RideCategory>, 6> kRideCategories{ {
+            { "All rides", RideCategory::none },
+            { "Roller coasters", RideCategory::rollerCoaster },
+            { "Thrill rides", RideCategory::thrill },
+            { "Gentle rides", RideCategory::gentle },
+            { "Water rides", RideCategory::water },
+            { "Transport", RideCategory::transport },
+        } };
+        static RideCategory EntryCategory(const Handheld::PickerEntry& entry)
+        {
+            ride_type_t type = kRideTypeNull;
+            const auto& key = entry.identity.key;
+            if (key.starts_with("custom-type:"))
+                type = static_cast<ride_type_t>(std::stoi(key.substr(12)));
+            else if (key.starts_with("custom:"))
+                type = RIDE_TYPE_WOODEN_ROLLER_COASTER;
+            else if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject<RideObject>(entry.identity.index))
+                for (auto candidate : object->GetEntry().ride_type)
+                    if (candidate != kRideTypeNull)
+                    {
+                        type = candidate;
+                        break;
+                    }
+            return type == kRideTypeNull ? RideCategory::none : GetRideTypeDescriptor(type).Category;
+        }
+        // Filters by the selected category, adds the game's ride description, and gives each
+        // grid cell the part of the name that tells entries apart (the vehicle, when several
+        // entries share a ride type).
+        std::vector<Handheld::PickerEntry> rideCatalog() const
+        {
+            auto all = Handheld::FlatRides::Entries();
+            auto mazes = Handheld::Mazes::Entries();
+            all.insert(all.end(), mazes.begin(), mazes.end());
+            auto custom = Handheld::CustomTracks::RideEntries();
+            all.insert(all.end(), custom.begin(), custom.end());
+            const auto wanted = kRideCategories[_rideCategory % kRideCategories.size()].second;
+            std::vector<Handheld::PickerEntry> result;
+            std::map<std::string, int> typeCounts;
+            for (auto& entry : all)
+            {
+                if (wanted != RideCategory::none && EntryCategory(entry) != wanted)
+                    continue;
+                if (const auto slash = entry.name.find(" / "); slash != std::string::npos)
+                    ++typeCounts[entry.name.substr(0, slash)];
+                if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject<RideObject>(entry.identity.index))
+                    entry.detail = object->GetDescription();
+                result.push_back(std::move(entry));
+            }
+            for (auto& entry : result)
+                if (const auto slash = entry.name.find(" / "); slash != std::string::npos)
+                {
+                    const auto type = entry.name.substr(0, slash);
+                    entry.label = typeCounts[type] > 1 ? entry.name.substr(slash + 3) : type;
+                }
+            return result;
+        }
         Handheld::Dashboard::State _newsDashboard;
         bool _parkGuestHistory{};
         bool _managementNewsReturn{};
@@ -478,7 +559,23 @@ namespace OpenRCT2::Ui::Windows
             if (_page == Page::financeLedger) return Handheld::FinanceInformation::LedgerPresentation(_ledger, _focus.index());
             if (_page == Page::mapSubjects) return Handheld::MapSubjects::Presentation(_mapSubjects, _parkMap.mode, _parkMap.filter, _focus.index(), _parkMap.guestFilter);
             if (_page == Page::mapSubject && _mapTarget) return Handheld::MapSubjects::Detail(*_mapTarget, _focus.index(), _status);
-            if (_page == Page::parkNews) return NewsPresentation(_parkNews, _focus.index());
+            if (_page == Page::parkNews)
+            {
+                auto model = NewsPresentation(_parkNews, _focus.index());
+                if (!_parkAlerts.empty())
+                {
+                    model.title = "Inbox";
+                    model.breadcrumb = "Park / Inbox";
+                    std::vector<std::string> alerts;
+                    for (const auto& alert : _parkAlerts) alerts.push_back(alert.title);
+                    if (_parkNews.empty()) model.rows.clear();
+                    model.rows.insert(model.rows.begin(), alerts.begin(), alerts.end());
+                    const auto focused = _focus.index();
+                    model.status = focused < _parkAlerts.size() ? _parkAlerts[focused].fix + "  |  A: go there"
+                                                                : std::to_string(_parkAlerts.size()) + (_parkAlerts.size() == 1 ? " thing needs" : " things need") + " attention";
+                }
+                return model;
+            }
             if (_page == Page::parkNewsDetail && _parkNewsTarget) {
                 auto model=NewsDetail(*_parkNewsTarget,_parkNewsPage,_focus.index(),_status);
                 model.rows[2]=Handheld::ManagementNews::Label(*_parkNewsTarget);
@@ -631,6 +728,64 @@ namespace OpenRCT2::Ui::Windows
                 || _page == Page::ridesOperations || _page == Page::ridesMaintenance || _page == Page::ridesAccess
                 || _page == Page::ridesPrice || _page == Page::ridesConfirm;
         }
+        // A guest at a glance: how they look and feel, then the three needs that drive what they do.
+        static Handheld::ManagementPresentation::Hero guestHero(const Guest& guest)
+        {
+            Handheld::ManagementPresentation::Hero hero;
+            const auto animations = guest.animationObjectIndex;
+            const auto group = guest.animationGroup;
+            const auto shirt = guest.tShirtColour, trousers = guest.trousersColour;
+            const auto face = GetPeepFaceSpriteLarge(const_cast<Guest*>(&guest));
+            hero.picture = [=](RenderTarget& rt) {
+                if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject<PeepAnimationsObject>(animations))
+                    GfxDrawSprite(rt, ImageId(object->GetPeepAnimation(group).baseImage + 1, shirt, trousers), { 16, 46 });
+                GfxDrawSprite(rt, ImageId(face), { 28, 14 });
+            };
+            const auto percent = [](int value, int maximum) { return std::clamp(value * 100 / std::max(1, maximum), 0, 100); };
+            const int happy = percent(guest.happiness, 255);
+            const int energy = percent(guest.energy - 32, 128 - 32);
+            const int nausea = percent(guest.nausea, 255);
+            hero.meters.push_back({ "Happiness", std::to_string(happy) + "%", happy, happy >= 60 ? "{POSITIVE}" : happy < 30 ? "{DANGER}" : "{WHITE}" });
+            hero.meters.push_back({ "Energy", std::to_string(energy) + "%", energy, energy < 25 ? "{CAUTION}" : "{WHITE}" });
+            hero.meters.push_back({ "Nausea", std::to_string(nausea) + "%", nausea, nausea >= 50 ? "{DANGER}" : "{WHITE}" });
+            return hero;
+        }
+        // The ride's own picture, its state as a switch, and its ratings: what makes a ride a ride.
+        static Handheld::ManagementPresentation::Hero rideHero(const Ride& ride)
+        {
+            Handheld::ManagementPresentation::Hero hero;
+            const auto subtype = ride.subtype;
+            hero.picture = [subtype](RenderTarget& rt) {
+                if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject(ObjectType::ride, subtype))
+                {
+                    rt.zoom_level = ZoomLevel{ 1 };
+                    object->DrawPreview(rt, 128, 120);
+                }
+            };
+            hero.states = { "Closed" };
+            if (ride.supportsStatus(RideStatus::testing)) hero.states.push_back("Testing");
+            hero.states.push_back("Open");
+            const auto current = ride.status == RideStatus::open ? "Open" : ride.status == RideStatus::testing ? "Testing" : "Closed";
+            hero.state = static_cast<size_t>(std::find(hero.states.begin(), hero.states.end(), current) - hero.states.begin());
+            auto rating = [](RideRating_t value) {
+                char text[16];
+                std::snprintf(text, sizeof(text), "%d.%02d", value / 100, value % 100);
+                return std::string(text);
+            };
+            if (!ride.ratings.isNull())
+            {
+                const auto& r = ride.ratings;
+                hero.meters.push_back({ "Excitement", rating(r.excitement), std::min(100, r.excitement / 10),
+                                        r.excitement >= 500 ? "{POSITIVE}" : "{WHITE}" });
+                hero.meters.push_back({ "Intensity", rating(r.intensity), std::min(100, r.intensity / 10),
+                                        r.intensity >= 1000 ? "{DANGER}" : r.intensity >= 700 ? "{CAUTION}" : "{WHITE}" });
+                hero.meters.push_back({ "Nausea", rating(r.nausea), std::min(100, r.nausea / 10),
+                                        r.nausea >= 700 ? "{DANGER}" : r.nausea >= 500 ? "{CAUTION}" : "{WHITE}" });
+            }
+            else
+                hero.meters.push_back({ "Ratings", "Test the ride to rate it", 0, "{MUTED}" });
+            return hero;
+        }
         Handheld::ManagementPresentation ridesPresentationFor(Page current, size_t selected) const
         {
             using Handheld::RideManagement::View;
@@ -763,13 +918,13 @@ namespace OpenRCT2::Ui::Windows
             {
                 Handheld::ManagementPresentation model;
                 model.breadcrumb = "Name / Keyboard";
-                model.title = _nameEntry.text.empty() ? "Default name" : _nameEntry.text;
+                model.title = current == Page::designName ? "Design name" : "Default name";
+                model.keyboard = _nameEntry;
+                model.keyboardHeading = current == Page::designName ? "Name this design" : "Rename ride";
                 model.rows = _nameEntry.Keys();
                 model.columns = Handheld::TextEntry::columns;
                 model.selected = selected;
-                model.status = std::to_string(_nameEntry.Length()) + " / 32 characters";
-                if (!_status.empty())
-                    model.status = _status;
+                model.status = _status;
                 model.primaryAction = "Type";
                 return model;
             }
@@ -829,7 +984,21 @@ namespace OpenRCT2::Ui::Windows
                 model = Handheld::RideTabs::Compose(model,stats,_rideTabs,selected);
                 if (_ridesTarget && Handheld::RideAccess::Supported(*_ridesTarget)) model.contextualAction = "Access";
                 if(const auto* ride=_ridesTarget?Handheld::RideManagement::Resolve(*_ridesTarget):nullptr)
+                {
                     model.headerInk=ride->status==RideStatus::open?"{POSITIVE}":ride->status==RideStatus::testing?"{CAUTION}":"{MUTED}";
+                    if(_rideTabs.tab==Handheld::RideTabs::overview)
+                    {
+                        model.hero=rideHero(*ride);
+                        if(selected==0) {model.navigationHint="Change";model.primaryAction="Next";}
+                        if(!model.settingRows.empty())
+                        {
+                            const bool priced=Handheld::RideManagement::PricePermitted(*ride);
+                            model.settingValues={priced?Handheld::FormatMoney(ride->price[0]):"Not charged"};
+                            // A free ride has nothing to adjust, so the footer offers nothing for it.
+                            if(selected==model.settingRows.front() && priced) {model.navigationHint="Price";model.primaryAction="Editor";}
+                        }
+                    }
+                }
             }
             if (current == Page::ridesConfirm && _ridesDraft && _ridesDraft->demolition) model.destructive=true;
             if (current == Page::ridesRoster) model.contentSized = true;
@@ -958,8 +1127,9 @@ namespace OpenRCT2::Ui::Windows
             {
                 auto model = Handheld::StaffManagement::NamePresentation(_nameEntry, selected, false, _status);
                 model.breadcrumb = "Guests / Filter by name";
-                model.title = _nameEntry.text.empty() ? "All guest names" : _nameEntry.text;
-                model.status = "Case insensitive / OK Apply / Clr Remove";
+                model.title = "All guests";
+                model.keyboardHeading = "Find guests by name";
+                model.status = _status.empty() ? "Matches any part of a name, in any case" : _status;
                 return model;
             }
             if (current == Page::guestName || current == Page::guestNameConfirm)
@@ -967,6 +1137,7 @@ namespace OpenRCT2::Ui::Windows
                 auto model = Handheld::StaffManagement::NamePresentation(
                     _nameEntry, selected, current == Page::guestNameConfirm, _status);
                 model.breadcrumb = current == Page::guestName ? "Guests / Name keyboard" : "Guests / Review name";
+                model.keyboardHeading = "Rename guest";
                 return model;
             }
             if (current == Page::guestTracking && _guestTarget)
@@ -984,14 +1155,20 @@ namespace OpenRCT2::Ui::Windows
                                                       : View::text;
             auto model = Handheld::GuestManagement::Presentation(
                 view, selected, _guestRoster, _guestTarget, _status, _guestText, _guestTextPage);
-            if(current==Page::guestInspect && _guestTarget){model=Handheld::PeopleTabs::Guest(*_guestTarget,_guestTabs,selected);model.status=_status;}
+            if(current==Page::guestInspect && _guestTarget){model=Handheld::PeopleTabs::Guest(*_guestTarget,_guestTabs,selected);model.status=_status;
+                if(_guestTabs.tab==0) if(const auto* guest=Handheld::GuestManagement::Resolve(*_guestTarget)) {
+                    model.hero=guestHero(*guest);
+                    // The hero shows happiness and what they are doing; the cards keep the rest.
+                    if(!model.bodyLines.empty()) {model.hero->caption=model.bodyLines.front();model.bodyLines.erase(model.bodyLines.begin());}
+                    std::erase_if(model.stats,[](const auto& stat){return stat.first=="Happiness";});
+                }}
             if (current == Page::guestRoster)
             {
                 model.title = Handheld::GuestManagement::FilterName(_guestFilter);
                 model.rows.back() = _guestRosterParent == Page::guestGroups ? "Back to groups"
                     : _guestRosterParent == Page::ridesCustomers ? "Back to ride customers" : "Back to Guests";
                 model.rows[2]=_guestFilter.tracked ? "All tracking" : "Tracked only";
-                model.status = std::to_string(_guestRoster.size()) + " guests / A Inspect or map";
+                model.status = std::to_string(_guestRoster.size()) + " guests";
             }
             return model;
         }
@@ -1034,10 +1211,66 @@ namespace OpenRCT2::Ui::Windows
             if(_shopAppearanceBusy)model.status="Applying colour...";
             return model;
         }
+        // A shop reads like a ride: its picture with Open/Closed as a switch, each product's price
+        // changed in place with Left/Right (one native step, the same action the old editor sent),
+        // then the less frequent actions as buttons. Rows: 0 status, 1..n prices, then the grid.
+        size_t shopPriceCount() const
+        {
+            return _shop && Handheld::ShopManagement::Find(*_shop) ? Handheld::ShopManagement::Prices(*_shop).size() : 0;
+        }
+        Handheld::ManagementPresentation shopPresentation() const
+        {
+            using namespace Handheld;
+            ManagementPresentation model;
+            const auto* ride = _shop ? ShopManagement::Find(*_shop) : nullptr;
+            model.title = ride ? ride->getName() : "Shop unavailable";
+            model.rows = rows();
+            model.selected = _focus.index();
+            model.status = _status;
+            if (!ride) return model;
+            const bool noMoney = getGameState().park.flags.has(ParkFlag::noMoney);
+            auto status = Formatter();
+            ride->formatStatusTo(status);
+            model.headerStatus = FormatStringIDLegacy(STR_STRINGID, status.Data());
+            model.headerInk = ride->status == RideStatus::open ? "{POSITIVE}" : "{MUTED}";
+            ManagementPresentation::Hero hero;
+            const auto subtype = ride->subtype;
+            hero.picture = [subtype](RenderTarget& rt) {
+                if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject(ObjectType::ride, subtype))
+                {
+                    rt.zoom_level = ZoomLevel{ 1 };
+                    object->DrawPreview(rt, 128, 120);
+                }
+            };
+            hero.states = { "Closed", "Open" };
+            hero.state = ride->status == RideStatus::open ? 1 : 0;
+            hero.caption = std::to_string(RideCustomersPerHour(*ride)) + " customers / hour";
+            model.hero = hero;
+            model.heroRow = 0;
+            const auto prices = ShopManagement::Prices(*_shop);
+            for (size_t i = 0; i < prices.size(); ++i)
+            {
+                model.settingRows.push_back(1 + i);
+                // Some items (burgers, drinks) share one price across every stall that sells them.
+                if (prices[i].shared) model.rows[1 + i] = prices[i].name + "  (park-wide)";
+                model.settingValues.push_back(noMoney ? "Free" : ShopManagement::Money(prices[i].value));
+            }
+            auto earnings = [noMoney](money64 value) {
+                return noMoney ? std::string("-") : value == kMoney64Undefined ? std::string("-") : ShopManagement::Money(value);
+            };
+            model.stats = { { "Customers", std::to_string(ride->totalCustomers) },
+                            { "Income / hr", earnings(ride->incomePerHour) },
+                            { "Profit / hr", earnings(ride->profit) } };
+            model.summaryMetrics = true;
+            model.metricColumns = 3;
+            model.metricHeight = 34;
+            model.actionGrid = true;
+            return model;
+        }
     private:
         bool shopManagement() const
         {
-            return _page == Page::shop || _page == Page::shopPrices || _page == Page::shopDemolish || _page==Page::shopAppearance || _page==Page::shopAppearanceEditor || _page==Page::shopAppearanceReview;
+            return _page == Page::shop || _page == Page::shopDemolish || _page==Page::shopAppearance || _page==Page::shopAppearanceEditor || _page==Page::shopAppearanceReview;
         }
         void pauseManagement()
         {
@@ -1078,35 +1311,105 @@ namespace OpenRCT2::Ui::Windows
         void parkMapControl(int control)
         {
             if (!parkMapOpen()) return;
+            // 0 next view, 3 previous view (L1/R1, like tabs everywhere), 4 cycle zoom 1/2/4/8 (Y),
+            // 2 details (R2); -1/+1 step zoom.
             if (control == 2) _parkMap.details = !_parkMap.details;
-            else if (control == 0) _parkMap.Mode();
+            else if (control == 0) _parkMap.Mode(1);
+            else if (control == 3) _parkMap.Mode(-1);
+            else if (control == 4) _parkMap.zoom = _parkMap.zoom >= 8 ? 1 : _parkMap.zoom * 2;
             else _parkMap.zoom = std::clamp(_parkMap.zoom + control, 1, 8);
             _parkMap.Update();
             invalidate();
+        }
+        Handheld::Accent accent() const
+        {
+            using Handheld::Accent;
+            using Section = Handheld::Dashboard::Section;
+            if (managementShell())
+            {
+                switch (_dashboard.section)
+                {
+                    case Section::rides: return Accent::rides;
+                    case Section::guests: return Accent::guests;
+                    case Section::staff: return Accent::staff;
+                    case Section::finances: return Accent::finances;
+                    case Section::research: return Accent::research;
+                    case Section::marketing: return Accent::marketing;
+                    default: return Accent::standard;
+                }
+            }
+            if (choiceCards() || picker())
+                return Accent::build;
+            return Accent::standard;
         }
         bool choiceCards() const
         {
             return _page == Page::build || _page == Page::paths || _page == Page::sceneryCategory
                 || _page == Page::customChoice;
         }
+        // Build menu art: a real loaded object of each kind, drawn with the same preview the object
+        // catalog uses, so the big cards show this park's own rides, shops, paths and scenery.
+        enum class BuildArt { ride, shop, path, scenery };
+        static std::function<void(RenderTarget&)> BuildPicture(BuildArt kind)
+        {
+            auto& objects = GetContext()->GetObjectManager();
+            const Object* chosen = nullptr;
+            if (kind == BuildArt::ride || kind == BuildArt::shop)
+            {
+                for (ObjectEntryIndex i = 0; i < kMaxRideObjects && !chosen; ++i)
+                    if (const auto* ride = objects.GetLoadedObject<RideObject>(i))
+                        for (auto type : ride->GetEntry().ride_type)
+                            if (type != kRideTypeNull)
+                            {
+                                const auto& rtd = GetRideTypeDescriptor(type);
+                                const bool shop = rtd.flags.has(RtdFlag::isShopOrFacility);
+                                if ((kind == BuildArt::shop) == shop
+                                    && (shop || rtd.Category == RideCategory::rollerCoaster || rtd.Category == RideCategory::thrill))
+                                    chosen = ride;
+                                break;
+                            }
+            }
+            else
+            {
+                const auto type = kind == BuildArt::path ? ObjectType::footpathSurface : ObjectType::smallScenery;
+                for (ObjectEntryIndex i = 0; i < 64 && !chosen; ++i)
+                    chosen = objects.GetLoadedObject(type, i);
+            }
+            if (!chosen) return {};
+            const bool square = kind == BuildArt::ride || kind == BuildArt::shop;
+            return [chosen, square](RenderTarget& rt) {
+                // Ride previews are fixed 112 px squares drawn from their corner: centre a half-size
+                // window for them. Other previews centre themselves.
+                RenderTarget art = rt;
+                if (square)
+                {
+                    const int side = std::min({ 56, rt.width, rt.height });
+                    if (!ClipRenderTarget(art, rt, { (rt.width - side) / 2, (rt.height - side) / 2 }, side, side)) return;
+                }
+                art.zoom_level = ZoomLevel{ 1 };
+                chosen->DrawPreview(art, art.zoom_level.ApplyTo(art.width), art.zoom_level.ApplyTo(art.height));
+            };
+        }
         std::vector<Handheld::ChoiceCard> choices() const
         {
             using I = Handheld::PanelIcon;
             if (_page == Page::build)
-                return {{0,"Raise land","Lift the ground under your cursor",I::raise},
-                    {1,"Lower land","Lower the ground under your cursor",I::lower},
-                    {2,"Paths","Footpaths, queues, connected paths and removal",I::path},
-                    {3,"Water","Raise or lower water",I::terrain,SPR_TAB_WATER},
-                    {4,"Surfaces","Choose a ground surface",I::terrain,SPR_G2_TAB_LAND},
-                    {5,"Remove scenery","Remove an existing scenery object",I::remove},
-                    {6,"Trees","Choose a tree from the visual catalog",I::tree},
-                    {7,"Shops & facilities","Food, drinks, shops and guest facilities",I::folder,SPR_SHOP_ITEM_BURGER},
-                    {8,"Rides","Choose a ride, then place or construct it",I::play,SPR_TAB_RIDE_0},
-                    {9,"Saved designs","Browse your saved track designs",I::folder},
-                    {10,"Scenery","Trees, buildings, fences, signs and path furniture",I::largeScenery},
-                    {11,"Landscape","Brush, shape, water and terrain painting",I::terrain,SPR_G2_TAB_LAND},
-                    {12,"Land & rights","Buy available land or construction rights",I::terrain},
-                    {13,"Park","Return to your park",I::back}};
+                // Grouped by what you are doing: building things first (big cards), then shaping
+                // the land, then tools. Actions keep their native numbers; only the order changed.
+                // "Park" is gone: B does that.
+                return {{8,"Rides","Choose a ride, then place or construct it",I::play,SPR_TAB_RIDE_0,0,16,BuildPicture(BuildArt::ride)},
+                    {7,"Shops","Food, drinks, shops and guest facilities",I::folder,SPR_SHOP_ITEM_BURGER,0,1,BuildPicture(BuildArt::shop)},
+                    {2,"Paths","Footpaths and queues",I::path,0,0,1,BuildPicture(BuildArt::path)},
+                    {10,"Scenery","Trees, buildings, fences, signs and path furniture",I::largeScenery,0,0,1,BuildPicture(BuildArt::scenery)},
+                    {9,"Saved designs","Rides you or others saved, ready to place",I::folder,SPR_TOOLBAR_CONSTRUCT_RIDE,0},
+                    {0,"Raise hill","Gentle hills; Y also digs, makes ponds or flattens",I::raise,0,1},
+                    {1,"Dig","Lower the ground with gentle slopes",I::lower,0,1},
+                    {3,"Pond","Dig a pond that fills with water",I::terrain,SPR_TAB_WATER,1},
+                    {4,"Surfaces","Choose a ground surface",I::terrain,SPR_G2_TAB_LAND,1},
+                    {6,"Trees","Plant from the tree catalog",I::tree,0,1},
+                    {5,"Remove scenery","Pick up placed scenery",I::remove,0,2},
+                    {12,"Land & rights","Buy land or construction rights",I::terrain,SPR_BUY_LAND_RIGHTS,2},
+                    {11,"Advanced","Corners, edges, water levels and terrain painting",I::terrain,SPR_TOOLBAR_LAND,2}};
             if (_page == Page::paths)
                 return {{0,"Footpath","Place individual tiles; Y Adjust also offers Line and Fill",I::path},
                     {1,"Queue","Build a queue for a ride entrance",I::path},
@@ -1115,20 +1418,60 @@ namespace OpenRCT2::Ui::Windows
                     {5,"Extend queue","Continue a queue from an endpoint",I::path},
                     {3,"Build menu","Return to the other building tools",I::back}};
             if (_page == Page::customChoice)
-                return {{0,"Build track","Construct your own track, piece by piece",I::play,SPR_TAB_RIDE_0},
-                    {1,"Saved design","Choose an existing design from the visual catalog",I::folder},
+                return {{1,"Ready-made design","Pick a finished ride from the design catalog",I::folder},
+                    {0,"Build track","Construct your own track, piece by piece",I::play,SPR_TAB_RIDE_0},
                     {2,"Back","Return to the ride catalog",I::back}};
-            return {{0,"Trees & small","Plants, trees and small scenery objects",I::tree},
-                {1,"Buildings","Large scenery and building objects",I::largeScenery},
-                {2,"Walls & fences","Choose a wall or fence",I::walls},
-                {3,"Signs","Banners and signs",I::furniture},
-                {4,"Path furniture","Benches, bins, lamps and other path additions",I::furniture},
-                {5,"Clear area","Select which scenery types to clear with a brush",I::remove},
-                {6,"Build menu","Return to the other building tools",I::back}};
+            // Each category shows a real object from it, drawn the way the catalog draws it, like
+            // the Build menu's big cards. "Build menu" is gone: B does that.
+            if (!_sceneryArtReady)
+            {
+                for (size_t c = 0; c < _sceneryArt.size(); ++c)
+                {
+                    using SC = Handheld::SceneryTools::Category;
+                    const auto category = static_cast<SC>(c);
+                    const auto entries = Handheld::SceneryTools::Entries(category);
+                    if (entries.empty()) continue;
+                    // A representative object rather than whatever loaded first: a tree, the
+                    // biggest building, a bench or lamp.
+                    auto entry = entries.front();
+                    auto named = [&](std::initializer_list<const char*> words) {
+                        for (const auto& candidate : entries)
+                            for (const auto* word : words)
+                                if (candidate.name.find(word) != std::string::npos) { entry = candidate; return; }
+                    };
+                    if (category == SC::small) named({ "Tree", "tree" });
+                    else if (category == SC::additions) named({ "Bench", "Lamp", "bench", "lamp" });
+                    else if (category == SC::large)
+                    {
+                        size_t most = 0;
+                        for (const auto& candidate : entries)
+                            if (const auto* large = ObjectEntryManager::GetObjectEntry<LargeSceneryEntry>(candidate.identity.index))
+                                if (large->tiles.size() > most) { most = large->tiles.size(); entry = candidate; }
+                    }
+                    _sceneryArt[c] = [entry](RenderTarget& rt) {
+                        if (entry.drawPreview) { entry.drawPreview(rt); return; }
+                        if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject(entry.identity.type, entry.identity.index))
+                        {
+                            RenderTarget art = rt;
+                            art.zoom_level = ZoomLevel{ 1 };
+                            object->DrawPreview(art, art.zoom_level.ApplyTo(art.width), art.zoom_level.ApplyTo(art.height));
+                        }
+                    };
+                }
+                _sceneryArtReady = true;
+            }
+            return {{0,"Trees & small","Plants, trees and small scenery objects",I::tree,0,0,1,_sceneryArt[0]},
+                {1,"Buildings","Large scenery and building objects",I::largeScenery,0,0,1,_sceneryArt[1]},
+                {2,"Walls & fences","Choose a wall or fence",I::walls,0,0,1,_sceneryArt[2]},
+                {3,"Signs","Banners and signs",I::furniture,0,0,1,_sceneryArt[3]},
+                {4,"Path furniture","Benches, bins, lamps and other path additions",I::furniture,0,0,1,_sceneryArt[4]},
+                {5,"Clear area","Select which scenery types to clear with a brush",I::remove,SPR_DEMOLISH}};
         }
+        mutable std::array<std::function<void(RenderTarget&)>, 5> _sceneryArt;
+        mutable bool _sceneryArtReady{};
         bool constructionMenu() const
         {
-            return choiceCards() || _page == Page::controls || _page == Page::designOptions || _page == Page::researchCatalog || _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
+            return choiceCards() || _page == Page::controls || _page == Page::primer || _page == Page::park || _page == Page::settings || _page == Page::designOptions || _page == Page::researchCatalog || _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
                 || _page == Page::staffPatrolClear || _page == Page::rightsOptions || _page == Page::rightsConfirm
                 || (_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) || _page == Page::areaOptions || _page == Page::terrainPaintConfirm || _page == Page::sceneryOptions || _page == Page::parkInspect || (_page == Page::designInspect || _page == Page::designVehicles || _page == Page::designWarnings || _page == Page::designConfirm) || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
                 || _page == Page::sceneryConfirm || _page == Page::sceneryGroups || _page == Page::sceneryStyle
@@ -1163,11 +1506,33 @@ namespace OpenRCT2::Ui::Windows
                 _status.clear();invalidate();return;
             }
             if (_page == Page::controls) {
-                _focus.move(x ? x : y,3);invalidate();return;
+                _focus.move(x ? x : y,Handheld::Guide::kTabs.size());invalidate();return;
+            }
+            if (_page == Page::primer) {
+                // Cards step without wrapping: Right past the last card does nothing.
+                const int step = x ? x : y;
+                const int next = std::clamp<int>(static_cast<int>(_focus.index()) + step, 0, static_cast<int>(rows().size()) - 1);
+                _focus.move(next - static_cast<int>(_focus.index()), rows().size());invalidate();return;
+            }
+            if (_page == Page::park && x) {
+                // Two columns: Right/Left cross between Game and the speed / display column at the
+                // same height (rows 0-7 and 8-14).
+                const size_t i = _focus.index();
+                const size_t target = x > 0 ? (i < 8 ? std::min<size_t>(8 + i, 14) : i) : (i >= 8 ? std::min<size_t>(i - 8, 7) : i);
+                _focus.move(static_cast<int>(target) - static_cast<int>(i), rows().size());
+                invalidate();
+                return;
+            }
+            if (_page == Page::settings) {
+                if (y) move(y);
+                else if (x) toggleSetting(_focus.index());
+                invalidate();
+                return;
             }
             if (choiceCards())
             {
-                const auto next = Handheld::MoveChoiceCards(choices(), _focus.index(), _page == Page::build ? 4 : 3, x, y);
+                const auto next = _page == Page::build ? Handheld::MoveChoiceGroups(choices(), 3, _focus.index(), x, y)
+                                                       : Handheld::MoveChoiceCards(choices(), _focus.index(), 3, x, y);
                 _focus.move(static_cast<int>(next) - static_cast<int>(_focus.index()), rows().size());
                 invalidate();
                 return;
@@ -1251,6 +1616,18 @@ namespace OpenRCT2::Ui::Windows
         }
 
     private:
+        // Pages that draw across the whole canvas. The window must cover what they draw, or the
+        // parts outside it are never repainted (stale highlights and toggles).
+        bool fullScreen() const
+        {
+            return choiceCards() || _page == Page::staffPatrolClear || _page == Page::rightsConfirm || _page == Page::parkInspect
+                || _page == Page::designInspect || _page == Page::designVehicles || _page == Page::designWarnings || _page == Page::designConfirm
+                || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
+                || _page == Page::sceneryConfirm || _page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles
+                || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement()
+                || managementShell() || _page == Page::park || _page == Page::settings || _page == Page::controls || _page == Page::primer
+                || _page == Page::save || _page == Page::load;
+        }
         void layout()
         {
             auto size = Handheld::OverlaySize(std::min<size_t>(8, rows().size()));
@@ -1259,18 +1636,14 @@ namespace OpenRCT2::Ui::Windows
             const ScreenSize target{ _page == Page::overwrite || _page == Page::discard || _page == Page::exit || _page == Page::quitChoice ? 330
                                                                                                                : size.width,
                                      size.height };
-            const ScreenSize bounds = (choiceCards() || _page == Page::staffPatrolClear || _page == Page::rightsConfirm
-                                       || _page == Page::parkInspect || (_page == Page::designInspect || _page == Page::designVehicles || _page == Page::designWarnings || _page == Page::designConfirm) || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch || _page == Page::sceneryConfirm
-                                       || (_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement() || managementShell())
+            const ScreenSize bounds = fullScreen()
                 ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
                 : information() ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 }
                                 : target;
             WindowSetResize(*this, bounds, bounds);
             WindowSetPosition(
                 *this,
-                (choiceCards() || _page == Page::staffPatrolClear || _page == Page::rightsConfirm || _page == Page::parkInspect || (_page == Page::designInspect || _page == Page::designVehicles || _page == Page::designWarnings || _page == Page::designConfirm) || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
-                 || _page == Page::sceneryConfirm || (_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement()
-                 || managementShell())
+                fullScreen()
                     ? ScreenCoordsXY{ 0, 0 }
                     : ScreenCoordsXY{ 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
         }
@@ -1540,7 +1913,6 @@ namespace OpenRCT2::Ui::Windows
             if (next == Page::paths) _focus.move(static_cast<int>(_pathModeFocus), rows().size());
             if (next == Page::pathOptions) _focus.move(static_cast<int>(_pathOptionsFocus[Handheld::Paths::IsConnected()]), rows().size());
             _status.clear();
-            _priceDraft.reset();
             layout();
             if (next == Page::parkFiles || next == Page::saveFiles || next == Page::designFiles) _focus.move(static_cast<int>(_fileFocus), rows().size());
             if (next == Page::staff)
@@ -1559,14 +1931,16 @@ namespace OpenRCT2::Ui::Windows
                 _focus.move(static_cast<int32_t>(std::min(_guestRideFocus, rows().size() - 1)), rows().size());
             if (next == Page::guestRoster)
                 _focus.move(static_cast<int32_t>(std::min(_guestRosterFocus, rows().size() - 1)), rows().size());
-            if (next == Page::accessReview || next == Page::saveReview || next == Page::overwrite || next == Page::discard || next == Page::exit || next == Page::shopDemolish
-                || next == Page::overviewConfirm || next == Page::ridesConfirm || next == Page::financeConfirm
-                || next == Page::marketingConfirm || next == Page::staffHire || next == Page::staffDismiss
-                || next == Page::staffNameConfirm || next == Page::guestNameConfirm || next == Page::guestTracking
-                || next == Page::peepCancel)
-                _focus.move(1, 2); // destructive confirmations default to Cancel
-            if (next == Page::researchConfirm)
-                _focus.move(static_cast<int32_t>(rows().size() - 1), rows().size());
+            if (next == Page::customChoice)
+                _focus.move(1, rows().size()); // Ready-made designs are the quickest way to a coaster.
+            // Only confirmations that lose something (a save, the session, a ride, an employee, a
+            // placement) start on Cancel; ordinary decisions start on the action so A-A completes them.
+            const bool destructive = next == Page::overwrite || next == Page::discard || next == Page::exit
+                || next == Page::shopDemolish || next == Page::staffDismiss || next == Page::peepCancel
+                || (next == Page::ridesConfirm && _ridesDraft && _ridesDraft->demolition)
+                || (next == Page::saveReview && _saveDraft && _saveDraft->baseline);
+            if (destructive)
+                _focus.move(1, 2);
             invalidate();
         }
         std::vector<Handheld::SceneryTools::Style> signStyles() const
@@ -1618,11 +1992,21 @@ namespace OpenRCT2::Ui::Windows
                 case Page::park:
                     return { "Resume park",   "Build",     "Park dashboard",      "Save park",
                              "Save and quit", "Load park", "Quit...", "Controls...",
-                             simulationChoice(0), simulationChoice(1), simulationChoice(2), simulationChoice(3), Handheld::MenuThemes::Choice() };
+                             simulationChoice(0), simulationChoice(1), simulationChoice(2), simulationChoice(3), Handheld::MenuThemes::Choice(),
+                             Handheld::MenuThemes::MotionChoice(), "More settings..." };
                 case Page::quitChoice:
                     return { "Save and quit", "Quit without saving...", "Cancel" };
                 case Page::controls:
-                    return { "Park", "Build", "Menus" };
+                    return { Handheld::Guide::kTabs.begin(), Handheld::Guide::kTabs.end() };
+                case Page::primer:
+                {
+                    std::vector<std::string> cards;
+                    for (const auto& card : Handheld::Guide::Cards()) cards.push_back(card.title);
+                    return cards;
+                }
+                case Page::settings:
+                    return { "Theme", "Motion", "Smart cursor", "Goal in the HUD", "Clock and battery in the HUD",
+                             "Continue last park on launch", "Save when the device sleeps" };
                 case Page::dashboard:
                     return HandheldDashboardPresentation(0).rows;
                 case Page::staff:
@@ -1718,7 +2102,14 @@ namespace OpenRCT2::Ui::Windows
                 case Page::researchConfirm:
                     return researchPresentation().rows;
                 case Page::shop:
-                    return { "Status", "Prices", "Demolish", "Rename", "Appearance" };
+                {
+                    std::vector<std::string> result{ "Status" };
+                    if (_shop && Handheld::ShopManagement::Find(*_shop))
+                        for (const auto& price : Handheld::ShopManagement::Prices(*_shop))
+                            result.push_back(price.name);
+                    result.insert(result.end(), { "Demolish...", "Rename...", "Appearance..." });
+                    return result;
+                }
                 case Page::shopAppearance: {
                     std::vector<std::string> result;
                     if(_shop)for(const auto& setting:Handheld::ShopAppearance::Settings(*_shop))
@@ -1728,14 +2119,6 @@ namespace OpenRCT2::Ui::Windows
                 case Page::shopAppearanceEditor:
                     return _shopAppearanceDraft?_shopAppearanceDraft->setting.labels:std::vector<std::string>{"Shop unavailable"};
                 case Page::shopAppearanceReview:return {"Cancel","Apply change"};
-                case Page::shopPrices:
-                {
-                    std::vector<std::string> result;
-                    if (_shop)
-                        for (const auto& price : Handheld::ShopManagement::Prices(*_shop))
-                            result.push_back(price.name);
-                    return result;
-                }
                 case Page::shopDemolish:
                     return { "Demolish", "Cancel" };
                 case Page::ride:
@@ -1759,10 +2142,10 @@ namespace OpenRCT2::Ui::Windows
                 case Page::customChoice:
                     return { "Custom build", "Saved designs...", "Back" };
                 case Page::build:
-                    return { "Raise land",
-                             "Lower land",
+                    return { "Raise hill",
+                             "Dig",
                              "Paths",
-                             "Water",
+                             "Pond",
                              "Surface",
                              "Remove scenery",
                              "Trees",
@@ -1958,7 +2341,7 @@ namespace OpenRCT2::Ui::Windows
             _fileLoad = browsing;
             if (browsing) {
                 _files.Open(folder, pattern); _fileFocus=0;
-                for(size_t i=0;i<_files.entries.size();++i)if(_files.entries[i].path==selected)_fileFocus=i+2;
+                for(size_t i=0;i<_files.entries.size();++i)if(_files.entries[i].path==selected)_fileFocus=i+Handheld::FileBrowsing::kFirst;
                 page(Page::parkFiles);
             }
             else page(Page::load);
@@ -2116,11 +2499,7 @@ namespace OpenRCT2::Ui::Windows
         }
         void refreshPicker(std::optional<Handheld::PickerIdentity> preferred = {})
         {
-            auto rideEntries = Handheld::FlatRides::Entries();
-            auto mazes = Handheld::Mazes::Entries();
-            rideEntries.insert(rideEntries.end(), mazes.begin(), mazes.end());
-            auto custom = Handheld::CustomTracks::RideEntries();
-            rideEntries.insert(rideEntries.end(), custom.begin(), custom.end());
+            auto rideEntries = _page == Page::ridePicker ? rideCatalog() : std::vector<Handheld::PickerEntry>{};
             _picker.setEntries(
                 _page == Page::terrainMaterialPicker ? Handheld::TerrainMaterials::Entries(_terrainMaterialEdge)
                     : _page == Page::pathSurfacePicker   ? Handheld::PathSurfaces::Entries()
@@ -2227,7 +2606,7 @@ namespace OpenRCT2::Ui::Windows
             if(!Handheld::Designs::Selection().empty()) folder=fs::u8path(Handheld::Designs::Selection()).parent_path();
             _files.Open(folder,Ui::FileBrowser::GetFilterPatternByType(LoadSaveType::track,false));
             _fileFocus=0;_fileDetail=0;
-            for(size_t i=0;i<_files.entries.size();++i)if(_files.entries[i].path.u8string()==Handheld::Designs::Selection())_fileFocus=i+2;
+            for(size_t i=0;i<_files.entries.size();++i)if(_files.entries[i].path.u8string()==Handheld::Designs::Selection())_fileFocus=i+Handheld::FileBrowsing::kFirst;
             page(Page::designFiles);
         }
         void openDesignPicker(bool fromBuild = false)
@@ -2277,6 +2656,7 @@ namespace OpenRCT2::Ui::Windows
         {
             _newsDashboard=_dashboard;_newsFromPark=fromPark;_newsFromDashboard=!fromPark;
             _parkNews=Handheld::ParkInformation::NewsList();_parkNewsFocus=0;_parkNewsPage=0;
+            Handheld::Alerts::Invalidate();_parkAlerts=Handheld::Alerts::Current();
             _dashboard.section=Handheld::Dashboard::Section::overview;_dashboard.focus=Handheld::Dashboard::Focus::content;
             if(fromPark && !_parkNews.empty()) {
                 _parkNewsTarget=_parkNews.front();page(Page::parkNewsDetail);
@@ -2284,8 +2664,42 @@ namespace OpenRCT2::Ui::Windows
                     _focus.move(0,rows().size());
             } else page(Page::parkNews);
         }
+        // Hold Y in the park: the inbox list itself, alerts first, rather than the latest item.
+        void openInbox()
+        {
+            openNews(false);
+            _newsFromDashboard=false;_newsFromPark=true;
+        }
         // Scenario start shows the objective as a Pocket page instead of the desktop window;
         // B from it returns straight to the park, matching news opened from the park.
+        // The first-run controls intro. From the guide it returns there; otherwise it closes
+        // into the park. Finishing or skipping it marks it seen.
+        bool _primerFromGuide{};
+        void openPrimer(bool fromGuide)
+        {
+            _primerFromGuide = fromGuide;
+            page(Page::primer);
+            _focus = {};
+            _focus.move(0, rows().size());
+        }
+        void finishPrimer()
+        {
+            auto& store = Handheld::MenuThemes::settings;
+            store.Load(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user));
+            if (!Handheld::preferences.primerSeen)
+            {
+                Handheld::preferences.primerSeen = true;
+                store.SavePreferences();
+            }
+            if (_primerFromGuide) { page(Page::controls); _focus = {}; _focus.move(3, rows().size()); }
+            else close();
+        }
+        bool controlsIntro()
+        {
+            if (_page != Page::controls) return false;
+            openPrimer(true);
+            return true;
+        }
         void openObjectives()
         {
             _parkTabs.tab = 1;
@@ -2295,6 +2709,14 @@ namespace OpenRCT2::Ui::Windows
         }
         bool dashboardNews(){if(_page!=Page::dashboard)return false;openNews(false);return true;}
         bool pickerGroup(){
+            if (_page == Page::ridePicker) {
+                _rideCategory = (_rideCategory + 1) % kRideCategories.size();
+                _picker = {};
+                refreshPicker();
+                _status.clear();
+                invalidate();
+                return true;
+            }
             if (_page == Page::researchCatalog) {
                 _researchFilter=(_researchFilter+1)%8; _researchCatalog=Handheld::ResearchCatalog::Roster(_researchFilter);
                 _focus={};invalidate();return true;
@@ -2319,10 +2741,28 @@ namespace OpenRCT2::Ui::Windows
         {
             if (!picker() || (x == 0 && y == 0))
                 return;
+            // In the ride catalog the shoulders move through the type tabs instead of paging.
+            if (_page == Page::ridePicker && (y == 2 || y == -2))
+            {
+                const auto count = kRideCategories.size();
+                _rideCategory = (_rideCategory + (y > 0 ? 1 : count - 1)) % count;
+                _picker = {};
+                refreshPicker();
+                _status.clear();
+                invalidate();
+                return;
+            }
             refreshPicker();
             _picker.move(x, y);
             _status.clear();
             invalidate();
+        }
+        // Sounds follow what changed on screen, so every input path (lists, grids, rails,
+        // tabs) gets the same feedback without each handler playing its own.
+        void playFeelSound(Handheld::MenuFeel::Event event)
+        {
+            Handheld::PlayFeelSound(event, _feelBack);
+            _feelBack = false;
         }
         void pickerPause()
         {
@@ -2331,7 +2771,7 @@ namespace OpenRCT2::Ui::Windows
         }
         void onUpdate() override
         {
-            _menuFeel.Observe(scrollKey(), _focus.index() + (_dashboard.index() << 16));
+            playFeelSound(_menuFeel.Observe(scrollKey(), _focus.index() + (_dashboard.index() << 16), Handheld::MenuFeel::Clock(), static_cast<int>(_page)));
             if (_menuFeel.NeedsDraw()) invalidate();
             if(_scrollViews[scrollKey()].moving())invalidate();
             if (_page == Page::sceneryPicker) { refreshPicker(); invalidate(); }
@@ -2467,7 +2907,6 @@ namespace OpenRCT2::Ui::Windows
             if (shopManagement() && _shop && !Handheld::ShopManagement::Find(*_shop))
             {
                 _shop.reset();
-                _priceDraft.reset();
                 _status = "Shop no longer available";
                 invalidate();
             }
@@ -2499,6 +2938,8 @@ namespace OpenRCT2::Ui::Windows
         {
             if(!Handheld::RideManagement::Resolve(target)) { close();return; }
             openRide(target.id);
+            // What the tool just did (auto-placed access, say), shown until the next page change.
+            if(!sRideReturnNotice.empty()) {_status=std::exchange(sRideReturnNotice,{});invalidate();}
             if(context && context->target==target)
             {
                 _rideTabs=context->tabs;_rideFromPark=context->fromPark;_ridesRosterFocus=context->rosterFocus;
@@ -2575,6 +3016,106 @@ namespace OpenRCT2::Ui::Windows
                 || _page == Page::ridesAppearance || _page == Page::ridesMusic || _page == Page::ridesDispatch
                 || _page == Page::ridesOperations || _page == Page::ridesMaintenance;
         }
+        // Changes a ride's state straight away: opening, testing and closing are free and can be
+        // undone with the same switch, so they need no review screen.
+        void stepRideState(int direction, bool wrap)
+        {
+            const auto* ride = _ridesTarget ? Handheld::RideManagement::Resolve(*_ridesTarget) : nullptr;
+            if (!ride) return;
+            std::vector<RideStatus> states{ RideStatus::closed };
+            if (ride->supportsStatus(RideStatus::testing)) states.push_back(RideStatus::testing);
+            states.push_back(RideStatus::open);
+            const auto found = std::find(states.begin(), states.end(), ride->status);
+            const int current = found == states.end() ? 0 : static_cast<int>(found - states.begin());
+            int next = current + direction;
+            const int size = static_cast<int>(states.size());
+            next = wrap ? (next % size + size) % size : std::clamp(next, 0, size - 1);
+            if (next == current) return;
+            if (auto draft = Handheld::RideManagement::Begin(*_ridesTarget, states[next]))
+            {
+                const auto result = Handheld::RideManagement::Action(*draft, true);
+                if (result.error != GameActions::Status::ok)
+                    _status = result.getErrorMessage().empty() ? result.getErrorTitle() : result.getErrorMessage();
+                else
+                    _status.clear();
+            }
+            invalidate();
+        }
+        // Ride prices change in place, one native step per press (holding repeats). Each step is the
+        // same RideSetPriceAction the editor uses, so limits and park pricing rules still apply.
+        void adjustRidePrice(int direction)
+        {
+            if (!_ridesTarget) return;
+            auto draft = Handheld::RideManagement::Begin(*_ridesTarget);
+            if (!draft) { _status = "This park does not charge for rides"; invalidate(); return; }
+            Handheld::RideManagement::AdjustPrice(*draft, direction);
+            const auto result = Handheld::RideManagement::Action(*draft, true);
+            if (result.error != GameActions::Status::ok)
+                _status = result.getErrorMessage().empty() ? result.getErrorTitle() : result.getErrorMessage();
+            else
+                _status.clear();
+            invalidate();
+        }
+        // Rows above a two-column grid that are changed with Left/Right in place (a state switch, a
+        // price). Up/Down walks the controls, then the grid keeps its columns.
+        void controlsThenGridMove(int x, int y, size_t controls, const std::function<void(size_t, int)>& adjust)
+        {
+            const auto count = rows().size();
+            const auto current = _focus.index();
+            size_t next = current;
+            if (current < controls)
+            {
+                if (x) adjust(current, x);
+                else if (y < 0 && current > 0) next = current - 1;
+                else if (y > 0 && current + 1 < count) next = current + 1;
+            }
+            else
+            {
+                const size_t grid = current - controls, cells = count - controls;
+                if (y < 0 && grid < 2) next = controls - 1;
+                else if (y)
+                {
+                    const auto candidate = static_cast<int>(grid) + y * 2;
+                    if (candidate >= 0 && candidate < static_cast<int>(cells)) next = static_cast<size_t>(candidate) + controls;
+                    else if (y > 0 && grid / 2 < (cells - 1) / 2) next = count - 1;
+                }
+                else if (x < 0 && grid % 2) --next;
+                else if (x > 0 && grid % 2 == 0 && grid + 1 < cells) ++next;
+            }
+            _focus.move(static_cast<int>(next) - static_cast<int>(current), count);
+            invalidate();
+        }
+        void stepFunding(int direction, bool wrap)
+        {
+            if (!Handheld::ResearchManagement::FundingAvailable()) { _status = "Research funding unavailable"; invalidate(); return; }
+            auto draft = Handheld::ResearchManagement::Begin();
+            const int next = wrap ? (draft.funding + direction + 4) % 4 : std::clamp<int>(draft.funding + direction, 0, 3);
+            if (next == draft.funding) return;
+            draft.funding = static_cast<uint8_t>(next);
+            const auto result = Handheld::ResearchManagement::Action(draft, true);
+            _status = result.error == GameActions::Status::ok ? "" : Handheld::Finances::Feedback(result);
+            invalidate();
+        }
+        void setParkOpen(bool open)
+        {
+            auto draft = Handheld::ParkOverview::Begin();
+            if (!draft) { _status = "Park status locked by objective"; invalidate(); return; }
+            if (draft->baselineOpen == open) return;
+            const auto result = Handheld::ParkOverview::Action(*draft, true);
+            _status = result.error == GameActions::Status::ok ? "" : Handheld::Finances::Feedback(result);
+            invalidate();
+        }
+        void adjustAdmission(int direction)
+        {
+            if (!Handheld::Finances::Available(Handheld::Finances::Field::admission))
+            { _status = "Admission price locked"; invalidate(); return; }
+            auto draft = Handheld::Finances::Begin(Handheld::Finances::Field::admission);
+            Handheld::Finances::Adjust(draft, direction);
+            if (draft.value == draft.baseline) return;
+            const auto result = Handheld::Finances::Action(draft, true);
+            _status = result.error == GameActions::Status::ok ? "" : Handheld::Finances::Feedback(result);
+            invalidate();
+        }
         void enterDashboardContent()
         {
             using Handheld::Dashboard::Section;
@@ -2601,6 +3142,79 @@ namespace OpenRCT2::Ui::Windows
         {
             page(Page::dashboard);
         }
+        // A sign edited straight from the park (context A) goes back to the park, not to the
+        // scenery tool's options.
+        bool _signFromPark{};
+        void leaveSign()
+        {
+            if (_signFromPark)
+            {
+                _signFromPark = false;
+                close();
+            }
+            else
+                page(Page::sceneryOptions);
+        }
+        void openSignFromPark()
+        {
+            _signTarget = Handheld::SceneryEditTarget();
+            if (!_signTarget || _signTarget->banner == BannerIndex::GetNull())
+            {
+                close();
+                return;
+            }
+            _signFromPark = true;
+            _nameEntry = { _signTarget->text };
+            page(Page::sceneryName);
+        }
+        // Settings: A or Left/Right flips a row. Theme and Motion keep their own files; the rest
+        // live in pocket-prefs.cfg.
+        void toggleSetting(size_t row)
+        {
+            auto& store = Handheld::MenuThemes::settings;
+            store.Load(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user));
+            static constexpr std::array<const char*, 5> keys{ "smartCursor", "hudGoal", "hudClock", "resumeOnLaunch", "saveOnSleep" };
+            bool saved = true;
+            if (row == 0) saved = store.Toggle();
+            else if (row == 1) saved = store.ToggleMotion();
+            else if (row >= 2 && row <= 6) saved = store.TogglePreference(keys[row - 2]);
+            _status = saved ? "" : "Changed for this session; the preference could not be saved";
+            invalidate();
+        }
+        // The quick wheel's destinations. Build reopens on the card used last (Build remembers
+        // its focus), and "Again" confirms that card straight away.
+        void quickJump(Handheld::QuickWheel::Target target)
+        {
+            using T = Handheld::QuickWheel::Target;
+            using S = Handheld::Dashboard::Section;
+            switch (target)
+            {
+                case T::build: page(Page::build); break;
+                case T::repeat:
+                    _buildFocus = sLastBuildCard;
+                    page(Page::build);
+                    if (!sLastBuildLabel.empty()) confirm();
+                    break;
+                case T::map:
+                    _parkMap.Begin();
+                    page(Page::parkMap);
+                    break;
+                case T::rides:
+                case T::staff:
+                case T::finances:
+                case T::guests:
+                    _dashboard.section = target == T::rides ? S::rides : target == T::staff ? S::staff
+                        : target == T::finances ? S::finances : S::guests;
+                    page(Page::dashboard);
+                    _dashboard.section = target == T::rides ? S::rides : target == T::staff ? S::staff
+                        : target == T::finances ? S::finances : S::guests;
+                    enterDashboardContent();
+                    break;
+                case T::pause: break;
+            }
+            invalidate();
+        }
+
         void dashboardPause()
         {
             if (guardLeave([this] { dashboardPause(); }))
@@ -2662,7 +3276,24 @@ namespace OpenRCT2::Ui::Windows
                 if(y>0) move(static_cast<int>(3-_focus.index()));
                 invalidate();
             }
-            else if (_page == Page::ridesInspect || _page == Page::overview || _page==Page::finances || _page==Page::research
+            else if (_page == Page::ridesInspect && _rideTabs.tab == Handheld::RideTabs::overview)
+            {
+                const auto model = ridesPresentationFor(_page, _focus.index());
+                controlsThenGridMove(x, y, model.settingRows.empty() ? 1 : 2, [this](size_t row, int dx) {
+                    if (row == 0) stepRideState(dx, false); else adjustRidePrice(dx);
+                });
+            }
+            else if (_page == Page::finances && _financeTabs.tab == 3)
+                controlsThenGridMove(x, y, 1, [this](size_t, int dx) { adjustAdmission(dx); });
+            else if (_page == Page::research && _researchTabs.tab == 0)
+                controlsThenGridMove(x, y, 1, [this](size_t, int dx) { stepFunding(dx, false); });
+            else if (_page == Page::overview && !_overviewDraft)
+            {
+                controlsThenGridMove(x, y, 2, [this](size_t row, int dx) {
+                    if (row == 0) setParkOpen(dx > 0); else adjustAdmission(dx);
+                });
+            }
+            else if (_page == Page::ridesInspect || _page == Page::overview || _page==Page::finances || _page==Page::research || _page==Page::guests
                 || (_page==Page::marketing&&_marketingTabs.tab==1)
                 || (_page==Page::staffInspect && _staffTabs.tab!=1) || (_page==Page::guestInspect && _guestTabs.tab!=1 && _guestTabs.tab!=2))
             {
@@ -2784,6 +3415,12 @@ namespace OpenRCT2::Ui::Windows
         {
             if (_leaveAction)
                 return;
+            // L1/R1 step the guide's sections and the intro's cards, as their tabs suggest.
+            if (_page == Page::controls || _page == Page::primer)
+            {
+                constructionMove(direction, 0);
+                return;
+            }
             if (dutiesDirty() && guardLeave([this, direction] { dashboardPage(direction); }))
                 return;
             if (dashboardRailFocused())
@@ -2976,6 +3613,33 @@ namespace OpenRCT2::Ui::Windows
             if (financeManagement())
                 page(Page::park);
         }
+        bool keyboardPage() const
+        {
+            return _page == Page::saveName || _page == Page::sceneryName || _page == Page::scenerySearch || _page == Page::ridesName
+                || _page == Page::designName || _page == Page::staffName || _page == Page::guestName || _page == Page::guestFilterName;
+        }
+        // Console keyboards put the common keys on face buttons. Each shortcut presses the real key
+        // (focus it, confirm, restore focus), so every screen's own handling still runs.
+        bool textEntryKey(Handheld::Action action)
+        {
+            if (!keyboardPage()) return false;
+            using T = Handheld::TextEntry;
+            const size_t key = action == Handheld::Action::contextSecondary ? T::kDelete
+                : action == Handheld::Action::contextPrimary                ? T::kSpace
+                : action == Handheld::Action::previousOption                ? T::kCase
+                : action == Handheld::Action::openMenu                      ? T::kDone
+                                                                            : SIZE_MAX;
+            if (key == SIZE_MAX) return false;
+            const auto count = rows().size();
+            if (key >= count) return false;
+            const auto saved = _focus.index();
+            _focus.move(static_cast<int>(key) - static_cast<int>(saved), count);
+            confirm();
+            if (keyboardPage() && key != T::kDone)
+                _focus.move(static_cast<int>(saved) - static_cast<int>(_focus.index()), rows().size());
+            invalidate();
+            return true;
+        }
         bool shopIsOpen() const
         {
             return shopManagement();
@@ -2992,19 +3656,36 @@ namespace OpenRCT2::Ui::Windows
                 invalidate();
                 return;
             }
+            if (_page == Page::shop)
+            {
+                controlsThenGridMove(x, y, 1 + shopPriceCount(), [this](size_t row, int dx) {
+                    if (row == 0) setShopOpen(dx > 0);
+                    else adjustShopPrice(row - 1, dx);
+                });
+                return;
+            }
             if (y != 0)
-            {
                 move(y);
-                _priceDraft.reset();
-            }
-            if (_page == Page::shopPrices && _shop && x != 0)
-            {
-                const auto prices = Handheld::ShopManagement::Prices(*_shop);
-                if (_focus.index() < prices.size())
-                    _priceDraft = std::clamp(
-                        _priceDraft.value_or(prices[_focus.index()].value) + x, kRideMinPrice, kRideMaxPrice);
-                invalidate();
-            }
+        }
+        void setShopOpen(bool open)
+        {
+            const auto* ride = _shop ? Handheld::ShopManagement::Find(*_shop) : nullptr;
+            if (!ride || (ride->status == RideStatus::open) == open) return;
+            const auto result = Handheld::ShopManagement::SetStatus(*_shop, open);
+            _status = result.error == GameActions::Status::ok ? "" : result.getErrorMessage();
+            invalidate();
+        }
+        void adjustShopPrice(size_t index, int direction)
+        {
+            if (!_shop) return;
+            if (getGameState().park.flags.has(ParkFlag::noMoney)) { _status = "This park does not charge"; invalidate(); return; }
+            const auto prices = Handheld::ShopManagement::Prices(*_shop);
+            if (index >= prices.size()) return;
+            const auto next = std::clamp<money64>(prices[index].value + direction, kRideMinPrice, kRideMaxPrice);
+            if (next == prices[index].value) return;
+            const auto result = Handheld::ShopManagement::SetPrice(*_shop, prices[index].primary, next);
+            _status = result.error == GameActions::Status::ok ? "" : result.getErrorMessage();
+            invalidate();
         }
         void shopPause()
         {
@@ -3138,9 +3819,19 @@ namespace OpenRCT2::Ui::Windows
                 invalidate();
                 return;
             }
-            const auto count=rows().size();
+            const auto visible=rows();
+            const auto count=visible.size();
             if(count) {
-                const auto next=std::clamp<int64_t>(static_cast<int64_t>(_focus.index())+direction,0,static_cast<int64_t>(count)-1);
+                auto next=std::clamp<int64_t>(static_cast<int64_t>(_focus.index())+direction,0,static_cast<int64_t>(count)-1);
+                // Hidden "Back to ..." rows (B does that) are stepped over, unless nothing else is left.
+                if(managementShell() && direction!=0)
+                {
+                    const int step=direction>0?1:-1;
+                    auto probe=next;
+                    while(probe>=0 && probe<static_cast<int64_t>(count) && Handheld::IsBackRow(visible[probe])) probe+=step;
+                    if(probe>=0 && probe<static_cast<int64_t>(count)) next=probe;
+                    else if(Handheld::IsBackRow(visible[next])) next=_focus.index();
+                }
                 _focus.move(static_cast<int32_t>(next)-static_cast<int32_t>(_focus.index()),count);
             }
             if ((_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles)) { _fileFocus = _focus.index(); _fileDetail = 0; }
@@ -3149,6 +3840,8 @@ namespace OpenRCT2::Ui::Windows
         }
         void back()
         {
+            _menuFeel.MarkBack();
+            _feelBack = true;
             if (_leaveAction)
             {
                 cancelLeave();
@@ -3181,9 +3874,16 @@ namespace OpenRCT2::Ui::Windows
             }
             switch (_page)
             {
+                case Page::primer:
+                    finishPrimer();
+                    break;
                 case Page::controls:
                     page(Page::park);
                     _focus.move(7, rows().size());
+                    break;
+                case Page::settings:
+                    page(Page::park);
+                    _focus.move(14, rows().size());
                     break;
                 case Page::researchCatalog:
                     page(Page::research); break;
@@ -3257,7 +3957,7 @@ namespace OpenRCT2::Ui::Windows
                     else _focus.move(static_cast<int>(_scenerySearchRow),rows().size());
                     break;
                 case Page::sceneryName:
-                    page(Page::sceneryOptions);
+                    leaveSign();
                     break;
                 case Page::sceneryConfirm:
                     page(Page::sceneryName);
@@ -3319,7 +4019,6 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 }
                 case Page::shopAppearance:
-                case Page::shopPrices:
                 case Page::shopDemolish:
                     page(Page::shop);
                     break;
@@ -3504,7 +4203,10 @@ namespace OpenRCT2::Ui::Windows
                     if (_objectivesFromPark)
                     {
                         _objectivesFromPark = false;
-                        close();
+                        // A new scenario: the first time ever, the controls intro follows the goal.
+                        Handheld::MenuThemes::settings.Load(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user));
+                        if (!Handheld::preferences.primerSeen) openPrimer(false);
+                        else close();
                         break;
                     }
                     page(Page::dashboard);
@@ -3840,6 +4542,10 @@ namespace OpenRCT2::Ui::Windows
                         invalidate();
                     }
                     break;
+                case Page::primer:
+                    if (_focus.index() + 1 < rows().size()) { _focus.move(1, rows().size()); invalidate(); }
+                    else finishPrimer();
+                    break;
                 case Page::controls:
                     page(Page::park);
                     _focus.move(7, rows().size());
@@ -3879,10 +4585,22 @@ namespace OpenRCT2::Ui::Windows
                                 ? "Theme changed" : "Theme changed for this session; preference could not be saved";
                             invalidate();
                             break;
+                        case 13:
+                            Handheld::MenuThemes::settings.Load(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user));
+                            _status = Handheld::MenuThemes::settings.ToggleMotion()
+                                ? "Motion changed" : "Motion changed for this session; preference could not be saved";
+                            invalidate();
+                            break;
                         case 8: case 9: case 10: case 11:
                             chooseSimulation(static_cast<uint8_t>(choice - 8));
                             break;
+                        case 14:
+                            page(Page::settings);
+                            break;
                     }
+                    break;
+                case Page::settings:
+                    toggleSetting(choice);
                     break;
                 case Page::sceneryCategory:
                     if (choice == 5) {close();Handheld::BeginSceneryClear();}
@@ -3920,13 +4638,13 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::sceneryName:
                     if (choice == 47)
-                        page(Page::sceneryOptions);
+                        leaveSign();
                     else if (choice == 46 && _signTarget)
                     {
                         const auto query = Handheld::SceneryTools::SetText(*_signTarget, _nameEntry.text, true);
                         if (query.error == GameActions::Status::ok)
                         {
-                            page(Page::sceneryOptions);
+                            leaveSign();
                         }
                         else
                         {
@@ -3947,7 +4665,7 @@ namespace OpenRCT2::Ui::Windows
                     {
                         const auto result = Handheld::SceneryTools::SetText(*_signTarget, _nameEntry.text, true);
                         if (result.error == GameActions::Status::ok)
-                            page(Page::sceneryOptions);
+                            leaveSign();
                         else
                         {
                             _status = result.getErrorMessage();
@@ -4166,6 +4884,13 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::build:
+                    for (const auto& card : choices())
+                        if (card.action == choice)
+                        {
+                            sLastBuildCard = choice;
+                            sLastBuildLabel = card.label;
+                            sLastBuildSprite = card.sprite;
+                        }
                     if (choice == 12)
                     {
                         close();
@@ -4531,7 +5256,7 @@ namespace OpenRCT2::Ui::Windows
                     if(_financeTabs.tab==2){_financeGraph=(_financeGraph+1)%3;invalidate();break;}
                     if(_financeTabs.tab==0&&choice>0){financeTab(choice);break;}
                     {
-                        const auto field=choice==0?Handheld::Finances::Field::loan:Handheld::Finances::Field::admission;
+                        const auto field=choice==0?Handheld::Finances::Field::admission:Handheld::Finances::Field::loan;
                         if(Handheld::Finances::Available(field))
                         {_financeReturnPage=Page::finances;_financeDraft=Handheld::Finances::Begin(field);page(Page::financeEditor);}
                     }
@@ -4583,9 +5308,17 @@ namespace OpenRCT2::Ui::Windows
                     else back();
                     break;
                 case Page::parkNews:
+                    if (choice < _parkAlerts.size())
+                    {
+                        const auto index = choice;
+                        close();
+                        Handheld::JumpToAlert(_parkAlerts[index]);
+                        break;
+                    }
+                    choice -= _parkAlerts.size();
                     if (choice < _parkNews.size())
                     {
-                        _parkNewsTarget = _parkNews[choice]; _parkNewsFocus = choice; _parkNewsPage = 0;
+                        _parkNewsTarget = _parkNews[choice]; _parkNewsFocus = choice + _parkAlerts.size(); _parkNewsPage = 0;
                         page(Page::parkNewsDetail);
                     }
                     else { _parkNews = Handheld::ParkInformation::NewsList(); invalidate(); }
@@ -4663,14 +5396,9 @@ namespace OpenRCT2::Ui::Windows
                     }
                     else if (choice == 0)
                     {
-                        _overviewDraft = Handheld::ParkOverview::Begin();
-                        if (_overviewDraft)
-                            page(Page::overviewConfirm);
-                        else
-                        {
-                            _status = "Park status locked by objective";
-                            invalidate();
-                        }
+                        // Opening and closing the park is free and reversible: change it in place.
+                        const bool open = getGameState().park.flags.has(ParkFlag::parkOpen);
+                        setParkOpen(!open);
                     }
                     else if (Handheld::Finances::Available(Handheld::Finances::Field::admission))
                     {
@@ -4896,12 +5624,32 @@ namespace OpenRCT2::Ui::Windows
                         page(choice == 0 ? Page::ridesCustomers : choice == 1 ? Page::ridesEarnings : Page::ridesGraphs);
                         break;
                     }
+                    if (_rideTabs.tab == Handheld::RideTabs::overview)
+                    {
+                        // Row 0 is the state switch: A steps to the next state, wrapping round.
+                        if (choice == 0) { stepRideState(1, true); break; }
+                        --choice;
+                    }
                     auto nativeModel = Handheld::RideManagement::Presentation(
                         Handheld::RideManagement::View::inspection,0,_ridesRoster,_ridesTarget);
                     const auto indices = Handheld::RideTabs::Indices(nativeModel,_rideTabs.tab);
                     if (choice >= indices.size()) break;
                     choice = indices[choice];
                     auto rows = nativeModel.rows;
+                    if (const auto along = std::find(rows.begin(), rows.end(), "Ride along"); along != rows.end())
+                    {
+                        const auto index = static_cast<size_t>(along - rows.begin());
+                        if (choice == index)
+                        {
+                            const auto ride = _ridesTarget->id;
+                            Handheld::GuestFollow::Stop();
+                            close();
+                            if (!Handheld::RideFollow::Start(ride))
+                                GetWindowManager()->ShowError("Ride along", "This ride has no trains yet");
+                            break;
+                        }
+                        rows.erase(along); if (choice > index) --choice;
+                    }
                     const auto accessRow = std::find(rows.begin(), rows.end(), "Entrances / exits...");
                     if (accessRow != rows.end())
                     {
@@ -5365,16 +6113,17 @@ namespace OpenRCT2::Ui::Windows
                     else applyRideDraft();
                     break;
                 case Page::guests:
-                    if (choice == 2 || choice == 3)
+                    // Rows: roster, thoughts, actions, tracked, (hidden) back.
+                    if (choice == 1 || choice == 2)
                     {
                         _guestGroupMode = choice == 2 ? Handheld::GuestManagement::GroupMode::actions
                                                       : Handheld::GuestManagement::GroupMode::thoughts;
                         _guestGroupFocus = 0;
                         page(Page::guestGroups);
                     }
-                    else if (choice == 0 || choice == 4)
+                    else if (choice == 0 || choice == 3)
                     {
-                        _guestFilter = { {}, choice == 4 };
+                        _guestFilter = { {}, choice == 3 };
                         _guestRosterParent = Page::guests;
                         _guestRosterFocus = 3;
                         page(Page::guestRoster);
@@ -5739,7 +6488,9 @@ namespace OpenRCT2::Ui::Windows
                 case Page::research:
                     if(_researchTabs.tab==0)
                     {
-                        if(choice==0)researchTab(1);
+                        // Rows: funding switch, priorities, catalog.
+                        if(choice==0)stepFunding(1,true);
+                        else if(choice==1)researchTab(1);
                         else {_researchFilter=0;_researchCatalog=Handheld::ResearchCatalog::Roster(0);page(Page::researchCatalog);}
                     }
                     else if(_researchDraft)
@@ -5804,14 +6555,12 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::shop:
+                {
+                    const size_t priceRows = shopPriceCount();
+                    if (choice >= 1 + priceRows) choice = choice - priceRows + 1; // Map the grid onto 2..4.
+                    else if (choice >= 1) { invalidate(); break; } // Prices change with Left/Right.
                     if (!_shop || !Handheld::ShopManagement::Find(*_shop))
                         _status = "Shop no longer available";
-                    else if (choice == 1)
-                    {
-                        if (!getGameState().park.flags.has(ParkFlag::noMoney)
-                            && !Handheld::ShopManagement::Prices(*_shop).empty())
-                            page(Page::shopPrices);
-                    }
                     else if (choice == 4) {page(Page::shopAppearance);_shopAppearanceChannel=0;}
                     else if (choice == 3)
                     {
@@ -5830,11 +6579,11 @@ namespace OpenRCT2::Ui::Windows
                     {
                         const auto result = Handheld::ShopManagement::SetStatus(
                             *_shop, Handheld::ShopManagement::Find(*_shop)->status != RideStatus::open);
-                        _status = result.error == GameActions::Status::ok ? "Status updated"
-                                                                          : result.getErrorMessage();
+                        _status = result.error == GameActions::Status::ok ? "" : result.getErrorMessage();
                     }
                     invalidate();
                     break;
+                }
                 case Page::shopAppearance:
                     if(!_shop || choice>=Handheld::ShopAppearance::Settings(*_shop).size())page(Page::shop);
                     else {
@@ -5858,21 +6607,6 @@ namespace OpenRCT2::Ui::Windows
                 case Page::shopAppearanceReview:
                     if(choice==0) {back();break;}
                     applyShopAppearanceDraft();
-                    break;
-                case Page::shopPrices:
-                    if (_shop)
-                    {
-                        const auto prices = Handheld::ShopManagement::Prices(*_shop);
-                        if (choice < prices.size() && _priceDraft)
-                        {
-                            const auto result = Handheld::ShopManagement::SetPrice(
-                                *_shop, prices[choice].primary, *_priceDraft);
-                            _status = result.error == GameActions::Status::ok ? "Price updated"
-                                                                              : result.getErrorMessage();
-                            _priceDraft.reset();
-                        }
-                    }
-                    invalidate();
                     break;
                 case Page::shopDemolish:
                     if (choice == 1)
@@ -5961,9 +6695,8 @@ namespace OpenRCT2::Ui::Windows
                 case Page::saveFiles:
                     if(choice==0) editSaveName(fs::u8path(gScenarioSavePath).stem().u8string());
                     else if(choice==1) { _files.Parent(); _fileFocus=0; page(Page::saveFiles); }
-                    else if(choice==2) { _files.Refresh(); _fileFocus=0; _focus={}; invalidate(); }
-                    else if(choice-3<_files.entries.size()) {
-                        const auto entry=_files.entries[choice-3];
+                    else if(choice-1-Handheld::FileBrowsing::kFirst<_files.entries.size()) {
+                        const auto entry=_files.entries[choice-1-Handheld::FileBrowsing::kFirst];
                         if(entry.directory) { _files.Open(entry.path,_files.pattern); _fileFocus=0; page(Page::saveFiles); }
                         else editSaveName(entry.path.stem().u8string());
                     }
@@ -5988,11 +6721,11 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::designFiles:
                     if(choice==0) { const auto child=_files.directory;_files.Parent();_fileFocus=0;
-                        for(size_t i=0;i<_files.entries.size();++i)if(_files.entries[i].path==child)_fileFocus=i+2;
+                        for(size_t i=0;i<_files.entries.size();++i)if(_files.entries[i].path==child)_fileFocus=i+Handheld::FileBrowsing::kFirst;
                         page(Page::designFiles);
-                    } else if(choice==1) { TrackRepositoryScan();_files.Refresh();_focus={};_fileFocus=0;invalidate(); }
-                    else if(choice-2<_files.entries.size()) {
-                        const auto entry=_files.entries[choice-2];
+                    }
+                    else if(choice-Handheld::FileBrowsing::kFirst<_files.entries.size()) {
+                        const auto entry=_files.entries[choice-Handheld::FileBrowsing::kFirst];
                         if(entry.directory) {_files.Open(entry.path,_files.pattern);_fileFocus=0;page(Page::designFiles);}
                         else {
                             _designFile=Handheld::FileBrowsing::Capture(entry.path);
@@ -6048,18 +6781,15 @@ namespace OpenRCT2::Ui::Windows
                 {
                     if (choice == 0) {
                         const auto previous = _files.directory; _files.Parent(); _fileFocus=0;
-                        for (size_t i=0;i<_files.entries.size();++i) if (_files.entries[i].path == previous) _fileFocus=i+2;
+                        for (size_t i=0;i<_files.entries.size();++i) if (_files.entries[i].path == previous) _fileFocus=i+Handheld::FileBrowsing::kFirst;
                         _fileDetail=0; page(Page::parkFiles);
                     }
-                    else if (choice == 1) {
-                        _files.Refresh(); _focus={}; _fileFocus=0; invalidate();
-                    }
-                    else if (choice - 2 < _files.entries.size()) {
-                        const auto entry = _files.entries[choice - 2];
+                    else if (choice - Handheld::FileBrowsing::kFirst < _files.entries.size()) {
+                        const auto entry = _files.entries[choice - Handheld::FileBrowsing::kFirst];
                         if (entry.directory) { _files.Open(entry.path, _files.pattern); _fileFocus=0; _fileDetail=0; page(Page::parkFiles); }
                         else {
                             _loadFile = Handheld::FileBrowsing::Capture(entry.path);
-                            if (!_loadFile) { _status="File unavailable. Refresh the folder."; invalidate(); }
+                            if (!_loadFile) { _status="File unavailable. Open the folder again."; invalidate(); }
                             else {
                                 _parkFilePreview.reset(); _parkPreviewStatus="Preview unavailable for this format";
                                 if(ParkImporter::ExtensionIsOpenRCT2ParkFile(_loadFile->path.extension().u8string())) {
@@ -6117,6 +6847,7 @@ namespace OpenRCT2::Ui::Windows
                     {
                         close();
                         // The deliberate Pocket discard confirmation is final.
+                        Handheld::Resume::Discard();
                         GetContext()->Finish();
                     }
                     else
@@ -6129,12 +6860,33 @@ namespace OpenRCT2::Ui::Windows
             if (widget == 2)
                 back();
         }
-        void onDraw(RenderTarget& rt) override
+        void onDraw(RenderTarget& screen) override
         {
             Handheld::MenuThemes::settings.Load(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user));
             Handheld::Theme::Refresh();
-            _menuFeel.Observe(scrollKey(), _focus.index() + (_dashboard.index() << 16));
+            Handheld::ApplyAccent(accent());
+            playFeelSound(_menuFeel.Observe(scrollKey(), _focus.index() + (_dashboard.index() << 16), Handheld::MenuFeel::Clock(), static_cast<int>(_page)));
+            // Page transitions offset a copy of the target, so every draw below slides together.
+            RenderTarget rt = screen;
+            const auto [slideX, slideY] = _menuFeel.Slide();
+            rt.x -= slideX;
+            rt.y -= slideY;
+            rt.cullingX -= slideX;
+            rt.cullingY -= slideY;
             Handheld::MenuFeelScope buttonMotion(_menuFeel);
+            Handheld::FooterSurfaceScope fixedFooter(screen);
+            _menuFeel.base = { reinterpret_cast<const uint8_t*>(rt.bits), rt.x, rt.y, rt.LineStride() };
+            // Runs after every early return below, drawing the pointer above all content.
+            struct PointerOverlay
+            {
+                RenderTarget& target;
+                Handheld::MenuFeel& feel;
+                ~PointerOverlay()
+                {
+                    feel.EndFrame();
+                    Handheld::DrawFocusPointer(target, feel);
+                }
+            } pointerOverlay{ rt, _menuFeel };
             Handheld::ListScrollScope listMotion(_scrollViews[scrollKey()]);
             if(_page==Page::staffUniform && _staffTarget) {
                 auto model=staffPresentation();model.breadcrumb="Staff / Uniform colour";
@@ -6144,6 +6896,12 @@ namespace OpenRCT2::Ui::Windows
             if(_page==Page::accessManage || _page==Page::accessPoint){drawAccessSelection(rt);return;}
 
             if (_page == Page::trackBlocks || _page == Page::trackBlock || _page==Page::trackContext) { drawTrackSelection(rt); return; }
+            if (_page == Page::build)
+            {
+                Handheld::DrawChoiceGroups(rt, {ContextGetWidth(), ContextGetHeight()}, "Build", choices(),
+                    {{"BUILD", 104}, {"SHAPE THE LAND", 70}, {"TOOLS", 30}}, _focus.index(), "Park");
+                return;
+            }
             if (choiceCards())
             {
                 Handheld::DrawChoiceCards(rt, {ContextGetWidth(), ContextGetHeight()},
@@ -6152,34 +6910,53 @@ namespace OpenRCT2::Ui::Windows
                     choices(), _focus.index(), _page == Page::build ? 4 : 3, _page == Page::build ? "Park" : "Back");
                 return;
             }
+            if (_page == Page::settings)
+            {
+                // Grouped toggles, with what the focused one does spelled out underneath.
+                using namespace Handheld;
+                const ScreenSize canvas{ ContextGetWidth(), ContextGetHeight() };
+                const int w = canvas.width - 16, h = Layout::ContentHeight(canvas);
+                DrawSurface(rt, { 8, 8 }, { w, h });
+                DrawHeadingText(rt, { 20, 19 }, "{WHITE}Settings", w - 24);
+                Fill(rt, { 20, 45 }, { w - 24, 1 }, Theme::edge);
+                const auto& prefs = Handheld::preferences;
+                struct Row { const char* section; const char* label; bool on; std::string value; const char* help; };
+                const std::array<Row, 7> list{ {
+                    { "DISPLAY", "Theme", false, MenuThemes::Choice().substr(7), "Daylight, Slate or the classic Pixel look." },
+                    { nullptr, "Motion", false, MenuThemes::MotionChoice().substr(8), "Reduced turns off slides, glides and scrolling names." },
+                    { "PLAYING", "Smart cursor", prefs.smartCursor, {}, "The cursor slows over rides, stalls and guests so it is easier to stop on them." },
+                    { "HUD", "Goal in the HUD", prefs.hudGoal, {}, "Shows your scenario goal's progress under the money and date." },
+                    { nullptr, "Clock and battery in the HUD", prefs.hudClock, {}, "Shows the time and battery level in the top bar." },
+                    { "DEVICE", "Continue last park on launch", prefs.resumeOnLaunch, {}, "Skips the title screen and opens the park you played last." },
+                    { nullptr, "Save when the device sleeps", prefs.saveOnSleep, {}, "Autosaves when the device sleeps or the game is closed, so nothing is lost." },
+                } };
+                int y = 52;
+                const auto focused = _focus.index();
+                for (size_t i = 0; i < list.size(); ++i)
+                {
+                    if (list[i].section)
+                    {
+                        DrawSectionLabel(rt, { 22, y + 4 }, w - 28, list[i].section);
+                        y += 18;
+                    }
+                    DrawToggleRow(rt, { 16, y }, w - 16, list[i].label, list[i].on, i == focused, list[i].value);
+                    y += 28;
+                }
+                if (focused < list.size())
+                    DrawModernEllipsised(rt, { 20, h - 10 }, w - 24, "{MUTED}" + std::string(list[focused].help));
+                if (!_status.empty())
+                    DrawModernEllipsised(rt, { 20, h - 24 }, w - 24, "{CAUTION}" + _status);
+                Handheld::DrawFooter(rt, canvas, { { "D-pad", "Choose" }, { "A", "Change" }, { "B", "Back" } });
+                return;
+            }
             if (_page == Page::controls)
             {
-                using namespace Handheld;
-                Concept::Box(rt,{8,8},{496,340});
-                DrawModernText(rt,{20,24},"{GOLD}Controller guide",{},460,true);
-                DrawTabs(rt,{20,48},472,{"Park","Build","Menus"},_focus.index());
-                Concept::Box(rt,{24,104},{190,170});
-                DrawCommand(rt,{42,154},0,"D-pad","");
-                DrawCommand(rt,{164,130},0,"X","");DrawCommand(rt,{142,153},0,"Y","");
-                DrawCommand(rt,{185,153},0,"A","");DrawCommand(rt,{164,176},0,"B","");
-                DrawCommand(rt,{40,115},0,"L1","");DrawCommand(rt,{166,115},0,"R1","");
-                DrawCommand(rt,{40,229},0,"SELECT","");DrawCommand(rt,{134,229},0,"START","");
-                const auto tab=_focus.index();
-                std::vector<std::pair<std::string,std::string>> lines;
-                const auto key=[](Action a){return std::string(ActionKey(a));};
-                if(tab==0)lines={{"D-pad","Move through park"},{key(Action::confirm),"Inspect / use tool"},
-                    {key(Action::back),"Cancel / Park menu"},{key(Action::contextPrimary),"Rotate view"},
-                    {"L1/R1","Zoom view"},{key(Action::openBuild),"Build menu"},{key(Action::openMenu),"Park menu"}};
-                else if(tab==1)lines={{"D-pad","Move / adjust"},{key(Action::confirm),"Build / apply"},
-                    {key(Action::contextSecondary),"Tool options"},{"L2/R2","Height / slope / brush"},
-                    {key(Action::openBuild),"Catalog / more options"},{key(Action::back),"Back / cancel"},
-                    {"L1/R1","Zoom / connected piece"}};
-                else lines={{"D-pad","Choose / adjust value"},{key(Action::confirm),"Select / apply"},
-                    {key(Action::back),"Back / discard draft"},{"L1/R1","Tabs / browse list"},
-                    {key(Action::contextSecondary),"Catalog category"},{"START+SELECT","Quit review"}};
-                for(size_t i=0;i<lines.size();++i)DrawCommand(rt,{230,109+static_cast<int>(i)*30},0,lines[i].first.c_str(),lines[i].second.c_str());
-                DrawModernText(rt,{24,306},"Tools show their current actions in the footer.",{},464);
-                DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Section"},{std::string(ActionKey(Action::back)),"Back"}});
+                Handheld::Guide::DrawPage(rt, { ContextGetWidth(), ContextGetHeight() }, _focus.index());
+                return;
+            }
+            if (_page == Page::primer)
+            {
+                Handheld::Guide::DrawIntro(rt, { ContextGetWidth(), ContextGetHeight() }, _focus.index());
                 return;
             }
             if (_leaveAction)
@@ -6230,8 +7007,34 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::DrawManagementContent(rt,{8,36},{240,312},model);
                 Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Choose"},{"A","Toggle / select"},{"B","Back"}});return;
             }
-            if (_page == Page::save || _page == Page::load || _page == Page::parkInspect || _page == Page::designInspect) {
-                const bool slots=_page==Page::save || _page==Page::load;
+            if (_page == Page::save || _page == Page::load) {
+                // Save slots as cards (picture, name, date, how the park is doing), then Browse.
+                const ScreenSize canvas{ ContextGetWidth(), ContextGetHeight() };
+                const ScreenCoordsXY p{ Handheld::Layout::margin, Handheld::Layout::margin };
+                const int w = canvas.width - 2 * Handheld::Layout::margin, h = Handheld::Layout::ContentHeight(canvas);
+                const bool saving = _page == Page::save;
+                Handheld::DrawSurface(rt, p, { w, h });
+                Handheld::DrawHeadingText(rt, p + ScreenCoordsXY{ 12, 11 }, saving ? "{WHITE}Save park" : "{WHITE}Load park", w - 24);
+                Handheld::Fill(rt, p + ScreenCoordsXY{ 12, 37 }, { w - 24, 1 }, Handheld::Theme::edge);
+                const int cardH = std::clamp((h - 46 - 46 - 12) / 3, 52, 70);
+                int y = 46;
+                for (size_t slot = 0; slot < 3; ++slot)
+                {
+                    std::error_code error;
+                    Handheld::SavedParkPresentation::DrawSlot(rt, p + ScreenCoordsXY{ 12, y }, { w - 24, cardH }, slot,
+                        _slotPreviews[slot], fs::exists(SlotPath(slot), error), _focus.index() == slot, saving);
+                    y += cardH + 6;
+                }
+                Handheld::DrawActionRow(rt, p + ScreenCoordsXY{ 12, y + 4 }, { w - 24, 30 },
+                    saving ? "Save with a name..." : "Browse parks and autosaves...", "", _focus.index() == 3, true,
+                    Handheld::PanelIcon::folder);
+                if (!_status.empty())
+                    Handheld::DrawModernEllipsised(rt, p + ScreenCoordsXY{ 12, h - 16 }, w - 24, "{WHITE}" + _status);
+                Handheld::DrawFooter(rt, canvas, { { "D-pad", "Choose" }, { "A", saving ? "Save" : "Load" }, { "B", "Back" } });
+                return;
+            }
+            if (_page == Page::parkInspect || _page == Page::designInspect) {
+                const bool slots=false;
                 const bool design=_page==Page::designInspect;
                 Handheld::ManagementPresentation model;model.rows=rows();model.selected=_focus.index();model.rowHeight=38;
                 model.title=slots?(_page==Page::save?"Save park":"Load park"):design?"Saved design":"Saved park";
@@ -6262,15 +7065,8 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::DrawObjectPicker(rt,{ContextGetWidth(),ContextGetHeight()},picker,
                     research?"Research catalog":"Choose vehicle", research?"Y: "+Handheld::ResearchCatalog::Category(_researchFilter):"Compatible vehicles",
                     research?"No researched items":"No compatible vehicles");
-                Handheld::Concept::Box(rt,{336,36},{168,312});
-                if (const auto* entry=picker.selected()) {
-                    Handheld::DrawWrappedLabel(rt,{346,54},148,entry->name,5);
-                    if (research && _focus.index()<_researchCatalog.size()) {
-                        const auto& item=_researchCatalog[_focus.index()];
-                        Handheld::DrawWrappedLabel(rt,{346,164},148,Handheld::ResearchCatalog::Category(EnumValue(item.item.category)+1),3);
-                        Handheld::DrawWrappedLabel(rt,{346,235},148,Handheld::ResearchCatalog::Invented(item.item)?"Researched":Handheld::ResearchCatalog::Loaded(item.item)?"Not researched":"Object unavailable",3);
-                    } else Handheld::DrawWrappedLabel(rt,{346,200},148,"Train settings and compatibility warnings remain in Details.",5);
-                }
+                // The full-screen picker has its own detail pane (name, preview, detail line); the old
+                // overlay box drew on top of it, and of its empty state.
                 Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Choose"},{"A",research?"Details":"Use vehicle"},{"Y",research?"Category":""},{"B","Back"}});
                 return;
             }
@@ -6392,16 +7188,35 @@ namespace OpenRCT2::Ui::Windows
             }
             if ((_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles))
             {
+                // Files as a list you would see on a console: friendly names, what each one is and
+                // when it was saved, folders marked as folders, and the folder's name (not its path)
+                // in the header.
+                namespace FB = Handheld::FileBrowsing;
                 Handheld::ManagementPresentation model;
                 model.breadcrumb = std::string(_page == Page::designFiles ? "Designs / " : _page == Page::saveFiles ? "Save / " : "Load / ") + _files.directory.u8string();
-                model.title = _page == Page::designFiles ? "Track design files" : _page == Page::saveFiles ? "Save As destination" : "Parks and autosaves";
-                model.rows = rows(); model.selected = _focus.index();
-                model.bodyLines={Handheld::FileBrowsing::Detail(fileDetailPath(),_fileDetail)};
+                model.title = _page == Page::designFiles ? "Track designs" : _page == Page::saveFiles ? "Choose where to save" : "Browse parks";
+                const auto folder = _files.directory.filename().u8string();
+                model.headerStatus = folder == "save" ? "Saves" : folder == "autosave" ? "Autosaves" : folder == "track" ? "Designs"
+                    : folder.empty() ? _files.directory.u8string() : folder;
+                model.selected = _focus.index();
+                model.denseRoster = true;
+                const size_t lead = _page == Page::saveFiles ? 1 : 0;
+                if (lead) { model.rows.push_back("Save in this folder..."); model.rowDetails.push_back("Name the park on the next screen"); }
+                model.rows.push_back("Up one folder");
+                model.rowDetails.push_back(_files.directory.parent_path().filename().u8string());
+                for (const auto& entry : _files.entries)
+                {
+                    model.rows.push_back(FB::DisplayName(entry.path, entry.directory));
+                    const auto when = entry.directory ? std::string{} : FB::Modified(entry.path);
+                    const auto kind = entry.directory ? std::string("Folder")
+                        : _page == Page::designFiles ? std::string("Track design") : std::string("Saved park");
+                    model.rowDetails.push_back(when.empty() ? kind : kind + " / " + when);
+                }
                 model.status = !_status.empty() ? _status : !_files.error.empty() ? _files.error
-                    : _files.entries.empty() ? "No supported files or folders" : "";
-                Handheld::DrawManagementContent(rt, {8,8}, {496,348}, model);
-                Handheld::Concept::Box(rt,{8,359},{496,25});
-                Handheld::DrawModernText(rt,{16,369},"Up/Down Select  Left/Right Detail  A Open  B Back",{},480);
+                    : _files.entries.empty() ? "No parks or folders here" : "";
+                const ScreenSize canvas{ ContextGetWidth(), ContextGetHeight() };
+                Handheld::DrawManagementContent(rt, { 8, 8 }, { canvas.width - 16, Handheld::Layout::ContentHeight(canvas) }, model);
+                Handheld::DrawFooter(rt, canvas, { { "D-pad", "Choose" }, { "A", "Open" }, { "B", "Back" } });
                 return;
             }
             if (_page == Page::saveReview)
@@ -6420,10 +7235,11 @@ namespace OpenRCT2::Ui::Windows
             {
                 auto model = Handheld::StaffManagement::NamePresentation(_nameEntry,_focus.index(),false,_status);
                 model.breadcrumb = _page == Page::saveName ? "Save As / Filename" : "Scenery / Search";
-                model.title = _nameEntry.text.empty() ? (_page == Page::saveName ? "Enter park filename" : "All eligible objects") : _nameEntry.text;
-                model.status = _status.empty() ? "Done applies / B cancels" : _status;
+                model.title = _page == Page::saveName ? "Park filename" : "All eligible objects";
+                model.keyboardHeading = _page == Page::saveName ? "Save park as" : "Search scenery";
+                model.status = _status;
                 Handheld::DrawManagementContent(rt,{8,8},{ContextGetWidth()-16,Handheld::Layout::ContentHeight({ContextGetWidth(),ContextGetHeight()})},model);
-                Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Choose"},{"A","Type"},{"B","Back"}});
+                Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},Handheld::KeyboardHints());
                 return;
             }
             if (_page == Page::parkMap) { Handheld::ParkMap::Draw(rt, _parkMap); return; }
@@ -6512,7 +7328,9 @@ namespace OpenRCT2::Ui::Windows
                 if (_page == Page::dashboard)
                 {
                     model.metricHeight = 40;
-                    model.rowHeight = 26;
+                    // Rosters keep their detail line in the preview, so the rail already shows
+                    // status and queues before you step in.
+                    if (model.rowDetails.empty()) model.rowHeight = 26;
                 }
                 Handheld::Dashboard::Draw(
                     rt, { ContextGetWidth(), ContextGetHeight() }, _dashboard, model, dashboardCanSwitch());
@@ -6531,15 +7349,43 @@ namespace OpenRCT2::Ui::Windows
                     { { "D-pad", "Choose" }, { "A", _page == Page::shopAppearanceEditor ? "Apply" : "Select" }, { "B", "Back" } });
                 return;
             }
-            if (shopManagement())
+            if (_page == Page::shop)
             {
-                using Handheld::ShopManagement::View;
-                Handheld::ShopManagement::Draw(
-                    rt, { ContextGetWidth(), ContextGetHeight() }, _shop,
-                    _page == Page::shop             ? View::inspection
-                        : _page == Page::shopPrices ? View::prices
-                                                    : View::demolition,
-                    _focus.index(), _priceDraft, _status);
+                const auto model = shopPresentation();
+                Handheld::DrawManagementContent(rt, { 8, 8 }, { 330, 348 }, model);
+                Handheld::DrawActionStrip(rt, { ContextGetWidth(), ContextGetHeight() });
+                const auto row = _focus.index();
+                const bool onPrice = row >= 1 && row <= shopPriceCount();
+                using Hints = std::vector<Handheld::ControlHint>;
+                Handheld::DrawFooter(rt, { ContextGetWidth(), ContextGetHeight() },
+                    row == 0  ? Hints{ { "D-pad", "Open / close" }, { "A", "Switch" }, { "B", "Back" } }
+                    : onPrice ? Hints{ { "D-pad", "Price" }, { "B", "Back" } }
+                              : Hints{ { "D-pad", "Choose" }, { "A", "Select" }, { "B", "Back" } });
+                return;
+            }
+            if (_page == Page::shopDemolish)
+            {
+                // The same review card as ride demolition: what you get back, Cancel focused first.
+                Handheld::ManagementPresentation model;
+                const auto* ride = _shop ? Handheld::ShopManagement::Find(*_shop) : nullptr;
+                model.title = ride ? ride->getName() : "Shop unavailable";
+                model.confirmation = true;
+                model.destructive = true;
+                model.selected = _focus.index();
+                model.status = _status;
+                model.rows = { "Demolish shop", "Cancel" };
+                if (ride)
+                {
+                    const auto quote = Handheld::ShopManagement::Demolish(*_shop, false);
+                    const bool noMoney = getGameState().park.flags.has(ParkFlag::noMoney);
+                    model.stats = { { "Removes", "This building" },
+                                    { "Refund", quote.error != GameActions::Status::ok ? quote.getErrorMessage()
+                                                    : noMoney                          ? std::string("None")
+                                                                                       : Handheld::FormatMoney(-quote.cost) } };
+                }
+                Handheld::DrawManagementContent(rt, { 8, 8 }, { 330, 348 }, model);
+                Handheld::DrawActionStrip(rt, { ContextGetWidth(), ContextGetHeight() });
+                Handheld::DrawFooter(rt, { ContextGetWidth(), ContextGetHeight() }, { { "D-pad", "Choose" }, { "A", "Select" }, { "B", "Cancel" } });
                 return;
             }
             if (_page == Page::trackPiecePicker)
@@ -6547,10 +7393,6 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::DrawObjectPicker(
                     rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Track pieces", _status.empty() ? "Y Group: "+Handheld::CustomTracks::GroupName(Handheld::CustomTracks::CurrentGroup()) : _status, "No compatible pieces",
                     false, "Ride", "Camera");
-                const auto* e=_picker.selected();const ScreenCoordsXY p{336,36};Handheld::Concept::Box(rt,p,{168,246});
-                Handheld::DrawHeadingText(rt,p+ScreenCoordsXY{10,12},"{WHITE}Selected piece",148);
-                if(e&&!e->identity.key.empty()&&std::isdigit(static_cast<unsigned char>(e->identity.key[0]))){Drawing::RenderTarget preview;if(ClipRenderTarget(preview,rt,p+ScreenCoordsXY{8,40},152,110))e->drawPreview(preview);}
-                Handheld::DrawWrappedLabel(rt,p+ScreenCoordsXY{10,162},148,e ? e->name : "No compatible piece",4);
                 return;
             }
             if (_page == Page::designPicker)
@@ -6562,8 +7404,11 @@ namespace OpenRCT2::Ui::Windows
             }
             if (_page == Page::ridePicker)
             {
+                static const std::vector<std::string> tabs{ "All", "Coasters", "Thrill", "Gentle", "Water", "Transport" };
                 Handheld::DrawObjectPicker(
-                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Rides", _status, "No rides available");
+                    rt, { ContextGetWidth(), ContextGetHeight() }, _picker, "Rides",
+                    _status, "None of this type available yet", false, "Pause", "", "Type", tabs,
+                    _rideCategory % kRideCategories.size());
                 return;
             }
             if (_page == Page::shopPicker)
@@ -6622,14 +7467,21 @@ namespace OpenRCT2::Ui::Windows
                 model.selected = _focus.index();
                 model.columns = _page == Page::sceneryName ? Handheld::TextEntry::columns : 1;
                 model.confirmation = _page == Page::sceneryConfirm;
-                model.status = _status.empty() ? "Up to 32 characters" : _status;
+                if (_page == Page::sceneryName)
+                {
+                    model.keyboard = _nameEntry;
+                    model.keyboardHeading = "Sign text";
+                    model.title = "Empty sign";
+                }
+                model.status = _status;
                 Handheld::DrawManagementContent(
                     rt, Handheld::Concept::kMenuOrigin,
                     { 324, Handheld::Layout::ContentHeight({ ContextGetWidth(), ContextGetHeight() }) }, model);
                 Handheld::DrawActionStrip(rt, { ContextGetWidth(), ContextGetHeight() });
                 Handheld::DrawFooter(
                     rt, { ContextGetWidth(), ContextGetHeight() },
-                    { { "D-pad", "Choose" }, { "A", "Select" }, { "B", "Back" } });
+                    _page == Page::sceneryName ? Handheld::KeyboardHints()
+                                               : std::vector<Handheld::ControlHint>{ { "D-pad", "Choose" }, { "A", "Select" }, { "B", "Back" } });
                 return;
             }
             if (_page == Page::sceneryPicker)
@@ -6685,94 +7537,107 @@ namespace OpenRCT2::Ui::Windows
                     _page==Page::sceneryOptions,rows(),_focus.index(),_status);
                 return;
             }
-            const char* title = "PARK / PAUSE";
+            if (_page == Page::park)
+            {
+                const auto hud = Handheld::NativeHud();
+                const bool paused = (gGamePaused & ~(_pausedHere ? GAME_PAUSED_NORMAL : 0)) != 0;
+                Handheld::PauseSummary summary{ getGameState().park.name, hud.date, hud.noMoney ? "" : hud.cash,
+                                                hud.guests + " guests",
+                                                paused ? "Paused" : std::to_string(1u << (gGameSpeed - 1)) + "x speed" };
+                Handheld::DrawPauseScreen(rt, { ContextGetWidth(), ContextGetHeight() }, rows(), _focus.index(), summary, _status);
+                Handheld::DrawFooter(rt, { ContextGetWidth(), ContextGetHeight() },
+                    { { "D-pad", "Choose" }, { "A", "Select" }, { "B", "Resume" } });
+                return;
+            }
+            const char* title = "Paused";
             switch (_page)
             {
                 case Page::dashboard:
-                    title = "PARK DASHBOARD";
+                    title = "Park dashboard";
                     break;
                 case Page::overview:
-                    title = "PARK OVERVIEW";
+                    title = "Park overview";
                     break;
                 case Page::finances:
-                    title = "FINANCES";
+                    title = "Finances";
                     break;
                 case Page::guests:
-                    title = "GUESTS";
+                    title = "Guests";
                     break;
                 case Page::research:
-                    title = "RESEARCH";
+                    title = "Research";
                     break;
                 case Page::ride:
-                    title = "RIDE INSPECTION";
+                    title = "Ride";
                     break;
                 case Page::paths:
-                    title = "PATHS";
+                    title = "Paths";
                     break;
                 case Page::pathOptions:
-                    title = "PATH OPTIONS";
+                    title = "Path options";
                     break;
                 case Page::customChoice:
-                    title = "RIDE CONSTRUCTION";
+                    title = "Build a ride";
                     break;
                 case Page::designOptions:
-                    title = "DESIGN OPTIONS";
+                    title = "Design options";
                     break;
                 case Page::designConfirm:
-                    title = "PLACE DESIGN?";
+                    title = "Place design?";
                     break;
                 case Page::peepOptions:
                 case Page::peepCancel:
-                    title = "PERSON PLACEMENT";
+                    title = "Place person";
                     break;
                 case Page::staffPatrolOptions:
-                    title = "STAFF PATROL";
+                    title = "Staff patrol";
                     break;
                 case Page::rightsOptions:
-                    title = "LAND / RIGHTS OPTIONS";
+                    title = "Land and rights";
                     break;
                 case Page::areaOptions:
-                    title = "AREA BRUSH OPTIONS";
+                    title = "Brush options";
                     break;
-                case Page::sceneryClearOptions: title="CLEAR AREA OPTIONS"; break;
+                case Page::sceneryClearOptions: title="Clear area"; break;
                 case Page::sceneryGroups:
-                    title = "SCENERY GROUP";
+                    title = "Scenery group";
                     break;
                 case Page::sceneryStyle:
-                    title = "SIGN STYLE";
+                    title = "Sign style";
                     break;
                 case Page::sceneryCategory:
-                    title = "SCENERY CATEGORY";
+                    title = "Scenery";
                     break;
                 case Page::sceneryOptions:
-                    title = "SCENERY OPTIONS";
+                    title = "Scenery options";
                     break;
                 case Page::build:
-                    title = "BUILD";
+                    title = "Build";
                     break;
                 case Page::save:
-                    title = _exitAfterSave ? "SAVE AND QUIT" : "SAVE PARK";
+                    title = _exitAfterSave ? "Save and quit" : "Save park";
                     break;
                 case Page::load:
-                    title = "LOAD PARK";
+                    title = "Load park";
                     break;
                 case Page::overwrite:
-                    title = "REPLACE SAVE?";
+                    title = "Replace save?";
                     break;
                 case Page::discard:
-                    title = "DISCARD UNSAVED CHANGES?";
+                    title = "Discard unsaved changes?";
                     break;
                 case Page::quitChoice:
-                    title = "QUIT GAME";
+                    title = "Quit game";
                     break;
                 case Page::exit:
-                    title = "EXIT WITHOUT SAVING?";
+                    title = "Exit without saving?";
                     break;
                 default:
                     break;
             }
             Handheld::MenuPresentation model;
             model.title = title;
+            model.destructive = _page == Page::exit || _page == Page::discard || _page == Page::overwrite;
             model.rows = rows();
             model.selected = _focus.index();
             model.status = _status;
@@ -6937,6 +7802,11 @@ namespace OpenRCT2::Ui::Windows
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->move(direction);
     }
+    bool HandheldTextEntryKey(int action)
+    {
+        auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        return window && static_cast<HandheldMenuWindow*>(window)->textEntryKey(static_cast<Handheld::Action>(action));
+    }
     void HandheldMenuConfirm()
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
@@ -6946,6 +7816,10 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->back();
+    }
+    void HandheldRideReturnNotice(std::string notice)
+    {
+        sRideReturnNotice=std::move(notice);
     }
     void HandheldRideReturn(const Handheld::RideManagement::Target& target, const std::optional<Handheld::RideNavigation::Context>& context)
     {
@@ -7144,6 +8018,9 @@ namespace OpenRCT2::Ui::Windows
 namespace OpenRCT2::Ui::Windows
 {
     std::string HandheldNewsText(const std::string& text){return Handheld::ParkInformation::PlainText(text);}
+    bool HandheldControlsIntro(){auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);return w&&static_cast<HandheldMenuWindow*>(w)->controlsIntro();}
+    void HandheldPrimerOpen(){HandheldDashboardOpen();auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);if(w)static_cast<HandheldMenuWindow*>(w)->openPrimer(false);}
+    void HandheldInboxOpen(){HandheldDashboardOpen();auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);if(w)static_cast<HandheldMenuWindow*>(w)->openInbox();}
     void HandheldNewsOpen(){HandheldDashboardOpen();auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);if(w)static_cast<HandheldMenuWindow*>(w)->openNews(true);}
     void HandheldObjectivesOpen(){HandheldDashboardOpen();auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);if(w)static_cast<HandheldMenuWindow*>(w)->openObjectives();}
     bool HandheldDashboardNews(){auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);return w&&static_cast<HandheldMenuWindow*>(w)->dashboardNews();}
@@ -7220,6 +8097,20 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->dashboardPause();
+    }
+    void HandheldSignEditOpen()
+    {
+        if (auto* window = OpenPanel())
+            window->openSignFromPark();
+    }
+    void HandheldQuickJump(Handheld::QuickWheel::Target target)
+    {
+        if (auto* window = OpenPanel())
+            window->quickJump(target);
+    }
+    std::pair<std::string, uint32_t> HandheldLastBuild()
+    {
+        return { sLastBuildLabel, sLastBuildSprite };
     }
     void HandheldDashboardOpen()
     {

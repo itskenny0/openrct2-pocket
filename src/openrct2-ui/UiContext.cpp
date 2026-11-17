@@ -15,6 +15,8 @@
 #include "WindowManager.h"
 #include "drawing/engines/DrawingEngineFactory.hpp"
 #include "handheld/Explorer.h"
+#include "handheld/Layout.h"
+#include "handheld/Resume.h"
 #include "input/ShortcutManager.h"
 #include "interface/Chat.h"
 #include "interface/InGameConsole.h"
@@ -357,11 +359,21 @@ public:
         SDL_Event e;
         while (SDL_PollEvent(&e))
         {
+            if (Handheld::IsEnabled())
+                Handheld::Resume::OnEvent(e);
             if (_inputManager.handleHandheldEvent(e))
                 continue;
             switch (e.type)
             {
                 case SDL_QUIT:
+                    // On a handheld, SDL_QUIT is the system closing the game (SIGTERM from the
+                    // frontend or power-off), and nobody is there to answer a quit prompt. Once
+                    // the park is safely saved, close at once; otherwise ask as usual.
+                    if (Handheld::IsEnabled() && Handheld::Resume::BeforeQuit())
+                    {
+                        GetContext()->Finish();
+                        break;
+                    }
                     ContextQuit();
                     break;
                 case SDL_WINDOWEVENT:
@@ -834,7 +846,7 @@ private:
         ApplyScreenSaverLockSetting();
 
         if (Handheld::IsEnabled())
-            SDL_SetWindowMinimumSize(_window, 512, 384);
+            SDL_SetWindowMinimumSize(_window, Handheld::Layout::minCanvasWidth, Handheld::Layout::minCanvasHeight);
         else
             SDL_SetWindowMinimumSize(_window, 720, 480);
         SetCursorTrap(Config::Get().general.trapCursor);
@@ -853,6 +865,15 @@ private:
 
     void OnResize(int32_t width, int32_t height)
     {
+        // Handheld builds choose a whole-number scale for the actual panel, so one Pak fits
+        // different devices. OPENRCT2_HANDHELD_SCALE forces a specific scale.
+        if (Handheld::IsEnabled() && width > 0 && height > 0)
+        {
+            int scale = Handheld::Layout::AutoScale(width, height);
+            if (const char* forced = std::getenv("OPENRCT2_HANDHELD_SCALE"); forced != nullptr && std::atoi(forced) > 0)
+                scale = std::atoi(forced);
+            Config::Get().general.windowScale = static_cast<float>(scale);
+        }
         // Scale the native window size to the game's canvas size
         _width = static_cast<int32_t>(width / Config::Get().general.windowScale);
         _height = static_cast<int32_t>(height / Config::Get().general.windowScale);

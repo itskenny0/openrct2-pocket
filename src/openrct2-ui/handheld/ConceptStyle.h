@@ -18,6 +18,28 @@ namespace OpenRCT2::Ui::Handheld::Concept
 
     inline void Box(Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, bool gold = false)
     {
+        if (PocketPalette::Pixel())
+        {
+            // Same frame as the Pixel menu windows (DrawCard): navy outline with notched corners and,
+            // on panels, a pale inner line. Selected rows keep only the outline, like Pixel buttons.
+            const auto put = [&](int x0, int y0, int w, int h, uint8_t colour) {
+                for (int y = std::max(p.y + y0, rt.y); y < std::min(p.y + y0 + h, rt.y + rt.height); ++y)
+                    for (int x = std::max(p.x + x0, rt.x); x < std::min(p.x + x0 + w, rt.x + rt.width); ++x)
+                        rt.bits[(y - rt.y) * rt.LineStride() + x - rt.x] = static_cast<PaletteIndex>(colour);
+            };
+            put(2, 0, size.width - 4, size.height, PocketPalette::border);
+            put(0, 2, size.width, size.height - 4, PocketPalette::border);
+            put(1, 1, size.width - 2, size.height - 2, PocketPalette::border);
+            put(2, 2, size.width - 4, size.height - 4, gold ? PocketPalette::selection : PocketPalette::panel);
+            if (!gold && size.width > 12 && size.height > 12)
+            {
+                put(4, 3, size.width - 8, 1, PocketPalette::separator);
+                put(4, size.height - 4, size.width - 8, 1, PocketPalette::separator);
+                put(3, 4, 1, size.height - 8, PocketPalette::separator);
+                put(size.width - 4, 4, 1, size.height - 8, PocketPalette::separator);
+            }
+            return;
+        }
         for (int y = std::max(p.y, rt.y); y < std::min(p.y + size.height, rt.y + rt.height); ++y)
             for (int x = std::max(p.x, rt.x); x < std::min(p.x + size.width, rt.x + rt.width); ++x)
             {

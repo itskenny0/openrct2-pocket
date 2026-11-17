@@ -27,6 +27,7 @@ namespace OpenRCT2::Ui::Handheld
         if (label == "Operations" || label == "Settings") return { SPR_TAB_GEARS_0, 4 };
         if (label == "Statistics" || label == "History" || label == "Graphs") return { SPR_TAB_GRAPH_0, 8 };
         if (label == "Needs" || label == "Guests") return { SPR_TAB_GUESTS_0, 8 };
+        if (label == "Terrain") return { SPR_G2_TAB_LAND };
         if (label == "Summary" || label == "Finances") return { SPR_TAB_FINANCES_SUMMARY_0, 8 };
         if (label == "Research") return { SPR_TAB_FINANCES_RESEARCH_0, 8 };
         if (label == "Marketing") return { SPR_TAB_FINANCES_MARKETING_0, 19 };
@@ -54,6 +55,7 @@ namespace OpenRCT2::Ui::Handheld
         if (label == "Close..." || label == "Close" || label == "Close park...") return { SPR_CLOSED };
         if (label == "Test..." || label == "Test unavailable") return { SPR_TESTING };
         if (label == "Locate" || label == "Locate ride" || label == "Locate subject") return { SPR_LOCATE };
+        if (label == "Ride along") return { SPR_TAB_RIDE_0 };
         if (label == "Statistics..." || label == "Statistics") return { SPR_GRAPH };
         if (label == "Save park" || label == "Save and quit" || label == "Save") return { SPR_FLOPPY };
         if (label == "Load park" || label == "Browse...") return { SPR_G2_FOLDER };
@@ -87,7 +89,7 @@ namespace OpenRCT2::Ui::Handheld
         if (label == "Park awards...") return { SPR_AWARD };
         if (label == "Read objectives") return { SPR_TAB_OBJECTIVE_0, 16 };
         if (label == "Park history..." || label == "Financial history") return { SPR_GRAPH };
-        if (label == "Borrow / repay..." || label == "Expenditure ledger" || label == "Financial controls") return { SPR_FINANCE };
+        if (label == "Borrow / repay..." || label == "Borrow or repay" || label == "Expenditure ledger" || label == "Spending ledger" || label == "Financial controls") return { SPR_FINANCE };
         if (label == "Admission price..." || label == "Admission...") return { SPR_TAB_ADMISSION_0, 8 };
         if (label == "Invention catalog...") return { SPR_TAB_FINANCES_RESEARCH_0, 8 };
         if (label == "Funding & priorities") return { SPR_TAB_FINANCES_SUMMARY_0, 8 };
