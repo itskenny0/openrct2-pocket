@@ -688,7 +688,7 @@ namespace OpenRCT2::Ui::Handheld
         {
             if (window->flags.has(WindowFlag::dead) || window->classification == WindowClass::mainWindow
                 || (window->classification == WindowClass::handheldHud
-                    && (window->number == 5 || window->number == 3 || window->number == 0))
+                    && (window->number == 5 || window->number == 3 || window->number == 0 || window->number >= 6))
                 || window->classification == WindowClass::handheldFocus)
                 continue;
             const bool docked = window->windowPos.x <= Layout::margin + 2;
@@ -725,6 +725,87 @@ namespace OpenRCT2::Ui::Handheld
         }
     };
 
+    static QuickWheel::State _wheel;
+    struct Photo
+    {
+        bool active{};
+        bool pending{};    // A pressed: waiting for a clean frame.
+        int cleanFrames{}; // Frames drawn with nothing on top since A.
+        bool pausedHere{};
+        uint64_t hintUntil{}; // The hint shows on entry and after each button, then fades away.
+        std::string note;
+    };
+    static Photo _photo;
+    static constexpr uint64_t kPhotoHintMs = 2500;
+    // Handheld zoom stops one step short of the game's furthest zoom-out. That last step draws four
+    // times as much of the map as the one before, which the Brick's Cortex-A53 cannot keep at
+    // frame rate in a busy or wooded park; the park map covers the overview instead.
+    static constexpr ZoomLevel kPocketMaxZoom{ 2 };
+    static void PocketZoom(bool zoomIn)
+    {
+        const auto* main = WindowGetMain();
+        if (!zoomIn && main != nullptr && main->viewport != nullptr && main->viewport->zoom >= kPocketMaxZoom)
+            return;
+        Windows::MainWindowZoom(zoomIn, false);
+    }
+
+    // Overlay repaints. Every overlay window is transparent, so repainting one also re-renders the
+    // park underneath it, which is the expensive part on the device (much more so zoomed out).
+    // Overlays are repainted when input arrives, when the HUD's numbers are animating, and at
+    // most four times a second otherwise, rather than on every frame.
+    static bool _overlayDirty = true;
+    static uint64_t _overlayRefreshed{};
+    static constexpr uint64_t kOverlayRefreshMs = 250;
+    static void MarkOverlayDirty()
+    {
+        _overlayDirty = true;
+    }
+    static bool TakeOverlayRefresh()
+    {
+        const auto now = MenuFeel::Clock();
+        if (!_overlayDirty && now - _overlayRefreshed < kOverlayRefreshMs)
+            return false;
+        _overlayDirty = false;
+        _overlayRefreshed = now;
+        return true;
+    }
+
+    // Keeps one overlay window in step with something Pocket draws. Anything drawn over the park
+    // needs a window under it: when the park scrolls, the game shifts the screen's pixels and
+    // repaints only the newly exposed strips and the areas windows cover, so an element without a
+    // window is dragged along with the map and only partly redrawn.
+    static WindowBase* SyncOverlay(WindowNumber number, bool visible, ScreenCoordsXY origin, ScreenSize size, bool repaint)
+    {
+        auto* wm = GetWindowManager();
+        auto* window = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ number });
+        if (!visible)
+        {
+            if (window != nullptr)
+                wm->Close(*window);
+            return nullptr;
+        }
+        if (window == nullptr)
+        {
+            window = wm->Create<FocusWindow>(
+                WindowClass::handheldHud, origin, size,
+                { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
+            if (window != nullptr)
+                window->number = number;
+            return window;
+        }
+        if (window->windowPos != origin || window->width != size.width || window->height != size.height)
+        {
+            window->invalidate();
+            window->windowPos = origin;
+            window->width = size.width;
+            window->height = size.height;
+            window->invalidate();
+        }
+        else if (repaint)
+            window->invalidate();
+        return window;
+    }
+
     static void SyncFocusWindow()
     {
         auto* wm = GetWindowManager();
@@ -736,6 +817,7 @@ namespace OpenRCT2::Ui::Handheld
             wm->CloseByClass(WindowClass::handheldHud);
             return;
         }
+        const bool refresh = TakeOverlayRefresh() || cashTicker.Trend() != 0;
         const auto position = Centre() - ScreenCoordsXY{ kCursorWindow / 2, kCursorWindow / 2 };
         if (focus == nullptr)
         {
@@ -781,7 +863,7 @@ namespace OpenRCT2::Ui::Handheld
                 chip->width = size.width;
                 chip->height = size.height;
             }
-            if (chip != nullptr)
+            if (chip != nullptr && refresh)
                 chip->invalidate();
         }
         auto* toast = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 5 });
@@ -819,7 +901,7 @@ namespace OpenRCT2::Ui::Handheld
                 { ContextGetWidth(), kActionStripHeight },
                 { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
         }
-        if (hud != nullptr)
+        if (hud != nullptr && refresh)
         {
             hud->invalidate();
             hud->windowPos = { 0, ContextGetHeight() - kActionStripHeight };
@@ -836,7 +918,7 @@ namespace OpenRCT2::Ui::Handheld
             if (top != nullptr)
                 top->number = 3;
         }
-        if (top != nullptr)
+        if (top != nullptr && refresh)
         {
             top->invalidate();
             top->width = ContextGetWidth() - 2 * Layout::margin;
@@ -855,7 +937,7 @@ namespace OpenRCT2::Ui::Handheld
                 if (tools != nullptr)
                     tools->number = 1;
             }
-            if (tools != nullptr)
+            if (tools != nullptr && refresh)
                 tools->invalidate();
         }
         else if (tools != nullptr)
@@ -873,7 +955,7 @@ namespace OpenRCT2::Ui::Handheld
                 if (cost != nullptr)
                     cost->number = 2;
             }
-            if (cost != nullptr)
+            if (cost != nullptr && refresh)
             {
                 cost->invalidate();
                 cost->windowPos = Layout::ContextAnchor(
@@ -883,6 +965,16 @@ namespace OpenRCT2::Ui::Handheld
         }
         else if (cost != nullptr)
             wm->Close(*cost);
+
+        // The goal card, the quick menu and the photo-mode hint, which had no windows of their own.
+        const ScreenSize screen{ ContextGetWidth(), ContextGetHeight() };
+        const bool park = !_terrainActive && !Paths::IsActive();
+        const bool goal = park && preferences.hudGoal && !_wheel.open && !ToastVisible() && !_photo.active
+            && Goal::Current().has_value();
+        SyncOverlay(6, goal, GoalOrigin(screen), { kGoalWidth, kGoalHeight }, refresh);
+        SyncOverlay(7, _wheel.open, { 0, 0 }, screen, refresh);
+        SyncOverlay(
+            8, _photo.active && MenuFeel::Clock() < _photo.hintUntil, { 0, Layout::hudTop }, { screen.width, 40 }, refresh);
     }
 
     bool HandleMenuInput(ControllerInput& input, const Frame& frame)
@@ -1439,7 +1531,6 @@ namespace OpenRCT2::Ui::Handheld
             Windows::HandheldNewsOpen();
         input.suspend();
     }
-    static QuickWheel::State _wheel;
     static void ChooseWheel(ControllerInput& input, size_t slot)
     {
         const auto target = QuickWheel::kSlots[slot].target;
@@ -1457,17 +1548,6 @@ namespace OpenRCT2::Ui::Handheld
     // rotation work as usual; A saves a screenshot, Y freezes time, B (or START) leaves. The
     // shot is taken one drawn frame after A, so the frame on screen when A was pressed (which may
     // still carry the hint) is never the one saved.
-    struct Photo
-    {
-        bool active{};
-        bool pending{};    // A pressed: waiting for a clean frame.
-        int cleanFrames{}; // Frames drawn with nothing on top since A.
-        bool pausedHere{};
-        uint64_t hintUntil{}; // The hint shows on entry and after each button, then fades away.
-        std::string note;
-    };
-    static Photo _photo;
-    static constexpr uint64_t kPhotoHintMs = 2500;
     static void BeginPhoto()
     {
         EndTerrain();
@@ -1610,6 +1690,8 @@ namespace OpenRCT2::Ui::Handheld
 
     void HandleExplorerInput(ControllerInput& input, const Frame& frame)
     {
+        if (!frame.actions.empty() || frame.panX || frame.panY || frame.navigateX || frame.navigateY || frame.leftTrigger)
+            MarkOverlayDirty();
         auto* wm = GetWindowManager();
         for (const auto action : frame.actions)
         {
@@ -1809,7 +1891,7 @@ namespace OpenRCT2::Ui::Handheld
                     if (!Paths::IsConnected())
                         Paths::CycleMode(action == Action::nextOption ? 1 : -1);
                     else
-                        Windows::MainWindowZoom(action == Action::nextOption, false);
+                        PocketZoom(action == Action::nextOption);
                     _terrainStatus.clear();
                 }
                 else if (action == Action::slopeDown || action == Action::slopeUp)
@@ -1853,7 +1935,7 @@ namespace OpenRCT2::Ui::Handheld
                     else if (action == Action::previousOption || action == Action::nextOption)
                     {
                         if (Mazes::CameraMode())
-                            Windows::MainWindowZoom(action == Action::nextOption, false);
+                            PocketZoom(action == Action::nextOption);
                         else
                             Mazes::Turn(action == Action::nextOption ? 1 : -1);
                     }
@@ -1932,7 +2014,7 @@ namespace OpenRCT2::Ui::Handheld
                     else if (action == Action::previousOption || action == Action::nextOption)
                     {
                         if (CustomTracks::CameraMode())
-                            Windows::MainWindowZoom(action == Action::nextOption, false);
+                            PocketZoom(action == Action::nextOption);
                         else if (CustomTracks::StationPlacement())
                             CustomTracks::Cycle(action == Action::nextOption ? 1 : -1);
                         else
@@ -2242,10 +2324,10 @@ namespace OpenRCT2::Ui::Handheld
                         Invoke(ShortcutId::kViewGeneralRotateClockwise);
                         break;
                     case Action::previousOption:
-                        Windows::MainWindowZoom(false, false);
+                        PocketZoom(false);
                         break;
                     case Action::nextOption:
-                        Windows::MainWindowZoom(true, false);
+                        PocketZoom(true);
                         break;
                     case Action::contextSecondary:
                         if (Paths::IsActive())

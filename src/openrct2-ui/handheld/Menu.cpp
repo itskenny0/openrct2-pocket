@@ -3341,6 +3341,11 @@ namespace OpenRCT2::Ui::Windows
                 static_cast<int>(_page)));
             if (_menuFeel.NeedsDraw())
                 invalidate();
+            if (managementShell() && Handheld::MenuFeel::Clock() - _previewRefreshed > 500)
+            {
+                _previewRefreshed = Handheld::MenuFeel::Clock();
+                invalidate();
+            }
             if (_scrollViews[scrollKey()].moving())
                 invalidate();
             if (_page == Page::sceneryPicker)
@@ -3704,7 +3709,10 @@ namespace OpenRCT2::Ui::Windows
             if (current < controls)
             {
                 if (x)
+                {
                     adjust(current, x);
+                    ++_valueSteps;
+                }
                 else if (y < 0 && current > 0)
                     next = current - 1;
                 else if (y > 0 && current + 1 < count)
@@ -3922,7 +3930,31 @@ namespace OpenRCT2::Ui::Windows
                 page(Page::dashboard);
             }
         }
+        // Left/Right that changed a value (admission, funding, a toggle) rather than moving focus.
+        uint32_t _valueSteps{};
+        // The rail keeps showing a preview of the focused section; repaint it now and then so the
+        // numbers stay live while the game runs.
+        uint64_t _previewRefreshed{};
         void dashboardMove(int x, int y)
+        {
+            // Left that does nothing else in a section's content returns to the section rail, as
+            // the rail on the left suggests (B still works too).
+            if (x < 0 && !y && !dashboardRailFocused() && !_leaveAction && managementShell() && dashboardCanSwitch())
+            {
+                const auto page = _page;
+                const auto focused = _focus.index();
+                const auto steps = _valueSteps;
+                dashboardMoveWithin(x, y);
+                if (_page == page && _focus.index() == focused && _valueSteps == steps && dashboardCanSwitch())
+                {
+                    this->page(Page::dashboard);
+                    invalidate();
+                }
+                return;
+            }
+            dashboardMoveWithin(x, y);
+        }
+        void dashboardMoveWithin(int x, int y)
         {
             if (_leaveAction)
             {
@@ -3949,6 +3981,7 @@ namespace OpenRCT2::Ui::Windows
                         _ledger.Move(x);
                     else
                         _financeSample = std::clamp<int>(static_cast<int>(_financeSample) - x, 0, 63);
+                    ++_valueSteps;
                 }
                 if (y)
                     move(y);
