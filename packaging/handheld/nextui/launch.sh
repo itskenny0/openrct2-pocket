@@ -2,7 +2,19 @@
 # NextUI Tools/tg5040/OpenRCT2 Pocket.pak/launch.sh
 set -eu
 PAK_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)"
-SD_ROOT="$(CDPATH= cd -- "$PAK_DIR/../../.." && pwd -P)"
+# Find the SD card root. NextUI puts Paks in Tools/<platform>/, NX Redux and others directly in
+# Tools/, so a fixed number of "../" is wrong on one or the other. Prefer the frontend's
+# SDCARD_PATH, then the nearest folder above the Pak that has .userdata, then /mnt/SDCARD.
+SD_ROOT="${SDCARD_PATH:-}"
+if [ -z "$SD_ROOT" ] || [ ! -d "$SD_ROOT" ]; then
+ SD_ROOT=""
+ dir="$PAK_DIR"
+ while [ "$dir" != "/" ]; do
+  dir="$(dirname -- "$dir")"
+  if [ -d "$dir/.userdata" ]; then SD_ROOT="$dir"; break; fi
+ done
+ [ -n "$SD_ROOT" ] || SD_ROOT="/mnt/SDCARD"
+fi
 USER_DIR="$SD_ROOT/.userdata/tg5040/openrct2-pocket"
 mkdir -p "$USER_DIR"
 exec >> "$USER_DIR/launch.log" 2>&1
