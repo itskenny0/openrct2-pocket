@@ -65,7 +65,17 @@ printf 'SDL video=%s audio=%s\n' "${SDL_VIDEODRIVER:-auto}" "${SDL_AUDIODRIVER:-
 printf 'LD_PRELOAD=%s\n' "${LD_PRELOAD:-unset}"
 [ ! -s /etc/ld.so.preload ] || { printf '/etc/ld.so.preload: '; tr '\n' ' ' < /etc/ld.so.preload; echo; }
 unset LD_PRELOAD
+# libstdc++ ships as libstdcxx.so.6 because some copy tools drop names containing '+'. Preload it
+# by path so the game and ICU get the Pak's copy instead of the device's older one.
+# (The path is relative to the game folder, set below: LD_PRELOAD splits on spaces, and the Pak's
+# own folder name has one. The bundled glibc 2.26 loader predates --preload.)
+PRELOAD=""
+for cxx in libstdcxx.so.6 libstdc++.so.6; do
+ if [ -f "$LIB_DIR/$cxx" ]; then PRELOAD="lib/$cxx"; break; fi
+done
+[ -n "$PRELOAD" ] || echo 'Warning: the Pak has no libstdc++ (libstdcxx.so.6); copy the Pak to the SD card again.'
 cd "$GAME_DIR"
+[ -z "$PRELOAD" ] || export LD_PRELOAD="$PRELOAD"
 # A private glibc runtime avoids imposing a newer libc on NextUI itself.
 # The loader affects this child only. Exiting returns normally to NextUI.
 exec "$LOADER" --library-path "$RUNTIME_LIB_PATH" "$GAME_DIR/openrct2" \
