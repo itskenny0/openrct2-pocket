@@ -18,6 +18,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: git config --global --add safe.directory "$PWD"
+      # ICU (built for the target in build-deps.sh) uses autotools; the image has no make.
+      - name: Install make
+        run: apt-get update -q && apt-get install -yq --no-install-recommends make curl
       # The toolchain, vendor SDK and cross-built libraries take a long time and change rarely.
       - name: Restore SDK
         uses: actions/cache@v4
