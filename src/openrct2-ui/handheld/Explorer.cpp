@@ -614,7 +614,29 @@ namespace OpenRCT2::Ui::Handheld
     }
     static ScreenCoordsXY ToastOrigin()
     {
-        return { (ContextGetWidth() - ToastSize().width) / 2, Layout::hudTop + Layout::hudHeight + 6 };
+        const auto size = ToastSize();
+        const int y = Layout::hudTop + Layout::hudHeight + 6;
+        const int width = ContextGetWidth();
+        // Tool panels dock on the left under the HUD. Centre the toast in the space to their right
+        // so it never covers the panel the player is working in.
+        int left = 0;
+        for (const auto& window : gWindowList)
+        {
+            if (window->flags.has(WindowFlag::dead) || window->classification == WindowClass::mainWindow
+                || (window->classification == WindowClass::handheldHud
+                    && (window->number == 5 || window->number == 3 || window->number == 0))
+                || window->classification == WindowClass::handheldFocus)
+                continue;
+            const bool docked = window->windowPos.x <= Layout::margin + 2;
+            const bool overlaps = window->windowPos.y < y + size.height && window->windowPos.y + window->height > y;
+            if (docked && overlaps)
+                left = std::max(left, window->windowPos.x + window->width + Layout::gutter);
+        }
+        const int room = width - Layout::margin - left;
+        const int x = left == 0 ? (width - size.width) / 2
+            : room >= size.width ? left + (room - size.width) / 2
+                                 : std::max(Layout::margin, width - Layout::margin - size.width);
+        return { x, y };
     }
     // Slides down from under the HUD, then back up before it disappears.
     static int ToastOffset(uint64_t now = MenuFeel::Clock())

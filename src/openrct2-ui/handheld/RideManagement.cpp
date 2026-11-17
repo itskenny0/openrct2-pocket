@@ -1246,7 +1246,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             if (draft->demolition)
             {
                 model.breadcrumb = "Rides / Demolish permanently";
-                model.stats.emplace_back("Removal", "Ride, track, entrances/exits");
+                model.stats.emplace_back("Removes", "Ride, track and exits");
                 model.stats.emplace_back(
                     "Refund",
                     draft->noMoney                                 ? "Not applicable"
