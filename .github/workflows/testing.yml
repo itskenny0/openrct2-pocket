@@ -1,0 +1,43 @@
+# Every push and pull request: format check, native build with the standalone tests, and a
+# testing Pak to download from the run's artifacts.
+name: Testing
+on:
+  push:
+    branches: ['**']
+    tags-ignore: ['v*']
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: testing-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  format:
+    name: Code formatting
+    runs-on: ubuntu-24.04
+    container: ghcr.io/openrct2/openrct2-build:26-format
+    steps:
+      - uses: actions/checkout@v4
+      - run: git config --global --add safe.directory "$PWD"
+      - run: scripts/check-code-formatting
+  native:
+    name: Linux build and tests
+    runs-on: ubuntu-24.04
+    container: ghcr.io/openrct2/openrct2-build:26-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Standalone handheld tests
+        run: |
+          cmake -S test/handheld -B build-input-tests -G Ninja
+          cmake --build build-input-tests
+          ctest --test-dir build-input-tests --output-on-failure
+      - name: Build the game
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DDISABLE_NETWORK=ON -DDISABLE_HTTP=ON \
+            -DDISABLE_DISCORD_RPC=ON -DDISABLE_GOOGLE_BENCHMARK=ON
+          cmake --build build
+  pak:
+    name: Testing Pak
+    needs: [format, native]
+    uses: ./.github/workflows/brick-pak.yml
+    with:
+      name: OpenRCT2-Pocket-testing-${{ github.sha }}.zip

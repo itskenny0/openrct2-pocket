@@ -90,7 +90,7 @@ The pause menu's **Controls...** page shows all of this in-game, including the h
 
 You need your own copy of RollerCoaster Tycoon 2 (it's sold on Steam and GOG). **No game data is included here, and none should ever be added to this repository.**
 
-1. Get the Pak: build it with [the NextUI packaging guide](packaging/handheld/nextui/BUILD.md) (a downloadable release will be linked here).
+1. Get the Pak from [Releases](../../releases). Testing builds of every commit are attached to the [Testing workflow runs](../../actions/workflows/testing.yml) as artifacts. To build it yourself, run `packaging/handheld/nextui/ci-build.sh` (see [the NextUI packaging guide](packaging/handheld/nextui/BUILD.md)).
 2. Extract it to the SD card root so that `Tools/tg5040/OpenRCT2 Pocket.pak/launch.sh` exists.
 3. Copy the `Data`, `ObjData` and `Scenarios` folders from your RCT2 install into `Tools/tg5040/OpenRCT2 Pocket.pak/RCT2/`. `RCT2/Data/g1.dat` must exist.
 4. Eject the card and launch **OpenRCT2 Pocket** from NextUI's **Tools** menu.
