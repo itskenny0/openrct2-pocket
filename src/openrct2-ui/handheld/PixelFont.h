@@ -4,6 +4,8 @@
 #include <openrct2/drawing/Drawing.h>
 #include <openrct2/drawing/Font.h>
 #include <openrct2/drawing/G1Element.h>
+#include <openrct2/drawing/RenderTarget.h>
+#include <openrct2/world/Location.hpp>
 #include <string>
 
 // The Pixel theme's text: RCT2's own bitmap font, read straight from g1.dat. The glyph sprites mark

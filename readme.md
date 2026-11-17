@@ -25,7 +25,7 @@ The park renderer, simulation, game actions and save format are OpenRCT2's own, 
 <p align="center">
   <img src="docs/handheld/screenshots/title.png" width="32%" alt="Title menu">
   <img src="docs/handheld/screenshots/build.png" width="32%" alt="Build menu">
-  <img src="docs/handheld/screenshots/paths.png" width="32%" alt="Path tool with live cost">
+  <img src="docs/handheld/screenshots/paths.png" width="32%" alt="Paths and queues menu">
 </p>
 
 ## Made for a handheld
