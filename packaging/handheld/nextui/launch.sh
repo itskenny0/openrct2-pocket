@@ -32,6 +32,15 @@ done
 if [ ! -x "$GAME_DIR/openrct2" ] || [ ! -x "$LOADER" ] || [ ! -f "$GAME_DIR/data/g2.dat" ]; then
  echo 'Incomplete package: executable, loader or engine data missing.';exit 1
 fi
+# A damaged copy of a bundled library is skipped silently by the loader, which then falls back to
+# the device's older one and the game refuses to start. Check the runtime against the Pak's
+# checksums so the log names the bad file.
+if command -v sha256sum >/dev/null 2>&1 && [ -f "$GAME_DIR/SHA256SUMS.txt" ]; then
+ if ! (cd "$GAME_DIR" && grep '  lib/' SHA256SUMS.txt | sha256sum -c >/dev/null 2>&1); then
+  echo 'Damaged runtime files (copy the Pak to the SD card again):'
+  (cd "$GAME_DIR" && grep '  lib/' SHA256SUMS.txt | sha256sum -c 2>&1 | grep -v ': OK$')
+ fi
+fi
 RCT2_DIR="${OPENRCT2_RCT2_PATH:-$PAK_DIR/RCT2}"
 if [ ! -f "$RCT2_DIR/Data/g1.dat" ] && [ ! -f "$RCT2_DIR/data/g1.dat" ]; then
  echo "Original RCT2 assets missing. Copy Data, ObjData and Scenarios into $PAK_DIR/RCT2.";exit 1
