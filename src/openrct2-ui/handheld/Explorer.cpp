@@ -22,6 +22,8 @@
 #include "Panel.h"
 #include "MenuThemes.h"
 #include "RideFollow.h"
+#include <openrct2/core/Path.hpp>
+#include <openrct2/interface/Screenshot.h>
 #include "Undo.h"
 #include <openrct2/PlatformEnvironment.h>
 #include "Paths.h"
@@ -899,6 +901,7 @@ namespace OpenRCT2::Ui::Handheld
                 }
                 else if (action==Action::contextSecondary && Windows::HandheldObjectPickerGroup()) {}
                 else if (action==Action::contextSecondary && Windows::HandheldDashboardNews()) {}
+                else if (action==Action::contextSecondary && Windows::HandheldControlsIntro()) {}
                 else if (
                     Windows::HandheldObjectPickerIsOpen() && (action == Action::previousOption || action == Action::nextOption))
                     Windows::HandheldObjectPickerMove(0, action == Action::nextOption ? 2 : -2);
@@ -1001,6 +1004,7 @@ namespace OpenRCT2::Ui::Handheld
         return {};
     }
 
+    static void UpdatePhoto();
     // Riding along with more than one train: A moves to the next.
     static bool RideAlongCycles()
     {
@@ -1013,6 +1017,7 @@ namespace OpenRCT2::Ui::Handheld
     {
         GuestFollow::Update();
         RideFollow::Update();
+        UpdatePhoto();
         _inspect = !_terrainActive && !Paths::IsActive() && CanExplore() && ContextHasFocus() ? ResolveInspectTarget()
                                                                                              : InspectTarget{};
         if (gLegacyScene != LegacyScene::playing)
@@ -1381,6 +1386,117 @@ namespace OpenRCT2::Ui::Handheld
     }
     // While the wheel is open it owns the controller: the D-pad points, releasing L2 (after a
     // hold) or A takes the highlighted slot, B or a second L2 closes it.
+    // Photo mode: everything Pocket draws goes away, leaving the park itself. The D-pad, zoom and
+    // rotation work as usual; A saves a screenshot, Y freezes time, B (or START) leaves. The
+    // shot is taken one drawn frame after A, so the frame on screen when A was pressed (which may
+    // still carry the hint) is never the one saved.
+    struct Photo
+    {
+        bool active{};
+        bool pending{};      // A pressed: waiting for a clean frame.
+        int cleanFrames{};   // Frames drawn with nothing on top since A.
+        bool pausedHere{};
+        uint64_t hintUntil{}; // The hint shows on entry and after each button, then fades away.
+        std::string note;
+    };
+    static Photo _photo;
+    static constexpr uint64_t kPhotoHintMs = 2500;
+    static void BeginPhoto()
+    {
+        EndTerrain();
+        GuestFollow::Stop();
+        _photo = {};
+        _photo.active = true;
+        _photo.hintUntil = MenuFeel::Clock() + kPhotoHintMs;
+    }
+    static void EndPhoto()
+    {
+        if (_photo.pausedHere && GameIsPaused())
+            PauseToggle();
+        _photo = {};
+    }
+    bool PhotoModeActive()
+    {
+        return _photo.active;
+    }
+    // Called each update: take the pending shot once a clean frame has been drawn.
+    static void UpdatePhoto()
+    {
+        if (!_photo.active || !_photo.pending || _photo.cleanFrames < 1)
+            return;
+        _photo.pending = false;
+        const auto path = ScreenshotDump();
+        Audio::Play(Audio::SoundId::windowOpen, 0, Audio::kAudioPlayAtCentre);
+        _photo.note = path.empty() ? "Could not save the photo" : "Saved " + Path::GetFileName(path);
+        _photo.hintUntil = MenuFeel::Clock() + kPhotoHintMs;
+    }
+    // True when photo mode handled the frame.
+    static bool HandlePhoto(ControllerInput& input, const Frame& frame)
+    {
+        if (!_photo.active)
+            return false;
+        for (const auto action : frame.actions)
+        {
+            switch (action)
+            {
+                case Action::confirm:
+                    _photo.pending = true;
+                    _photo.cleanFrames = 0;
+                    _photo.hintUntil = 0;
+                    input.suspend();
+                    return true;
+                case Action::back:
+                case Action::openMenu:
+                    EndPhoto();
+                    input.suspend();
+                    return true;
+                case Action::contextSecondary:
+                    if (GameIsPaused() && _photo.pausedHere)
+                    {
+                        PauseToggle();
+                        _photo.pausedHere = false;
+                    }
+                    else if (!GameIsPaused())
+                    {
+                        PauseToggle();
+                        _photo.pausedHere = true;
+                    }
+                    _photo.note = GameIsPaused() ? "Time frozen" : "Time running";
+                    _photo.hintUntil = MenuFeel::Clock() + kPhotoHintMs;
+                    input.suspend();
+                    return true;
+                case Action::openBuild:
+                case Action::slopeDown:
+                case Action::slopeUp:
+                    // Build and the quick menu wait until photo mode ends.
+                    input.suspend();
+                    return true;
+                default:
+                    break; // Zoom and rotate fall through to the park's own handling.
+            }
+        }
+        return false;
+    }
+    static void DrawPhoto(Drawing::RenderTarget& rt)
+    {
+        if (_photo.pending)
+        {
+            ++_photo.cleanFrames;
+            return;
+        }
+        if (MenuFeel::Clock() >= _photo.hintUntil)
+            return;
+        const ScreenSize screen{ ContextGetWidth(), ContextGetHeight() };
+        const std::string text = _photo.note.empty() ? "Photo mode" : _photo.note;
+        const int width = std::max(TextWidth(text, true), 200) + 24;
+        const ScreenCoordsXY at{ (screen.width - width) / 2, Layout::hudTop };
+        DrawCard(rt, at, { width, 40 });
+        DrawStrongText(rt, at + ScreenCoordsXY{ 12, 7 }, "{WHITE}" + text, width - 24);
+        DrawModernText(rt, at + ScreenCoordsXY{ 12, 23 },
+            std::string("{MUTED}") + ActionKey(Action::confirm).data() + " photo  " + ActionKey(Action::contextSecondary).data()
+                + (GameIsPaused() ? " resume  " : " freeze  ") + ActionKey(Action::back).data() + " done");
+    }
+
     static void HandleWheel(ControllerInput& input, const Frame& frame)
     {
         if (!CanExplore())
@@ -1393,6 +1509,13 @@ namespace OpenRCT2::Ui::Handheld
         {
             if (action == Action::confirm && _wheel.selected)
                 return ChooseWheel(input, *_wheel.selected);
+            if (action == Action::contextSecondary)
+            {
+                _wheel.Close();
+                BeginPhoto();
+                input.suspend();
+                return;
+            }
             if (action == Action::back || (action == Action::slopeDown && !_wheel.selected))
             {
                 _wheel.Close();
@@ -1431,6 +1554,8 @@ namespace OpenRCT2::Ui::Handheld
         }
         if (_wheel.open)
             return HandleWheel(input, frame);
+        if (HandlePhoto(input, frame))
+            return;
         if (_backHold)
             return HandleBackHold(input, frame);
         if (_alertHold)
@@ -2134,6 +2259,8 @@ namespace OpenRCT2::Ui::Handheld
         Theme::Refresh();
         if (!IsEnabled() || !CanExplore())
             return;
+        if (_photo.active)
+            return DrawPhoto(rt);
         using namespace Drawing;
         const auto c = Centre();
         const auto height = ContextGetHeight();

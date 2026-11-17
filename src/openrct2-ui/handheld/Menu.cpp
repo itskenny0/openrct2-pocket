@@ -12,6 +12,7 @@
 #include "RideFollow.h"
 #include "Alerts.h"
 #include "Resume.h"
+#include "Guide.h"
 #include "ChoiceCards.h"
 #include "Designs.h"
 #include "DesignAuthoring.h"
@@ -111,6 +112,7 @@ namespace OpenRCT2::Ui::Windows
     {
         park,
         controls,
+        primer,
         settings,
         build,
         paths,
@@ -1469,7 +1471,7 @@ namespace OpenRCT2::Ui::Windows
         mutable bool _sceneryArtReady{};
         bool constructionMenu() const
         {
-            return choiceCards() || _page == Page::controls || _page == Page::park || _page == Page::settings || _page == Page::designOptions || _page == Page::researchCatalog || _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
+            return choiceCards() || _page == Page::controls || _page == Page::primer || _page == Page::park || _page == Page::settings || _page == Page::designOptions || _page == Page::researchCatalog || _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
                 || _page == Page::staffPatrolClear || _page == Page::rightsOptions || _page == Page::rightsConfirm
                 || (_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) || _page == Page::areaOptions || _page == Page::terrainPaintConfirm || _page == Page::sceneryOptions || _page == Page::parkInspect || (_page == Page::designInspect || _page == Page::designVehicles || _page == Page::designWarnings || _page == Page::designConfirm) || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
                 || _page == Page::sceneryConfirm || _page == Page::sceneryGroups || _page == Page::sceneryStyle
@@ -1504,7 +1506,13 @@ namespace OpenRCT2::Ui::Windows
                 _status.clear();invalidate();return;
             }
             if (_page == Page::controls) {
-                _focus.move(x ? x : y,3);invalidate();return;
+                _focus.move(x ? x : y,Handheld::Guide::kTabs.size());invalidate();return;
+            }
+            if (_page == Page::primer) {
+                // Cards step without wrapping: Right past the last card does nothing.
+                const int step = x ? x : y;
+                const int next = std::clamp<int>(static_cast<int>(_focus.index()) + step, 0, static_cast<int>(rows().size()) - 1);
+                _focus.move(next - static_cast<int>(_focus.index()), rows().size());invalidate();return;
             }
             if (_page == Page::park && x) {
                 // Two columns: Right/Left cross between Game and the speed / display column at the
@@ -1617,7 +1625,7 @@ namespace OpenRCT2::Ui::Windows
                 || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
                 || _page == Page::sceneryConfirm || _page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles
                 || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement()
-                || managementShell() || _page == Page::park || _page == Page::settings || _page == Page::controls
+                || managementShell() || _page == Page::park || _page == Page::settings || _page == Page::controls || _page == Page::primer
                 || _page == Page::save || _page == Page::load;
         }
         void layout()
@@ -1989,7 +1997,13 @@ namespace OpenRCT2::Ui::Windows
                 case Page::quitChoice:
                     return { "Save and quit", "Quit without saving...", "Cancel" };
                 case Page::controls:
-                    return { "Park", "Build", "Menus" };
+                    return { Handheld::Guide::kTabs.begin(), Handheld::Guide::kTabs.end() };
+                case Page::primer:
+                {
+                    std::vector<std::string> cards;
+                    for (const auto& card : Handheld::Guide::Cards()) cards.push_back(card.title);
+                    return cards;
+                }
                 case Page::settings:
                     return { "Theme", "Motion", "Smart cursor", "Goal in the HUD", "Clock and battery in the HUD",
                              "Continue last park on launch", "Save when the device sleeps" };
@@ -2658,6 +2672,34 @@ namespace OpenRCT2::Ui::Windows
         }
         // Scenario start shows the objective as a Pocket page instead of the desktop window;
         // B from it returns straight to the park, matching news opened from the park.
+        // The first-run controls intro. From the guide it returns there; otherwise it closes
+        // into the park. Finishing or skipping it marks it seen.
+        bool _primerFromGuide{};
+        void openPrimer(bool fromGuide)
+        {
+            _primerFromGuide = fromGuide;
+            page(Page::primer);
+            _focus = {};
+            _focus.move(0, rows().size());
+        }
+        void finishPrimer()
+        {
+            auto& store = Handheld::MenuThemes::settings;
+            store.Load(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user));
+            if (!Handheld::preferences.primerSeen)
+            {
+                Handheld::preferences.primerSeen = true;
+                store.SavePreferences();
+            }
+            if (_primerFromGuide) { page(Page::controls); _focus = {}; _focus.move(3, rows().size()); }
+            else close();
+        }
+        bool controlsIntro()
+        {
+            if (_page != Page::controls) return false;
+            openPrimer(true);
+            return true;
+        }
         void openObjectives()
         {
             _parkTabs.tab = 1;
@@ -3373,6 +3415,12 @@ namespace OpenRCT2::Ui::Windows
         {
             if (_leaveAction)
                 return;
+            // L1/R1 step the guide's sections and the intro's cards, as their tabs suggest.
+            if (_page == Page::controls || _page == Page::primer)
+            {
+                constructionMove(direction, 0);
+                return;
+            }
             if (dutiesDirty() && guardLeave([this, direction] { dashboardPage(direction); }))
                 return;
             if (dashboardRailFocused())
@@ -3826,6 +3874,9 @@ namespace OpenRCT2::Ui::Windows
             }
             switch (_page)
             {
+                case Page::primer:
+                    finishPrimer();
+                    break;
                 case Page::controls:
                     page(Page::park);
                     _focus.move(7, rows().size());
@@ -4152,7 +4203,10 @@ namespace OpenRCT2::Ui::Windows
                     if (_objectivesFromPark)
                     {
                         _objectivesFromPark = false;
-                        close();
+                        // A new scenario: the first time ever, the controls intro follows the goal.
+                        Handheld::MenuThemes::settings.Load(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user));
+                        if (!Handheld::preferences.primerSeen) openPrimer(false);
+                        else close();
                         break;
                     }
                     page(Page::dashboard);
@@ -4487,6 +4541,10 @@ namespace OpenRCT2::Ui::Windows
                         _status = "Tree unavailable";
                         invalidate();
                     }
+                    break;
+                case Page::primer:
+                    if (_focus.index() + 1 < rows().size()) { _focus.move(1, rows().size()); invalidate(); }
+                    else finishPrimer();
                     break;
                 case Page::controls:
                     page(Page::park);
@@ -6893,32 +6951,12 @@ namespace OpenRCT2::Ui::Windows
             }
             if (_page == Page::controls)
             {
-                using namespace Handheld;
-                Concept::Box(rt,{8,8},{496,340});
-                DrawModernText(rt,{20,24},"{GOLD}Controller guide",{},460,true);
-                DrawTabs(rt,{20,48},472,{"Park","Build","Menus"},_focus.index());
-                Concept::Box(rt,{24,104},{190,170});
-                DrawCommand(rt,{42,154},0,"D-pad","");
-                DrawCommand(rt,{164,130},0,"X","");DrawCommand(rt,{142,153},0,"Y","");
-                DrawCommand(rt,{185,153},0,"A","");DrawCommand(rt,{164,176},0,"B","");
-                DrawCommand(rt,{40,115},0,"L1","");DrawCommand(rt,{166,115},0,"R1","");
-                DrawCommand(rt,{40,229},0,"SELECT","");DrawCommand(rt,{134,229},0,"START","");
-                const auto tab=_focus.index();
-                std::vector<std::pair<std::string,std::string>> lines;
-                const auto key=[](Action a){return std::string(ActionKey(a));};
-                if(tab==0)lines={{"D-pad","Move through park"},{key(Action::confirm),"Inspect / use tool"},
-                    {key(Action::back),"Cancel / Park menu"},{key(Action::contextPrimary),"Rotate view"},
-                    {"L1/R1","Zoom view"},{key(Action::openBuild),"Build menu"},{key(Action::openMenu),"Park menu"}};
-                else if(tab==1)lines={{"D-pad","Move / adjust"},{key(Action::confirm),"Build / apply"},
-                    {key(Action::contextSecondary),"Tool options"},{"L2/R2","Height / slope / brush"},
-                    {key(Action::openBuild),"Catalog / more options"},{key(Action::back),"Back / cancel"},
-                    {"L1/R1","Zoom / connected piece"}};
-                else lines={{"D-pad","Choose / adjust value"},{key(Action::confirm),"Select / apply"},
-                    {key(Action::back),"Back / discard draft"},{"L1/R1","Tabs / browse list"},
-                    {key(Action::contextSecondary),"Catalog category"},{"START+SELECT","Quit review"}};
-                for(size_t i=0;i<lines.size();++i)DrawCommand(rt,{230,109+static_cast<int>(i)*30},0,lines[i].first.c_str(),lines[i].second.c_str());
-                DrawModernText(rt,{24,306},"Tools show their current actions in the footer.",{},464);
-                DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Section"},{std::string(ActionKey(Action::back)),"Back"}});
+                Handheld::Guide::DrawPage(rt, { ContextGetWidth(), ContextGetHeight() }, _focus.index());
+                return;
+            }
+            if (_page == Page::primer)
+            {
+                Handheld::Guide::DrawIntro(rt, { ContextGetWidth(), ContextGetHeight() }, _focus.index());
                 return;
             }
             if (_leaveAction)
@@ -7980,6 +8018,8 @@ namespace OpenRCT2::Ui::Windows
 namespace OpenRCT2::Ui::Windows
 {
     std::string HandheldNewsText(const std::string& text){return Handheld::ParkInformation::PlainText(text);}
+    bool HandheldControlsIntro(){auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);return w&&static_cast<HandheldMenuWindow*>(w)->controlsIntro();}
+    void HandheldPrimerOpen(){HandheldDashboardOpen();auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);if(w)static_cast<HandheldMenuWindow*>(w)->openPrimer(false);}
     void HandheldInboxOpen(){HandheldDashboardOpen();auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);if(w)static_cast<HandheldMenuWindow*>(w)->openInbox();}
     void HandheldNewsOpen(){HandheldDashboardOpen();auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);if(w)static_cast<HandheldMenuWindow*>(w)->openNews(true);}
     void HandheldObjectivesOpen(){HandheldDashboardOpen();auto* w=GetWindowManager()->FindByClass(WindowClass::handheldMenu);if(w)static_cast<HandheldMenuWindow*>(w)->openObjectives();}

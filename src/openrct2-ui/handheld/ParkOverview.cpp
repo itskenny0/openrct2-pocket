@@ -148,7 +148,7 @@ namespace OpenRCT2::Ui::Handheld::ParkOverview
             model.bodyLines.push_back(std::string(alerts[0].kind <= Alerts::Kind::breakdown ? "{DANGER}" : "{CAUTION}")
                 + alerts[0].title + "  -  " + alerts[0].fix);
             model.bodyLines.push_back("{MUTED}" + (alerts.size() > 1 ? std::to_string(alerts.size() - 1) + " more need attention.  " : std::string())
-                + "Y in the park visits each one");
+                + "Y visits each; hold Y to list them");
             model.rows = { StatusPermitted() ? (park.flags.has(ParkFlag::parkOpen) ? "Close park..." : "Open park...")
                                              : "Park status locked",
                            Finances::Available(Finances::Field::admission) ? "Admission..." : "Admission unavailable",

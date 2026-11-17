@@ -399,6 +399,17 @@ int main(int argc, char** argv)
         FocusRideTabAction("Continue track...");press(H::Action::confirm);press(H::Action::openMenu);press(H::Action::back);
         Check(W::HandheldRidesPresentation().selected==rosterRow&&W::HandheldRidesPresentation().tabs.empty(),"Roster return lost original row");capture("11-roster-return.png");
         {
+            // Photo mode: L2 opens the quick menu, Y there enters photo mode, Y freezes time and B
+            // leaves (unfreezing what photo mode froze).
+            closeMenu();H::EndTerrain();gGamePaused=0;
+            H::Frame open;open.actions={H::Action::slopeDown};open.leftTrigger=true;H::HandleExplorerInput(input,open);
+            Check(H::QuickWheelOpen(),"L2 did not open the quick menu");
+            H::Frame photo;photo.actions={H::Action::contextSecondary};photo.leftTrigger=true;H::HandleExplorerInput(input,photo);
+            Check(!H::QuickWheelOpen()&&H::PhotoModeActive(),"Y on the quick menu did not enter photo mode");
+            press(H::Action::contextSecondary);Check(GameIsPaused(),"Y in photo mode did not freeze time");
+            press(H::Action::back);Check(!H::PhotoModeActive()&&!GameIsPaused(),"B did not leave photo mode and unfreeze");
+        }
+        {
             // Save when the device sleeps: the resume save is written atomically and dropped again
             // when the player deliberately quits without saving.
             Check(H::Resume::Wanted()&&H::Resume::Save()&&std::filesystem::exists(H::Resume::Path()),"Resume save was not written");

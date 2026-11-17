@@ -129,7 +129,7 @@ namespace OpenRCT2::Ui::Handheld::QuickWheel
         DrawStrongText(rt, hubPos + ScreenCoordsXY{ (hub.width - tw) / 2, 7 }, "{WHITE}" + top);
         DrawModernText(rt, hubPos + ScreenCoordsXY{ (hub.width - bw) / 2, 23 }, "{MUTED}" + bottom);
         DrawFooter(rt, screen,
-            state.tapped ? std::vector<ControlHint>{ { "D-pad", "Point" }, { "A", "Choose" }, { "B", "Close" } }
-                         : std::vector<ControlHint>{ { "D-pad", "Point" }, { "L2", "Release to choose" }, { "B", "Close" } });
+            state.tapped ? std::vector<ControlHint>{ { "D-pad", "Point" }, { "A", "Choose" }, { "Y", "Photo" }, { "B", "Close" } }
+                         : std::vector<ControlHint>{ { "D-pad", "Point" }, { "L2", "Release to choose" }, { "Y", "Photo" }, { "B", "Close" } });
     }
 } // namespace OpenRCT2::Ui::Handheld::QuickWheel

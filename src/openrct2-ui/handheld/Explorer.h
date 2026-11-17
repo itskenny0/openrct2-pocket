@@ -37,6 +37,8 @@ namespace OpenRCT2::Ui::Handheld
     // Y in the park: moves the camera to the next alert and shows what usually fixes it. Returns
     // false when nothing needs attention.
     bool JumpToNextAlert();
+    // L2 then Y: the park with nothing drawn over it, for screenshots.
+    bool PhotoModeActive();
     // Glide to one alert and say what fixes it (the inbox's A).
     void JumpToAlert(const Alerts::Alert& alert);
     void UpdateExplorer(ControllerInput& input);
@@ -116,6 +118,9 @@ namespace OpenRCT2::Ui::Windows
     std::string HandheldNewsText(const std::string& text);
     void HandheldNewsOpen();
     void HandheldInboxOpen();
+    // Y on the controls guide plays the intro; the intro can also be opened directly.
+    bool HandheldControlsIntro();
+    void HandheldPrimerOpen();
     void HandheldObjectivesOpen();
     bool HandheldDashboardNews();
     void HandheldPeepPlacementOptionsOpen();
