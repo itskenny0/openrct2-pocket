@@ -15,6 +15,7 @@
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/FlatRides.h>
 #include <openrct2-ui/handheld/RideFollow.h>
+#include <openrct2-ui/handheld/Resume.h>
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/RideAccess.h>
 #include <openrct2-ui/handheld/TrackEditing.h>
@@ -397,6 +398,15 @@ int main(int argc, char** argv)
         const auto rosterRow=static_cast<size_t>(row-roster.rows.begin());W::HandheldMenuMove(static_cast<int>(rosterRow)-static_cast<int>(roster.selected));press(H::Action::confirm);
         FocusRideTabAction("Continue track...");press(H::Action::confirm);press(H::Action::openMenu);press(H::Action::back);
         Check(W::HandheldRidesPresentation().selected==rosterRow&&W::HandheldRidesPresentation().tabs.empty(),"Roster return lost original row");capture("11-roster-return.png");
+        {
+            // Save when the device sleeps: the resume save is written atomically and dropped again
+            // when the player deliberately quits without saving.
+            Check(H::Resume::Wanted()&&H::Resume::Save()&&std::filesystem::exists(H::Resume::Path()),"Resume save was not written");
+            SDL_Event power{};power.type=SDL_KEYDOWN;power.key.keysym.scancode=SDL_SCANCODE_POWER;
+            const auto written=std::filesystem::last_write_time(H::Resume::Path());H::Resume::OnEvent(power);
+            Check(std::filesystem::last_write_time(H::Resume::Path())==written,"Power key saved again inside the throttle window");
+            H::Resume::Discard();Check(!std::filesystem::exists(H::Resume::Path()),"Discard kept the resume save");
+        }
         std::cout<<"PASS native park selection / modern tabs / contextual access / camera preservation / safe status and demolition reviews\n";
         std::cout<<"PASS coaster Undo/piece/camera/return, flat access cancellation/completion, maze camera/leave, roster focus restoration\n";
         return 0;

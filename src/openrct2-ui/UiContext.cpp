@@ -16,6 +16,7 @@
 #include "drawing/engines/DrawingEngineFactory.hpp"
 #include "handheld/Explorer.h"
 #include "handheld/Layout.h"
+#include "handheld/Resume.h"
 #include "input/ShortcutManager.h"
 #include "interface/Chat.h"
 #include "interface/InGameConsole.h"
@@ -358,11 +359,21 @@ public:
         SDL_Event e;
         while (SDL_PollEvent(&e))
         {
+            if (Handheld::IsEnabled())
+                Handheld::Resume::OnEvent(e);
             if (_inputManager.handleHandheldEvent(e))
                 continue;
             switch (e.type)
             {
                 case SDL_QUIT:
+                    // On a handheld, SDL_QUIT is the system closing the game (SIGTERM from the
+                    // frontend or power-off), and nobody is there to answer a quit prompt. Once
+                    // the park is safely saved, close at once; otherwise ask as usual.
+                    if (Handheld::IsEnabled() && Handheld::Resume::BeforeQuit())
+                    {
+                        GetContext()->Finish();
+                        break;
+                    }
                     ContextQuit();
                     break;
                 case SDL_WINDOWEVENT:

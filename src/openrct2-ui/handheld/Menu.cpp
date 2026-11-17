@@ -11,6 +11,7 @@
 #include "QuickWheel.h"
 #include "RideFollow.h"
 #include "Alerts.h"
+#include "Resume.h"
 #include "ChoiceCards.h"
 #include "Designs.h"
 #include "DesignAuthoring.h"
@@ -6788,6 +6789,7 @@ namespace OpenRCT2::Ui::Windows
                     {
                         close();
                         // The deliberate Pocket discard confirmation is final.
+                        Handheld::Resume::Discard();
                         GetContext()->Finish();
                     }
                     else

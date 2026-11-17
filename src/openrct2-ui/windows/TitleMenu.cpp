@@ -11,6 +11,7 @@
 #include <openrct2-ui/handheld/FeelSound.h>
 #include <openrct2-ui/handheld/Panel.h>
 #include <openrct2-ui/handheld/Currency.h>
+#include <openrct2-ui/handheld/Resume.h>
 #include <openrct2-ui/handheld/SavedParkPresentation.h>
 #include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2-ui/interface/Widget.h>
@@ -388,6 +389,11 @@ namespace OpenRCT2::Ui::Windows
         void onUpdate() override
         {
             if (!Handheld::IsEnabled())
+                return;
+            // Continue last park on launch: once per run, straight into the newest park. A failed
+            // load leaves the title as it was.
+            scanContinue();
+            if (Handheld::Resume::LaunchContinue(_continuePath.value_or(std::filesystem::path{})))
                 return;
             Handheld::PlayFeelSound(_feel.Observe("title", _handheldRow));
             if (_feel.NeedsDraw())
