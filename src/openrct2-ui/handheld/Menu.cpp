@@ -3068,6 +3068,31 @@ namespace OpenRCT2::Ui::Windows
         {
             page(Page::dashboard);
         }
+        // A sign edited straight from the park (context A) goes back to the park, not to the
+        // scenery tool's options.
+        bool _signFromPark{};
+        void leaveSign()
+        {
+            if (_signFromPark)
+            {
+                _signFromPark = false;
+                close();
+            }
+            else
+                page(Page::sceneryOptions);
+        }
+        void openSignFromPark()
+        {
+            _signTarget = Handheld::SceneryEditTarget();
+            if (!_signTarget || _signTarget->banner == BannerIndex::GetNull())
+            {
+                close();
+                return;
+            }
+            _signFromPark = true;
+            _nameEntry = { _signTarget->text };
+            page(Page::sceneryName);
+        }
         // Settings: A or Left/Right flips a row. Theme and Motion keep their own files; the rest
         // live in pocket-prefs.cfg.
         void toggleSetting(size_t row)
@@ -3849,7 +3874,7 @@ namespace OpenRCT2::Ui::Windows
                     else _focus.move(static_cast<int>(_scenerySearchRow),rows().size());
                     break;
                 case Page::sceneryName:
-                    page(Page::sceneryOptions);
+                    leaveSign();
                     break;
                 case Page::sceneryConfirm:
                     page(Page::sceneryName);
@@ -4523,13 +4548,13 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::sceneryName:
                     if (choice == 47)
-                        page(Page::sceneryOptions);
+                        leaveSign();
                     else if (choice == 46 && _signTarget)
                     {
                         const auto query = Handheld::SceneryTools::SetText(*_signTarget, _nameEntry.text, true);
                         if (query.error == GameActions::Status::ok)
                         {
-                            page(Page::sceneryOptions);
+                            leaveSign();
                         }
                         else
                         {
@@ -4550,7 +4575,7 @@ namespace OpenRCT2::Ui::Windows
                     {
                         const auto result = Handheld::SceneryTools::SetText(*_signTarget, _nameEntry.text, true);
                         if (result.error == GameActions::Status::ok)
-                            page(Page::sceneryOptions);
+                            leaveSign();
                         else
                         {
                             _status = result.getErrorMessage();
@@ -7972,6 +7997,11 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->dashboardPause();
+    }
+    void HandheldSignEditOpen()
+    {
+        if (auto* window = OpenPanel())
+            window->openSignFromPark();
     }
     void HandheldQuickJump(Handheld::QuickWheel::Target target)
     {

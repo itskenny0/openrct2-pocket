@@ -185,6 +185,25 @@ int main(int argc, char** argv)
             capture("06e-shop-demolish.png");W::HandheldMenuBack();closeMenu();
         }
         {
+            // Context A: on a path end (one connected edge), A starts the connected path tool there.
+            auto* surface=objects.LoadObject("rct2.footpath_surface.tarmac");auto* railing=objects.LoadObject("rct2.footpath_railings.wood");
+            Check(surface&&railing,"Path objects missing");
+            for(const CoordsXY t:{CoordsXY{1120,800},CoordsXY{1152,800}})
+            {
+                GameActions::FootpathPlaceAction a({t,MapGetSurfaceElementAt(t)->getBaseZ()},FootpathSlope{},
+                    objects.GetLoadedObjectEntryIndex(surface),objects.GetLoadedObjectEntryIndex(railing));
+                Check(GameActions::Execute(&a,state).error==GameActions::Status::ok,"Context path fixture failed");
+                GameActions::ProcessQueue(state);
+            }
+            const CoordsXY end{1152,800};
+            focus({end.x+16,end.y+16,MapGetSurfaceElementAt(end)->getBaseZ()});H::UpdateExplorer(input);
+            capture("06f-path-end.png");
+            press(H::Action::confirm);
+            Check(H::Paths::IsActive()&&H::Paths::IsConnected()&&H::Paths::ConnectedReady(),"A on a path end did not start extending it");
+            H::EndTerrain();
+            Check(!H::Paths::IsActive(),"Extend path tool did not end");
+        }
+        {
             // Attention: a broken ride becomes the first alert, Y glides the camera to it, and the
             // overview home leads with it. With no problems, Y is News as before.
             auto* ride=GetRide(target.id);ride->flags.set(RideFlag::brokenDown);H::Alerts::Invalidate();

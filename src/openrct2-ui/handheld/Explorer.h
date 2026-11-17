@@ -87,6 +87,7 @@ namespace OpenRCT2::Ui::Windows
     Handheld::ManagementPresentation HandheldDashboardPresentation(size_t selected);
     void HandheldDashboardOpen();
     void HandheldQuickJump(Handheld::QuickWheel::Target target);
+    void HandheldSignEditOpen();
     std::pair<std::string, uint32_t> HandheldLastBuild();
     void HandheldDashboardPause();
     bool HandheldDashboardIsOpen();

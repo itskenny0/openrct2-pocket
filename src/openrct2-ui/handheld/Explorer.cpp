@@ -36,6 +36,7 @@
 #include "Water.h"
 
 #include <SDL_timer.h>
+#include <bit>
 #include <iomanip>
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/input/MouseInput.h>
@@ -552,7 +553,11 @@ namespace OpenRCT2::Ui::Handheld
         guest,
         staff,
         park,
+        path, // A extends it with the connected path tool.
+        sign, // A edits its text.
     };
+    // The footer verb is one word (the chip beside the cursor names the target), so the park's
+    // footer stays on one row.
     struct InspectTarget
     {
         std::string verb = "Inspect";
@@ -571,6 +576,8 @@ namespace OpenRCT2::Ui::Handheld
             case InspectKind::guest: return NearestPaletteIndex(250, 215, 60);
             case InspectKind::staff: return NearestPaletteIndex(90, 160, 245);
             case InspectKind::park: return NearestPaletteIndex(225, 110, 220);
+            case InspectKind::path: return NearestPaletteIndex(170, 200, 230);
+            case InspectKind::sign: return NearestPaletteIndex(200, 170, 255);
             default: return NearestPaletteIndex(240, 240, 240);
         }
     }
@@ -919,7 +926,7 @@ namespace OpenRCT2::Ui::Handheld
             if (ride == nullptr)
                 return InspectTarget{};
             const bool shop = ride->getRideTypeDescriptor().flags.has(RtdFlag::isShopOrFacility);
-            return InspectTarget{ shop ? "Inspect shop" : "Inspect ride", ride->getName(),
+            return InspectTarget{ "Open", ride->getName(),
                                   shop ? InspectKind::shop : InspectKind::ride };
         };
         switch (info.interactionType)
@@ -930,7 +937,7 @@ namespace OpenRCT2::Ui::Handheld
                 if (const auto* peep = info.Entity->as<Peep>(); peep != nullptr)
                 {
                     const bool staff = info.Entity->type == EntityType::staff;
-                    return { staff ? "Inspect staff" : "Inspect guest", peep->getName(),
+                    return { "Inspect", peep->getName(),
                              staff ? InspectKind::staff : InspectKind::guest };
                 }
                 if (const auto* vehicle = info.Entity->as<Vehicle>(); vehicle != nullptr && !vehicle->IsCableLift())
@@ -947,10 +954,20 @@ namespace OpenRCT2::Ui::Handheld
                     return rideTarget(GetRide(info.Element->asPath()->getRideIndex()));
                 break;
             case ViewportInteractionItem::parkEntrance:
-                return { "Inspect park", getGameState().park.name, InspectKind::park };
+                return { "Open", getGameState().park.name, InspectKind::park };
             default:
                 break;
         }
+        // Nothing to inspect: a sign can be edited, a plain path or queue extended.
+        const auto sign = SceneryTools::Capture(GetMapCoordinatesFromPos(at.value_or(Centre()),
+            { ViewportInteractionItem::banner, ViewportInteractionItem::wall, ViewportInteractionItem::largeScenery }));
+        if (sign && sign->banner != BannerIndex::GetNull())
+            return { "Edit", sign->text.empty() ? std::string("Sign") : sign->text, InspectKind::sign };
+        const auto path = GetMapCoordinatesFromPos(at.value_or(Centre()), { ViewportInteractionItem::footpath });
+        // Only path ends (at most one connected edge): every path tile would bracket most of a park.
+        if (path.Element && path.Element->getType() == TileElementType::path && !path.Element->isGhost()
+            && std::popcount(static_cast<unsigned>(path.Element->asPath()->getEdges() & 0x0F)) <= 1)
+            return { "Extend", path.Element->asPath()->isQueue() ? "Queue end" : "Path end", InspectKind::path };
         return {};
     }
 
@@ -1811,6 +1828,30 @@ namespace OpenRCT2::Ui::Handheld
                                 const auto* ride = GetRide(info.Element->getRideIndex());
                                 if (ride && !ride->getRideTypeDescriptor().flags.has(RtdFlag::isShopOrFacility))
                                     Windows::HandheldRideOpen(ride->id);
+                            }
+                            else if (_inspect.kind == InspectKind::path)
+                            {
+                                // Start the connected path tool on this path, as if chosen from
+                                // Build > Paths > Extend and then pointed at.
+                                const auto pathInfo = GetMapCoordinatesFromPos(Centre(), { ViewportInteractionItem::footpath });
+                                const bool queue = pathInfo.Element && pathInfo.Element->getType() == TileElementType::path
+                                    && pathInfo.Element->asPath()->isQueue();
+                                EndTerrain();
+                                Paths::BeginConnected(queue);
+                                Paths::UpdateTarget(Centre());
+                                const auto result = Paths::Action(true);
+                                _terrainStatus = result.error == GameActions::Status::ok ? "Steer with the D-pad, A to lay path"
+                                                                                         : result.getErrorMessage();
+                                input.suspend();
+                                return;
+                            }
+                            else if (_inspect.kind == InspectKind::sign)
+                            {
+                                _sceneryEdit = SceneryTools::Capture(GetMapCoordinatesFromPos(Centre(),
+                                    { ViewportInteractionItem::banner, ViewportInteractionItem::wall, ViewportInteractionItem::largeScenery }));
+                                Windows::HandheldSignEditOpen();
+                                input.suspend();
+                                return;
                             }
                             else if (!info.Element || !info.Element->isGhost())
                                 ViewportInteractionLeftClick(Centre());
