@@ -44,8 +44,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryClear
     {
         DrawConstructionOverlay(
             rt, origin, "Clear area", "Choose what to remove", "Review before clearing",
-            std::to_string(settings.width) + " x " + std::to_string(settings.height) + " tiles",
-            "Removes whole objects");
+            std::to_string(settings.width) + " x " + std::to_string(settings.height) + " tiles", "Removes whole objects");
     }
     struct Snapshot
     {

@@ -162,7 +162,8 @@ namespace OpenRCT2::Ui::Handheld::PeepPlacement
         model.selected = selected;
         model.confirmation = true;
         model.status = Network::GetPickupPeepOldX(Network::GetCurrentPlayerId()) == kLocationNull
-            ? "No previous position; place this person first" : "Returns to the previous position";
+            ? "No previous position; place this person first"
+            : "Returns to the previous position";
         return model;
     }
 } // namespace OpenRCT2::Ui::Handheld::PeepPlacement

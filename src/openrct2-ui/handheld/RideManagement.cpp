@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "RideManagement.h"
-#include "RideFollow.h"
 
 #include "../interface/Dropdown.h"
 #include "CustomTracks.h"
@@ -8,6 +7,7 @@
 #include "FlatRides.h"
 #include "Mazes.h"
 #include "RideAccess.h"
+#include "RideFollow.h"
 #include "TextEntry.h"
 #include "TrackEditing.h"
 
@@ -946,8 +946,7 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 return Invalid("Testing unavailable for this ride");
             // Native RideSetStatusAction uses Close on an already-closed crashed ride
             // to clear the crash flag. Do not block that recovery action here.
-            if (*draft.status == ride->status
-                && !(*draft.status == RideStatus::closed && ride->flags.has(RideFlag::crashed)))
+            if (*draft.status == ride->status && !(*draft.status == RideStatus::closed && ride->flags.has(RideFlag::crashed)))
                 return Invalid("Ride already has this status");
             GameActions::RideSetStatusAction action(draft.target.id, *draft.status);
             action.SetCallback(std::move(callback));
@@ -990,7 +989,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
             {
                 const auto* ride = Resolve(entry);
                 model.rows.push_back(ride ? ride->getName() : "Ride unavailable");
-                model.rowDetails.push_back(ride ? Status(*ride) + "  |  Queue " + std::to_string(ride->getTotalQueueLength()) : "No longer in park");
+                model.rowDetails.push_back(
+                    ride ? Status(*ride) + "  |  Queue " + std::to_string(ride->getTotalQueueLength()) : "No longer in park");
                 model.rowEnabled.push_back(ride != nullptr);
             }
             model.rows.push_back("Back to dashboard");
@@ -1315,13 +1315,14 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.stats.emplace_back("Current price", FormatMoney(ride->price[0]));
                 model.stats.emplace_back("Draft price", FormatMoney(draft->price));
             }
-            if (!draft->demolition && queried.cost!=0)
+            if (!draft->demolition && queried.cost != 0)
                 model.stats.emplace_back(
                     "Cost", queried.error == GameActions::Status::ok ? FormatMoney(queried.cost) : "Unavailable");
             if (view == View::price && draft->setting && draft->setting->appearance)
             {
                 model.title = draft->setting->name;
-                if (IsColourSetting(*draft->setting)) model.colourValues = draft->setting->values;
+                if (IsColourSetting(*draft->setting))
+                    model.colourValues = draft->setting->values;
                 model.currentColour = draft->setting->current;
                 model.rows = draft->setting->labels;
                 model.primaryAction = "Review";
@@ -1329,16 +1330,24 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
                 model.navigationHint = "Choose";
                 return model;
             }
-            const bool vehicleReview=draft->setting && draft->setting->vehicle.has_value();
-            if(view==View::price) {
-                model.title=draft->setting ? draft->setting->name : "Admission price";
-                model.primaryAction=vehicleReview ? "Review" : "Apply";
-                model.navigationHint="Adjust";
-                model.summaryMetrics=true;model.metricColumns=1;
-                if(feedback.empty())model.status=queried.error==GameActions::Status::ok ? "Left/Right: Adjust" : Finances::Feedback(queried);
+            const bool vehicleReview = draft->setting && draft->setting->vehicle.has_value();
+            if (view == View::price)
+            {
+                model.title = draft->setting ? draft->setting->name : "Admission price";
+                model.primaryAction = vehicleReview ? "Review" : "Apply";
+                model.navigationHint = "Adjust";
+                model.summaryMetrics = true;
+                model.metricColumns = 1;
+                if (feedback.empty())
+                    model.status = queried.error == GameActions::Status::ok ? "Left/Right: Adjust"
+                                                                            : Finances::Feedback(queried);
             }
-            model.rows = view == View::price ? std::vector<std::string>{vehicleReview ? "Review configuration" : "Apply change", "Cancel"}
-                : std::vector<std::string>{draft->demolition ? "Demolish ride" : draft->refurbishment ? "Refurbish ride" : "Apply change", "Cancel"};
+            model.rows = view == View::price
+                ? std::vector<std::string>{ vehicleReview ? "Review configuration" : "Apply change", "Cancel" }
+                : std::vector<std::string>{ draft->demolition          ? "Demolish ride"
+                                                : draft->refurbishment ? "Refurbish ride"
+                                                                       : "Apply change",
+                                            "Cancel" };
             if (queried.error != GameActions::Status::ok && feedback.empty())
                 model.status = Finances::Feedback(queried);
         }

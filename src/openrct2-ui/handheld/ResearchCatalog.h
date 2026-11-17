@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
-#include "ManagementPanel.h"
-#include "ObjectPicker.h"
-#include "Shops.h"
 #include "FlatRides.h"
+#include "ManagementPanel.h"
 #include "Mazes.h"
+#include "ObjectPicker.h"
 #include "ParkInformation.h"
+#include "Shops.h"
 
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
@@ -95,26 +95,46 @@ namespace OpenRCT2::Ui::Handheld::ResearchCatalog
         std::vector<PickerEntry> entries;
         for (const auto& target : roster)
         {
-            PickerEntry entry{{target.item.type == Research::EntryType::ride ? ObjectType::ride : ObjectType::sceneryGroup,
-                target.item.entryIndex, std::to_string(target.item.rawValue) + ":" + std::to_string(target.occurrence)}, Name(target), target.item.type == Research::EntryType::ride ? ZoomLevel{1} : ZoomLevel{2}};
+            PickerEntry entry{ { target.item.type == Research::EntryType::ride ? ObjectType::ride : ObjectType::sceneryGroup,
+                                 target.item.entryIndex,
+                                 std::to_string(target.item.rawValue) + ":" + std::to_string(target.occurrence) },
+                               Name(target),
+                               target.item.type == Research::EntryType::ride ? ZoomLevel{ 1 } : ZoomLevel{ 2 } };
             // The picker's own detail pane says what it is and whether you have it yet.
             entry.detail = Category(EnumValue(target.item.category) + 1) + ". "
-                + (Invented(target.item) ? "Researched" : Loaded(target.item) ? "Not researched yet" : "Object unavailable");
+                + (Invented(target.item)     ? "Researched"
+                       : Loaded(target.item) ? "Not researched yet"
+                                             : "Object unavailable");
             entries.push_back(std::move(entry));
         }
         std::optional<PickerIdentity> preferred;
-        if (selected < entries.size()) preferred = entries[selected].identity;
-        ObjectPicker picker; picker.setEntries(std::move(entries),preferred); return picker;
+        if (selected < entries.size())
+            preferred = entries[selected].identity;
+        ObjectPicker picker;
+        picker.setEntries(std::move(entries), preferred);
+        return picker;
     }
-    enum class BuildKind { none, shop, flat, maze, track };
+    enum class BuildKind
+    {
+        none,
+        shop,
+        flat,
+        maze,
+        track
+    };
     inline BuildKind Construction(const Target& target)
     {
-        if (!Current(target) || !Invented(target.item) || target.item.type != Research::EntryType::ride) return BuildKind::none;
+        if (!Current(target) || !Invented(target.item) || target.item.type != Research::EntryType::ride)
+            return BuildKind::none;
         const auto i = target.item.entryIndex;
-        if (Shops::Eligible(i)) return BuildKind::shop;
-        if (FlatRides::Eligible(i)) return BuildKind::flat;
-        if (Mazes::Eligible(i)) return BuildKind::maze;
-        if (TrackConstructionSupport::Available(i,target.item.baseRideType)) return BuildKind::track;
+        if (Shops::Eligible(i))
+            return BuildKind::shop;
+        if (FlatRides::Eligible(i))
+            return BuildKind::flat;
+        if (Mazes::Eligible(i))
+            return BuildKind::maze;
+        if (TrackConstructionSupport::Available(i, target.item.baseRideType))
+            return BuildKind::track;
         return BuildKind::none;
     }
     inline ManagementPresentation Presentation(const std::vector<Target>& roster, uint8_t filter, size_t selected)
@@ -127,8 +147,7 @@ namespace OpenRCT2::Ui::Handheld::ResearchCatalog
         for (const auto& target : roster)
             model.rows.push_back(Name(target));
 
-        model.status = roster.empty() ? "No items in this category"
-                                      : "Left/Right category / A Details";
+        model.status = roster.empty() ? "No items in this category" : "Left/Right category / A Details";
         return model;
     }
     inline ManagementPresentation Detail(const Target& target, size_t selected)
@@ -136,8 +155,8 @@ namespace OpenRCT2::Ui::Handheld::ResearchCatalog
         ManagementPresentation model;
         model.breadcrumb = "Research / Invention details";
         model.selected = selected;
-        model.rows = Construction(target) == BuildKind::none ? std::vector<std::string>{"Back to catalog"}
-            : std::vector<std::string>{"Build this item", "Back to catalog"};
+        model.rows = Construction(target) == BuildKind::none ? std::vector<std::string>{ "Back to catalog" }
+                                                             : std::vector<std::string>{ "Build this item", "Back to catalog" };
         if (!Current(target))
         {
             model.title = "Research record changed";

@@ -3,8 +3,8 @@
 #include "ObjectPicker.h"
 #include "RideManagement.h"
 
-#include <openrct2/ride/ted/TrackElemType.h>
 #include <openrct2/ride/TrackConstructionSupport.h>
+#include <openrct2/ride/ted/TrackElemType.h>
 namespace OpenRCT2::Ui::Handheld::CustomTracks
 {
     bool Eligible(ObjectEntryIndex index, ride_type_t type = kRideTypeNull);
@@ -15,8 +15,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     bool ResumeFrom(
         const RideManagement::Target& target, std::optional<std::pair<CoordsXYZD, TrackElemType>> source,
         bool backward = false);
-    bool ResumeReplacement(const RideManagement::Target& target,
-        const TrackConstructionSupport::BlockSnapshot& removed, uint8_t colour);
+    bool ResumeReplacement(
+        const RideManagement::Target& target, const TrackConstructionSupport::BlockSnapshot& removed, uint8_t colour);
     bool Replacing();
     void End();
     bool Active();
@@ -46,12 +46,22 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     bool SetPlacementSeat(uint8_t seat);
     void Bank();
     void Chain();
-    enum class PieceGroup { all, straight, station, turns, slopes, banks, special, count };
+    enum class PieceGroup
+    {
+        all,
+        straight,
+        station,
+        turns,
+        slopes,
+        banks,
+        special,
+        count
+    };
     PieceGroup GroupOf(TrackElemType);
     PieceGroup CurrentGroup();
     std::string GroupName(PieceGroup);
     void NextGroup();
-    std::vector<PickerEntry> Pieces(bool filtered=false);
+    std::vector<PickerEntry> Pieces(bool filtered = false);
     bool HasPreview();
     std::string PieceName(TrackElemType type);
     void DrawPiecePreview(Drawing::RenderTarget& rt, TrackElemType type);

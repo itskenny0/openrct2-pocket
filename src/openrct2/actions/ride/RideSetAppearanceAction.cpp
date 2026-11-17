@@ -56,9 +56,14 @@ namespace OpenRCT2::GameActions
             return Result(Status::invalidParameters, STR_ERR_INVALID_PARAMETER, STR_ERR_RIDE_NOT_FOUND);
         }
 
-        if (!_shopContext.empty() && (_shopContext!=ShopAppearanceContext::Capture(*ride)
-            || !ShopAppearanceContext::Allowed(*ride,_type,_value,_index))) {
-            Result result;result.error=Status::disallowed;result.errorMessage="Shop appearance or object changed; review again";return result;
+        if (!_shopContext.empty()
+            && (_shopContext != ShopAppearanceContext::Capture(*ride)
+                || !ShopAppearanceContext::Allowed(*ride, _type, _value, _index)))
+        {
+            Result result;
+            result.error = Status::disallowed;
+            result.errorMessage = "Shop appearance or object changed; review again";
+            return result;
         }
 
         switch (_type)
@@ -95,8 +100,11 @@ namespace OpenRCT2::GameActions
 
     Result RideSetAppearanceAction::Execute(GameState_t& gameState, Park::ParkData& park) const
     {
-        if (!_shopContext.empty()) {
-            const auto query=Query(gameState,park);if(query.error!=Status::ok)return query;
+        if (!_shopContext.empty())
+        {
+            const auto query = Query(gameState, park);
+            if (query.error != Status::ok)
+                return query;
         }
         auto ride = GetRide(_rideIndex);
         if (ride == nullptr)

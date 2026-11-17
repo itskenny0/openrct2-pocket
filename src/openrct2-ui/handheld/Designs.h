@@ -9,7 +9,9 @@ namespace OpenRCT2::Ui::Handheld::Designs
     bool Eligible(const TrackDesign& design);
     std::string UnavailableReason(const TrackDesign& design);
     std::vector<PickerEntry> Entries();
-    std::optional<PickerEntry> FileEntry(const std::string& path, std::optional<ObjectEntryDescriptor> vehicle = {}, int width = 86, int height = 62, Direction orientation = 0);
+    std::optional<PickerEntry> FileEntry(
+        const std::string& path, std::optional<ObjectEntryDescriptor> vehicle = {}, int width = 86, int height = 62,
+        Direction orientation = 0);
     bool BrowserReturn();
     void SetBrowserReturn(bool value);
     bool Begin(const std::string& path, std::optional<ObjectEntryDescriptor> vehicle = {});

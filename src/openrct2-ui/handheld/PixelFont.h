@@ -2,9 +2,8 @@
 #pragma once
 #include <openrct2/SpriteIds.h>
 #include <openrct2/drawing/Drawing.h>
-#include <openrct2/drawing/G1Element.h>
 #include <openrct2/drawing/Font.h>
-
+#include <openrct2/drawing/G1Element.h>
 #include <string>
 
 // The Pixel theme's text: RCT2's own bitmap font, read straight from g1.dat. The glyph sprites mark
@@ -99,8 +98,9 @@ namespace OpenRCT2::Ui::Handheld::PixelFont
                     }
             }
     }
-    inline void Draw(Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& text, Style style,
-        Drawing::PaletteIndex ink, int scale = 1)
+    inline void Draw(
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& text, Style style, Drawing::PaletteIndex ink,
+        int scale = 1)
     {
         for (size_t at = 0; at < text.size();)
         {

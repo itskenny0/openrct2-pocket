@@ -57,7 +57,8 @@ namespace OpenRCT2::Ui::Handheld::RideManagement
     inline bool IsColourSetting(const Setting& setting)
     {
         using A = GameActions::RideSetAppearanceType;
-        if (!setting.appearance || setting.values.size() < Drawing::kColourNumNormal) return false;
+        if (!setting.appearance || setting.values.size() < Drawing::kColourNumNormal)
+            return false;
         return *setting.appearance == A::trackColourMain || *setting.appearance == A::trackColourAdditional
             || *setting.appearance == A::trackColourSupports || *setting.appearance == A::vehicleColourBody
             || *setting.appearance == A::vehicleColourTrim || *setting.appearance == A::vehicleColourTertiary;

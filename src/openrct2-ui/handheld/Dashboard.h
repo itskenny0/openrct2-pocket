@@ -74,25 +74,85 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
     {
         const auto colour = selected ? Theme::ink : Theme::text;
         const auto line = [&](int x1, int y1, int x2, int y2) {
-            GfxDrawLine(rt, {p + ScreenCoordsXY{x1, y1}, p + ScreenCoordsXY{x2, y2}}, colour);
+            GfxDrawLine(rt, { p + ScreenCoordsXY{ x1, y1 }, p + ScreenCoordsXY{ x2, y2 } }, colour);
         };
-        if (category == 0) { line(3,1,3,16); line(4,2,14,2); line(14,2,11,7); line(11,7,4,7); }
+        if (category == 0)
+        {
+            line(3, 1, 3, 16);
+            line(4, 2, 14, 2);
+            line(14, 2, 11, 7);
+            line(11, 7, 4, 7);
+        }
         else if (category == 1)
         {
-            const std::array<ScreenCoordsXY,9> points{{{5,1},{11,1},{15,5},{15,11},{11,15},{5,15},{1,11},{1,5},{5,1}}};
-            for (size_t i=1;i<points.size();++i) { GfxDrawLine(rt,{p+points[i-1],p+points[i]},colour); GfxDrawLine(rt,{p+ScreenCoordsXY{8,8},p+points[i]},colour); }
-            line(8,8,4,18);line(8,8,12,18);line(2,18,14,18);
+            const std::array<ScreenCoordsXY, 9> points{
+                { { 5, 1 }, { 11, 1 }, { 15, 5 }, { 15, 11 }, { 11, 15 }, { 5, 15 }, { 1, 11 }, { 1, 5 }, { 5, 1 } }
+            };
+            for (size_t i = 1; i < points.size(); ++i)
+            {
+                GfxDrawLine(rt, { p + points[i - 1], p + points[i] }, colour);
+                GfxDrawLine(rt, { p + ScreenCoordsXY{ 8, 8 }, p + points[i] }, colour);
+            }
+            line(8, 8, 4, 18);
+            line(8, 8, 12, 18);
+            line(2, 18, 14, 18);
         }
         else if (category == 2)
         {
-            Fill(rt,p+ScreenCoordsXY{2,2},{4,4},colour);Fill(rt,p+ScreenCoordsXY{11,2},{4,4},colour);
-            line(1,9,7,9);line(0,10,0,15);line(8,10,8,15);line(10,9,16,9);line(17,10,17,15);
-            line(3,9,3,18);line(5,9,5,18);line(12,9,12,18);line(14,9,14,18);
+            Fill(rt, p + ScreenCoordsXY{ 2, 2 }, { 4, 4 }, colour);
+            Fill(rt, p + ScreenCoordsXY{ 11, 2 }, { 4, 4 }, colour);
+            line(1, 9, 7, 9);
+            line(0, 10, 0, 15);
+            line(8, 10, 8, 15);
+            line(10, 9, 16, 9);
+            line(17, 10, 17, 15);
+            line(3, 9, 3, 18);
+            line(5, 9, 5, 18);
+            line(12, 9, 12, 18);
+            line(14, 9, 14, 18);
         }
-        else if (category == 3) { line(3,1,1,6);line(1,6,5,10);line(5,10,9,9);line(9,9,15,16);line(15,16,17,14);line(17,14,10,7);line(10,7,10,3);line(10,3,6,0);line(6,0,6,5);line(6,5,3,5);line(3,5,3,1); }
-        else if (category == 4) { Fill(rt,p+ScreenCoordsXY{1,10},{4,7},colour);Fill(rt,p+ScreenCoordsXY{7,6},{4,11},colour);Fill(rt,p+ScreenCoordsXY{13,1},{4,16},colour);line(0,19,18,19); }
-        else if (category == 5) { line(6,0,12,0);line(7,1,7,7);line(11,1,11,7);line(7,7,1,17);line(11,7,17,17);line(1,17,17,17);line(4,13,14,13); }
-        else { line(2,6,7,6);line(7,6,16,1);line(16,1,16,15);line(16,15,7,10);line(7,10,2,10);line(2,10,2,6);line(6,11,8,18);line(8,18,11,18); }
+        else if (category == 3)
+        {
+            line(3, 1, 1, 6);
+            line(1, 6, 5, 10);
+            line(5, 10, 9, 9);
+            line(9, 9, 15, 16);
+            line(15, 16, 17, 14);
+            line(17, 14, 10, 7);
+            line(10, 7, 10, 3);
+            line(10, 3, 6, 0);
+            line(6, 0, 6, 5);
+            line(6, 5, 3, 5);
+            line(3, 5, 3, 1);
+        }
+        else if (category == 4)
+        {
+            Fill(rt, p + ScreenCoordsXY{ 1, 10 }, { 4, 7 }, colour);
+            Fill(rt, p + ScreenCoordsXY{ 7, 6 }, { 4, 11 }, colour);
+            Fill(rt, p + ScreenCoordsXY{ 13, 1 }, { 4, 16 }, colour);
+            line(0, 19, 18, 19);
+        }
+        else if (category == 5)
+        {
+            line(6, 0, 12, 0);
+            line(7, 1, 7, 7);
+            line(11, 1, 11, 7);
+            line(7, 7, 1, 17);
+            line(11, 7, 17, 17);
+            line(1, 17, 17, 17);
+            line(4, 13, 14, 13);
+        }
+        else
+        {
+            line(2, 6, 7, 6);
+            line(7, 6, 16, 1);
+            line(16, 1, 16, 15);
+            line(16, 15, 7, 10);
+            line(7, 10, 2, 10);
+            line(2, 10, 2, 6);
+            line(6, 11, 8, 18);
+            line(8, 18, 11, 18);
+        }
     }
     inline std::vector<ControlHint> Hints(const State& state, const ManagementPresentation& model, bool sectionRoot)
     {
@@ -118,7 +178,8 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
             hints.push_back({ "L1/R1", "Page" });
         else if (state.focus == Focus::rail)
             hints.push_back({ "L1/R1", "Section" });
-        if (state.focus == Focus::rail) hints.push_back({"Y","News"});
+        if (state.focus == Focus::rail)
+            hints.push_back({ "Y", "News" });
         if (state.focus == Focus::content && !model.contextualAction.empty())
             hints.push_back({ "X", model.contextualAction });
         hints.push_back(
@@ -144,49 +205,55 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         const bool expanded = state.focus == Focus::content;
         if (!expanded)
         {
-        DrawSurface(rt, rail, { railWidth, height });
-        DrawStrongText(rt, rail + ScreenCoordsXY{ 10, 14 }, "{WHITE}Your park", railWidth - 20);
-        Rule(rt, rail + ScreenCoordsXY{ 10, 42 }, railWidth - 20);
-        // 40 px rows on the Brick; shorter canvases (16:9 panels) tighten the pitch so all
-        // sections stay on screen.
-        const int pitch = std::clamp((height - 56) / static_cast<int>(kCategories.size()), 30, 40);
-        for (size_t i = 0; i < kCategories.size(); ++i)
-        {
-            const auto& category = kCategories[i];
-            const int y = 52 + static_cast<int>(i) * pitch;
-            const bool active = i == state.index();
-            const bool focused = active && state.focus == Focus::rail;
-            if (focused)
+            DrawSurface(rt, rail, { railWidth, height });
+            DrawStrongText(rt, rail + ScreenCoordsXY{ 10, 14 }, "{WHITE}Your park", railWidth - 20);
+            Rule(rt, rail + ScreenCoordsXY{ 10, 42 }, railWidth - 20);
+            // 40 px rows on the Brick; shorter canvases (16:9 panels) tighten the pitch so all
+            // sections stay on screen.
+            const int pitch = std::clamp((height - 56) / static_cast<int>(kCategories.size()), 30, 40);
+            for (size_t i = 0; i < kCategories.size(); ++i)
             {
-                Fill(rt, rail + ScreenCoordsXY{ 6, y }, { railWidth - 12, pitch - 4 }, Theme::gold);
-                ReportSelected(rt, rail + ScreenCoordsXY{ 6, y }, { railWidth - 12, pitch - 4 });
-            }
-            else if (active)
-            {
-                for (int x = 6; x <= 8; ++x)
-                    GfxDrawLine(
-                        rt, { rail + ScreenCoordsXY{ x, y + 3 }, rail + ScreenCoordsXY{ x, y + pitch - 9 } },
-                        static_cast<Drawing::PaletteIndex>(PocketPalette::selection));
-            }
-            static constexpr std::array sprites{SPR_TAB_PARK_ENTRANCE, SPR_TAB_RIDE_0, SPR_TAB_GUESTS_0,
-                SPR_TAB_STAFF_OPTIONS_0, SPR_TAB_FINANCES_SUMMARY_0, SPR_TAB_FINANCES_RESEARCH_0, SPR_TAB_FINANCES_MARKETING_0};
-            static constexpr std::array<uint8_t, 7> frames{ 1, 16, 8, 7, 8, 8, 19 };
-            const int inset = (pitch - 40) / 2;
-            if (!DrawNativeMenuArt(rt, rail + ScreenCoordsXY{ 7, y + 2 + inset }, { 28, 32 }, { sprites[i], frames[i] }, focused))
-                DrawCategoryMark(rt, rail + ScreenCoordsXY{12, y + 7 + inset}, i, focused);
-            DrawModernEllipsised(
-                rt, rail + ScreenCoordsXY{ 39, y + 13 + inset }, railWidth - 45,
-                std::string(
-                    focused                  ? "{BLACK}"
-                        : active             ? "{GOLD}"
-                        : category.available ? "{WHITE}"
-                                             : "{MUTED}")
-                    + category.name);
-            if (!category.available)
+                const auto& category = kCategories[i];
+                const int y = 52 + static_cast<int>(i) * pitch;
+                const bool active = i == state.index();
+                const bool focused = active && state.focus == Focus::rail;
+                if (focused)
+                {
+                    Fill(rt, rail + ScreenCoordsXY{ 6, y }, { railWidth - 12, pitch - 4 }, Theme::gold);
+                    ReportSelected(rt, rail + ScreenCoordsXY{ 6, y }, { railWidth - 12, pitch - 4 });
+                }
+                else if (active)
+                {
+                    for (int x = 6; x <= 8; ++x)
+                        GfxDrawLine(
+                            rt, { rail + ScreenCoordsXY{ x, y + 3 }, rail + ScreenCoordsXY{ x, y + pitch - 9 } },
+                            static_cast<Drawing::PaletteIndex>(PocketPalette::selection));
+                }
+                static constexpr std::array sprites{ SPR_TAB_PARK_ENTRANCE,
+                                                     SPR_TAB_RIDE_0,
+                                                     SPR_TAB_GUESTS_0,
+                                                     SPR_TAB_STAFF_OPTIONS_0,
+                                                     SPR_TAB_FINANCES_SUMMARY_0,
+                                                     SPR_TAB_FINANCES_RESEARCH_0,
+                                                     SPR_TAB_FINANCES_MARKETING_0 };
+                static constexpr std::array<uint8_t, 7> frames{ 1, 16, 8, 7, 8, 8, 19 };
+                const int inset = (pitch - 40) / 2;
+                if (!DrawNativeMenuArt(
+                        rt, rail + ScreenCoordsXY{ 7, y + 2 + inset }, { 28, 32 }, { sprites[i], frames[i] }, focused))
+                    DrawCategoryMark(rt, rail + ScreenCoordsXY{ 12, y + 7 + inset }, i, focused);
                 DrawModernEllipsised(
-                    rt, rail + ScreenCoordsXY{ 14, y + 22 }, railWidth - 24,
-                    std::string(focused ? "{BLACK}" : "{MUTED}") + "Unavailable");
-        }
+                    rt, rail + ScreenCoordsXY{ 39, y + 13 + inset }, railWidth - 45,
+                    std::string(
+                        focused                  ? "{BLACK}"
+                            : active             ? "{GOLD}"
+                            : category.available ? "{WHITE}"
+                                                 : "{MUTED}")
+                        + category.name);
+                if (!category.available)
+                    DrawModernEllipsised(
+                        rt, rail + ScreenCoordsXY{ 14, y + 22 }, railWidth - 24,
+                        std::string(focused ? "{BLACK}" : "{MUTED}") + "Unavailable");
+            }
         }
         // Inside a section the rail stays on screen, collapsed to its icons, so the frame never jumps
         // and you can always see which section you are in.
@@ -195,8 +262,13 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
         {
             DrawSurface(rt, rail, { compactRail, height });
             const int pitch = std::clamp((height - 16) / static_cast<int>(kCategories.size()), 30, 44);
-            static constexpr std::array sprites{SPR_TAB_PARK_ENTRANCE, SPR_TAB_RIDE_0, SPR_TAB_GUESTS_0,
-                SPR_TAB_STAFF_OPTIONS_0, SPR_TAB_FINANCES_SUMMARY_0, SPR_TAB_FINANCES_RESEARCH_0, SPR_TAB_FINANCES_MARKETING_0};
+            static constexpr std::array sprites{ SPR_TAB_PARK_ENTRANCE,
+                                                 SPR_TAB_RIDE_0,
+                                                 SPR_TAB_GUESTS_0,
+                                                 SPR_TAB_STAFF_OPTIONS_0,
+                                                 SPR_TAB_FINANCES_SUMMARY_0,
+                                                 SPR_TAB_FINANCES_RESEARCH_0,
+                                                 SPR_TAB_FINANCES_MARKETING_0 };
             static constexpr std::array<uint8_t, 7> frames{ 1, 16, 8, 7, 8, 8, 19 };
             for (size_t i = 0; i < kCategories.size(); ++i)
             {
@@ -209,15 +281,21 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
                     FillRound(rt, rail + ScreenCoordsXY{ 4, y }, { compactRail - 8, pitch - 4 }, Theme::gold);
                     FillRound(rt, rail + ScreenCoordsXY{ 6, y + 2 }, { compactRail - 12, pitch - 8 }, Theme::raised);
                 }
-                if (!DrawNativeMenuArt(rt, rail + ScreenCoordsXY{ 6, y + (pitch - 4 - 30) / 2 }, { 28, 30 }, { sprites[i], frames[i] }, active))
+                if (!DrawNativeMenuArt(
+                        rt, rail + ScreenCoordsXY{ 6, y + (pitch - 4 - 30) / 2 }, { 28, 30 }, { sprites[i], frames[i] },
+                        active))
                     DrawCategoryMark(rt, rail + ScreenCoordsXY{ 11, y + 6 }, i, active);
             }
         }
         const auto inner = rail + ScreenCoordsXY{ compactRail + Layout::gutter, 0 };
-        const auto workspace = model.confirmation ? ScreenCoordsXY{(screen.width-360)/2, Layout::margin+20} : expanded ? inner : content;
+        const auto workspace = model.confirmation ? ScreenCoordsXY{ (screen.width - 360) / 2, Layout::margin + 20 }
+            : expanded                            ? inner
+                                                  : content;
         DrawManagementContent(
-            rt, workspace, {model.confirmation ? 360 : screen.width - workspace.x - Layout::margin,
-                model.confirmation ? height-20 : height}, model, state.focus == Focus::content);
+            rt, workspace,
+            { model.confirmation ? 360 : screen.width - workspace.x - Layout::margin,
+              model.confirmation ? height - 20 : height },
+            model, state.focus == Focus::content);
         DrawFooter(rt, screen, Hints(state, model, sectionRoot));
     }
 } // namespace OpenRCT2::Ui::Handheld::Dashboard

@@ -1,16 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Native initialized scenario fixture; construction and editing use real actions.
-#include <SDL.h>
-#include <thread>
-#include <openrct2-ui/handheld/GuestManagement.h>
-#include <openrct2-ui/handheld/StaffManagement.h>
-#include <openrct2/entity/Guest.h>
-#include <openrct2/world/MapSelection.h>
-#include <openrct2/actions/ride/RideSetPriceAction.h>
 #include "RideTabNavigation.h"
-#include <openrct2-ui/handheld/Mazes.h>
-#include <openrct2/management/Research.h>
-#include <openrct2/interface/Viewport.h>
+
+#include <SDL.h>
 #include <filesystem>
 #include <iostream>
 #include <openrct2-ui/UiContext.h>
@@ -18,8 +10,11 @@
 #include <openrct2-ui/handheld/CustomTracks.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/FlatRides.h>
+#include <openrct2-ui/handheld/GuestManagement.h>
+#include <openrct2-ui/handheld/Mazes.h>
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/RideAccess.h>
+#include <openrct2-ui/handheld/StaffManagement.h>
 #include <openrct2-ui/handheld/TrackEditing.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
@@ -28,19 +23,25 @@
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/PlatformEnvironment.h>
 #include <openrct2/actions/footpath/FootpathPlaceAction.h>
+#include <openrct2/actions/ride/RideSetPriceAction.h>
 #include <openrct2/actions/ride/RideSetStatusAction.h>
 #include <openrct2/audio/AudioContext.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/core/Imaging.h>
 #include <openrct2/drawing/Palette.h>
 #include <openrct2/drawing/X8DrawingEngine.h>
+#include <openrct2/entity/Guest.h>
+#include <openrct2/interface/Viewport.h>
+#include <openrct2/management/Research.h>
 #include <openrct2/paint/Paint.h>
 #include <openrct2/park/ParkFile.h>
 #include <openrct2/ride/Vehicle.h>
 #include <openrct2/scenario/Scenario.h>
 #include <openrct2/ui/UiContext.h>
 #include <openrct2/ui/WindowManager.h>
+#include <openrct2/world/MapSelection.h>
 #include <openrct2/world/tile_element/SurfaceElement.h>
+#include <thread>
 using namespace OpenRCT2;
 namespace H = Ui::Handheld;
 namespace C = H::CustomTracks;
@@ -93,75 +94,224 @@ int main(int argc, char** argv)
             objects.LoadObject("rct2.terrain_surface.grass") && objects.LoadObject("rct2.terrain_edge.rock")
                 && objects.LoadObject("rct2.station.plain"),
             "Fixture terrain/station missing");
-        namespace F=H::FlatRides;namespace M=H::Mazes;
-        auto* wm=Ui::GetWindowManager();H::ControllerInput input;
-        auto press=[&](H::Action action){H::Frame frame;frame.actions={action,action};H::HandleExplorerInput(input,frame);};
-        auto closeMenu=[&](){wm->CloseByClass(WindowClass::handheldMenu);WindowCullDead();};
-        auto focus=[&](CoordsXYZ point){auto* v=WindowGetMain()->viewport;v->zoom=ZoomLevel{0};
-            v->viewPos=Translate3DTo2DWithZ(v->rotation,point)-ScreenCoordsXY{256,192};WindowGetMain()->savedViewPos=v->viewPos;};
-        auto capture=[&](const char* name){const auto* folder=std::getenv("POCKET_BRICK_FEEL_CAPTURES");if(!folder||argc!=4)return;
-            std::filesystem::create_directories(folder);Drawing::X8DrawingEngine engine(context->GetUiContext());engine.Resize(512,384);engine.BeginDraw();
-            auto& rt=*engine.getRT();ResetAllSpriteQuadrantPlacements();Drawing::UpdatePaletteEffects();ViewportRender(rt,WindowGetMain()->viewport);
-            if(auto* window=wm->FindByClass(WindowClass::handheldMenu))window->onDraw(rt);else H::DrawExplorer(rt);
+        namespace F = H::FlatRides;
+        namespace M = H::Mazes;
+        auto* wm = Ui::GetWindowManager();
+        H::ControllerInput input;
+        auto press = [&](H::Action action) {
+            H::Frame frame;
+            frame.actions = { action, action };
+            H::HandleExplorerInput(input, frame);
+        };
+        auto closeMenu = [&]() {
+            wm->CloseByClass(WindowClass::handheldMenu);
+            WindowCullDead();
+        };
+        auto focus = [&](CoordsXYZ point) {
+            auto* v = WindowGetMain()->viewport;
+            v->zoom = ZoomLevel{ 0 };
+            v->viewPos = Translate3DTo2DWithZ(v->rotation, point) - ScreenCoordsXY{ 256, 192 };
+            WindowGetMain()->savedViewPos = v->viewPos;
+        };
+        auto capture = [&](const char* name) {
+            const auto* folder = std::getenv("POCKET_BRICK_FEEL_CAPTURES");
+            if (!folder || argc != 4)
+                return;
+            std::filesystem::create_directories(folder);
+            Drawing::X8DrawingEngine engine(context->GetUiContext());
+            engine.Resize(512, 384);
+            engine.BeginDraw();
+            auto& rt = *engine.getRT();
+            ResetAllSpriteQuadrantPlacements();
+            Drawing::UpdatePaletteEffects();
+            ViewportRender(rt, WindowGetMain()->viewport);
+            if (auto* window = wm->FindByClass(WindowClass::handheldMenu))
+                window->onDraw(rt);
+            else
+                H::DrawExplorer(rt);
             Check(H::FooterHeight({ 512, 384 }, H::LastControlHints) == 28, "Runtime footer expanded beyond one row");
-            Image image;image.Width=512;image.Height=384;image.Depth=8;image.Stride=rt.LineStride();image.Palette=Drawing::gPalette;
-            const auto* bytes=reinterpret_cast<uint8_t*>(rt.bits);image.Pixels.assign(bytes,bytes+rt.LineStride()*rt.height);
-            Imaging::WriteToFile((std::filesystem::path(folder)/name).string(),image,ImageFormat::png);engine.EndDraw();};
+            Image image;
+            image.Width = 512;
+            image.Height = 384;
+            image.Depth = 8;
+            image.Stride = rt.LineStride();
+            image.Palette = Drawing::gPalette;
+            const auto* bytes = reinterpret_cast<uint8_t*>(rt.bits);
+            image.Pixels.assign(bytes, bytes + rt.LineStride() * rt.height);
+            Imaging::WriteToFile((std::filesystem::path(folder) / name).string(), image, ImageFormat::png);
+            engine.EndDraw();
+        };
 
-        auto load=[&](const char* name,ride_type_t type){auto* o=objects.LoadObject(name);Check(o,"Ride object missing");const auto i=objects.GetLoadedObjectEntryIndex(o);
-            ResearchInsertRideEntry(i,true);RideEntrySetInvented(i);RideTypeSetInvented(type);return i;};
-        const auto flat=load("rct2.ride.mgr1",RIDE_TYPE_MERRY_GO_ROUND);
-        Check(H::BeginFlatRide(flat),"Flat start failed");
-        Check(F::Action(CoordsXY{640,640},true).error==GameActions::Status::ok,"Native flat placement failed");GameActions::ProcessQueue(state);
-        const auto target=*F::Target();H::EndTerrain();state.park.flags.set(ParkFlag::unlockAllPrices);
-        W::HandheldRideOpen(target.id);FocusRideTabAction("Admission price...");press(H::Action::confirm);
-        const auto oldPrice=GetRide(target.id)->price[0];const auto oldCash=state.park.cash;
-        H::Frame right;right.navigateX=1;H::HandleExplorerInput(input,right);
-        Check(GetRide(target.id)->price[0]==oldPrice,"Price draft changed live ride");capture("01-price-editor.png");
-        press(H::Action::confirm);GameActions::ProcessQueue(state);
-        Check(GetRide(target.id)->price[0]==oldPrice+1 && state.park.cash==oldCash,"Direct Apply changed wrong price or cash");
-        FocusRideTabAction("Admission price...");press(H::Action::confirm);H::HandleExplorerInput(input,right);press(H::Action::back);
-        Check(GetRide(target.id)->price[0]==oldPrice+1 && state.park.cash==oldCash,"Back committed price draft");
-        FocusRideTabAction("Admission price...");press(H::Action::confirm);H::HandleExplorerInput(input,right);
-        GameActions::RideSetPriceAction external(target.id,oldPrice+3,true);Check(GameActions::Execute(&external,state).error==GameActions::Status::ok,"External price update failed");GameActions::ProcessQueue(state);
-        press(H::Action::confirm);GameActions::ProcessQueue(state);
-        Check(GetRide(target.id)->price[0]==oldPrice+3 && state.park.cash==oldCash && W::HandheldRidesPresentation().status!="Left/Right: Adjust","Stale editor overwrote state or hid feedback");closeMenu();
-        Check(H::ResumeFlatRide(target.id),"Resume access failed");
-        for(int part=0;part<2;++part){bool done=false;for(int y=480;y<=800&&!done;y+=32)for(int x=480;x<=800&&!done;x+=32) {
-            if(F::Action(CoordsXY{x,y},false).error==GameActions::Status::ok){Check(F::Action(CoordsXY{x,y},true).error==GameActions::Status::ok,"Access failed");GameActions::ProcessQueue(state);done=true;} }
-            Check(done,"No valid native access");}
-        H::UpdateExplorer(input);press(H::Action::contextPrimary);
-        const auto flags=gMapSelectFlags;const auto type=gMapSelectType;const auto a=gMapSelectPositionA,b=gMapSelectPositionB;const auto accessCash=state.park.cash;
+        auto load = [&](const char* name, ride_type_t type) {
+            auto* o = objects.LoadObject(name);
+            Check(o, "Ride object missing");
+            const auto i = objects.GetLoadedObjectEntryIndex(o);
+            ResearchInsertRideEntry(i, true);
+            RideEntrySetInvented(i);
+            RideTypeSetInvented(type);
+            return i;
+        };
+        const auto flat = load("rct2.ride.mgr1", RIDE_TYPE_MERRY_GO_ROUND);
+        Check(H::BeginFlatRide(flat), "Flat start failed");
+        Check(F::Action(CoordsXY{ 640, 640 }, true).error == GameActions::Status::ok, "Native flat placement failed");
+        GameActions::ProcessQueue(state);
+        const auto target = *F::Target();
+        H::EndTerrain();
+        state.park.flags.set(ParkFlag::unlockAllPrices);
+        W::HandheldRideOpen(target.id);
+        FocusRideTabAction("Admission price...");
+        press(H::Action::confirm);
+        const auto oldPrice = GetRide(target.id)->price[0];
+        const auto oldCash = state.park.cash;
+        H::Frame right;
+        right.navigateX = 1;
+        H::HandleExplorerInput(input, right);
+        Check(GetRide(target.id)->price[0] == oldPrice, "Price draft changed live ride");
+        capture("01-price-editor.png");
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Check(
+            GetRide(target.id)->price[0] == oldPrice + 1 && state.park.cash == oldCash,
+            "Direct Apply changed wrong price or cash");
+        FocusRideTabAction("Admission price...");
+        press(H::Action::confirm);
+        H::HandleExplorerInput(input, right);
+        press(H::Action::back);
+        Check(GetRide(target.id)->price[0] == oldPrice + 1 && state.park.cash == oldCash, "Back committed price draft");
+        FocusRideTabAction("Admission price...");
+        press(H::Action::confirm);
+        H::HandleExplorerInput(input, right);
+        GameActions::RideSetPriceAction external(target.id, oldPrice + 3, true);
+        Check(GameActions::Execute(&external, state).error == GameActions::Status::ok, "External price update failed");
+        GameActions::ProcessQueue(state);
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Check(
+            GetRide(target.id)->price[0] == oldPrice + 3 && state.park.cash == oldCash
+                && W::HandheldRidesPresentation().status != "Left/Right: Adjust",
+            "Stale editor overwrote state or hid feedback");
+        closeMenu();
+        Check(H::ResumeFlatRide(target.id), "Resume access failed");
+        for (int part = 0; part < 2; ++part)
+        {
+            bool done = false;
+            for (int y = 480; y <= 800 && !done; y += 32)
+                for (int x = 480; x <= 800 && !done; x += 32)
+                {
+                    if (F::Action(CoordsXY{ x, y }, false).error == GameActions::Status::ok)
+                    {
+                        Check(F::Action(CoordsXY{ x, y }, true).error == GameActions::Status::ok, "Access failed");
+                        GameActions::ProcessQueue(state);
+                        done = true;
+                    }
+                }
+            Check(done, "No valid native access");
+        }
+        H::UpdateExplorer(input);
+        press(H::Action::contextPrimary);
+        const auto flags = gMapSelectFlags;
+        const auto type = gMapSelectType;
+        const auto a = gMapSelectPositionA, b = gMapSelectPositionB;
+        const auto accessCash = state.park.cash;
         capture("02-spatial-access.png");
-        Check(gMapSelectFlags==flags && gMapSelectType==type && gMapSelectPositionA==a && gMapSelectPositionB==b && state.park.cash==accessCash,"Access preview leaked selection or cash");closeMenu();
-        for(const char* id:{"rct2.peep_names.original","rct2.peep_animations.guest"})Check(objects.LoadObject(id),"Peep animation missing");
-        state.park.entrances.push_back({320,320,16,0});
-        for(int i=0;i<40;++i){auto* g=Guest::generate({320+i*2,320,16});Check(g,"Guest fixture failed");g->outsideOfPark=false;g->state=PeepState::walking;g->setParkEntryTime(state.currentTicks);g->peepFlags.set(PeepFlag::hasPaidForParkEntry);}
-        state.park.numGuestsInPark=H::GuestManagement::Roster().size();focus({336,336,16});
-        W::HandheldDashboardOpen();while(W::HandheldDashboardSectionIndex()!=2)W::HandheldDashboardMove(0,1);W::HandheldDashboardMove(1,0);press(H::Action::confirm);capture("03-roster-start.png");
-        const auto startRow=W::HandheldGuestsPresentation().selected;
-        H::Frame down;down.navigateY=1;
-        for(int i=0;i<12;++i){H::HandleExplorerInput(input,down);std::this_thread::sleep_for(std::chrono::milliseconds(55));capture(("scroll-"+std::to_string(i)+".png").c_str());}
-        const auto selected=W::HandheldGuestsPresentation().selected;
-        Check(selected==startRow+12,"Scrolling lost input or selected wrong guest");
-        const auto movingRoster=W::HandheldGuestsPresentation();
-        for(size_t i=selected-5;i<=selected+2;++i)Check(!movingRoster.rows[i].empty(),"Moving viewport contains unprepared rows");
-        for(int i=0;i<10;++i){std::this_thread::sleep_for(std::chrono::milliseconds(16));capture(("motion-"+std::to_string(i)+".png").c_str());}
+        Check(
+            gMapSelectFlags == flags && gMapSelectType == type && gMapSelectPositionA == a && gMapSelectPositionB == b
+                && state.park.cash == accessCash,
+            "Access preview leaked selection or cash");
+        closeMenu();
+        for (const char* id : { "rct2.peep_names.original", "rct2.peep_animations.guest" })
+            Check(objects.LoadObject(id), "Peep animation missing");
+        state.park.entrances.push_back({ 320, 320, 16, 0 });
+        for (int i = 0; i < 40; ++i)
+        {
+            auto* g = Guest::generate({ 320 + i * 2, 320, 16 });
+            Check(g, "Guest fixture failed");
+            g->outsideOfPark = false;
+            g->state = PeepState::walking;
+            g->setParkEntryTime(state.currentTicks);
+            g->peepFlags.set(PeepFlag::hasPaidForParkEntry);
+        }
+        state.park.numGuestsInPark = H::GuestManagement::Roster().size();
+        focus({ 336, 336, 16 });
+        W::HandheldDashboardOpen();
+        while (W::HandheldDashboardSectionIndex() != 2)
+            W::HandheldDashboardMove(0, 1);
+        W::HandheldDashboardMove(1, 0);
+        press(H::Action::confirm);
+        capture("03-roster-start.png");
+        const auto startRow = W::HandheldGuestsPresentation().selected;
+        H::Frame down;
+        down.navigateY = 1;
+        for (int i = 0; i < 12; ++i)
+        {
+            H::HandleExplorerInput(input, down);
+            std::this_thread::sleep_for(std::chrono::milliseconds(55));
+            capture(("scroll-" + std::to_string(i) + ".png").c_str());
+        }
+        const auto selected = W::HandheldGuestsPresentation().selected;
+        Check(selected == startRow + 12, "Scrolling lost input or selected wrong guest");
+        const auto movingRoster = W::HandheldGuestsPresentation();
+        for (size_t i = selected - 5; i <= selected + 2; ++i)
+            Check(!movingRoster.rows[i].empty(), "Moving viewport contains unprepared rows");
+        for (int i = 0; i < 10; ++i)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+            capture(("motion-" + std::to_string(i) + ".png").c_str());
+        }
         capture("04-roster-scrolled.png");
-        for(int i=0;i<100;++i)H::HandleExplorerInput(input,down);
-        Check(W::HandheldGuestsPresentation().selected==W::HandheldGuestsPresentation().rows.size()-1,"Held scrolling wrapped at bottom");capture("05-roster-bottom.png");
-        closeMenu();namespace S=H::StaffManagement;
-        Check(objects.LoadObject("rct2.peep_animations.handyman"),"Staff animation missing");
-        Check(S::Hire(StaffType::handyman,true).error==GameActions::Status::ok,"Native hire failed");GameActions::ProcessQueue(state);
-        const auto employee=S::Roster(StaffType::handyman).front();W::HandheldStaffOpen(employee);
-        auto selectStaff=[&](const char* label){for(int tab=0;tab<4;++tab){const auto m=W::HandheldStaffPresentation();const auto row=std::find(m.rows.begin(),m.rows.end(),label);
-            if(row!=m.rows.end()){W::HandheldMenuMove(static_cast<int>(row-m.rows.begin())-static_cast<int>(m.selected));return;}press(H::Action::nextOption);}throw std::runtime_error(label);};
-        selectStaff("Uniform colour...");press(H::Action::confirm);const auto uniform=StaffGetColour(StaffType::handyman);const auto uniformCash=state.park.cash;
-        H::HandleExplorerInput(input,right);capture("06-uniform-grid.png");Check(StaffGetColour(StaffType::handyman)==uniform,"Palette draft applied early");
-        press(H::Action::back);Check(StaffGetColour(StaffType::handyman)==uniform,"Palette Back applied draft");
-        selectStaff("Uniform colour...");press(H::Action::confirm);H::Frame colourDown;colourDown.navigateY=1;H::HandleExplorerInput(input,colourDown);press(H::Action::confirm);GameActions::ProcessQueue(state);
-        Check(StaffGetColour(StaffType::handyman)!=uniform && state.park.cash==uniformCash,"Uniform Apply failed or charged cash");
-        std::cout<<"PASS direct price Apply / B discard / native stale guard / cash invariants / spatial access restoration / continuous 40-guest roster / held-scroll bounds / uniform grid Apply and Cancel / single-row footer\n";
+        for (int i = 0; i < 100; ++i)
+            H::HandleExplorerInput(input, down);
+        Check(
+            W::HandheldGuestsPresentation().selected == W::HandheldGuestsPresentation().rows.size() - 1,
+            "Held scrolling wrapped at bottom");
+        capture("05-roster-bottom.png");
+        closeMenu();
+        namespace S = H::StaffManagement;
+        Check(objects.LoadObject("rct2.peep_animations.handyman"), "Staff animation missing");
+        Check(S::Hire(StaffType::handyman, true).error == GameActions::Status::ok, "Native hire failed");
+        GameActions::ProcessQueue(state);
+        const auto employee = S::Roster(StaffType::handyman).front();
+        W::HandheldStaffOpen(employee);
+        auto selectStaff = [&](const char* label) {
+            for (int tab = 0; tab < 4; ++tab)
+            {
+                const auto m = W::HandheldStaffPresentation();
+                const auto row = std::find(m.rows.begin(), m.rows.end(), label);
+                if (row != m.rows.end())
+                {
+                    W::HandheldMenuMove(static_cast<int>(row - m.rows.begin()) - static_cast<int>(m.selected));
+                    return;
+                }
+                press(H::Action::nextOption);
+            }
+            throw std::runtime_error(label);
+        };
+        selectStaff("Uniform colour...");
+        press(H::Action::confirm);
+        const auto uniform = StaffGetColour(StaffType::handyman);
+        const auto uniformCash = state.park.cash;
+        H::HandleExplorerInput(input, right);
+        capture("06-uniform-grid.png");
+        Check(StaffGetColour(StaffType::handyman) == uniform, "Palette draft applied early");
+        press(H::Action::back);
+        Check(StaffGetColour(StaffType::handyman) == uniform, "Palette Back applied draft");
+        selectStaff("Uniform colour...");
+        press(H::Action::confirm);
+        H::Frame colourDown;
+        colourDown.navigateY = 1;
+        H::HandleExplorerInput(input, colourDown);
+        press(H::Action::confirm);
+        GameActions::ProcessQueue(state);
+        Check(
+            StaffGetColour(StaffType::handyman) != uniform && state.park.cash == uniformCash,
+            "Uniform Apply failed or charged cash");
+        std::cout << "PASS direct price Apply / B discard / native stale guard / cash invariants / spatial access restoration "
+                     "/ continuous 40-guest roster / held-scroll bounds / uniform grid Apply and Cancel / single-row footer\n";
         return 0;
-    }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+        return 1;
+    }
 }

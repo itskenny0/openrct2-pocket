@@ -1,24 +1,34 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
-#include "TabbedActions.h"
 #include "ManagementPanel.h"
+#include "TabbedActions.h"
+
 #include <algorithm>
 #include <string_view>
 
 namespace OpenRCT2::Ui::Handheld::RideTabs
 {
-    enum Tab : size_t { overview, operations, statistics, settings, count };
+    enum Tab : size_t
+    {
+        overview,
+        operations,
+        statistics,
+        settings,
+        count
+    };
     using State = TabFocus<count>;
-    inline const std::vector<std::string> labels{"Overview", "Operations", "Statistics", "Settings"};
+    inline const std::vector<std::string> labels{ "Overview", "Operations", "Statistics", "Settings" };
     inline Tab Group(std::string_view label)
     {
-        if (label == "Rename..." || label == "Appearance..." || label == "Music..."
-            || label == "Save design..." || label == "Demolish..." || label == "Back to roster")
+        if (label == "Rename..." || label == "Appearance..." || label == "Music..." || label == "Save design..."
+            || label == "Demolish..." || label == "Back to roster")
             return settings;
-        if (label == "Statistics...") return statistics;
-        if (label == "Operations..." || label == "Maintenance..." || label == "Vehicles..."
-            || label == "Dispatch..." || label == "Continue track..." || label == "Edit maze..."
-            || label == "Edit track..." || label == "Access / paths...") return operations;
+        if (label == "Statistics...")
+            return statistics;
+        if (label == "Operations..." || label == "Maintenance..." || label == "Vehicles..." || label == "Dispatch..."
+            || label == "Continue track..." || label == "Edit maze..." || label == "Edit track..."
+            || label == "Access / paths...")
+            return operations;
         return overview;
     }
     // Open / Close / Test are one state switch in the overview's hero, changed in place; their
@@ -34,16 +44,21 @@ namespace OpenRCT2::Ui::Handheld::RideTabs
         // Status controls form one immediate group, rather than being interspersed
         // with inspection/navigation. Everything maps back to its native row.
         const std::vector<std::string_view> order = tab == overview
-            ? std::vector<std::string_view>{"Admission price...", "Price unavailable", "Place entrance / exit...", "Locate", "Ride along", "Entrances / exits..."}
-            : tab == operations ? std::vector<std::string_view>{"Operations...", "Vehicles...", "Dispatch...", "Maintenance..."}
-            : tab == settings ? std::vector<std::string_view>{"Rename...", "Appearance...", "Music...", "Save design...", "Demolish...", "Back to roster"}
-            : std::vector<std::string_view>{};
+            ? std::vector<std::string_view>{ "Admission price...", "Price unavailable",   "Place entrance / exit...", "Locate",
+                                             "Ride along",         "Entrances / exits..." }
+            : tab == operations
+            ? std::vector<std::string_view>{ "Operations...", "Vehicles...", "Dispatch...", "Maintenance..." }
+            : tab == settings ? std::vector<std::string_view>{ "Rename...",      "Appearance...", "Music...",
+                                                               "Save design...", "Demolish...",   "Back to roster" }
+                              : std::vector<std::string_view>{};
         for (auto label : order)
-            for (size_t i=0;i<source.rows.size();++i)
-                if (source.rows[i] == label) result.push_back(i);
-        for (size_t i=0;i<source.rows.size();++i)
+            for (size_t i = 0; i < source.rows.size(); ++i)
+                if (source.rows[i] == label)
+                    result.push_back(i);
+        for (size_t i = 0; i < source.rows.size(); ++i)
             if (Group(source.rows[i]) == tab && !(tab == overview && StatusRow(source.rows[i]))
-                && std::find(result.begin(),result.end(),i)==result.end()) result.push_back(i);
+                && std::find(result.begin(), result.end(), i) == result.end())
+                result.push_back(i);
         return result;
     }
     inline ManagementPresentation Compose(
@@ -62,13 +77,16 @@ namespace OpenRCT2::Ui::Handheld::RideTabs
             for (const auto& stat : stats.stats)
                 if (stat.first == "Reliability" || stat.first == "Customers" || stat.first == "Profit / hour")
                     model.stats.push_back(stat);
-        model.rows.clear(); model.rowEnabled.clear(); model.rowDetails.clear();
-        model.metricHeight = state.tab==overview?38:40;
-        if(state.tab==overview)model.rowHeight=26;
+        model.rows.clear();
+        model.rowEnabled.clear();
+        model.rowDetails.clear();
+        model.metricHeight = state.tab == overview ? 38 : 40;
+        if (state.tab == overview)
+            model.rowHeight = 26;
         if (state.tab == statistics)
         {
             model.stats = stats.stats;
-            model.rows = {"Customers...", "Finances...", "Graphs..."};
+            model.rows = { "Customers...", "Finances...", "Graphs..." };
         }
         else
         {
@@ -76,8 +94,9 @@ namespace OpenRCT2::Ui::Handheld::RideTabs
             {
                 model.rows.push_back(source.rows[index]);
                 model.rowDetails.push_back(index < source.rowDetails.size() ? source.rowDetails[index] : "");
-                model.rowEnabled.push_back(index < source.rowEnabled.size() ? source.rowEnabled[index]
-                    : source.rows[index].find("unavailable") == std::string::npos);
+                model.rowEnabled.push_back(
+                    index < source.rowEnabled.size() ? source.rowEnabled[index]
+                                                     : source.rows[index].find("unavailable") == std::string::npos);
             }
         }
         model.actionGrid = true;
@@ -109,4 +128,3 @@ namespace OpenRCT2::Ui::Handheld::RideTabs
         return model;
     }
 } // namespace OpenRCT2::Ui::Handheld::RideTabs
-

@@ -7,9 +7,9 @@
 
 #include <SDL_gamecontroller.h>
 #include <cstdint>
-#include <vector>
 #include <optional>
 #include <string_view>
+#include <vector>
 
 union SDL_Event;
 

@@ -7,7 +7,6 @@
 #include <deque>
 #include <map>
 #include <memory>
-#include <utility>
 #include <openrct2/GameState.h>
 #include <openrct2/actions/GameActionRunner.h>
 #include <openrct2/actions/footpath/FootpathPlaceAction.h>
@@ -19,6 +18,7 @@
 #include <openrct2/world/TileElementsView.h>
 #include <openrct2/world/tile_element/PathElement.h>
 #include <openrct2/world/tile_element/TrackElement.h>
+#include <utility>
 
 namespace OpenRCT2::Ui::Handheld::AutoAccess
 {
@@ -166,7 +166,8 @@ namespace OpenRCT2::Ui::Handheld::AutoAccess
                         continue;
                     // An exit can only be checked once the entrance exists; until then the
                     // entrance's own check stands in for it (same tile, same clearance).
-                    GameActions::FlatRideEntrancePlaceAction action(ride.id, *location, exit && !station.entrance.isNull(), index);
+                    GameActions::FlatRideEntrancePlaceAction action(
+                        ride.id, *location, exit && !station.entrance.isNull(), index);
                     if (GameActions::Query(&action, state).error != GameActions::Status::ok)
                         continue;
                     const CoordsXY outside = CoordsXY(*location) - CoordsDirectionDelta[location->direction];

@@ -200,7 +200,8 @@ namespace OpenRCT2::Ui::Windows
             for (const auto& item : _listItems)
                 if (item.type == ListItemType::scenario && item.scenario.scenario == _highlightedScenario)
                     _showLockedInformation = item.scenario.is_locked;
-            if (changed) LoadPreview();
+            if (changed)
+                LoadPreview();
             int32_t y = 0;
             for (const auto& item : _listItems)
             {
@@ -495,15 +496,18 @@ namespace OpenRCT2::Ui::Windows
             FillRound(rt, pager + ScreenCoordsXY{ 1, 1 }, { pagerWidth - 2, 20 }, Theme::raised);
             DrawModernText(rt, pager + ScreenCoordsXY{ 7, CapCentre(22) }, "{MUTED}L1");
             DrawModernText(rt, pager + ScreenCoordsXY{ pagerWidth - 7 - TextWidth("R1"), CapCentre(22) }, "{MUTED}R1");
-            const std::string sourceName = selectedTab >= 0 && static_cast<size_t>(selectedTab) < std::size(kScenarioOriginStringIds)
+            const std::string sourceName = selectedTab >= 0
+                    && static_cast<size_t>(selectedTab) < std::size(kScenarioOriginStringIds)
                 ? LanguageGetString(kScenarioOriginStringIds[selectedTab])
                 : "";
             const int nameRoom = pagerWidth - 44;
             const int nameWidth = std::min(nameRoom, TextWidth(sourceName, true));
-            DrawStrongText(rt, pager + ScreenCoordsXY{ 22 + (nameRoom - nameWidth) / 2, CapCentre(22) }, "{WHITE}" + sourceName, nameRoom);
+            DrawStrongText(
+                rt, pager + ScreenCoordsXY{ 22 + (nameRoom - nameWidth) / 2, CapCentre(22) }, "{WHITE}" + sourceName, nameRoom);
             const int dotsWidth = static_cast<int>(sources.size()) * 6 - 2;
             for (size_t i = 0; i < sources.size(); ++i)
-                Fill(rt, pager + ScreenCoordsXY{ (pagerWidth - dotsWidth) / 2 + static_cast<int>(i) * 6, 25 }, { 4, 2 },
+                Fill(
+                    rt, pager + ScreenCoordsXY{ (pagerWidth - dotsWidth) / 2 + static_cast<int>(i) * 6, 25 }, { 4, 2 },
                     sources[i] == static_cast<int32_t>(selectedTab) ? Theme::gold : Theme::edge);
             Fill(rt, p + ScreenCoordsXY{ 12, 37 }, { w - 24, 1 }, Theme::edge);
 
@@ -540,8 +544,9 @@ namespace OpenRCT2::Ui::Windows
                         if (y + headingHeight > _handheldScroll && y < _handheldScroll + listH)
                         {
                             auto label = HandheldPlain(LanguageGetString(item.heading.string_id));
-                            std::transform(label.begin(), label.end(), label.begin(),
-                                [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+                            std::transform(label.begin(), label.end(), label.begin(), [](unsigned char c) {
+                                return static_cast<char>(std::toupper(c));
+                            });
                             DrawSectionLabel(list, origin + ScreenCoordsXY{ 2, y + (y == 0 ? 4 : 10) }, listW - 4, label);
                         }
                         y += headingHeight;
@@ -576,9 +581,13 @@ namespace OpenRCT2::Ui::Windows
             const auto card = p + ScreenCoordsXY{ cardX, listY };
             FillRound(rt, card, { cardW, listH }, Theme::raised);
             const auto* scenario = _highlightedScenario;
-            const auto footer = std::vector<ControlHint>{ { "D-pad", "Choose" }, { "L1/R1", "Source" },
+            const auto footer = std::vector<ControlHint>{
+                { "D-pad", "Choose" },
+                { "L1/R1", "Source" },
                 { "A", selectedLocked ? "Locked" : "Start" },
-                { "X", Config::Get().general.scenarioUnlockingEnabled ? "Unlock all" : "Lock order" }, { "B", "Back" } };
+                { "X", Config::Get().general.scenarioUnlockingEnabled ? "Unlock all" : "Lock order" },
+                { "B", "Back" }
+            };
             DrawFooter(rt, screen, footer);
             if (scenario == nullptr)
             {
@@ -642,7 +651,8 @@ namespace OpenRCT2::Ui::Windows
                 y += 13;
             }
             if (scenario->Highscore != nullptr)
-                DrawModernEllipsised(rt, card + ScreenCoordsXY{ 10, listH - 17 }, textW,
+                DrawModernEllipsised(
+                    rt, card + ScreenCoordsXY{ 10, listH - 17 }, textW,
                     "{POSITIVE}Completed  " + FormatStringIDLegacy(STR_CURRENCY2DP, &scenario->Highscore->company_value));
         }
 
@@ -927,9 +937,7 @@ namespace OpenRCT2::Ui::Windows
                         if (isHighlighted)
                         {
                             if (Handheld::IsEnabled())
-                                Rectangle::fill(
-                                    rt, { 1, y, listWidth - 1, y + scenarioItemHeight - 2 },
-                                    Handheld::Theme::gold);
+                                Rectangle::fill(rt, { 1, y, listWidth - 1, y + scenarioItemHeight - 2 }, Handheld::Theme::gold);
                             else
                                 Rectangle::filter(
                                     rt, { 0, y, width, y + scenarioItemHeight - 1 }, FilterPaletteID::paletteDarken1);
@@ -951,10 +959,11 @@ namespace OpenRCT2::Ui::Windows
 
                         if (Handheld::IsEnabled())
                         {
-                            if (isDisabled) GfxDrawSprite(rt, ImageId(SPR_G2_LOCKED), {listWidth - 20, y + 5});
+                            if (isDisabled)
+                                GfxDrawSprite(rt, ImageId(SPR_G2_LOCKED), { listWidth - 20, y + 5 });
                             Handheld::DrawModernEllipsised(
-                                rt, { 8, y + 5 }, listWidth - (isDisabled ? 36 : 16), (isHighlighted ? "{BLACK}" : "{WHITE}") + scenario->Name,
-                                { Colour::white });
+                                rt, { 8, y + 5 }, listWidth - (isDisabled ? 36 : 16),
+                                (isHighlighted ? "{BLACK}" : "{WHITE}") + scenario->Name, { Colour::white });
                         }
                         else
                             drawText(
@@ -1241,8 +1250,7 @@ namespace OpenRCT2::Ui::Windows
             WindowClass::scenarioSelect, {},
             // Handheld: 504x360 on the Brick, shrinking to fit shorter or narrower canvases.
             // Handheld: the whole canvas, so its footer covers the title menu's.
-            Handheld::IsEnabled() ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
-                                  : kWindowSize,
+            Handheld::IsEnabled() ? ScreenSize{ ContextGetWidth(), ContextGetHeight() } : kWindowSize,
             { WindowFlag::autoPosition, WindowFlag::centreScreen }, callback);
         return window;
     }

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "RideAccess.h"
 
+#include "Currency.h"
 #include "Explorer.h"
 #include "FlatRides.h"
 #include "Paths.h"
-#include "Currency.h"
-#include <openrct2/ride/AccessPlacementContext.h>
 
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2/Context.h>
 #include <openrct2/interface/Viewport.h>
+#include <openrct2/ride/AccessPlacementContext.h>
 #include <openrct2/ride/FlatRidePlacement.h>
 #include <openrct2/world/Footpath.h>
 #include <openrct2/world/tile_element/EntranceElement.h>
@@ -20,8 +20,8 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
 {
     static std::string Coordinates(CoordsXYZD p)
     {
-        return "Tile " + std::to_string(p.x / 32) + "," + std::to_string(p.y / 32)
-            + " / Z " + std::to_string(p.z) + " / dir " + std::to_string(p.direction);
+        return "Tile " + std::to_string(p.x / 32) + "," + std::to_string(p.y / 32) + " / Z " + std::to_string(p.z) + " / dir "
+            + std::to_string(p.direction);
     }
     std::string PointLabel(const ExistingPoint& p)
     {
@@ -31,17 +31,22 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
     {
         std::vector<ExistingPoint> result;
         const auto* ride = RideManagement::Resolve(target);
-        if (!ride || !Supported(target)) return result;
+        if (!ride || !Supported(target))
+            return result;
         for (size_t i = 0; i < ride->getStations().size(); ++i)
         {
             const auto& s = ride->getStations()[i];
-            if (s.start.isNull()) continue;
+            if (s.start.isNull())
+                continue;
             for (bool exit : { false, true })
             {
                 const auto& source = exit ? s.exit : s.entrance;
-                if (source.isNull()) continue;
+                if (source.isNull())
+                    continue;
                 auto context = AccessPlacementContext::Capture(*ride, source.toCoordsXY());
-                if (!context.empty()) result.push_back({target, StationIndex::FromUnderlying(i), exit, source.toCoordsXYZD(), std::move(context)});
+                if (!context.empty())
+                    result.push_back(
+                        { target, StationIndex::FromUnderlying(i), exit, source.toCoordsXYZD(), std::move(context) });
             }
         }
         return result;
@@ -49,7 +54,8 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
     bool Current(const ExistingPoint& p)
     {
         const auto* ride = RideManagement::Resolve(p.target);
-        if (!ride || p.station.ToUnderlying() >= ride->getStations().size()) return false;
+        if (!ride || p.station.ToUnderlying() >= ride->getStations().size())
+            return false;
         const auto& s = ride->getStation(p.station);
         const auto& source = p.exit ? s.exit : s.entrance;
         return !source.isNull() && source.toCoordsXYZD() == p.source && !p.context.empty()
@@ -57,33 +63,50 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
     }
     std::optional<EditDraft> Review(const ExistingPoint& point, std::optional<CoordsXYZD> destination, std::string& error)
     {
-        if (!Current(point)) { error = "Access changed; select it again"; return {}; }
-        auto action = GameActions::FlatRideEntrancePlaceAction(point.target.id, destination.value_or(point.source), point.exit, point.station);
+        if (!Current(point))
+        {
+            error = "Access changed; select it again";
+            return {};
+        }
+        auto action = GameActions::FlatRideEntrancePlaceAction(
+            point.target.id, destination.value_or(point.source), point.exit, point.station);
         action.EditExisting(!destination);
         auto q = GameActions::Query(&action, getGameState());
-        if (q.error != GameActions::Status::ok) { error = q.getErrorMessage(); if(error.empty()) error=q.getErrorTitle(); return {}; }
-        action.GuardContext(AccessPlacementContext::Capture(*RideManagement::Resolve(point.target), destination.value_or(point.source)), q.cost);
-        return EditDraft{point, destination.value_or(point.source), !destination, std::move(action), q.cost};
+        if (q.error != GameActions::Status::ok)
+        {
+            error = q.getErrorMessage();
+            if (error.empty())
+                error = q.getErrorTitle();
+            return {};
+        }
+        action.GuardContext(
+            AccessPlacementContext::Capture(*RideManagement::Resolve(point.target), destination.value_or(point.source)),
+            q.cost);
+        return EditDraft{ point, destination.value_or(point.source), !destination, std::move(action), q.cost };
     }
     ManagementPresentation ReviewPresentation(const EditDraft& d, size_t selected, const std::string& feedback)
     {
         ManagementPresentation m;
         m.title = d.remove ? "Remove ride access?" : "Move ride access?";
         m.breadcrumb = "Rides / Entrances & exits";
-        m.selected = selected; m.confirmation = true;
-        m.rows = {"Apply native edit", "Cancel"};
-        m.bodyLines = {PointLabel(d.point), "From: " + Coordinates(d.point.source)};
-        if (!d.remove) m.bodyLines.push_back("To: " + Coordinates(d.destination));
+        m.selected = selected;
+        m.confirmation = true;
+        m.rows = { "Apply native edit", "Cancel" };
+        m.bodyLines = { PointLabel(d.point), "From: " + Coordinates(d.point.source) };
+        if (!d.remove)
+            m.bodyLines.push_back("To: " + Coordinates(d.destination));
         m.bodyLines.push_back("Cost: " + FormatMoney(d.cost));
         m.bodyLines.push_back("Reconnect queue / exit path afterward.");
         m.bodyLines.push_back("Native maze hedges update with access.");
-        if (!d.remove) m.bodyLines.push_back("Sequential move; failure may leave a gap.");
+        if (!d.remove)
+            m.bodyLines.push_back("Sequential move; failure may leave a gap.");
         m.status = feedback.empty() ? "Native edit clears testing / queue state" : feedback;
         return m;
     }
     bool BeginRelocation(const ExistingPoint& point)
     {
-        if (!Current(point) || RideManagement::Resolve(point.target)->status != RideStatus::closed) return false;
+        if (!Current(point) || RideManagement::Resolve(point.target)->status != RideStatus::closed)
+            return false;
         BeginTerrain(true);
         return FlatRides::ResumeExisting(point);
     }

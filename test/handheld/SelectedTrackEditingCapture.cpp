@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Native initialized scenario fixture; construction and editing use real actions.
-#include <SDL.h>
 #include "RideTabNavigation.h"
+
+#include <SDL.h>
 #include <filesystem>
 #include <iostream>
 #include <openrct2-ui/UiContext.h>
@@ -85,7 +86,8 @@ int main(int argc, char** argv)
                 && objects.LoadObject("rct2.station.plain"),
             "Fixture terrain/station missing");
         const char* ids[] = { "rct2.ride.mono1", "rct2.ride.ding1", "rct2.ride.bmair", "rct2.ride.arrx" };
-        const ride_type_t types[] = { RIDE_TYPE_MONORAIL, RIDE_TYPE_DINGHY_SLIDE, RIDE_TYPE_FLYING_ROLLER_COASTER, RIDE_TYPE_MULTI_DIMENSION_ROLLER_COASTER };
+        const ride_type_t types[] = { RIDE_TYPE_MONORAIL, RIDE_TYPE_DINGHY_SLIDE, RIDE_TYPE_FLYING_ROLLER_COASTER,
+                                      RIDE_TYPE_MULTI_DIMENSION_ROLLER_COASTER };
         const CoordsXY positions[] = { { 640, 640 }, { 640, 1408 }, { 1408, 1408 }, { 1408, 640 } };
         std::array<ObjectEntryIndex, 4> indices{};
         // Object/research availability is fixture initialization, before actions.
@@ -158,7 +160,8 @@ int main(int argc, char** argv)
             GameActions::ProcessQueue(state);
             C::Update(positions[family]);
             captureFocus = { positions[family].x + 16, positions[family].y + 16, C::Endpoint()->z };
-            if (family == 3) Check(C::SetPlacementSeat(9), "Native seat fixture unavailable");
+            if (family == 3)
+                Check(C::SetPlacementSeat(9), "Native seat fixture unavailable");
             place(TrackElemType::endStation);
             for (int n = 0; n < 3; ++n)
                 place(TrackElemType::endStation);
@@ -292,46 +295,59 @@ int main(int argc, char** argv)
             if (GetRide(circuit.id)->getRideTypeDescriptor().flags.has(RtdFlag::supportsMultipleColourSchemes))
             {
                 const auto blocks = E::Blocks(circuit);
-                auto block = *std::find_if(blocks.begin(), blocks.end(), [](const auto& b) { return b.type == TrackElemType::middleStation; });
+                auto block = *std::find_if(
+                    blocks.begin(), blocks.end(), [](const auto& b) { return b.type == TrackElemType::middleStation; });
                 H::RideManagement::PaintTarget paint{ circuit, block.origin, block.type, 0, block.colour };
-                Check(H::RideManagement::Paint(paint, 2, true).error == GameActions::Status::ok, "Native station colour fixture failed");
+                Check(
+                    H::RideManagement::Paint(paint, 2, true).error == GameActions::Status::ok,
+                    "Native station colour fixture failed");
                 GameActions::ProcessQueue(state);
             }
             for (auto part : { TrackElemType::beginStation, TrackElemType::middleStation, TrackElemType::endStation })
             {
                 circuit = *H::RideManagement::Identify(circuit.id);
                 const auto beforeBlocks = E::Blocks(circuit);
-                const auto found = std::find_if(beforeBlocks.begin(), beforeBlocks.end(), [&](const auto& b) { return b.type == part; });
+                const auto found = std::find_if(
+                    beforeBlocks.begin(), beforeBlocks.end(), [&](const auto& b) { return b.type == part; });
                 Check(found != beforeBlocks.end(), "Native station part unavailable");
                 const auto block = *found;
                 const auto prefix = "selected-" + std::to_string(family + 1) + "-" + std::to_string(static_cast<int>(part));
                 captureFocus = CoordsXYZ(block.origin) + CoordsXYZ{ 16, 16, 0 };
                 const auto impact = E::AccessRemoval(block);
-                std::cout << "Native part " << static_cast<int>(part) << " deletes " << impact.first << "," << impact.second << " access\n";
+                std::cout << "Native part " << static_cast<int>(part) << " deletes " << impact.first << "," << impact.second
+                          << " access\n";
                 const auto beforeContext = E::Context(block);
                 const auto beforeCash = state.park.cash;
                 openBlock(block);
-                if (part == TrackElemType::middleStation) capture((prefix + "-inspection.png").c_str(), true);
+                if (part == TrackElemType::middleStation)
+                    capture((prefix + "-inspection.png").c_str(), true);
                 choose("Inspect connections / station...");
-                if (part == TrackElemType::middleStation) {
+                if (part == TrackElemType::middleStation)
+                {
                     W::HandheldMenuMove(4);
                     capture((prefix + "-station-context.png").c_str(), true);
                 }
                 H::HandleMenuInput(controller, back);
                 choose("Replace block...");
                 Check(W::HandheldRidesPresentation().selected == 0, "Circuit replacement not Cancel-first");
-                if (part == TrackElemType::middleStation) capture((prefix + "-cancel-first-quote.png").c_str(), true);
+                if (part == TrackElemType::middleStation)
+                    capture((prefix + "-cancel-first-quote.png").c_str(), true);
                 H::HandleMenuInput(controller, confirm);
                 Check(E::Context(block) == beforeContext && state.park.cash == beforeCash, "Circuit cancel mutated park");
-                if (part == TrackElemType::middleStation) capture((prefix + "-cancelled-unchanged.png").c_str(), true);
+                if (part == TrackElemType::middleStation)
+                    capture((prefix + "-cancelled-unchanged.png").c_str(), true);
                 choose("Replace block...");
                 const auto removal = E::RemoveForReplacement(block);
                 Check(removal.error == GameActions::Status::ok, "Circuit removal query failed");
                 W::HandheldMenuMove(1);
                 H::HandleMenuInput(controller, confirm);
                 GameActions::ProcessQueue(state);
-                Check(C::Replacing() && C::Active() && state.park.cash == beforeCash - removal.cost, "Circuit station native removal handoff failed");
-                Check(C::Endpoint() == block.origin && C::PlacementInverted() == block.inverted, "Circuit draft identity changed");
+                Check(
+                    C::Replacing() && C::Active() && state.park.cash == beforeCash - removal.cost,
+                    "Circuit station native removal handoff failed");
+                Check(
+                    C::Endpoint() == block.origin && C::PlacementInverted() == block.inverted,
+                    "Circuit draft identity changed");
                 const auto gapCash = state.park.cash;
                 if (part == TrackElemType::middleStation)
                 {
@@ -339,12 +355,19 @@ int main(int argc, char** argv)
                     capture((prefix + "-native-gap-ghost.png").c_str(), false);
                     const auto gapFile = (std::filesystem::path(argv[2]) / (prefix + "-gap.park")).string();
                     Check(ScenarioSave(state, gapFile, {}), "Native provisional gap save failed");
-                    Check(C::Replacing() && state.park.cash == gapCash && C::Action(false).error == GameActions::Status::ok, "Provisional save damaged selected rebuild");
-                    if (family == 1) Check(C::Select(TrackElemType::flat) && C::ToggleCovered(), "Covered choice unavailable");
+                    Check(
+                        C::Replacing() && state.park.cash == gapCash && C::Action(false).error == GameActions::Status::ok,
+                        "Provisional save damaged selected rebuild");
+                    if (family == 1)
+                        Check(C::Select(TrackElemType::flat) && C::ToggleCovered(), "Covered choice unavailable");
                     W::HandheldTrackPiecePickerOpen();
                     const auto choices = C::Pieces();
                     const auto utility = std::find_if(choices.begin(), choices.end(), [&](const auto& choice) {
-                        return choice.identity.key == (family == 1 ? "covered" : family == 2 ? "inverted" : family == 3 ? "seat-plus" : "camera");
+                        return choice.identity.key
+                            == (family == 1       ? "covered"
+                                    : family == 2 ? "inverted"
+                                    : family == 3 ? "seat-plus"
+                                                  : "camera");
                     });
                     Check(utility != choices.end(), "Native parameter/variant utility unavailable");
                     const auto selected = std::find_if(choices.begin(), choices.end(), [&](const auto& choice) {
@@ -353,47 +376,64 @@ int main(int argc, char** argv)
                     Check(selected != choices.end(), "Native selected piece missing");
                     const auto from = static_cast<size_t>(selected - choices.begin());
                     const auto to = static_cast<size_t>(utility - choices.begin());
-                    for (size_t n = 0; n < from % 3; ++n) W::HandheldObjectPickerMove(-1, 0);
-                    for (size_t n = from / 3; n < to / 3; ++n) W::HandheldObjectPickerMove(0, 1);
-                    for (size_t n = 0; n < to % 3; ++n) W::HandheldObjectPickerMove(1, 0);
+                    for (size_t n = 0; n < from % 3; ++n)
+                        W::HandheldObjectPickerMove(-1, 0);
+                    for (size_t n = from / 3; n < to / 3; ++n)
+                        W::HandheldObjectPickerMove(0, 1);
+                    for (size_t n = 0; n < to % 3; ++n)
+                        W::HandheldObjectPickerMove(1, 0);
                     capture((prefix + "-native-parameters.png").c_str(), true);
                     H::HandleMenuInput(controller, back);
                     Check(C::Select(TrackElemType::endStation), "Native station draft return failed");
                     auto* loaded = objects.GetLoadedObject(ObjectType::ride, block.ride.object);
                     Check(loaded, "Circuit descriptor missing");
                     const auto version = loaded->GetVersion();
-                    auto changed = version; ++std::get<2>(changed); loaded->SetVersion(changed);
+                    auto changed = version;
+                    ++std::get<2>(changed);
+                    loaded->SetVersion(changed);
                     C::Update({});
-                    Check(C::Action(true).error != GameActions::Status::ok && state.park.cash == gapCash, "Stale descriptor accepted");
+                    Check(
+                        C::Action(true).error != GameActions::Status::ok && state.park.cash == gapCash,
+                        "Stale descriptor accepted");
                     capture((prefix + "-stale-descriptor-recovery.png").c_str(), false);
                     loaded->SetVersion(version);
                 }
                 const auto quote = C::Action(false);
-                if (quote.error != GameActions::Status::ok) std::cerr << quote.getErrorMessage() << '\n';
-                Check(quote.error == GameActions::Status::ok && C::Action(true).error == GameActions::Status::ok, "Circuit native rebuild failed");
+                if (quote.error != GameActions::Status::ok)
+                    std::cerr << quote.getErrorMessage() << '\n';
+                Check(
+                    quote.error == GameActions::Status::ok && C::Action(true).error == GameActions::Status::ok,
+                    "Circuit native rebuild failed");
                 GameActions::ProcessQueue(state);
                 Check(state.park.cash == gapCash - quote.cost, "Circuit rebuild accounting differs");
                 circuit = *H::RideManagement::Identify(circuit.id);
                 const auto afterBlocks = E::Blocks(circuit);
                 Check(afterBlocks.size() == beforeBlocks.size() && C::Completed(), "Circuit connectivity not restored");
                 for (size_t n = 0; n < afterBlocks.size(); ++n)
-                    Check(afterBlocks[n].origin == beforeBlocks[n].origin && afterBlocks[n].type == beforeBlocks[n].type
-                        && afterBlocks[n].inverted == beforeBlocks[n].inverted && afterBlocks[n].colour == beforeBlocks[n].colour
-                        && afterBlocks[n].seat == beforeBlocks[n].seat && afterBlocks[n].speed == beforeBlocks[n].speed
-                        && afterBlocks[n].chain == beforeBlocks[n].chain, "Rebuilt native station parameters changed");
-                if (part == TrackElemType::middleStation) capture((prefix + "-native-connected-result.png").c_str(), false);
-                if (part == TrackElemType::beginStation) {
+                    Check(
+                        afterBlocks[n].origin == beforeBlocks[n].origin && afterBlocks[n].type == beforeBlocks[n].type
+                            && afterBlocks[n].inverted == beforeBlocks[n].inverted
+                            && afterBlocks[n].colour == beforeBlocks[n].colour && afterBlocks[n].seat == beforeBlocks[n].seat
+                            && afterBlocks[n].speed == beforeBlocks[n].speed && afterBlocks[n].chain == beforeBlocks[n].chain,
+                        "Rebuilt native station parameters changed");
+                if (part == TrackElemType::middleStation)
+                    capture((prefix + "-native-connected-result.png").c_str(), false);
+                if (part == TrackElemType::beginStation)
+                {
                     W::HandheldRideAccessOpen(circuit);
                     capture((prefix + "-native-access-state.png").c_str(), true);
                     Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
                 }
                 H::UpdateExplorer(controller);
-                if (H::FlatRides::CanResume(circuit)) Check(H::ResumeFlatRide(circuit.id), "Deleted-access recovery unavailable");
-                while (H::FlatRides::CurrentStage() != H::FlatRides::Stage::inactive) {
+                if (H::FlatRides::CanResume(circuit))
+                    Check(H::ResumeFlatRide(circuit.id), "Deleted-access recovery unavailable");
+                while (H::FlatRides::CurrentStage() != H::FlatRides::Stage::inactive)
+                {
                     std::optional<CoordsXY> tile;
                     for (int y = 32; y < 2016 && !tile; y += 32)
                         for (int x = 32; x < 2016 && !tile; x += 32)
-                            if (H::FlatRides::Action(CoordsXY{ x, y }, false).error == GameActions::Status::ok) tile = CoordsXY{ x, y };
+                            if (H::FlatRides::Action(CoordsXY{ x, y }, false).error == GameActions::Status::ok)
+                                tile = CoordsXY{ x, y };
                     Check(tile.has_value(), "Native access recovery site missing");
                     const auto cost = H::FlatRides::Action(tile, false);
                     const auto accessCash = state.park.cash;
@@ -405,7 +445,8 @@ int main(int argc, char** argv)
                 Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
                 access = H::RideAccess::Inspect(circuit);
                 Check(access && access->entrance.attached && access->exit.attached, "Recovered access not attached");
-                if (part == TrackElemType::middleStation) {
+                if (part == TrackElemType::middleStation)
+                {
                     W::HandheldRideAccessOpen(circuit);
                     capture((prefix + "-native-access-return.png").c_str(), true);
                     Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
@@ -455,8 +496,9 @@ int main(int argc, char** argv)
         for (auto id : built)
             Check(GetRide(id) && GetRide(id)->status == RideStatus::open, "Family saved Open lost");
         Check(!C::Active(), "Family tool context survived load");
-        std::cout << "Selected begin/middle/end station native circuit/access/open/accounting/save workflow passed; no sustained "
-                     "guest-use claim\n";
+        std::cout
+            << "Selected begin/middle/end station native circuit/access/open/accounting/save workflow passed; no sustained "
+               "guest-use claim\n";
     }
     catch (const std::exception& e)
     {

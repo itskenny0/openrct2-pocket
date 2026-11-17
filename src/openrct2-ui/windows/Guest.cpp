@@ -10,13 +10,13 @@
 #include "../interface/ViewportQuery.h"
 
 #include <array>
+#include <openrct2-ui/handheld/ControllerInput.h>
+#include <openrct2-ui/handheld/Explorer.h>
+#include <openrct2-ui/handheld/PeopleNavigation.h>
 #include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
-#include <openrct2-ui/handheld/ControllerInput.h>
-#include <openrct2-ui/handheld/Explorer.h>
-#include <openrct2-ui/handheld/PeopleNavigation.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
 #include <openrct2/SpriteIds.h>
@@ -1921,7 +1921,8 @@ namespace OpenRCT2::Ui::Windows
         if (Handheld::IsEnabled() && gLegacyScene == LegacyScene::playing)
         {
             const auto target = Handheld::GuestManagement::Identify(peep->id);
-            if (!target) return nullptr;
+            if (!target)
+                return nullptr;
             Handheld::PeopleNavigation::guest.reset();
             HandheldGuestOpen(*target);
             return GetWindowManager()->FindByClass(WindowClass::handheldMenu);

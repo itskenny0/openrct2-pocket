@@ -141,18 +141,21 @@ int main(int argc, char** argv)
             Check(W::HandheldFinancesIsOpen(), "Finance dashboard entry failed");
         };
         openFinance();
-        auto financeModel=[] { return W::HandheldManagementPresentation(); };
-        auto financeTab=[&](size_t tab) {
-            for(size_t i=0;i<4 && financeModel().selectedTab!=tab;++i) {
-                H::Frame next;next.actions={H::Action::nextOption};H::HandleMenuInput(input,next);
+        auto financeModel = [] { return W::HandheldManagementPresentation(); };
+        auto financeTab = [&](size_t tab) {
+            for (size_t i = 0; i < 4 && financeModel().selectedTab != tab; ++i)
+            {
+                H::Frame next;
+                next.actions = { H::Action::nextOption };
+                H::HandleMenuInput(input, next);
             }
-            Check(financeModel().selectedTab==tab,"Finance tab navigation failed");
+            Check(financeModel().selectedTab == tab, "Finance tab navigation failed");
         };
         financeTab(0);
-        const auto overview=financeModel();
-        const auto ledgerAction=std::find(overview.rows.begin(),overview.rows.end(),"Expenditure ledger");
-        Check(ledgerAction!=overview.rows.end(),"Ledger action missing from overview");
-        W::HandheldMenuMove(static_cast<int>(ledgerAction-overview.rows.begin())-static_cast<int>(overview.selected));
+        const auto overview = financeModel();
+        const auto ledgerAction = std::find(overview.rows.begin(), overview.rows.end(), "Expenditure ledger");
+        Check(ledgerAction != overview.rows.end(), "Ledger action missing from overview");
+        W::HandheldMenuMove(static_cast<int>(ledgerAction - overview.rows.begin()) - static_cast<int>(overview.selected));
         Check(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) == 0, "Virtual controller init failed");
         const auto device = SDL_JoystickAttachVirtual(
             SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);
@@ -185,21 +188,19 @@ int main(int argc, char** argv)
         SDL_JoystickDetachVirtual(device);
         pump();
         input.suspend();
-        Check(W::HandheldFinancesIsOpen() && financeModel().selectedTab==1, "Ledger tab entry failed");
+        Check(W::HandheldFinancesIsOpen() && financeModel().selectedTab == 1, "Ledger tab entry failed");
         H::Frame older;
         older.navigateX = -1;
         H::HandleMenuInput(input, older);
-        Check(
-            financeModel().headerStatus == F::Period(GetDate().GetMonthsElapsed() - 1),
-            "Controller month navigation failed");
+        Check(financeModel().headerStatus == F::Period(GetDate().GetMonthsElapsed() - 1), "Controller month navigation failed");
         H::Frame cancel;
         cancel.actions = { H::Action::back };
         H::HandleMenuInput(input, cancel);
-        Check(W::HandheldDashboardRailFocused() && W::HandheldDashboardSectionIndex()==4,
-            "Ledger Back lost finance section");
-        H::HandleMenuInput(input,confirm);
-        Check(W::HandheldFinancesIsOpen() && financeModel().selectedTab==1
-            && financeModel().headerStatus==F::Period(GetDate().GetMonthsElapsed()-1),
+        Check(W::HandheldDashboardRailFocused() && W::HandheldDashboardSectionIndex() == 4, "Ledger Back lost finance section");
+        H::HandleMenuInput(input, confirm);
+        Check(
+            W::HandheldFinancesIsOpen() && financeModel().selectedTab == 1
+                && financeModel().headerStatus == F::Period(GetDate().GetMonthsElapsed() - 1),
             "Finance re-entry lost ledger tab/period");
         Check(state.park.cash == cash + net, "Read-only ledger changed cash");
         financeTab(2);
@@ -208,10 +209,10 @@ int main(int argc, char** argv)
         Check(financeModel().title == "Weekly profit history", "Financial graph cycling failed");
         for (int i = 0; i < 100; ++i)
             H::HandleMenuInput(input, older);
-        Check(
-            financeModel().stats[1].first == "Sample 63 weeks back", "History sample escaped bounds");
+        Check(financeModel().stats[1].first == "Sample 63 weeks back", "History sample escaped bounds");
         H::HandleMenuInput(input, cancel);
-        Check(W::HandheldDashboardRailFocused() && W::HandheldDashboardSectionIndex()==4, "History Back lost finance section");
+        Check(
+            W::HandheldDashboardRailFocused() && W::HandheldDashboardSectionIndex() == 4, "History Back lost finance section");
         SaveFlags flags{};
         const auto save = std::string(argv[2]) + "/finance-information.park";
         Check(ScenarioSave(state, save, flags) && context->LoadParkFromFile(save), "Ledger save/reload failed");
@@ -298,24 +299,26 @@ int main(int argc, char** argv)
         W::HandheldDashboardOpen();
         W::HandheldDashboardMove(0, 5 - static_cast<int>(W::HandheldDashboardSectionIndex()));
         H::HandleMenuInput(input, confirm);
-        for(size_t attempts=0;attempts<2 && W::HandheldManagementPresentation().selectedTab!=0;++attempts) {
-            H::Frame next;next.actions={H::Action::nextOption};H::HandleMenuInput(input,next);
+        for (size_t attempts = 0; attempts < 2 && W::HandheldManagementPresentation().selectedTab != 0; ++attempts)
+        {
+            H::Frame next;
+            next.actions = { H::Action::nextOption };
+            H::HandleMenuInput(input, next);
         }
-        Check(W::HandheldManagementPresentation().selectedTab==0,"Research Project tab unavailable");
-        const auto project=W::HandheldManagementPresentation();
-        const auto catalogAction=std::find(project.rows.begin(),project.rows.end(),"Invention catalog...");
-        Check(catalogAction!=project.rows.end(),"Invention catalog action missing");
-        W::HandheldMenuMove(static_cast<int>(catalogAction-project.rows.begin())-static_cast<int>(project.selected));
+        Check(W::HandheldManagementPresentation().selectedTab == 0, "Research Project tab unavailable");
+        const auto project = W::HandheldManagementPresentation();
+        const auto catalogAction = std::find(project.rows.begin(), project.rows.end(), "Invention catalog...");
+        Check(catalogAction != project.rows.end(), "Invention catalog action missing");
+        W::HandheldMenuMove(static_cast<int>(catalogAction - project.rows.begin()) - static_cast<int>(project.selected));
         H::HandleMenuInput(input, confirm);
-        Check(
-            W::HandheldParkMapSubjectsPresentation().rows.size() == R::Roster(0).size(), "Catalog controller entry failed");
+        Check(W::HandheldParkMapSubjectsPresentation().rows.size() == R::Roster(0).size(), "Catalog controller entry failed");
         H::HandleMenuInput(input, confirm);
         Check(
             W::HandheldParkMapSubjectsPresentation().breadcrumb == "Research / Invention details",
             "Research item entry failed");
         H::HandleMenuInput(input, cancel);
         H::Frame filter;
-        filter.actions={H::Action::contextSecondary};
+        filter.actions = { H::Action::contextSecondary };
         H::HandleMenuInput(input, filter);
         Check(W::HandheldParkMapSubjectsPresentation().title == R::Category(1), "Catalog filter controller failed");
         const auto catalogSave = std::string(argv[2]) + "/research-catalog.park";
@@ -343,9 +346,10 @@ int main(int argc, char** argv)
         auto openNews = [&](News::ItemType type) {
             Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
             W::HandheldDashboardOpen();
-            H::Frame newsShortcut;newsShortcut.actions={H::Action::contextPrimary};
-            H::HandleMenuInput(input,newsShortcut);
-            Check(W::HandheldParkMapSubjectsPresentation().title=="Park news","Dashboard news shortcut failed");
+            H::Frame newsShortcut;
+            newsShortcut.actions = { H::Action::contextPrimary };
+            H::HandleMenuInput(input, newsShortcut);
+            Check(W::HandheldParkMapSubjectsPresentation().title == "Park news", "Dashboard news shortcut failed");
             const auto list = H::ParkInformation::NewsList();
             auto found = std::find_if(list.begin(), list.end(), [&](const auto& n) { return n.item.type == type; });
             Check(found != list.end(), "Native linked message absent");

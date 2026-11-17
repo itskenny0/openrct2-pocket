@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "RideManagement.h"
+
 #include <openrct2/actions/ride/FlatRideEntrancePlaceAction.h>
 namespace OpenRCT2::Ui::Handheld::RideAccess
 {
@@ -47,4 +48,7 @@ namespace OpenRCT2::Ui::Handheld::RideAccess
     bool BeginPaths(const RideManagement::Target& target, bool exit, bool connected = false);
 } // namespace OpenRCT2::Ui::Handheld::RideAccess
 
-namespace OpenRCT2::Ui::Windows { void HandheldAccessReviewOpen(const Handheld::RideAccess::EditDraft& draft); }
+namespace OpenRCT2::Ui::Windows
+{
+    void HandheldAccessReviewOpen(const Handheld::RideAccess::EditDraft& draft);
+}

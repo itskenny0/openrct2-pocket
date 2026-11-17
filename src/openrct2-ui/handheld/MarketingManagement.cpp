@@ -57,8 +57,9 @@ namespace OpenRCT2::Ui::Handheld::MarketingManagement
                     || rtd.flags.has(RtdFlag::sellsFood) || rtd.flags.has(RtdFlag::sellsDrinks)
                     || rtd.specialType == RtdSpecialType::toilet)
                     continue;
-                result.push_back({ ride.id.ToUnderlying(), true, ride.type, ride.subtype, ride.buildDate, ride.overallView,
-                                   removedRides[ride.id.ToUnderlying()] });
+                result.push_back(
+                    { ride.id.ToUnderlying(), true, ride.type, ride.subtype, ride.buildDate, ride.overallView,
+                      removedRides[ride.id.ToUnderlying()] });
             }
             std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
                 const auto left = TargetName(a), right = TargetName(b);
@@ -172,7 +173,9 @@ namespace OpenRCT2::Ui::Handheld::MarketingManagement
         if (view == View::active)
         {
             model.title = Name(activeType);
-            model.contentSized=true;model.summaryMetrics=true;model.metricColumns=2;
+            model.contentSized = true;
+            model.summaryMetrics = true;
+            model.metricColumns = 2;
             if (const auto* campaign = MarketingGetCampaign(activeType))
                 model.stats = { { "Target", ActiveTarget(*campaign) },
                                 { "Weeks left", std::to_string(campaign->weeksLeft) },
@@ -212,7 +215,10 @@ namespace OpenRCT2::Ui::Handheld::MarketingManagement
         const auto cost = query.error == GameActions::Status::ok ? query.cost : kMoney64Undefined;
         if (view == View::editor)
         {
-            model.summaryMetrics=true;model.metricColumns=2;model.contentSized=true;model.rowHeight=40;
+            model.summaryMetrics = true;
+            model.metricColumns = 2;
+            model.contentSized = true;
+            model.rowHeight = 40;
             model.stats = { { "Per week", noMoney ? "Not applicable" : FormatMoney(nominal) },
                             { "Total cost", noMoney ? "Not applicable" : FormatMoney(cost) } };
             if (NeedsTarget(draft->type))

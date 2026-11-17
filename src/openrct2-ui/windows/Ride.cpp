@@ -13,13 +13,13 @@
 #include <limits>
 #include <memory>
 #include <openrct2-ui/UiStringIds.h>
+#include <openrct2-ui/handheld/ControllerInput.h>
+#include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2-ui/interface/Theme.h>
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
-#include <openrct2-ui/handheld/ControllerInput.h>
-#include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2/Cheats.h>
 #include <openrct2/Context.h>
 #include <openrct2/Diagnostic.h>
@@ -7259,7 +7259,10 @@ namespace OpenRCT2::Ui::Windows
         }
 
         if (Handheld::IsEnabled() && gLegacyScene == LegacyScene::playing)
-        { HandheldRideOpen(ride.id); return GetWindowManager()->FindByClass(WindowClass::handheldMenu); }
+        {
+            HandheldRideOpen(ride.id);
+            return GetWindowManager()->FindByClass(WindowClass::handheldMenu);
+        }
         auto* windowMgr = GetWindowManager();
         RideWindow* w = static_cast<RideWindow*>(windowMgr->BringToFrontByNumber(WindowClass::ride, ride.id.ToUnderlying()));
         if (w == nullptr)
@@ -7381,7 +7384,8 @@ namespace OpenRCT2::Ui::Windows
         if (ride == nullptr)
             return nullptr;
 
-        if (Handheld::IsEnabled() && gLegacyScene == LegacyScene::playing) return RideMainOpen(*ride);
+        if (Handheld::IsEnabled() && gLegacyScene == LegacyScene::playing)
+            return RideMainOpen(*ride);
         // Get view index
         int16_t view = 1;
         for (int32_t i = 0; i <= Limits::kMaxTrainsPerRide; i++)

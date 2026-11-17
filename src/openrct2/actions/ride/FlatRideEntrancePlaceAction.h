@@ -17,14 +17,22 @@ namespace OpenRCT2::GameActions
         TileCoordsXYZD _entrance{};
         std::vector<int64_t> _context;
         bool _editExisting{}, _removeExisting{};
-        money64 _quote{kMoney64Undefined};
+        money64 _quote{ kMoney64Undefined };
 
     public:
         FlatRideEntrancePlaceAction() = default;
         FlatRideEntrancePlaceAction(
             RideId ride, CoordsXYZD location, bool isExit, StationIndex station = StationIndex::FromUnderlying(0));
-        void EditExisting(bool remove = false) { _editExisting = true; _removeExisting = remove; }
-        void GuardContext(std::vector<int64_t> context,money64 quote) { _context=std::move(context);_quote=quote; }
+        void EditExisting(bool remove = false)
+        {
+            _editExisting = true;
+            _removeExisting = remove;
+        }
+        void GuardContext(std::vector<int64_t> context, money64 quote)
+        {
+            _context = std::move(context);
+            _quote = quote;
+        }
         void AcceptParameters(GameActionParameterVisitor&) final;
         void Serialise(DataSerialiser&) final;
         Result Query(GameState_t&, Park::ParkData&) const final;

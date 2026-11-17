@@ -84,8 +84,9 @@ namespace OpenRCT2::Ui::Handheld::QuickWheel
     };
 
     // repeatLabel names the Build tool "Again" reopens; paused swaps Pause for Resume.
-    inline void Draw(Drawing::RenderTarget& rt, ScreenSize screen, const State& state, const std::string& repeatLabel,
-        uint32_t repeatSprite, bool paused)
+    inline void Draw(
+        Drawing::RenderTarget& rt, ScreenSize screen, const State& state, const std::string& repeatLabel, uint32_t repeatSprite,
+        bool paused)
     {
         const ScreenCoordsXY centre{ screen.width / 2, screen.height / 2 - 6 };
         constexpr ScreenSize cell{ 116, 44 };
@@ -105,15 +106,19 @@ namespace OpenRCT2::Ui::Handheld::QuickWheel
                 DrawFocusRing(rt, pos, cell);
             const bool isRepeat = slot.target == Target::repeat;
             const uint32_t sprite = isRepeat && repeatSprite ? repeatSprite : slot.sprite;
-            DrawNativeMenuArt(rt, pos + ScreenCoordsXY{ 6, 6 }, { 30, 32 }, { sprite, isRepeat ? uint8_t{ 1 } : slot.frames }, on);
+            DrawNativeMenuArt(
+                rt, pos + ScreenCoordsXY{ 6, 6 }, { 30, 32 }, { sprite, isRepeat ? uint8_t{ 1 } : slot.frames }, on);
             const std::string label = slot.target == Target::pause && paused ? "Resume" : slot.label;
             if (isRepeat && !repeatLabel.empty())
             {
-                DrawStrongText(rt, pos + ScreenCoordsXY{ 40, 8 }, std::string(on ? "{BLACK}" : "{WHITE}") + label, cell.width - 46);
-                DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 40, 24 }, cell.width - 46, std::string(on ? "{BLACK}" : "{MUTED}") + repeatLabel);
+                DrawStrongText(
+                    rt, pos + ScreenCoordsXY{ 40, 8 }, std::string(on ? "{BLACK}" : "{WHITE}") + label, cell.width - 46);
+                DrawModernEllipsised(
+                    rt, pos + ScreenCoordsXY{ 40, 24 }, cell.width - 46, std::string(on ? "{BLACK}" : "{MUTED}") + repeatLabel);
             }
             else
-                DrawStrongText(rt, pos + ScreenCoordsXY{ 40, CapCentre(cell.height) }, std::string(on ? "{BLACK}" : "{WHITE}") + label,
+                DrawStrongText(
+                    rt, pos + ScreenCoordsXY{ 40, CapCentre(cell.height) }, std::string(on ? "{BLACK}" : "{WHITE}") + label,
                     cell.width - 46);
         }
         // The hub says how to finish, in the words of the gesture being used.
@@ -124,12 +129,17 @@ namespace OpenRCT2::Ui::Handheld::QuickWheel
             return kSlots[i].target == Target::pause && paused ? std::string("Resume") : std::string(kSlots[i].label);
         };
         const std::string top = state.selected ? name(*state.selected) : std::string("Quick menu");
-        const std::string bottom = state.tapped ? (state.selected ? "A choose / B close" : "D-pad to point") : state.selected ? "Release L2" : "Point with D-pad";
+        const std::string bottom = state.tapped ? (state.selected ? "A choose / B close" : "D-pad to point")
+            : state.selected                    ? "Release L2"
+                                                : "Point with D-pad";
         const int tw = TextWidth(top, true), bw = TextWidth(bottom);
         DrawStrongText(rt, hubPos + ScreenCoordsXY{ (hub.width - tw) / 2, 7 }, "{WHITE}" + top);
         DrawModernText(rt, hubPos + ScreenCoordsXY{ (hub.width - bw) / 2, 23 }, "{MUTED}" + bottom);
-        DrawFooter(rt, screen,
-            state.tapped ? std::vector<ControlHint>{ { "D-pad", "Point" }, { "A", "Choose" }, { "Y", "Photo" }, { "B", "Close" } }
-                         : std::vector<ControlHint>{ { "D-pad", "Point" }, { "L2", "Release to choose" }, { "Y", "Photo" }, { "B", "Close" } });
+        DrawFooter(
+            rt, screen,
+            state.tapped
+                ? std::vector<ControlHint>{ { "D-pad", "Point" }, { "A", "Choose" }, { "Y", "Photo" }, { "B", "Close" } }
+                : std::vector<ControlHint>{
+                      { "D-pad", "Point" }, { "L2", "Release to choose" }, { "Y", "Photo" }, { "B", "Close" } });
     }
 } // namespace OpenRCT2::Ui::Handheld::QuickWheel

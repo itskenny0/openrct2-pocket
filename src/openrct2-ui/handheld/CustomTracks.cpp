@@ -2,10 +2,10 @@
 #include "CustomTracks.h"
 
 #include "Explorer.h"
-#include "TrackPreview.h"
 #include "NativeTrackThumbnail.h"
-#include <cctype>
+#include "TrackPreview.h"
 
+#include <cctype>
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2/actions/ride/RideCreateAction.h>
 #include <openrct2/actions/ride/RideDemolishAction.h>
@@ -64,7 +64,7 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     static TrackPreview nativePreview;
     static std::optional<CoordsXY> previewTile;
     static bool previewWanted{};
-    static PieceGroup pieceGroup{PieceGroup::all};
+    static PieceGroup pieceGroup{ PieceGroup::all };
     static int turnSize{ 1 }; // 0 tight, 1 normal, 2 wide
     static std::string feedback;
     static GA::Result Invalid(const char* text)
@@ -357,7 +357,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             return "Station";
         const auto native = FormatStringIDLegacy(ted.description, nullptr);
         if (!native.empty())
-            return native+(ted.sequenceData.numSequences>1 ? " / "+std::to_string(ted.sequenceData.numSequences)+" tiles" : "");
+            return native
+                + (ted.sequenceData.numSequences > 1 ? " / " + std::to_string(ted.sequenceData.numSequences) + " tiles" : "");
         const auto& d = ted.definition;
         auto slopeName = [](TrackPitch value) -> std::string {
             switch (value)
@@ -376,8 +377,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         };
         const int turn = (ted.coordinates.rotationEnd - ted.coordinates.rotationBegin) & 3;
         if (turn == 1 || turn == 3)
-            return std::string(ted.flags.has(TrackElementFlag::turnLeft) ? "Left turn" : "Right turn")+" / "+std::to_string(ted.sequenceData.numSequences)+" tiles"
-                + (d.rollEnd != TrackRoll::none ? " / bank" : "")
+            return std::string(ted.flags.has(TrackElementFlag::turnLeft) ? "Left turn" : "Right turn") + " / "
+                + std::to_string(ted.sequenceData.numSequences) + " tiles" + (d.rollEnd != TrackRoll::none ? " / bank" : "")
                 + (d.pitchEnd != TrackPitch::none ? " / " + slopeName(d.pitchEnd) : "");
         if (d.pitchStart != d.pitchEnd)
             return slopeName(d.pitchStart) + " > " + slopeName(d.pitchEnd);
@@ -392,11 +393,15 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     // Shared native-metadata preview: live picker and component validation use the same renderer.
     void DrawPiecePreview(Drawing::RenderTarget& rt, TrackElemType type)
     {
-        if (target && RideManagement::Resolve(*target)) {
+        if (target && RideManagement::Resolve(*target))
+        {
             SelectedLiftAndInverted flags{};
-            if(chain && type==selected)flags.set(LiftHillAndInverted::liftHill);
-            if(placementInverted)flags.set(LiftHillAndInverted::inverted);
-            Windows::DrawNativeTrackThumbnail(rt,target->id,type,endpoint ? endpoint->direction : 0,flags);return;
+            if (chain && type == selected)
+                flags.set(LiftHillAndInverted::liftHill);
+            if (placementInverted)
+                flags.set(LiftHillAndInverted::inverted);
+            Windows::DrawNativeTrackThumbnail(rt, target->id, type, endpoint ? endpoint->direction : 0, flags);
+            return;
         }
         const auto& ted = GetTrackElementDescriptor(type);
         int minX = 0, maxX = 0, minY = 0, maxY = 0;
@@ -417,19 +422,72 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         }
         DrawModernText(rt, { rt.x + 4, rt.y + 48 }, "{MUTED}" + std::to_string(ted.sequenceData.numSequences) + " tiles");
     }
-    PieceGroup GroupOf(TrackElemType type) {
-        switch(GetTrackElementDescriptor(type).definition.group) {
-            case TrackGroup::flat:case TrackGroup::straight:return PieceGroup::straight;
-            case TrackGroup::stationEnd:return PieceGroup::station;
-            case TrackGroup::curveVerySmall:case TrackGroup::curveSmall:case TrackGroup::curve:case TrackGroup::curveLarge:case TrackGroup::sBend:return PieceGroup::turns;
-            case TrackGroup::slope:case TrackGroup::slopeSteepDown:case TrackGroup::slopeSteepUp:case TrackGroup::flatToSteepSlope:case TrackGroup::slopeToFlat:case TrackGroup::slopeVertical:case TrackGroup::slopeSteepLong:case TrackGroup::diagSlope:case TrackGroup::diagSlopeSteepUp:case TrackGroup::diagSlopeSteepDown:case TrackGroup::diagSlopeSteepLong:case TrackGroup::liftHill:case TrackGroup::liftHillSteep:case TrackGroup::poweredLift:case TrackGroup::liftHillCable:return PieceGroup::slopes;
-            case TrackGroup::flatRollBanking:case TrackGroup::slopeRollBanking:case TrackGroup::slopeCurveBanked:case TrackGroup::slopeCurveLargeBanked:case TrackGroup::helixUpBankedHalf:case TrackGroup::helixDownBankedHalf:case TrackGroup::helixUpBankedQuarter:case TrackGroup::helixDownBankedQuarter:return PieceGroup::banks;
-            default:return PieceGroup::special;
+    PieceGroup GroupOf(TrackElemType type)
+    {
+        switch (GetTrackElementDescriptor(type).definition.group)
+        {
+            case TrackGroup::flat:
+            case TrackGroup::straight:
+                return PieceGroup::straight;
+            case TrackGroup::stationEnd:
+                return PieceGroup::station;
+            case TrackGroup::curveVerySmall:
+            case TrackGroup::curveSmall:
+            case TrackGroup::curve:
+            case TrackGroup::curveLarge:
+            case TrackGroup::sBend:
+                return PieceGroup::turns;
+            case TrackGroup::slope:
+            case TrackGroup::slopeSteepDown:
+            case TrackGroup::slopeSteepUp:
+            case TrackGroup::flatToSteepSlope:
+            case TrackGroup::slopeToFlat:
+            case TrackGroup::slopeVertical:
+            case TrackGroup::slopeSteepLong:
+            case TrackGroup::diagSlope:
+            case TrackGroup::diagSlopeSteepUp:
+            case TrackGroup::diagSlopeSteepDown:
+            case TrackGroup::diagSlopeSteepLong:
+            case TrackGroup::liftHill:
+            case TrackGroup::liftHillSteep:
+            case TrackGroup::poweredLift:
+            case TrackGroup::liftHillCable:
+                return PieceGroup::slopes;
+            case TrackGroup::flatRollBanking:
+            case TrackGroup::slopeRollBanking:
+            case TrackGroup::slopeCurveBanked:
+            case TrackGroup::slopeCurveLargeBanked:
+            case TrackGroup::helixUpBankedHalf:
+            case TrackGroup::helixDownBankedHalf:
+            case TrackGroup::helixUpBankedQuarter:
+            case TrackGroup::helixDownBankedQuarter:
+                return PieceGroup::banks;
+            default:
+                return PieceGroup::special;
         }
     }
-    PieceGroup CurrentGroup(){return pieceGroup;}
-    std::string GroupName(PieceGroup group){static const char* names[]{"All","Straight","Stations","Turns","Slopes","Banking","Special"};return names[static_cast<size_t>(group)];}
-    void NextGroup(){for(int n=0;n<static_cast<int>(PieceGroup::count);++n){pieceGroup=static_cast<PieceGroup>((static_cast<int>(pieceGroup)+1)%static_cast<int>(PieceGroup::count));if(pieceGroup==PieceGroup::all)return;for(const auto& e:Pieces())if(!e.identity.key.empty()&&std::isdigit(static_cast<unsigned char>(e.identity.key[0]))&&GroupOf(static_cast<TrackElemType>(std::stoi(e.identity.key)))==pieceGroup)return;}}
+    PieceGroup CurrentGroup()
+    {
+        return pieceGroup;
+    }
+    std::string GroupName(PieceGroup group)
+    {
+        static const char* names[]{ "All", "Straight", "Stations", "Turns", "Slopes", "Banking", "Special" };
+        return names[static_cast<size_t>(group)];
+    }
+    void NextGroup()
+    {
+        for (int n = 0; n < static_cast<int>(PieceGroup::count); ++n)
+        {
+            pieceGroup = static_cast<PieceGroup>((static_cast<int>(pieceGroup) + 1) % static_cast<int>(PieceGroup::count));
+            if (pieceGroup == PieceGroup::all)
+                return;
+            for (const auto& e : Pieces())
+                if (!e.identity.key.empty() && std::isdigit(static_cast<unsigned char>(e.identity.key[0]))
+                    && GroupOf(static_cast<TrackElemType>(std::stoi(e.identity.key))) == pieceGroup)
+                    return;
+        }
+    }
     // Steering works on shape rather than piece names: every ordinary piece is a turn (left or right)
     // or not, has an end slope, and has a footprint. The D-pad picks the shape and the game finds the
     // piece. Only plain track takes part; loops, helixes, diagonals and S-bends stay in the catalog.
@@ -437,12 +495,25 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     {
         switch (GetTrackElementDescriptor(type).definition.group)
         {
-            case TrackGroup::flat: case TrackGroup::straight: case TrackGroup::liftHill: case TrackGroup::liftHillSteep:
-            case TrackGroup::liftHillCurve: case TrackGroup::flatRollBanking: case TrackGroup::slope:
-            case TrackGroup::slopeSteepDown: case TrackGroup::slopeSteepUp: case TrackGroup::flatToSteepSlope:
-            case TrackGroup::slopeToFlat: case TrackGroup::slopeCurve: case TrackGroup::slopeCurveSteep:
-            case TrackGroup::curveVerySmall: case TrackGroup::curveSmall: case TrackGroup::curve:
-            case TrackGroup::curveLarge: case TrackGroup::slopeCurveBanked: case TrackGroup::slopeRollBanking:
+            case TrackGroup::flat:
+            case TrackGroup::straight:
+            case TrackGroup::liftHill:
+            case TrackGroup::liftHillSteep:
+            case TrackGroup::liftHillCurve:
+            case TrackGroup::flatRollBanking:
+            case TrackGroup::slope:
+            case TrackGroup::slopeSteepDown:
+            case TrackGroup::slopeSteepUp:
+            case TrackGroup::flatToSteepSlope:
+            case TrackGroup::slopeToFlat:
+            case TrackGroup::slopeCurve:
+            case TrackGroup::slopeCurveSteep:
+            case TrackGroup::curveVerySmall:
+            case TrackGroup::curveSmall:
+            case TrackGroup::curve:
+            case TrackGroup::curveLarge:
+            case TrackGroup::slopeCurveBanked:
+            case TrackGroup::slopeRollBanking:
                 return true;
             default:
                 return false;
@@ -531,8 +602,9 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             found = FindShape(turn, pitch, turnSize);
         if (!found)
         {
-            ShowToast("Can't turn here", pitch == TrackPitch::none ? "This ride has no turn that fits."
-                                                                   : "Level out first, then turn.");
+            ShowToast(
+                "Can't turn here",
+                pitch == TrackPitch::none ? "This ride has no turn that fits." : "Level out first, then turn.");
             return false;
         }
         return Select(*found);
@@ -554,14 +626,18 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             auto type = static_cast<TrackElemType>(i);
             if (!Supported(type) || type == TrackElemType::beginStation || type == TrackElemType::middleStation)
                 continue;
-            if(filtered && pieceGroup!=PieceGroup::all && GroupOf(type)!=pieceGroup)continue;
+            if (filtered && pieceGroup != PieceGroup::all && GroupOf(type) != pieceGroup)
+                continue;
             PickerEntry entry{ { ObjectType::ride, kObjectEntryIndexNull, std::to_string(i) },
                                PieceName(type),
                                ZoomLevel{ 0 } };
             entry.drawPreview = [type](Drawing::RenderTarget& rt) { DrawPiecePreview(rt, type); };
             result.push_back(std::move(entry));
         }
-        std::stable_sort(result.begin(),result.end(),[](const auto& a,const auto& b){return GroupOf(static_cast<TrackElemType>(std::stoi(a.identity.key)))<GroupOf(static_cast<TrackElemType>(std::stoi(b.identity.key)));});
+        std::stable_sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
+            return GroupOf(static_cast<TrackElemType>(std::stoi(a.identity.key)))
+                < GroupOf(static_cast<TrackElemType>(std::stoi(b.identity.key)));
+        });
         const auto coveredBase = TrackConstructionSupport::CoveredBase(selected);
         const auto coveredNext = coveredBase.value_or(GetTrackElementDescriptor(selected).alternativeType);
         if (coveredNext != TrackElemType::none && Supported(coveredNext))
@@ -603,8 +679,16 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         const auto flags = GetTrackElementDescriptor(selected).flags;
         return flags.has(TrackElementFlag::allowLiftHill) || flags.has(TrackElementFlag::curveAllowsLift);
     }
-    static void RemoveGhost(){ghost.reset();nativePreview.clear();}
-    void ClearPreview(){previewWanted=false;RemoveGhost();}
+    static void RemoveGhost()
+    {
+        ghost.reset();
+        nativePreview.clear();
+    }
+    void ClearPreview()
+    {
+        previewWanted = false;
+        RemoveGhost();
+    }
     void End()
     {
         ClearPreview();
@@ -635,7 +719,9 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         endpoint.reset();
         previous.reset();
         anchor.reset();
-        depth = 0;previewTile.reset();pieceGroup=PieceGroup::all;
+        depth = 0;
+        previewTile.reset();
+        pieceGroup = PieceGroup::all;
         camera = false;
         backward = false;
         placementInverted = false;
@@ -746,23 +832,28 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                 }
         return true;
     }
-    bool Replacing() { return active && replacement.has_value(); }
-    bool ResumeReplacement(const RideManagement::Target& old,
-        const TrackConstructionSupport::BlockSnapshot& removed, uint8_t colour)
+    bool Replacing()
+    {
+        return active && replacement.has_value();
+    }
+    bool ResumeReplacement(
+        const RideManagement::Target& old, const TrackConstructionSupport::BlockSnapshot& removed, uint8_t colour)
     {
         const auto now = RideManagement::Identify(old.id);
-        if (!now || now->id != old.id || now->type != old.type || now->object != old.object
-            || now->buildDate != old.buildDate || now->generation != old.generation
-            || !Eligible(now->object, now->type)) return false;
+        if (!now || now->id != old.id || now->type != old.type || now->object != old.object || now->buildDate != old.buildDate
+            || now->generation != old.generation || !Eligible(now->object, now->type))
+            return false;
         const auto* ride = RideManagement::Resolve(*now);
-        if (!ride || ride->status != RideStatus::closed) return false;
+        if (!ride || ride->status != RideStatus::closed)
+            return false;
         End();
         target = *now;
         replacement = removed;
         replacementContext = TrackConstructionSupport::EditingContext(*ride);
         endpoint = removed.origin;
         selected = removed.type == TrackElemType::beginStation || removed.type == TrackElemType::middleStation
-            ? TrackElemType::endStation : removed.type;
+            ? TrackElemType::endStation
+            : removed.type;
         placementInverted = removed.inverted;
         placementSpeed = removed.speed;
         placementSeat = removed.seat;
@@ -770,7 +861,11 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         chain = removed.chain;
         active = true;
         feedback.clear();
-        if (!Supported(selected)) { End(); return false; }
+        if (!Supported(selected))
+        {
+            End();
+            return false;
+        }
         FocusEndpoint();
         return true;
     }
@@ -919,7 +1014,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     {
         if (!active || !target || !endpoint || !Supported(selected))
             return {};
-        if (replacement) return Block{ replacement->origin, selected };
+        if (replacement)
+            return Block{ replacement->origin, selected };
         if (backward)
             return Block{ TrackConstructionSupport::BackwardOrigin(*endpoint, selected), selected };
         auto origin = *endpoint;
@@ -941,7 +1037,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         query.SetPlacementSeat(SeatSupported() ? placementSeat : 0);
         query.SetPlacementInverted(placementInverted);
         query.SetPlacementColour(placementColour);
-        if (replacement) query.UseDetached(replacementContext);
+        if (replacement)
+            query.UseDetached(replacementContext);
         if (sourceBaseline && !backward)
             query.GuardSource(*sourceBaseline);
         if (backward)
@@ -959,7 +1056,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         action.SetPlacementSeat(SeatSupported() ? placementSeat : 0);
         action.SetPlacementInverted(placementInverted);
         action.SetPlacementColour(placementColour);
-        if (replacement) action.UseDetached(replacementContext);
+        if (replacement)
+            action.UseDetached(replacementContext);
         if (sourceBaseline && !backward)
             action.GuardSource(*sourceBaseline);
         if (backward)
@@ -983,7 +1081,10 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                     for (auto* track : TileElementsView<TrackElement>(xy))
                         if (!track->isGhost() && track->getRideIndex() == target->id && track->getSequenceIndex() == 0
                             && track->getBaseZ() == placed.origin.z + c.z && track->getDirection() == placed.origin.direction)
-                        { anchor->type = track->getTrackType(); break; }
+                        {
+                            anchor->type = track->getTrackType();
+                            break;
+                        }
                     replacement.reset();
                     replacementContext.clear();
                 }
@@ -1025,7 +1126,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     GameActions::Result Undo(bool execute)
     {
         ClearPreview();
-        if (replacement) return Invalid("Rebuild cancelled only through B / Return to park");
+        if (replacement)
+            return Invalid("Rebuild cancelled only through B / Return to park");
         if (!previous || !target || busy)
             return Invalid("No preceding track piece");
         const auto block = *previous;
@@ -1093,7 +1195,8 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     }
     void Update(std::optional<CoordsXY> tile)
     {
-        previewTile=tile;previewWanted=true;
+        previewTile = tile;
+        previewWanted = true;
         if (!active || busy)
             return;
         if (!target || !RideManagement::Resolve(*target)
@@ -1140,9 +1243,13 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
     }
     void RestorePreview()
     {
-        if (depth && --depth==0 && active && !busy && previewWanted)Update(previewTile);
+        if (depth && --depth == 0 && active && !busy && previewWanted)
+            Update(previewTile);
     }
-    bool HasPreview(){return ghost.has_value()&&nativePreview.exists();}
+    bool HasPreview()
+    {
+        return ghost.has_value() && nativePreview.exists();
+    }
     void DrawPanel(Drawing::RenderTarget& rt, ScreenSize screen)
     {
         using namespace Concept;
@@ -1189,7 +1296,10 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
         DrawModernEllipsised(rt, p + ScreenCoordsXY{ 76, 28 }, width - 84, "{MUTED}" + direction + "  |  " + slope);
         std::string detail = trackTypeHasSpeedSetting(selected)
             ? FormatStringID(STR_VELOCITY, static_cast<uint16_t>((placementSpeed * 9) >> 2))
-            : bank == TrackRoll::none ? "No bank" : bank == TrackRoll::left ? "Banked left" : bank == TrackRoll::right ? "Banked right" : "Inverted";
+            : bank == TrackRoll::none  ? "No bank"
+            : bank == TrackRoll::left  ? "Banked left"
+            : bank == TrackRoll::right ? "Banked right"
+                                       : "Inverted";
         if (ChainAllowed())
             detail += chain ? "  |  Chain lift" : "  |  No chain";
         if (endpoint)
@@ -1198,14 +1308,20 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
             detail += "  |  Seat " + std::to_string(placementSeat);
         DrawModernEllipsised(rt, p + ScreenCoordsXY{ 76, 46 }, width - 84, "{MUTED}" + detail);
         const bool steering = !camera && !StationPlacement();
-        std::vector<ControlHint> hints{ { "D-pad", camera ? "Pan" : StationPlacement() ? "Move" : "Steer",
+        std::vector<ControlHint> hints{ { "D-pad",
+                                          camera                   ? "Pan"
+                                              : StationPlacement() ? "Move"
+                                                                   : "Steer",
                                           camera || steering ? HintPriority::normal : HintPriority::guide },
                                         { "A", camera ? "Build mode" : "Build" },
                                         { "B",
                                           camera                                  ? "Build"
                                               : replacement || StationPlacement() ? "Cancel"
                                                                                   : "Undo" },
-                                        { "L1/R1", camera ? "Zoom" : steering ? "Turn size" : "Piece" },
+                                        { "L1/R1",
+                                          camera         ? "Zoom"
+                                              : steering ? "Turn size"
+                                                         : "Piece" },
                                         { "X",
                                           camera                                   ? "Rotate"
                                               : trackTypeHasSpeedSetting(selected) ? "Speed +"
@@ -1222,4 +1338,3 @@ namespace OpenRCT2::Ui::Handheld::CustomTracks
                 rt, Layout::ContextAnchor(screen, kContextSize, true), feedback.empty() ? q.getErrorMessage() : feedback);
     }
 } // namespace OpenRCT2::Ui::Handheld::CustomTracks
-

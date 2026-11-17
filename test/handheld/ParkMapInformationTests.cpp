@@ -153,31 +153,39 @@ int main(int argc, char** argv)
         H::ControllerInput input;
         H::Frame confirm;
         confirm.actions = { H::Action::confirm };
-        auto openOverview=[&] {
+        auto openOverview = [&] {
             W::HandheldDashboardOpen();
-            W::HandheldDashboardMove(0,-static_cast<int>(W::HandheldDashboardSectionIndex()));
-            H::HandleMenuInput(input,confirm);
-            Check(W::HandheldOverviewIsOpen(),"Overview entry failed");
+            W::HandheldDashboardMove(0, -static_cast<int>(W::HandheldDashboardSectionIndex()));
+            H::HandleMenuInput(input, confirm);
+            Check(W::HandheldOverviewIsOpen(), "Overview entry failed");
         };
-        auto parkTab=[&](size_t tab) {
-            for(size_t i=0;i<3 && W::HandheldManagementPresentation().selectedTab!=tab;++i) {
-                H::Frame next;next.actions={H::Action::nextOption};H::HandleMenuInput(input,next);
+        auto parkTab = [&](size_t tab) {
+            for (size_t i = 0; i < 3 && W::HandheldManagementPresentation().selectedTab != tab; ++i)
+            {
+                H::Frame next;
+                next.actions = { H::Action::nextOption };
+                H::HandleMenuInput(input, next);
             }
-            Check(W::HandheldManagementPresentation().selectedTab==tab,"Park tab navigation failed");
+            Check(W::HandheldManagementPresentation().selectedTab == tab, "Park tab navigation failed");
         };
-        auto selectParkAction=[&](const char* label) {
-            const auto m=W::HandheldManagementPresentation();
-            const auto it=std::find(m.rows.begin(),m.rows.end(),label);
-            Check(it!=m.rows.end(),"Named park action missing");
-            W::HandheldMenuMove(static_cast<int>(it-m.rows.begin())-static_cast<int>(m.selected));
+        auto selectParkAction = [&](const char* label) {
+            const auto m = W::HandheldManagementPresentation();
+            const auto it = std::find(m.rows.begin(), m.rows.end(), label);
+            Check(it != m.rows.end(), "Named park action missing");
+            W::HandheldMenuMove(static_cast<int>(it - m.rows.begin()) - static_cast<int>(m.selected));
         };
-        auto openRecord=[&](const char* label) {
-            openOverview();parkTab(2);selectParkAction(label);H::HandleMenuInput(input,confirm);
+        auto openRecord = [&](const char* label) {
+            openOverview();
+            parkTab(2);
+            selectParkAction(label);
+            H::HandleMenuInput(input, confirm);
         };
         auto openMap = [&] {
-            openOverview();parkTab(0);selectParkAction("Park map...");
-            H::HandleMenuInput(input,confirm);
-            Check(W::HandheldParkMapIsOpen(),"Pocket map entry failed");
+            openOverview();
+            parkTab(0);
+            selectParkAction("Park map...");
+            H::HandleMenuInput(input, confirm);
+            Check(W::HandheldParkMapIsOpen(), "Pocket map entry failed");
         };
         openMap();
         for (int rotation = 0; rotation < 4; ++rotation)
@@ -250,15 +258,20 @@ int main(int argc, char** argv)
         const auto history = I::History(false, 0);
         Check(history.stats[0].second == std::to_string(state.park.rating), "History invented current rating");
         openRecord("Park news...");
-        Check(W::HandheldParkMapSubjectsPresentation().title=="Park news","News entry failed");
+        Check(W::HandheldParkMapSubjectsPresentation().title == "Park news", "News entry failed");
         W::HandheldMenuBack();
-        Check(W::HandheldOverviewIsOpen() && W::HandheldManagementPresentation().selectedTab==2,
-            "News Back lost Records tab");
-        openRecord("Park awards...");W::HandheldMenuBack();
-        Check(W::HandheldOverviewIsOpen() && W::HandheldManagementPresentation().selectedTab==2,
+        Check(
+            W::HandheldOverviewIsOpen() && W::HandheldManagementPresentation().selectedTab == 2, "News Back lost Records tab");
+        openRecord("Park awards...");
+        W::HandheldMenuBack();
+        Check(
+            W::HandheldOverviewIsOpen() && W::HandheldManagementPresentation().selectedTab == 2,
             "Awards Back lost Records tab");
-        openRecord("Park history...");H::HandleMenuInput(input,confirm);W::HandheldMenuBack();
-        Check(W::HandheldOverviewIsOpen() && W::HandheldManagementPresentation().selectedTab==2,
+        openRecord("Park history...");
+        H::HandleMenuInput(input, confirm);
+        W::HandheldMenuBack();
+        Check(
+            W::HandheldOverviewIsOpen() && W::HandheldManagementPresentation().selectedTab == 2,
             "History Back lost Records tab");
         Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
         namespace M = H::MapSubjects;
@@ -379,7 +392,9 @@ int main(int argc, char** argv)
             W::HandheldParkMapSubjectsPresentation().title == M::Name(M::Roster(1, 0).front()),
             "Ride inspection return failed");
         Ui::GetWindowManager()->CloseByClass(WindowClass::handheldMenu);
-        openOverview();parkTab(0);selectParkAction("Park map...");
+        openOverview();
+        parkTab(0);
+        selectParkAction("Park map...");
         Check(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) == 0, "Virtual controller init failed");
         const auto device = SDL_JoystickAttachVirtual(
             SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);

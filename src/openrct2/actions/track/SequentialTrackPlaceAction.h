@@ -82,7 +82,10 @@ namespace OpenRCT2::GameActions
             _first = false;
             _editingContext = context;
         }
-        void SetPlacementColour(uint8_t colour) { _placementColour = colour; }
+        void SetPlacementColour(uint8_t colour)
+        {
+            _placementColour = colour;
+        }
         void GuardEditingContext(const std::vector<int32_t>& context)
         {
             _editingContext = context;

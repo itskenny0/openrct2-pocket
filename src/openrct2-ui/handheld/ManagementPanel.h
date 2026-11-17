@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
-#include <functional>
-#include "Panel.h"
 #include "ColourGrid.h"
 #include "ListScroll.h"
+#include "Panel.h"
 #include "TextEntry.h"
 
+#include <functional>
 #include <optional>
 
 namespace OpenRCT2::Ui::Handheld
@@ -104,7 +104,7 @@ namespace OpenRCT2::Ui::Handheld
         // A text field and controller keyboard instead of rows. rows still holds TextEntry::Keys()
         // and selected is a logical key index, so screens confirm keys as before.
         std::optional<TextEntry> keyboard;
-        std::string keyboardHeading; // "Rename ride"; the title is the field's placeholder.
+        std::string keyboardHeading;   // "Rename ride"; the title is the field's placeholder.
         std::optional<size_t> heroRow; // A row that is the hero's switch: not drawn as a button.
         // Rows that are values you change in place with Left/Right (a price, say): drawn full width
         // as "label  < value >" above the buttons instead of as a button that opens an editor.
@@ -142,17 +142,32 @@ namespace OpenRCT2::Ui::Handheld
     };
     inline ManagementLayout MeasureManagement(ScreenSize size, const ManagementPresentation& model)
     {
-        const int columns = model.actionGrid ? (size.width >= 360 ? 2 : 1) : static_cast<int>(std::max<size_t>(1, model.columns));
-        const int statColumns = model.summaryMetrics && !model.stats.empty() ? (model.metricColumns ? model.metricColumns : size.width >= 440 ? 3 : 2) : 1;
+        const int columns = model.actionGrid ? (size.width >= 360 ? 2 : 1)
+                                             : static_cast<int>(std::max<size_t>(1, model.columns));
+        const int statColumns = model.summaryMetrics && !model.stats.empty() ? (model.metricColumns     ? model.metricColumns
+                                                                                    : size.width >= 440 ? 3
+                                                                                                        : 2)
+                                                                             : 1;
         const int statHeight = model.summaryMetrics ? std::max(model.metricHeight, model.meterDirections.empty() ? 0 : 66) : 24;
         const int statRows = (static_cast<int>(model.stats.size()) + statColumns - 1) / statColumns;
-        const int rowStart = kHeaderHeight + (model.tabs.empty() ? 0 : kTabsHeight) + (model.hero ? kHeroHeight + 6 : 0) + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16
-            + model.reservedHeight + (model.graph.empty() ? 0 : 110) + (model.chart ? kChartHeight + 6 : 0)
-            + [&] { int h = model.changes.empty() ? 0 : 8; for (const auto& c : model.changes) h += ChangeHeight(c); return h; }()
+        const int rowStart = kHeaderHeight + (model.tabs.empty() ? 0 : kTabsHeight) + (model.hero ? kHeroHeight + 6 : 0)
+            + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16 + model.reservedHeight
+            + (model.graph.empty() ? 0 : 110) + (model.chart ? kChartHeight + 6 : 0) +
+            [&] {
+                int h = model.changes.empty() ? 0 : 8;
+                for (const auto& c : model.changes)
+                    h += ChangeHeight(c);
+                return h;
+            }()
             + static_cast<int>(model.settingLines.size()) * 28 + (model.rows.empty() ? 0 : 11) + (model.toolbarCount ? 36 : 0);
-        const int rowHeight = model.rowHeight ? model.rowHeight : model.denseRoster ? 38 : model.rosterCards ? 46 : model.actionGrid ? 30 : columns > 1 ? 24 : 30;
+        const int rowHeight = model.rowHeight ? model.rowHeight
+            : model.denseRoster               ? 38
+            : model.rosterCards               ? 46
+            : model.actionGrid                ? 30
+            : columns > 1                     ? 24
+                                              : 30;
         const size_t capacity = std::max(1, (size.height - rowStart - 34) / rowHeight) * columns;
-        return {columns, rowHeight, rowStart, statColumns, statHeight, capacity};
+        return { columns, rowHeight, rowStart, statColumns, statHeight, capacity };
     }
     // "Back to ..." rows repeat what B does on every screen. They stay in the model (so native row
     // indices and handlers are untouched) but are not drawn, unless they are the only rows.
@@ -162,7 +177,9 @@ namespace OpenRCT2::Ui::Handheld
     }
     inline std::optional<ManagementPresentation> WithoutBackRows(const ManagementPresentation& model)
     {
-        const auto setting = [&](size_t i) { return std::find(model.settingRows.begin(), model.settingRows.end(), i) != model.settingRows.end(); };
+        const auto setting = [&](size_t i) {
+            return std::find(model.settingRows.begin(), model.settingRows.end(), i) != model.settingRows.end();
+        };
         const auto hidden = [&](size_t i) { return IsBackRow(model.rows[i]) || model.heroRow == i || setting(i); };
         size_t hiddenCount = 0;
         for (size_t i = 0; i < model.rows.size(); ++i)
@@ -179,26 +196,37 @@ namespace OpenRCT2::Ui::Handheld
             const auto i = model.settingRows[n];
             if (i >= model.rows.size())
                 continue;
-            filtered.settingLines.push_back({ ButtonText(model.rows[i]), n < model.settingValues.size() ? model.settingValues[n] : "",
-                                              model.selected == i, i >= model.rowEnabled.size() || model.rowEnabled[i] });
+            filtered.settingLines.push_back(
+                { ButtonText(model.rows[i]), n < model.settingValues.size() ? model.settingValues[n] : "", model.selected == i,
+                  i >= model.rowEnabled.size() || model.rowEnabled[i] });
         }
         if (filtered.hero)
             filtered.hero->stateFocused = model.heroRow && model.selected == *model.heroRow;
-        filtered.rows.clear(); filtered.rowDetails.clear(); filtered.rowEnabled.clear();
-        filtered.rowReadOnly.clear(); filtered.rowValues.clear();
+        filtered.rows.clear();
+        filtered.rowDetails.clear();
+        filtered.rowEnabled.clear();
+        filtered.rowReadOnly.clear();
+        filtered.rowValues.clear();
         filtered.selected = SIZE_MAX;
         filtered.primaryRow = model.primaryRow ? std::optional<size_t>{ model.rows.size() } : std::nullopt;
         for (size_t i = 0; i < model.rows.size(); ++i)
         {
             if (hidden(i))
                 continue;
-            if (i == model.selected) filtered.selected = filtered.rows.size();
-            if (model.primaryRow == i) filtered.primaryRow = filtered.rows.size();
+            if (i == model.selected)
+                filtered.selected = filtered.rows.size();
+            if (model.primaryRow == i)
+                filtered.primaryRow = filtered.rows.size();
             filtered.rows.push_back(model.rows[i]);
-            if (i < model.rowDetails.size()) filtered.rowDetails.resize(filtered.rows.size() - 1), filtered.rowDetails.push_back(model.rowDetails[i]);
-            if (i < model.rowEnabled.size()) filtered.rowEnabled.resize(filtered.rows.size() - 1, true), filtered.rowEnabled.push_back(model.rowEnabled[i]);
-            if (i < model.rowReadOnly.size()) filtered.rowReadOnly.resize(filtered.rows.size() - 1, false), filtered.rowReadOnly.push_back(model.rowReadOnly[i]);
-            if (i < model.rowValues.size()) filtered.rowValues.resize(filtered.rows.size() - 1), filtered.rowValues.push_back(model.rowValues[i]);
+            if (i < model.rowDetails.size())
+                filtered.rowDetails.resize(filtered.rows.size() - 1), filtered.rowDetails.push_back(model.rowDetails[i]);
+            if (i < model.rowEnabled.size())
+                filtered.rowEnabled.resize(filtered.rows.size() - 1, true), filtered.rowEnabled.push_back(model.rowEnabled[i]);
+            if (i < model.rowReadOnly.size())
+                filtered.rowReadOnly.resize(filtered.rows.size() - 1, false),
+                    filtered.rowReadOnly.push_back(model.rowReadOnly[i]);
+            if (i < model.rowValues.size())
+                filtered.rowValues.resize(filtered.rows.size() - 1), filtered.rowValues.push_back(model.rowValues[i]);
         }
         if (filtered.selected == SIZE_MAX)
             filtered.selected = filtered.rows.size(); // Focus is on a hidden row: draw none focused.
@@ -206,24 +234,32 @@ namespace OpenRCT2::Ui::Handheld
     }
     inline std::vector<ControlHint> KeyboardHints()
     {
-        return { { "D-pad", "Move" }, { "A", "Type" }, { "Y", "Delete" }, { "X", "Space" }, { "START", "Done" }, { "B", "Cancel" } };
+        return { { "D-pad", "Move" }, { "A", "Type" },     { "Y", "Delete" },
+                 { "X", "Space" },    { "START", "Done" }, { "B", "Cancel" } };
     }
     inline const char* KeyLabel(const TextEntry& entry, size_t key)
     {
         switch (key)
         {
-            case TextEntry::kCase: return entry.Lower() ? "ABC" : "abc"; // What Shift will switch to.
-            case TextEntry::kSpace: return "Space";
-            case TextEntry::kDelete: return "Delete";
-            case TextEntry::kClear: return "Clear";
-            case TextEntry::kDone: return "Done";
-            default: return nullptr;
+            case TextEntry::kCase:
+                return entry.Lower() ? "ABC" : "abc"; // What Shift will switch to.
+            case TextEntry::kSpace:
+                return "Space";
+            case TextEntry::kDelete:
+                return "Delete";
+            case TextEntry::kClear:
+                return "Clear";
+            case TextEntry::kDone:
+                return "Done";
+            default:
+                return nullptr;
         }
     }
     // A console-style keyboard: a real text field (text, caret, count) over QWERTY keycaps. The
     // focused key is the only ringed key; Done is the one filled key, since it is where you finish.
     inline void DrawKeyboardContent(
-        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const ManagementPresentation& model, bool focused, bool drawSurface)
+        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const ManagementPresentation& model, bool focused,
+        bool drawSurface)
     {
         const auto& entry = *model.keyboard;
         const int width = size.width;
@@ -231,7 +267,8 @@ namespace OpenRCT2::Ui::Handheld
             activeMenuFeel->HidePointer();
         if (drawSurface)
             DrawSurface(rt, p, size);
-        DrawHeadingText(rt, p + ScreenCoordsXY{ 12, 11 },
+        DrawHeadingText(
+            rt, p + ScreenCoordsXY{ 12, 11 },
             "{WHITE}" + (model.keyboardHeading.empty() ? std::string("Enter a name") : model.keyboardHeading), width - 24);
         Fill(rt, p + ScreenCoordsXY{ 12, 37 }, { width - 24, 1 }, Theme::edge);
 
@@ -241,7 +278,8 @@ namespace OpenRCT2::Ui::Handheld
         FillRound(rt, field + ScreenCoordsXY{ 1, 1 }, { fieldWidth - 2, fieldHeight - 2 }, Theme::raised);
         const auto counter = std::to_string(entry.Length()) + " / " + std::to_string(TextEntry::limit);
         const int counterWidth = TextWidth(counter);
-        DrawModernText(rt, field + ScreenCoordsXY{ fieldWidth - 10 - counterWidth, CapCentre(fieldHeight) },
+        DrawModernText(
+            rt, field + ScreenCoordsXY{ fieldWidth - 10 - counterWidth, CapCentre(fieldHeight) },
             (entry.Length() >= TextEntry::limit ? "{CAUTION}" : "{MUTED}") + counter);
         const int room = fieldWidth - 30 - counterWidth;
         int caret = 10;
@@ -276,7 +314,8 @@ namespace OpenRCT2::Ui::Handheld
         for (size_t r = 0; r < layout.size(); ++r)
             for (const auto& slot : layout[r])
             {
-                const auto pos = p + ScreenCoordsXY{ left + slot.column * (unit + gap), top + static_cast<int>(r) * (keyHeight + gap) };
+                const auto pos = p
+                    + ScreenCoordsXY{ left + slot.column * (unit + gap), top + static_cast<int>(r) * (keyHeight + gap) };
                 const ScreenSize keySize{ slot.span * unit + (slot.span - 1) * gap, keyHeight };
                 const bool done = slot.key == TextEntry::kDone;
                 const bool isFocus = focused && slot.key == focusKey;
@@ -284,7 +323,8 @@ namespace OpenRCT2::Ui::Handheld
                 if (const auto* label = KeyLabel(entry, slot.key))
                 {
                     const int w = TextWidth(label, true);
-                    DrawStrongText(rt, pos + ScreenCoordsXY{ (keySize.width - w) / 2, CapCentre(keyHeight - 2) },
+                    DrawStrongText(
+                        rt, pos + ScreenCoordsXY{ (keySize.width - w) / 2, CapCentre(keyHeight - 2) },
                         std::string(done ? "{BLACK}" : "{WHITE}") + label);
                 }
                 else if (slot.key < keys.size())
@@ -294,7 +334,8 @@ namespace OpenRCT2::Ui::Handheld
             DrawModernEllipsised(rt, p + ScreenCoordsXY{ 12, size.height - 16 }, width - 24, "{MUTED}" + model.status);
     }
     inline void DrawManagementContent(
-        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const ManagementPresentation& model, bool focused = true, bool drawSurface = true)
+        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const ManagementPresentation& model, bool focused = true,
+        bool drawSurface = true)
     {
         if (model.keyboard)
             return DrawKeyboardContent(rt, p, size, model, focused, drawSurface);
@@ -309,21 +350,24 @@ namespace OpenRCT2::Ui::Handheld
         const int width = size.width;
         const auto layout = MeasureManagement(size, model);
         const auto [columns, rowHeight, rowStart, statColumns, statHeight, capacity] = layout;
-        const size_t toolbar=std::min(model.toolbarCount,model.rows.size());
+        const size_t toolbar = std::min(model.toolbarCount, model.rows.size());
         const auto primary = PrimaryRow(model);
-        const size_t count=model.rows.size()-toolbar;
-        const size_t selectedItem=std::max(model.selected,toolbar)-toolbar;
-        const size_t totalRows=(count+columns-1)/columns;
-        const int listHeight=std::max(rowHeight,size.height-rowStart-34);
-        const int offset=ListOffset(selectedItem/columns,totalRows,listHeight,rowHeight);
-        const size_t first=toolbar+static_cast<size_t>(offset/rowHeight)*columns;
-        const size_t end=std::min(model.rows.size(),toolbar+static_cast<size_t>((offset+listHeight+rowHeight-1)/rowHeight)*columns);
-        if (drawSurface) DrawSurface(rt, p, size);
+        const size_t count = model.rows.size() - toolbar;
+        const size_t selectedItem = std::max(model.selected, toolbar) - toolbar;
+        const size_t totalRows = (count + columns - 1) / columns;
+        const int listHeight = std::max(rowHeight, size.height - rowStart - 34);
+        const int offset = ListOffset(selectedItem / columns, totalRows, listHeight, rowHeight);
+        const size_t first = toolbar + static_cast<size_t>(offset / rowHeight) * columns;
+        const size_t end = std::min(
+            model.rows.size(), toolbar + static_cast<size_t>((offset + listHeight + rowHeight - 1) / rowHeight) * columns);
+        if (drawSurface)
+            DrawSurface(rt, p, size);
         // No breadcrumb: the rail and tabs already say where you are, and the title says what this is.
         const int statusWidth = model.headerStatus.empty() ? 0 : std::min(160, TextWidth(model.headerStatus, true) + 14);
         if (!model.headerStatus.empty())
         {
-            const bool coloured = model.headerInk == "{POSITIVE}" || model.headerInk == "{CAUTION}" || model.headerInk == "{DANGER}";
+            const bool coloured = model.headerInk == "{POSITIVE}" || model.headerInk == "{CAUTION}"
+                || model.headerInk == "{DANGER}";
             if (coloured)
                 FillRound(
                     rt, p + ScreenCoordsXY{ width - 12 - statusWidth, 13 }, { 4, 14 },
@@ -331,16 +375,28 @@ namespace OpenRCT2::Ui::Handheld
                         model.headerInk == "{POSITIVE}"     ? PocketPalette::positive
                             : model.headerInk == "{DANGER}" ? PocketPalette::destructive
                                                             : PocketPalette::caution));
-            DrawStrongText(rt, p + ScreenCoordsXY{ width - 12 - statusWidth + 9, 17 }, model.headerInk + model.headerStatus, statusWidth - 9);
+            DrawStrongText(
+                rt, p + ScreenCoordsXY{ width - 12 - statusWidth + 9, 17 }, model.headerInk + model.headerStatus,
+                statusWidth - 9);
         }
         const int heroTop = kHeaderHeight + (model.tabs.empty() ? 0 : kTabsHeight);
         const int contentTop = heroTop + (model.hero ? kHeroHeight + 6 : 0);
-        DrawHeadingText(rt, p + ScreenCoordsXY{12, 11},
-            std::string(model.destructive ? "{DANGER}" : model.confirmation ? "{GOLD}" : "{WHITE}") + model.title,
+        DrawHeadingText(
+            rt, p + ScreenCoordsXY{ 12, 11 },
+            std::string(
+                model.destructive        ? "{DANGER}"
+                    : model.confirmation ? "{GOLD}"
+                                         : "{WHITE}")
+                + model.title,
             width - 24 - statusWidth - (statusWidth ? 6 : 0));
-        Fill(rt, p + ScreenCoordsXY{12, 37}, {width - 24, 1}, Theme::edge);
-        if (model.destructive) Fill(rt,p+ScreenCoordsXY{12,37},{width-24,2},static_cast<Drawing::PaletteIndex>(PocketPalette::destructive));
-        if (!model.tabs.empty()) DrawTabs(rt,p+ScreenCoordsXY{10,kHeaderHeight - 2},width-20,model.tabs,model.selectedTab,model.breadcrumb);
+        Fill(rt, p + ScreenCoordsXY{ 12, 37 }, { width - 24, 1 }, Theme::edge);
+        if (model.destructive)
+            Fill(
+                rt, p + ScreenCoordsXY{ 12, 37 }, { width - 24, 2 },
+                static_cast<Drawing::PaletteIndex>(PocketPalette::destructive));
+        if (!model.tabs.empty())
+            DrawTabs(
+                rt, p + ScreenCoordsXY{ 10, kHeaderHeight - 2 }, width - 20, model.tabs, model.selectedTab, model.breadcrumb);
         if (model.hero)
         {
             const auto& hero = *model.hero;
@@ -416,18 +472,22 @@ namespace OpenRCT2::Ui::Handheld
                 DrawModernEllipsised(rt, origin + ScreenCoordsXY{ 8, 5 }, valueX - 24, "{MUTED}" + model.stats[i].first);
                 const auto& value = model.stats[i].second;
                 const int valueWidth = std::min(width - valueX - 20, TextWidth(value, true));
-                DrawStrongText(rt, origin + ScreenCoordsXY{ width - 32 - valueWidth, 5 },
+                DrawStrongText(
+                    rt, origin + ScreenCoordsXY{ width - 32 - valueWidth, 5 },
                     (i < model.statInk.size() ? model.statInk[i] : std::string("{WHITE}")) + value, width - valueX - 20);
                 if (highlight)
                     DrawFocusRing(rt, origin, { width - 24, 21 });
             }
         }
         const int statRows = (static_cast<int>(model.stats.size()) + statColumns - 1) / statColumns;
-        for (size_t i=0;i<model.meters.size() && i<model.stats.size();++i)
+        for (size_t i = 0; i < model.meters.size() && i < model.stats.size(); ++i)
         {
-            if(model.meters[i]<0) continue;
-            const int cellWidth=(width-24)/statColumns;
-            const auto start=p+ScreenCoordsXY{12+static_cast<int>(i%statColumns)*cellWidth,contentTop+static_cast<int>(i/statColumns)*statHeight+statHeight-8};
+            if (model.meters[i] < 0)
+                continue;
+            const int cellWidth = (width - 24) / statColumns;
+            const auto start = p
+                + ScreenCoordsXY{ 12 + static_cast<int>(i % statColumns) * cellWidth,
+                                  contentTop + static_cast<int>(i / statColumns) * statHeight + statHeight - 8 };
             const bool directional = i < model.meterDirections.size();
             const bool attention = i < model.meterAttention.size() && model.meterAttention[i];
             const auto ink = attention                        ? static_cast<Drawing::PaletteIndex>(PocketPalette::caution)
@@ -437,10 +497,12 @@ namespace OpenRCT2::Ui::Handheld
             if (directional && attention)
                 DrawModernText(rt, start + ScreenCoordsXY{ 0, -13 }, "{CAUTION}! Attention", {}, cellWidth - 6);
         }
-        for(size_t i=0;i<model.toolbarCount && i<model.rows.size();++i)
+        for (size_t i = 0; i < model.toolbarCount && i < model.rows.size(); ++i)
         {
-            const int cellWidth=(width-20)/static_cast<int>(model.toolbarCount);
-            DrawActionRow(rt,p+ScreenCoordsXY{10+static_cast<int>(i)*cellWidth,rowStart-47},{cellWidth-4,28},model.rows[i],"",focused&&model.selected==i,true,PanelIcon::none,false,false,false,true);
+            const int cellWidth = (width - 20) / static_cast<int>(model.toolbarCount);
+            DrawActionRow(
+                rt, p + ScreenCoordsXY{ 10 + static_cast<int>(i) * cellWidth, rowStart - 47 }, { cellWidth - 4, 28 },
+                model.rows[i], "", focused && model.selected == i, true, PanelIcon::none, false, false, false, true);
         }
         for (size_t i = 0; i < model.bodyLines.size(); ++i)
             if (const auto tab = model.bodyLines[i].find('\t'); tab != std::string::npos)
@@ -451,11 +513,13 @@ namespace OpenRCT2::Ui::Handheld
                 const auto origin = p + ScreenCoordsXY{ 12, contentTop + 4 + statRows * statHeight + static_cast<int>(i) * 16 };
                 DrawModernText(rt, origin, "{MUTED}" + label);
                 const int x = TextWidth(label) + 6;
-                DrawStrongText(rt, origin + ScreenCoordsXY{ x, 0 }, "{WHITE}" + model.bodyLines[i].substr(tab + 1), width - 24 - x);
+                DrawStrongText(
+                    rt, origin + ScreenCoordsXY{ x, 0 }, "{WHITE}" + model.bodyLines[i].substr(tab + 1), width - 24 - x);
             }
             else
-            DrawModernEllipsised(rt, p + ScreenCoordsXY{12, contentTop + 4 + statRows * statHeight + static_cast<int>(i) * 16},
-                width - 24, model.bodyLines[i].starts_with("{") ? model.bodyLines[i] : "{WHITE}" + model.bodyLines[i]);
+                DrawModernEllipsised(
+                    rt, p + ScreenCoordsXY{ 12, contentTop + 4 + statRows * statHeight + static_cast<int>(i) * 16 }, width - 24,
+                    model.bodyLines[i].starts_with("{") ? model.bodyLines[i] : "{WHITE}" + model.bodyLines[i]);
         if (!model.changes.empty())
         {
             int y = contentTop + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16 + 2;
@@ -494,7 +558,8 @@ namespace OpenRCT2::Ui::Handheld
         if (model.chart)
         {
             const auto& chart = *model.chart;
-            const auto origin = p + ScreenCoordsXY{ 12, contentTop + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16 + 2 };
+            const auto origin = p
+                + ScreenCoordsXY{ 12, contentTop + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16 + 2 };
             const int chartWidth = width - 24;
             FillRound(rt, origin, { chartWidth, kChartHeight }, Theme::raised);
             // A chart with no columns gives its bars the full width and a wider label column.
@@ -513,10 +578,14 @@ namespace OpenRCT2::Ui::Handheld
                 const int barLeft = 8 + labelWidth;
                 const int barRoom = half - barLeft - 60;
                 const int bar = std::max<int>(2, static_cast<int>(barRoom * std::abs(value) / largest));
-                FillRound(rt, origin + ScreenCoordsXY{ barLeft, y + 1 }, { bar, 9 },
-                    static_cast<Drawing::PaletteIndex>(ink == "{DANGER}" ? PocketPalette::destructive : PocketPalette::positive));
+                FillRound(
+                    rt, origin + ScreenCoordsXY{ barLeft, y + 1 }, { bar, 9 },
+                    static_cast<Drawing::PaletteIndex>(
+                        ink == "{DANGER}" ? PocketPalette::destructive : PocketPalette::positive));
                 if (i < chart.splitValues.size())
-                    DrawStrongText(rt, origin + ScreenCoordsXY{ barLeft + bar + 4, y + 1 }, "{WHITE}" + chart.splitValues[i], half - barLeft - bar - 8);
+                    DrawStrongText(
+                        rt, origin + ScreenCoordsXY{ barLeft + bar + 4, y + 1 }, "{WHITE}" + chart.splitValues[i],
+                        half - barLeft - bar - 8);
             }
             if (!wide)
                 Fill(rt, origin + ScreenCoordsXY{ half, 8 }, { 1, kChartHeight - 16 }, Theme::edge);
@@ -540,13 +609,17 @@ namespace OpenRCT2::Ui::Handheld
                     const int span = value >= 0 ? static_cast<int>((zero - top) * value / high)
                                                 : static_cast<int>((bottom - zero) * -value / std::max<int64_t>(1, -low));
                     if (value >= 0)
-                        FillRound(rt, origin + ScreenCoordsXY{ x, zero - span }, { slot - 4, std::max(span, 1) },
+                        FillRound(
+                            rt, origin + ScreenCoordsXY{ x, zero - span }, { slot - 4, std::max(span, 1) },
                             static_cast<Drawing::PaletteIndex>(PocketPalette::positive));
                     else
-                        FillRound(rt, origin + ScreenCoordsXY{ x, zero + 1 }, { slot - 4, std::max(span, 1) },
+                        FillRound(
+                            rt, origin + ScreenCoordsXY{ x, zero + 1 }, { slot - 4, std::max(span, 1) },
                             static_cast<Drawing::PaletteIndex>(PocketPalette::destructive));
                     if (i < chart.columnLabels.size())
-                        DrawModernText(rt, origin + ScreenCoordsXY{ x + (slot - 4) / 2 - 3, bottom + 4 }, "{MUTED}" + chart.columnLabels[i]);
+                        DrawModernText(
+                            rt, origin + ScreenCoordsXY{ x + (slot - 4) / 2 - 3, bottom + 4 },
+                            "{MUTED}" + chart.columnLabels[i]);
                 }
             }
         }
@@ -556,16 +629,17 @@ namespace OpenRCT2::Ui::Handheld
             const int range = std::max(1, *high - *low);
             const int plotBottom = rowStart - 35;
             const int plotWidth = width - 28;
-            Fill(rt, p + ScreenCoordsXY{12, plotBottom}, {width - 24, 1}, Theme::edge);
+            Fill(rt, p + ScreenCoordsXY{ 12, plotBottom }, { width - 24, 1 }, Theme::edge);
             for (size_t i = 1; i < model.graph.size(); ++i)
             {
                 const auto point = [&](size_t n) {
-                    return p + ScreenCoordsXY{14 + static_cast<int>(n * plotWidth / (model.graph.size() - 1)),
-                        plotBottom - (model.graph[n] - *low) * 76 / range};
+                    return p
+                        + ScreenCoordsXY{ 14 + static_cast<int>(n * plotWidth / (model.graph.size() - 1)),
+                                          plotBottom - (model.graph[n] - *low) * 76 / range };
                 };
-                GfxDrawLine(rt, {point(i - 1), point(i)}, Theme::gold);
+                GfxDrawLine(rt, { point(i - 1), point(i) }, Theme::gold);
             }
-            DrawSectionLabel(rt, p + ScreenCoordsXY{12, plotBottom + 8}, width - 24, model.graphRange);
+            DrawSectionLabel(rt, p + ScreenCoordsXY{ 12, plotBottom + 8 }, width - 24, model.graphRange);
         }
         for (size_t i = 0; i < model.settingLines.size(); ++i)
         {
@@ -573,7 +647,9 @@ namespace OpenRCT2::Ui::Handheld
             const auto origin = p + ScreenCoordsXY{ 12, rowStart - 11 - static_cast<int>(model.settingLines.size() - i) * 28 };
             const int lineWidth = width - 24;
             FillRound(rt, origin, { lineWidth, 24 }, Theme::raised);
-            DrawStrongText(rt, origin + ScreenCoordsXY{ 10, 7 }, std::string(line.enabled ? "{WHITE}" : "{DISABLED}") + line.label, lineWidth / 2);
+            DrawStrongText(
+                rt, origin + ScreenCoordsXY{ 10, 7 }, std::string(line.enabled ? "{WHITE}" : "{DISABLED}") + line.label,
+                lineWidth / 2);
             const int vw = TextWidth(line.value, true);
             const int right = origin.x + lineWidth - 12;
             if (line.enabled)
@@ -582,7 +658,7 @@ namespace OpenRCT2::Ui::Handheld
                 const auto arrowInk = line.focused ? Theme::gold : Theme::text;
                 for (int r = 0; r < 4; ++r)
                 {
-                    Fill(rt, { right - 3 + r, origin.y + 8 + r }, { 1, 9 - 2 * r }, arrowInk);      // >
+                    Fill(rt, { right - 3 + r, origin.y + 8 + r }, { 1, 9 - 2 * r }, arrowInk);       // >
                     Fill(rt, { right - vw - 17 - r, origin.y + 8 + r }, { 1, 9 - 2 * r }, arrowInk); // <
                 }
                 DrawStrongText(rt, { right - vw - 10, origin.y + 7 }, "{WHITE}" + line.value);
@@ -595,73 +671,86 @@ namespace OpenRCT2::Ui::Handheld
         // List labels keep only their first part: "GUESTS / CURRENT ACTIVITY / HAPPINESS" says no more
         // than "GUESTS" once the rows themselves show activity and happiness.
         if (!model.rows.empty() && model.bodyLines.empty() && !model.listLabel.empty())
-            DrawSectionLabel(rt, p + ScreenCoordsXY{12, rowStart - 12}, width - 24,
+            DrawSectionLabel(
+                rt, p + ScreenCoordsXY{ 12, rowStart - 12 }, width - 24,
                 model.listLabel.substr(0, model.listLabel.find(" / ")));
         Drawing::RenderTarget listRt;
-        if(ClipRenderTarget(listRt,rt,p+ScreenCoordsXY{0,rowStart},width-8,listHeight))
+        if (ClipRenderTarget(listRt, rt, p + ScreenCoordsXY{ 0, rowStart }, width - 8, listHeight))
         {
-        for (size_t i = first; i < end; ++i)
-        {
-            const int y = static_cast<int>((i - toolbar) / columns) * rowHeight-offset;
-            const int cellWidth = (width - 20) / columns;
-            const int x = 10 + static_cast<int>((i - toolbar) % columns) * cellWidth;
-            const bool enabled = i < model.rowEnabled.size() ? model.rowEnabled[i]
-                : model.rows[i].find("unavailable") == std::string::npos && model.rows[i].find("Unavailable") == std::string::npos;
-            if (columns > 2) // Native on-screen keyboard retains its compact cells.
+            for (size_t i = first; i < end; ++i)
             {
-                if (focused && i == model.selected) {Fill(listRt, ScreenCoordsXY{x, y}, {cellWidth - 2, rowHeight - 2}, Theme::gold);ReportSelected(listRt, {x, y}, {cellWidth - 2, rowHeight - 2});}
-                DrawModernEllipsised(listRt, ScreenCoordsXY{x + 3, y + 6}, cellWidth - 6,
-                    std::string(focused && i == model.selected ? "{BLACK}" : "{WHITE}") + model.rows[i]);
+                const int y = static_cast<int>((i - toolbar) / columns) * rowHeight - offset;
+                const int cellWidth = (width - 20) / columns;
+                const int x = 10 + static_cast<int>((i - toolbar) % columns) * cellWidth;
+                const bool enabled = i < model.rowEnabled.size() ? model.rowEnabled[i]
+                                                                 : model.rows[i].find("unavailable") == std::string::npos
+                        && model.rows[i].find("Unavailable") == std::string::npos;
+                if (columns > 2) // Native on-screen keyboard retains its compact cells.
+                {
+                    if (focused && i == model.selected)
+                    {
+                        Fill(listRt, ScreenCoordsXY{ x, y }, { cellWidth - 2, rowHeight - 2 }, Theme::gold);
+                        ReportSelected(listRt, { x, y }, { cellWidth - 2, rowHeight - 2 });
+                    }
+                    DrawModernEllipsised(
+                        listRt, ScreenCoordsXY{ x + 3, y + 6 }, cellWidth - 6,
+                        std::string(focused && i == model.selected ? "{BLACK}" : "{WHITE}") + model.rows[i]);
+                }
+                else if (i < model.rowReadOnly.size() && model.rowReadOnly[i])
+                {
+                    const bool selected = focused && i == model.selected;
+                    DrawListBackground(listRt, { x, y }, { cellWidth - 4, rowHeight - 2 }, selected);
+                    DrawModernEllipsised(listRt, { x + 8, y + 7 }, cellWidth - 20, "{WHITE}" + model.rows[i]);
+                }
+                else if (i < model.rowValues.size())
+                {
+                    const bool selected = focused && i == model.selected;
+                    DrawListBackground(listRt, { x, y }, { cellWidth - 4, rowHeight - 2 }, selected);
+                    DrawModernEllipsised(listRt, ScreenCoordsXY{ x + 8, y + 7 }, cellWidth - 164, "{WHITE}" + model.rows[i]);
+                    const auto& value = model.rowValues[i];
+                    // Values right-aligned, losses in red: a ledger you can read down the column.
+                    const auto valueInk = value.starts_with("-") || value.find("-") == 1 ? "{DANGER}" : "{WHITE}";
+                    const int valueWidth = std::min(140, TextWidth(value, true));
+                    DrawStrongText(listRt, ScreenCoordsXY{ x + cellWidth - 12 - valueWidth, y + 7 }, valueInk + value, 140);
+                }
+                else if (model.listLabel.starts_with("CURRENT THOUGHTS"))
+                {
+                    const bool selected = focused && i == model.selected;
+                    DrawListBackground(listRt, { x, y }, { cellWidth - 4, rowHeight - 2 }, selected);
+                    DrawWrappedLabel(listRt, ScreenCoordsXY{ x + 8, y + 7 }, cellWidth - 20, "{WHITE}" + model.rows[i], 2);
+                }
+                else if (!model.actionGrid && !model.confirmation && !model.editing && columns == 1)
+                    DrawListRow(
+                        listRt, ScreenCoordsXY{ x, y }, { cellWidth - 4, rowHeight - 2 }, model.rows[i],
+                        i < model.rowDetails.size() ? model.rowDetails[i] : "", focused && i == model.selected, enabled,
+                        !model.rosterCards && !model.denseRoster);
+                else
+                    DrawActionRow(
+                        listRt, ScreenCoordsXY{ x, y }, { cellWidth - 4, rowHeight - 2 }, model.rows[i],
+                        i < model.rowDetails.size() ? model.rowDetails[i] : "", focused && i == model.selected, enabled,
+                        PanelIcon::none, model.destructive && i == 0, !model.rosterCards && !model.denseRoster, primary == i);
             }
-            else if (i < model.rowReadOnly.size() && model.rowReadOnly[i])
-            {
-                const bool selected=focused && i==model.selected;
-                DrawListBackground(listRt,{x,y},{cellWidth-4,rowHeight-2},selected);
-                DrawModernEllipsised(listRt,{x+8,y+7},cellWidth-20,"{WHITE}"+model.rows[i]);
-            }
-            else if (i < model.rowValues.size())
-            {
-                const bool selected=focused&&i==model.selected;
-                DrawListBackground(listRt,{x,y},{cellWidth-4,rowHeight-2},selected);
-                DrawModernEllipsised(listRt,ScreenCoordsXY{x+8,y+7},cellWidth-164,"{WHITE}"+model.rows[i]);
-                const auto& value=model.rowValues[i];
-                // Values right-aligned, losses in red: a ledger you can read down the column.
-                const auto valueInk=value.starts_with("-")||value.find("-")==1?"{DANGER}":"{WHITE}";
-                const int valueWidth=std::min(140,TextWidth(value,true));
-                DrawStrongText(listRt,ScreenCoordsXY{x+cellWidth-12-valueWidth,y+7},valueInk+value,140);
-            }
-            else if (model.listLabel.starts_with("CURRENT THOUGHTS"))
-            {
-                const bool selected = focused && i == model.selected;
-                DrawListBackground(listRt, { x, y }, { cellWidth - 4, rowHeight - 2 }, selected);
-                DrawWrappedLabel(listRt, ScreenCoordsXY{ x + 8, y + 7 }, cellWidth - 20, "{WHITE}" + model.rows[i], 2);
-            }
-            else if (!model.actionGrid && !model.confirmation && !model.editing && columns == 1)
-                DrawListRow(
-                    listRt, ScreenCoordsXY{ x, y }, { cellWidth - 4, rowHeight - 2 }, model.rows[i],
-                    i < model.rowDetails.size() ? model.rowDetails[i] : "", focused && i == model.selected, enabled,
-                    !model.rosterCards && !model.denseRoster);
-            else
-                DrawActionRow(
-                    listRt, ScreenCoordsXY{ x, y }, { cellWidth - 4, rowHeight - 2 }, model.rows[i],
-                    i < model.rowDetails.size() ? model.rowDetails[i] : "", focused && i == model.selected, enabled,
-                    PanelIcon::none, model.destructive && i == 0, !model.rosterCards && !model.denseRoster,
-                    primary == i);
-        }
         }
         // Feedback and overflow have independent lines, so failures never hide pagination.
         if (!model.status.empty())
-            DrawModernEllipsised(rt, p + ScreenCoordsXY{12, size.height - 29}, width - 24, "{WHITE}" + model.status);
-        if(count>capacity)
+            DrawModernEllipsised(rt, p + ScreenCoordsXY{ 12, size.height - 29 }, width - 24, "{WHITE}" + model.status);
+        if (count > capacity)
         {
             // The pager counts items, so a trailing "Back to ..." row (kept for B-less navigation) is
             // not one of them: 20 employees read "1 / 20", not "1 / 21".
             const size_t items = count - (count > 0 && IsBackRow(model.rows.back()) ? 1 : 0);
-            DrawModernText(rt,p+ScreenCoordsXY{12,size.height-13},"{MUTED}"+std::to_string(std::min(selectedItem+1,items))+" / "+std::to_string(items));
-            const int totalHeight=std::max(listHeight,static_cast<int>(totalRows)*rowHeight);
-            const int thumb=std::max(8,listHeight*listHeight/totalHeight);
-            Fill(rt,p+ScreenCoordsXY{width-6,rowStart},{2,listHeight},Theme::raised);
-            Fill(rt,p+ScreenCoordsXY{width-6,rowStart+offset*(listHeight-thumb)/std::max(1,totalHeight-listHeight)},{2,thumb},Theme::gold);
+            DrawModernText(
+                rt, p + ScreenCoordsXY{ 12, size.height - 13 },
+                "{MUTED}" + std::to_string(std::min(selectedItem + 1, items)) + " / " + std::to_string(items));
+            const int totalHeight = std::max(listHeight, static_cast<int>(totalRows) * rowHeight);
+            const int thumb = std::max(8, listHeight * listHeight / totalHeight);
+            Fill(rt, p + ScreenCoordsXY{ width - 6, rowStart }, { 2, listHeight }, Theme::raised);
+            Fill(
+                rt,
+                p
+                    + ScreenCoordsXY{ width - 6,
+                                      rowStart + offset * (listHeight - thumb) / std::max(1, totalHeight - listHeight) },
+                { 2, thumb }, Theme::gold);
         }
     }
     // Compatibility wrapper for construction-era captures; Dashboard uses the content region directly.
@@ -678,4 +767,3 @@ namespace OpenRCT2::Ui::Handheld
               { "B", "Back" } });
     }
 } // namespace OpenRCT2::Ui::Handheld
-

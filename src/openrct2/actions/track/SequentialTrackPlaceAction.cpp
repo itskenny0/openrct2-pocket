@@ -131,7 +131,8 @@ namespace OpenRCT2::GameActions
         if (!_remove && !_speedChange
             && (TrackConstructionSupport::SeatRotation(ride->type, _piece) ? _placementSeat > 15 : _placementSeat != 0))
             return invalid();
-        if (_placementColour > 3) return invalid();
+        if (_placementColour > 3)
+            return invalid();
         const auto& ted = GetTrackElementDescriptor(_piece);
         if (!TrackConstructionSupport::Supported(*ride, *entry, _piece, _selected ? _sourceInverted : _placementInverted)
             || (_chain && !ted.flags.has(TrackElementFlag::allowLiftHill) && !ted.flags.has(TrackElementFlag::curveAllowsLift)))
@@ -139,7 +140,8 @@ namespace OpenRCT2::GameActions
         if (_detached)
         {
             if (_first || _selected || _remove || _speedChange || _backward || _editingContext.empty()
-                || (ted.coordinates.rotationBegin & 4) || (ted.coordinates.rotationEnd & 4)) return invalid();
+                || (ted.coordinates.rotationBegin & 4) || (ted.coordinates.rotationEnd & 4))
+                return invalid();
         }
         else if (_first)
         {
@@ -279,7 +281,8 @@ namespace OpenRCT2::GameActions
             flags.set(LiftHillAndInverted::liftHill);
         if (_placementInverted)
             flags.set(LiftHillAndInverted::inverted);
-        TrackPlaceAction native(_ride, _piece, ride->type, _origin, _placementSpeed, _placementColour, _placementSeat, flags, false);
+        TrackPlaceAction native(
+            _ride, _piece, ride->type, _origin, _placementSpeed, _placementColour, _placementSeat, flags, false);
         native.SetFlags(GetFlags());
         auto result = QueryNested(&native, state);
         if (result.error == Status::ok && _cost != kMoney64Undefined && result.cost != _cost)
@@ -315,7 +318,8 @@ namespace OpenRCT2::GameActions
             flags.set(LiftHillAndInverted::liftHill);
         if (_placementInverted)
             flags.set(LiftHillAndInverted::inverted);
-        TrackPlaceAction native(_ride, _piece, GetRide(_ride)->type, _origin, _placementSpeed, _placementColour, _placementSeat, flags, false);
+        TrackPlaceAction native(
+            _ride, _piece, GetRide(_ride)->type, _origin, _placementSpeed, _placementColour, _placementSeat, flags, false);
         native.SetFlags(GetFlags());
         return ExecuteNested(&native, state);
     }

@@ -9,11 +9,11 @@
 
 #include "ProvisionalElements.h"
 
-#include "handheld/CustomTracks.h"
 #include "handheld/AccessPreview.h"
-#include "handheld/Mazes.h"
+#include "handheld/CustomTracks.h"
 #include "handheld/Designs.h"
 #include "handheld/FlatRides.h"
+#include "handheld/Mazes.h"
 #include "handheld/Paths.h"
 #include "handheld/SceneryTools.h"
 #include "handheld/Shops.h"

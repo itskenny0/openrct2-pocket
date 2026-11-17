@@ -6,7 +6,6 @@
 #include "TextEntry.h"
 
 #include <algorithm>
-#include <openrct2/core/String.hpp>
 #include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2/GameState.h>
 #include <openrct2/actions/footpath/FootpathAdditionPlaceAction.h>
@@ -27,9 +26,11 @@
 #include <openrct2/actions/scenery/WallPlaceAction.h>
 #include <openrct2/actions/scenery/WallRemoveAction.h>
 #include <openrct2/actions/scenery/WallSetColourAction.h>
+#include <openrct2/core/String.hpp>
 #include <openrct2/drawing/Colour.h>
 #include <openrct2/localisation/Formatting.h>
 #include <openrct2/management/Research.h>
+#include <openrct2/network/Network.h>
 #include <openrct2/object/BannerObject.h>
 #include <openrct2/object/LargeSceneryObject.h>
 #include <openrct2/object/ObjectEntryManager.h>
@@ -40,7 +41,6 @@
 #include <openrct2/world/Banner.h>
 #include <openrct2/world/Map.h>
 #include <openrct2/world/SceneryScatter.h>
-#include <openrct2/network/Network.h>
 #include <openrct2/world/TileElementsView.h>
 #include <openrct2/world/tile_element/BannerElement.h>
 #include <openrct2/world/tile_element/LargeSceneryElement.h>
@@ -77,21 +77,34 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     };
     static std::optional<ScatterDraft> scatterDraft;
     static std::shared_ptr<ScatterOutcome> scatterOutcome;
-    bool ScatterActive() { return current.scatter && current.category == Category::small && current.mode == Mode::place; }
-    bool ScatterReviewed() { return scatterDraft && scatterDraft->reviewed; }
+    bool ScatterActive()
+    {
+        return current.scatter && current.category == Category::small && current.mode == Mode::place;
+    }
+    bool ScatterReviewed()
+    {
+        return scatterDraft && scatterDraft->reviewed;
+    }
     std::string ScatterStatus()
     {
         if (scatterOutcome)
         {
             const auto& o = *scatterOutcome;
             return std::to_string(o.placed) + "/" + std::to_string(o.total)
-                + (o.completed < o.total ? " pending" : " placed / " + FormatMoney(o.cost))
-                ;
+                + (o.completed < o.total ? " pending" : " placed / " + FormatMoney(o.cost));
         }
         return ScatterReviewed() ? "A Apply / B Cancel" : "A Review batch";
     }
-    std::pair<CoordsXY, CoordsXY> ScatterBounds(CoordsXY centre) { return SceneryScatterBounds(centre,current.scatterSize); }
-    void ResetScatter() { ClearPreview(); scatterOutcome.reset(); current.scatter = false; }
+    std::pair<CoordsXY, CoordsXY> ScatterBounds(CoordsXY centre)
+    {
+        return SceneryScatterBounds(centre, current.scatterSize);
+    }
+    void ResetScatter()
+    {
+        ClearPreview();
+        scatterOutcome.reset();
+        current.scatter = false;
+    }
 
     static std::optional<Target> ghost;
     static uint32_t suspended{};
@@ -135,29 +148,34 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     }
     std::vector<std::string> Categories()
     {
-        return { "Small scenery / trees", "Large scenery",  "Walls / fences",
-                 "Banners / signs",       "Path furniture", "Clear area...", "Back to build" };
+        return { "Small scenery / trees", "Large scenery", "Walls / fences", "Banners / signs",
+                 "Path furniture",        "Clear area...", "Back to build" };
     }
     std::string Name(const Settings& s)
     {
         const auto* o = GetContext()->GetObjectManager().GetLoadedObject(Type(s.category), s.object);
         return o ? o->GetName() : "No objects available";
     }
-    const std::string& Search() { return search; }
+    const std::string& Search()
+    {
+        return search;
+    }
     bool SetSearch(const std::string& value)
     {
-        if (TextEntry{value}.Length() > TextEntry::limit) return false;
+        if (TextEntry{ value }.Length() > TextEntry::limit)
+            return false;
         ClearPreview();
         search = value;
         return true;
     }
     static bool MatchesSearch(const Object& object)
     {
-        if (search.empty()) return true;
-        return String::contains(object.GetName(),search,true)
-            || String::contains(object.GetIdentifier(),search,true)
-            || String::contains(object.GetFileName(),search,true)
-            || std::ranges::any_of(object.GetAuthors(),[](const auto& author) { return String::contains(author,search,true); });
+        if (search.empty())
+            return true;
+        return String::contains(object.GetName(), search, true) || String::contains(object.GetIdentifier(), search, true)
+            || String::contains(object.GetFileName(), search, true)
+            || std::ranges::any_of(
+                   object.GetAuthors(), [](const auto& author) { return String::contains(author, search, true); });
     }
     std::vector<PickerEntry> Entries(Category c)
     {
@@ -177,8 +195,9 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                                ScenerySelection{ SceneryType(c), i })
                             != ObjectEntryManager::GetObjectEntry<SceneryGroupEntry>(groupFilter)->SceneryEntries.end())))
             {
-                const auto* object = GetContext()->GetObjectManager().GetLoadedObject(Type(c),i);
-                if (MatchesSearch(*object)) result.push_back({ { Type(c), i, std::string(object->GetIdentifier()) }, object->GetName() });
+                const auto* object = GetContext()->GetObjectManager().GetLoadedObject(Type(c), i);
+                if (MatchesSearch(*object))
+                    result.push_back({ { Type(c), i, std::string(object->GetIdentifier()) }, object->GetName() });
             }
         return result;
     }
@@ -219,9 +238,11 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     }
     bool CanRotate()
     {
-        if(current.category==Category::additions) return false;
-        if(current.category!=Category::small) return true;
-        const auto* e=ObjectEntryManager::GetObjectEntry<SmallSceneryEntry>(current.object);
+        if (current.category == Category::additions)
+            return false;
+        if (current.category != Category::small)
+            return true;
+        const auto* e = ObjectEntryManager::GetObjectEntry<SmallSceneryEntry>(current.object);
         return e && e->flags.has(SmallSceneryFlag::isRotatable);
     }
     std::array<bool, 3> Channels(Category c, ObjectEntryIndex i)
@@ -278,8 +299,9 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         if (!expectedDescriptor.empty())
         {
             const auto entries = Entries(current.category);
-            if (std::ranges::none_of(entries,[&](const auto& e) {
-                return e.identity.index == i && e.identity.key == expectedDescriptor; })) return false;
+            if (std::ranges::none_of(
+                    entries, [&](const auto& e) { return e.identity.index == i && e.identity.key == expectedDescriptor; }))
+                return false;
         }
         if (!Eligible(current.category, i))
             return false;
@@ -296,7 +318,8 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     }
     std::string HeightName()
     {
-        if (current.category == Category::additions) return "Follows selected path";
+        if (current.category == Category::additions)
+            return "Follows selected path";
         return current.height ? "Fixed level " + std::to_string(current.height / kCoordsZStep) : "Follows ground";
     }
     std::string DensityName()
@@ -306,13 +329,13 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     }
     void DrawPreview(Drawing::RenderTarget& rt, ScreenCoordsXY position, ScreenSize size)
     {
-        if(const auto* object=GetContext()->GetObjectManager().GetLoadedObject(Type(current.category),current.object))
+        if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject(Type(current.category), current.object))
         {
             Drawing::RenderTarget preview;
-            if(ClipRenderTarget(preview,rt,position,size.width,size.height))
+            if (ClipRenderTarget(preview, rt, position, size.width, size.height))
             {
-                preview.zoom_level=ZoomLevel{1};
-                object->DrawPreview(preview,preview.zoom_level.ApplyTo(size.width),preview.zoom_level.ApplyTo(size.height));
+                preview.zoom_level = ZoomLevel{ 1 };
+                object->DrawPreview(preview, preview.zoom_level.ApplyTo(size.width), preview.zoom_level.ApplyTo(size.height));
             }
         }
     }
@@ -340,11 +363,15 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                  "Edit sign style...",
                  "Pick placed object...",
                  search.empty() ? "Search objects..." : "Search: " + search,
-                 current.category != Category::small ? "Scatter: small scenery only" : current.scatter ? "Scatter: enabled" : "Scatter: disabled",
-                 "Scatter area: " + std::to_string(current.scatterSize) + " x " + std::to_string(current.scatterSize) + " tiles",
+                 current.category != Category::small ? "Scatter: small scenery only"
+                     : current.scatter               ? "Scatter: enabled"
+                                                     : "Scatter: disabled",
+                 "Scatter area: " + std::to_string(current.scatterSize) + " x " + std::to_string(current.scatterSize)
+                     + " tiles",
                  "Density: " + DensityName(),
                  scatterOutcome && !scatterOutcome->failure.empty()
-                    ? "Last error: " + FmtString(scatterOutcome->failure).WithoutFormatTokens() : "Last error: none" };
+                     ? "Last error: " + FmtString(scatterOutcome->failure).WithoutFormatTokens()
+                     : "Last error: none" };
     }
     void DrawOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY position, const std::optional<Target>& hovered)
     {
@@ -352,37 +379,51 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         if (s.mode == Mode::pick)
         {
             auto display = s;
-            if (hovered) { display.category = hovered->category; display.object = hovered->object; }
-            DrawConstructionOverlay(rt, position, "Pick scenery", hovered ? Name(display) : "Point at scenery",
-                "Pick placed object", "A Select / B Back", "No placement or charge");
+            if (hovered)
+            {
+                display.category = hovered->category;
+                display.object = hovered->object;
+            }
+            DrawConstructionOverlay(
+                rt, position, "Pick scenery", hovered ? Name(display) : "Point at scenery", "Pick placed object",
+                "A Select / B Back", "No placement or charge");
             return;
         }
-        DrawSurface(rt,position,{164,228});
-        DrawHeadingText(rt,position+ScreenCoordsXY{12,12},"Scenery",140);
-        if(const auto* object=GetContext()->GetObjectManager().GetLoadedObject(Type(s.category),s.object))
+        DrawSurface(rt, position, { 164, 228 });
+        DrawHeadingText(rt, position + ScreenCoordsXY{ 12, 12 }, "Scenery", 140);
+        if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject(Type(s.category), s.object))
         {
             Drawing::RenderTarget preview;
-            if(ClipRenderTarget(preview,rt,position+ScreenCoordsXY{12,42},60,62))
+            if (ClipRenderTarget(preview, rt, position + ScreenCoordsXY{ 12, 42 }, 60, 62))
             {
-                preview.zoom_level=ZoomLevel{2};
-                object->DrawPreview(preview,preview.zoom_level.ApplyTo(60),preview.zoom_level.ApplyTo(62));
+                preview.zoom_level = ZoomLevel{ 2 };
+                object->DrawPreview(preview, preview.zoom_level.ApplyTo(60), preview.zoom_level.ApplyTo(62));
             }
         }
-        DrawStrongText(rt,position+ScreenCoordsXY{80,48},s.mode==Mode::place ? "Place" : s.mode==Mode::recolour ? "Recolour" : "Remove",72);
-        DrawModernEllipsised(rt,position+ScreenCoordsXY{80,72},72,ScatterActive() ? "{WHITE}Scatter" : "{MUTED}Single");
-        DrawModernEllipsised(rt,position+ScreenCoordsXY{12,116},140,"{WHITE}"+Name(s));
-        DrawModernEllipsised(rt,position+ScreenCoordsXY{12,140},140,s.category==Category::additions ? "{MUTED}Attach to path edge"
-            : "{MUTED}Turn "+std::to_string(s.direction+1)+" / 4");
-        DrawModernEllipsised(rt,position+ScreenCoordsXY{12,160},140,ScatterActive() ? "{WHITE}"+ScatterStatus()
-            : "{MUTED}" + HeightName());
-        DrawModernText(rt,position+ScreenCoordsXY{12,186},"{WHITE}L2/R2 Height");
-        DrawModernText(rt,position+ScreenCoordsXY{12,207},"{WHITE}Y Adjust | X Camera");
+        DrawStrongText(
+            rt, position + ScreenCoordsXY{ 80, 48 },
+            s.mode == Mode::place          ? "Place"
+                : s.mode == Mode::recolour ? "Recolour"
+                                           : "Remove",
+            72);
+        DrawModernEllipsised(rt, position + ScreenCoordsXY{ 80, 72 }, 72, ScatterActive() ? "{WHITE}Scatter" : "{MUTED}Single");
+        DrawModernEllipsised(rt, position + ScreenCoordsXY{ 12, 116 }, 140, "{WHITE}" + Name(s));
+        DrawModernEllipsised(
+            rt, position + ScreenCoordsXY{ 12, 140 }, 140,
+            s.category == Category::additions ? "{MUTED}Attach to path edge"
+                                              : "{MUTED}Turn " + std::to_string(s.direction + 1) + " / 4");
+        DrawModernEllipsised(
+            rt, position + ScreenCoordsXY{ 12, 160 }, 140,
+            ScatterActive() ? "{WHITE}" + ScatterStatus() : "{MUTED}" + HeightName());
+        DrawModernText(rt, position + ScreenCoordsXY{ 12, 186 }, "{WHITE}L2/R2 Height");
+        DrawModernText(rt, position + ScreenCoordsXY{ 12, 207 }, "{WHITE}Y Adjust | X Camera");
     }
     static GameActions::Result Query(std::optional<CoordsXY> tile, const Settings& s);
     void Configure(size_t row, int delta)
     {
         const auto previewHeight = ghost && requested && requested->settings == current
-            ? std::optional<int32_t>{ ghost->location.z } : std::nullopt;
+            ? std::optional<int32_t>{ ghost->location.z }
+            : std::nullopt;
         ClearPreview();
         if ((row == 4 || row == 5) && current.height == 0 && lastTile)
         {
@@ -408,15 +449,23 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         {
             // Native enum values are not the ordered normal palette: silver and
             // light water follow the two special entries. Cycle actual choices.
-            int index=0;
-            for (uint8_t i=0;i<Drawing::kColourNumNormal;++i)
-                if (Windows::ColourDropDownIndexToColour(i)==current.colours[row-7]) { index=i;break; }
-            current.colours[row-7]=Windows::ColourDropDownIndexToColour(
-                (index+delta%Drawing::kColourNumNormal+Drawing::kColourNumNormal)%Drawing::kColourNumNormal);
+            int index = 0;
+            for (uint8_t i = 0; i < Drawing::kColourNumNormal; ++i)
+                if (Windows::ColourDropDownIndexToColour(i) == current.colours[row - 7])
+                {
+                    index = i;
+                    break;
+                }
+            current.colours[row - 7] = Windows::ColourDropDownIndexToColour(
+                (index + delta % Drawing::kColourNumNormal + Drawing::kColourNumNormal) % Drawing::kColourNumNormal);
         }
-        if (row == 16 && current.category == Category::small) current.scatter = !current.scatter;
-        if (row == 17) current.scatterSize = std::clamp<int>(current.scatterSize + delta, 1, 64);
-        if (row == 18) current.scatterDensity = static_cast<ScatterToolDensity>((static_cast<int>(current.scatterDensity)+delta+3)%3);
+        if (row == 16 && current.category == Category::small)
+            current.scatter = !current.scatter;
+        if (row == 17)
+            current.scatterSize = std::clamp<int>(current.scatterSize + delta, 1, 64);
+        if (row == 18)
+            current.scatterDensity = static_cast<ScatterToolDensity>(
+                (static_cast<int>(current.scatterDensity) + delta + 3) % 3);
         if (row == 10)
             current.mode = static_cast<Mode>((static_cast<int>(current.mode) + delta + 4) % 4);
     }
@@ -437,7 +486,8 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
             for (const auto* path : TileElementsView<PathElement>(tile))
                 if (!path->isGhost())
                 {
-                    if (s.pathHeight && path->getBaseZ() != wantedZ) continue;
+                    if (s.pathHeight && path->getBaseZ() != wantedZ)
+                        continue;
                     if (!selected || std::abs(path->getBaseZ() - wantedZ) < std::abs(selected->getBaseZ() - wantedZ))
                         selected = path;
                 }
@@ -447,7 +497,8 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
                 if (s.category == Category::banners && selected->isSloped() && selected->getSlopeDirection() == s.direction)
                     z += kPathHeightStep;
             }
-            else if (s.pathHeight) z = *s.pathHeight; // Native query reports a stale/missing path.
+            else if (s.pathHeight)
+                z = *s.pathHeight; // Native query reports a stale/missing path.
         }
         const CoordsXYZD loc{ tile, z, s.direction };
         const auto& c = s.colours;
@@ -586,13 +637,16 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     GameActions::Result Pick(const Target& t, bool execute)
     {
         auto* element = Find(t, false);
-        if (!element || Find(t, true)) return Invalid("Scenery target changed");
+        if (!element || Find(t, true))
+            return Invalid("Scenery target changed");
         InteractionInfo hit{};
         hit.Loc = t.location;
         hit.Element = element;
         const auto fresh = Capture(hit);
-        if (!fresh || *fresh != t) return Invalid("Scenery target changed");
-        if (!Eligible(t.category, t.object)) return Invalid("Object unavailable or not researched");
+        if (!fresh || *fresh != t)
+            return Invalid("Scenery target changed");
+        if (!Eligible(t.category, t.object))
+            return Invalid("Object unavailable or not researched");
         auto selected = current;
         selected.category = t.category;
         selected.object = t.object;
@@ -601,23 +655,29 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         selected.direction = t.category == Category::banners ? t.part : t.location.direction;
         selected.quadrant = t.category == Category::small ? t.part : 0;
         selected.height = t.location.z;
-        if (t.category == Category::banners) selected.height -= 2 * kCoordsZStep;
+        if (t.category == Category::banners)
+            selected.height -= 2 * kCoordsZStep;
         if (t.category == Category::large)
         {
             const auto* entry = ObjectEntryManager::GetObjectEntry<LargeSceneryEntry>(t.object);
-            if (!entry || t.part >= entry->tiles.size()) return Invalid("Large scenery sequence unavailable");
+            if (!entry || t.part >= entry->tiles.size())
+                return Invalid("Large scenery sequence unavailable");
             selected.height -= entry->tiles[t.part].offset.z;
         }
         const auto channels = Channels(t.category, t.object);
         for (size_t i = 0; i < channels.size(); ++i)
-            if (channels[i]) selected.colours[i] = t.colours[i];
+            if (channels[i])
+                selected.colours[i] = t.colours[i];
         if (execute)
         {
             ClearPreview();
             const auto entries = Entries(t.category);
-            if (current.category != t.category || std::ranges::none_of(entries,
-                [&](const auto& e) { return e.identity.index == t.object; }))
-            { groupFilter = kObjectEntryIndexNull; search.clear(); }
+            if (current.category != t.category
+                || std::ranges::none_of(entries, [&](const auto& e) { return e.identity.index == t.object; }))
+            {
+                groupFilter = kObjectEntryIndexNull;
+                search.clear();
+            }
             current = selected;
         }
         return {};
@@ -824,66 +884,84 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     static GameActions::Result Scatter(std::optional<CoordsXY> tile, const Settings& s, bool execute)
     {
         const auto max = GetMapSizeMaxXY();
-        if (!tile || tile->x < 32 || tile->y < 32 || tile->x > max.x || tile->y > max.y || tile->x%32 || tile->y%32
-            || s.scatterSize < 1 || s.scatterSize > 64 || static_cast<int>(s.scatterDensity)>2 || s.category != Category::small
-            || !Eligible(s.category,s.object) || Network::GetMode()!=Network::Mode::none)
+        if (!tile || tile->x < 32 || tile->y < 32 || tile->x > max.x || tile->y > max.y || tile->x % 32 || tile->y % 32
+            || s.scatterSize < 1 || s.scatterSize > 64 || static_cast<int>(s.scatterDensity) > 2
+            || s.category != Category::small || !Eligible(s.category, s.object) || Network::GetMode() != Network::Mode::none)
             return Invalid("Scatter unavailable / check object, land or network mode");
         if (execute && scatterOutcome && scatterOutcome->completed < scatterOutcome->total)
             return Invalid("Native scatter actions pending");
-        const auto* object = GetContext()->GetObjectManager().GetLoadedObject(Type(s.category),s.object);
+        const auto* object = GetContext()->GetObjectManager().GetLoadedObject(Type(s.category), s.object);
         const std::string descriptor(object->GetIdentifier());
-        const Request key{*tile,s};
+        const Request key{ *tile, s };
         if (execute && scatterDraft && scatterDraft->descriptor != descriptor)
             return Invalid("Scatter object changed / review again");
         if (!scatterDraft || scatterDraft->key != key || scatterDraft->descriptor != descriptor)
         {
-            scatterDraft = ScatterDraft{key,descriptor,{},false,0};
+            scatterDraft = ScatterDraft{ key, descriptor, {}, false, 0 };
             const auto* entry = ObjectEntryManager::GetObjectEntry<SmallSceneryEntry>(s.object);
-            auto direction=s.direction; auto quadrant=s.quadrant;
-            for (int i=0;i<SceneryScatterQuantity(s.scatterSize,s.scatterDensity);++i)
+            auto direction = s.direction;
+            auto quadrant = s.quadrant;
+            for (int i = 0; i < SceneryScatterQuantity(s.scatterSize, s.scatterDensity); ++i)
             {
-                const auto location=SceneryScatterProposal(*tile,s.scatterSize,*entry,quadrant,direction);
-                auto proposed=s; proposed.direction=direction; proposed.quadrant=quadrant;
-                scatterDraft->proposals.push_back({location,proposed});
+                const auto location = SceneryScatterProposal(*tile, s.scatterSize, *entry, quadrant, direction);
+                auto proposed = s;
+                proposed.direction = direction;
+                proposed.quadrant = quadrant;
+                scatterDraft->proposals.push_back({ location, proposed });
             }
         }
         GameActions::Result result;
-        result.cost=0;
-        size_t available=0;
+        result.cost = 0;
+        size_t available = 0;
         std::string failure;
         for (const auto& p : scatterDraft->proposals)
         {
-            const auto q=Query(p.tile,p.settings);
-            if (q.error==GameActions::Status::ok) { result.cost+=q.cost; ++available; }
-            else failure=q.getErrorMessage();
+            const auto q = Query(p.tile, p.settings);
+            if (q.error == GameActions::Status::ok)
+            {
+                result.cost += q.cost;
+                ++available;
+            }
+            else
+                failure = q.getErrorMessage();
         }
-        if (!available) return Invalid(failure.c_str());
-        if (!execute) return result; // Stable estimate; collisions between sampled proposals remain native partial failures.
-        if (!scatterDraft->reviewed || scatterDraft->quote!=result.cost)
+        if (!available)
+            return Invalid(failure.c_str());
+        if (!execute)
+            return result; // Stable estimate; collisions between sampled proposals remain native partial failures.
+        if (!scatterDraft->reviewed || scatterDraft->quote != result.cost)
         {
-            scatterDraft->reviewed=true; scatterDraft->quote=result.cost; scatterOutcome.reset();
+            scatterDraft->reviewed = true;
+            scatterDraft->quote = result.cost;
+            scatterOutcome.reset();
             return result; // First released A reviews; only the next released A submits native actions.
         }
-        scatterOutcome=std::make_shared<ScatterOutcome>();
-        const auto outcome=scatterOutcome;
-        outcome->total=scatterDraft->proposals.size();
-        const auto proposals=std::move(scatterDraft->proposals);
+        scatterOutcome = std::make_shared<ScatterOutcome>();
+        const auto outcome = scatterOutcome;
+        outcome->total = scatterDraft->proposals.size();
+        const auto proposals = std::move(scatterDraft->proposals);
         scatterDraft.reset();
         for (const auto& p : proposals)
         {
-            auto q=Query(p.tile,p.settings);
-            if (q.error!=GameActions::Status::ok)
+            auto q = Query(p.tile, p.settings);
+            if (q.error != GameActions::Status::ok)
             {
-                ++outcome->completed; outcome->failure=q.getErrorMessage();
+                ++outcome->completed;
+                outcome->failure = q.getErrorMessage();
                 continue;
             }
-            auto action=Placement(p.tile,p.settings);
-            action->SetCallback([outcome](const GameActions::GameAction*,const GameActions::Result* r) {
+            auto action = Placement(p.tile, p.settings);
+            action->SetCallback([outcome](const GameActions::GameAction*, const GameActions::Result* r) {
                 ++outcome->completed;
-                if (r->error==GameActions::Status::ok) { ++outcome->placed; outcome->cost+=r->cost; }
-                else outcome->failure=r->getErrorMessage();
+                if (r->error == GameActions::Status::ok)
+                {
+                    ++outcome->placed;
+                    outcome->cost += r->cost;
+                }
+                else
+                    outcome->failure = r->getErrorMessage();
             });
-            GameActions::Execute(action.get(),getGameState());
+            GameActions::Execute(action.get(), getGameState());
         }
         return result;
     }
@@ -891,10 +969,10 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     {
         const auto old = requested;
         RemoveGhost();
-        if (s.scatter && s.category==Category::small && s.mode==Mode::place)
+        if (s.scatter && s.category == Category::small && s.mode == Mode::place)
         {
             requested.reset();
-            return Scatter(tile,s,execute);
+            return Scatter(tile, s, execute);
         }
         const auto r = Query(tile, s);
         if (!execute)
@@ -911,7 +989,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
     }
     void SetPathTarget(const std::optional<CoordsXYZ>& target)
     {
-        current.pathHeight = target ? std::optional<int32_t>{target->z} : std::nullopt;
+        current.pathHeight = target ? std::optional<int32_t>{ target->z } : std::nullopt;
     }
     void UpdatePreview(std::optional<CoordsXY> tile)
     {

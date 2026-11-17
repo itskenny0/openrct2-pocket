@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include <cstdint>
+#include <openrct2/world/Location.hpp>
 #include <optional>
 #include <string>
 #include <vector>
-
-#include <openrct2/world/Location.hpp>
 
 namespace OpenRCT2::Ui::Handheld::Alerts
 {

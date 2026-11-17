@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "Currency.h"
-#include "RideManagement.h"
 #include "ManagementPanel.h"
+#include "RideManagement.h"
 
 #include <openrct2/actions/GameActionRunner.h>
 #include <openrct2/entity/Guest.h>
@@ -48,7 +48,12 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
         size_t count{};
         bool operator==(const Group&) const = default;
     };
-    enum class RideFilterKind { riders, queue, thoughts };
+    enum class RideFilterKind
+    {
+        riders,
+        queue,
+        thoughts
+    };
     struct RideFilter
     {
         RideManagement::Target ride;

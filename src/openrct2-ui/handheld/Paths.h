@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
-#include "RideManagement.h"
 #include "PathSelection.h"
+#include "RideManagement.h"
 
 #include <array>
 #include <openrct2/actions/GameActionResult.h>

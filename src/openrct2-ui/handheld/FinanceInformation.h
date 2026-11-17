@@ -33,9 +33,10 @@ namespace OpenRCT2::Ui::Handheld::FinanceInformation
     {
         auto ft = Formatter();
         ft.Add<uint16_t>(month);
-        Date period;period.monthsElapsed=month;
+        Date period;
+        period.monthsElapsed = month;
         return ParkInformation::PlainText(FormatStringIDLegacy(STR_FINANCES_SUMMARY_MONTH_HEADING, ft.Data()), true)
-            +" / Year "+std::to_string(period.GetYear()+1);
+            + " / Year " + std::to_string(period.GetYear() + 1);
     }
     struct Ledger
     {
@@ -136,8 +137,8 @@ namespace OpenRCT2::Ui::Handheld::FinanceInformation
                                                                         : "Waiting for weekly history";
         return model;
     }
-    inline void DrawHistory(Drawing::RenderTarget& rt, size_t graph,
-        ScreenRect bounds = {{138,150},{476,234}}, int32_t sample=-1)
+    inline void DrawHistory(
+        Drawing::RenderTarget& rt, size_t graph, ScreenRect bounds = { { 138, 150 }, { 476, 234 } }, int32_t sample = -1)
     {
         if (getGameState().park.flags.has(ParkFlag::noMoney))
             return;
@@ -166,11 +167,11 @@ namespace OpenRCT2::Ui::Handheld::FinanceInformation
         props.lineCol = ColourWithFlags{ Drawing::Colour::grey };
         props.RecalculateLayout(bounds, 5, 64);
         Graph::DrawFinanceGraph(rt, props);
-        if(sample>=0&&sample<64&&props.series[sample]!=kMoney64Undefined)
+        if (sample >= 0 && sample < 64 && props.series[sample] != kMoney64Undefined)
         {
-            const int x=props.internalBounds.getRight()-sample*props.xStepPx;
-            GfxDrawDashedLine(rt,{{x,props.internalBounds.getTop()},{x,props.internalBounds.getBottom()}},3,Theme::gold);
+            const int x = props.internalBounds.getRight() - sample * props.xStepPx;
+            GfxDrawDashedLine(
+                rt, { { x, props.internalBounds.getTop() }, { x, props.internalBounds.getBottom() } }, 3, Theme::gold);
         }
     }
 } // namespace OpenRCT2::Ui::Handheld::FinanceInformation
-

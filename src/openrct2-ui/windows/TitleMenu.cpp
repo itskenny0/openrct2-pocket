@@ -8,9 +8,9 @@
  *****************************************************************************/
 
 #include <openrct2-ui/handheld/ControllerInput.h>
+#include <openrct2-ui/handheld/Currency.h>
 #include <openrct2-ui/handheld/FeelSound.h>
 #include <openrct2-ui/handheld/Panel.h>
-#include <openrct2-ui/handheld/Currency.h>
 #include <openrct2-ui/handheld/Resume.h>
 #include <openrct2-ui/handheld/SavedParkPresentation.h>
 #include <openrct2-ui/interface/Dropdown.h>
@@ -236,12 +236,13 @@ namespace OpenRCT2::Ui::Windows
 
         void onResize() override
         {
-            if (!Handheld::IsEnabled()) return;
+            if (!Handheld::IsEnabled())
+                return;
             // The engine's desktop title anchor is y=height-182. A taller Pocket
             // menu must opt out or its rows/footer extend below the screen.
             width = ContextGetWidth();
             height = ContextGetHeight();
-            windowPos = {0, 0};
+            windowPos = { 0, 0 };
         }
 
         void onMouseUp(WidgetIndex widgetIndex) override
@@ -408,37 +409,39 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::MenuFeelScope motion(_feel);
                 _feel.base = { reinterpret_cast<const uint8_t*>(rt.bits), rt.x, rt.y, rt.LineStride() };
                 // Preserve the native animated title park and OpenRCT2 branding.
-                const ScreenCoordsXY logo{(width - 232) / 2, 8};
+                const ScreenCoordsXY logo{ (width - 232) / 2, 8 };
                 GfxDrawSprite(rt, ImageId(SPR_G2_LOGO), logo);
-                GfxDrawSprite(rt, ImageId(SPR_G2_TITLE), logo + ScreenCoordsXY{104, 18});
+                GfxDrawSprite(rt, ImageId(SPR_G2_TITLE), logo + ScreenCoordsXY{ 104, 18 });
                 const auto rows = handheldRows();
                 _handheldRow = std::min(_handheldRow, rows.size() - 1);
                 const bool hasContinue = _continuePath.has_value();
                 constexpr int kContinueHeight = 44;
                 const int cardHeight = 68 + static_cast<int>(rows.size()) * 34 + (hasContinue ? kContinueHeight - 32 : 0);
                 const ScreenCoordsXY p{ (width - 320) / 2, std::min(148, ContextGetHeight() - 34 - cardHeight) };
-                Handheld::DrawSurface(rt, p, {320, cardHeight});
-                Handheld::DrawSectionLabel(rt, p + ScreenCoordsXY{12, 14}, 296, "OPENRCT2 POCKET");
+                Handheld::DrawSurface(rt, p, { 320, cardHeight });
+                Handheld::DrawSectionLabel(rt, p + ScreenCoordsXY{ 12, 14 }, 296, "OPENRCT2 POCKET");
                 static constexpr const char* labels[] = { "New park", "Load saved park", "Multiplayer", "Game tools" };
                 static constexpr Handheld::PanelIcon icons[] = { Handheld::PanelIcon::terrain, Handheld::PanelIcon::folder,
-                    Handheld::PanelIcon::play, Handheld::PanelIcon::save };
+                                                                 Handheld::PanelIcon::play, Handheld::PanelIcon::save };
                 int32_t y = 49;
                 for (size_t i = 0; i < rows.size(); ++i)
                 {
                     const bool focused = i == _handheldRow;
                     if (rows[i] == kContinueRow)
                     {
-                        Handheld::DrawActionRow(rt, p + ScreenCoordsXY{12, y}, {296, kContinueHeight},
-                            "Continue: " + _continueName, _continueDetail, focused, true, Handheld::PanelIcon::play);
+                        Handheld::DrawActionRow(
+                            rt, p + ScreenCoordsXY{ 12, y }, { 296, kContinueHeight }, "Continue: " + _continueName,
+                            _continueDetail, focused, true, Handheld::PanelIcon::play);
                         y += kContinueHeight + 2;
                         continue;
                     }
-                    Handheld::DrawActionRow(rt, p + ScreenCoordsXY{12, y}, {296, 32},
-                        labels[rows[i]], {}, focused, true, icons[rows[i]]);
+                    Handheld::DrawActionRow(
+                        rt, p + ScreenCoordsXY{ 12, y }, { 296, 32 }, labels[rows[i]], {}, focused, true, icons[rows[i]]);
                     y += 34;
                 }
-                Handheld::DrawFooter(rt, {ContextGetWidth(), ContextGetHeight()},
-                    {{"D-pad", "Navigate"}, {"A", "Select"}, {"B", "Exit"}});
+                Handheld::DrawFooter(
+                    rt, { ContextGetWidth(), ContextGetHeight() },
+                    { { "D-pad", "Navigate" }, { "A", "Select" }, { "B", "Exit" } });
                 _feel.EndFrame();
                 Handheld::DrawFocusPointer(rt, _feel);
                 return;

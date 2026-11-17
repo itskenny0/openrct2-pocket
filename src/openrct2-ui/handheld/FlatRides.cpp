@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "FlatRides.h"
 
-#include "AutoAccess.h"
-
-#include "TrackPreview.h"
 #include "AccessPreview.h"
-#include "RideAccess.h"
+#include "AutoAccess.h"
 #include "ConstructionPanel.h"
+#include "RideAccess.h"
+#include "TrackPreview.h"
 
 #include <openrct2/actions/ride/FlatRideEntrancePlaceAction.h>
 #include <openrct2/actions/ride/FlatRidePlaceAction.h>
@@ -148,9 +147,13 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
     }
     bool ResumeExisting(const RideAccess::ExistingPoint& point)
     {
-        if (!RideAccess::Current(point) || RideManagement::Resolve(point.target)->status != RideStatus::closed) return false;
+        if (!RideAccess::Current(point) || RideManagement::Resolve(point.target)->status != RideStatus::closed)
+            return false;
         End();
-        editing = point; target = point.target; selected = point.target.object; stationIndex = point.station;
+        editing = point;
+        target = point.target;
+        selected = point.target.object;
+        stationIndex = point.station;
         stage = point.exit ? Stage::exit : Stage::entrance;
         return true;
     }
@@ -252,14 +255,21 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
         {
             std::string error;
             auto draft = RideAccess::Review(*editing, *location, error);
-            if (!draft) return Invalid(error);
+            if (!draft)
+                return Invalid(error);
             const auto quote = GameActions::Query(&draft->action, getGameState());
-            if (execute && quote.error == GameActions::Status::ok) Windows::HandheldAccessReviewOpen(*draft);
+            if (execute && quote.error == GameActions::Status::ok)
+                Windows::HandheldAccessReviewOpen(*draft);
             return quote;
         }
         auto action = GameActions::FlatRideEntrancePlaceAction(target->id, *location, isExit, stationIndex);
-        const auto result = AccessPreview::Bind(action,*location);
-        if (!execute || result.error != GameActions::Status::ok){if(execute && result.error!=GameActions::Status::ok)ClearPreview();return result;}
+        const auto result = AccessPreview::Bind(action, *location);
+        if (!execute || result.error != GameActions::Status::ok)
+        {
+            if (execute && result.error != GameActions::Status::ok)
+                ClearPreview();
+            return result;
+        }
         ClearPreview();
         const auto token = revision;
         busy = true;
@@ -302,11 +312,21 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
     }
     void UpdatePreview(std::optional<CoordsXY> tile)
     {
-        if((stage==Stage::entrance || stage==Stage::exit) && !busy && target) {
-            preview.clear();ghost.reset();requested.reset();
-            const auto loc=EntranceLocation(tile);
-            if (editing && !RideAccess::Current(*editing)) { AccessPreview::Clear(); return; }
-            if(loc)AccessPreview::Update(*target,*loc,stage==Stage::exit,stationIndex,editing.has_value());else AccessPreview::Clear();
+        if ((stage == Stage::entrance || stage == Stage::exit) && !busy && target)
+        {
+            preview.clear();
+            ghost.reset();
+            requested.reset();
+            const auto loc = EntranceLocation(tile);
+            if (editing && !RideAccess::Current(*editing))
+            {
+                AccessPreview::Clear();
+                return;
+            }
+            if (loc)
+                AccessPreview::Update(*target, *loc, stage == Stage::exit, stationIndex, editing.has_value());
+            else
+                AccessPreview::Clear();
             return;
         }
         if (stage != Stage::ride || busy)
@@ -347,22 +367,36 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
         const auto p = kOrigin;
         Box(rt, p, { 216, 190 });
         Heading(rt, p + ScreenCoordsXY{ 10, 12 }, editing ? "Move ride access" : "Build ride");
-        DrawWrappedLabel(rt,p+ScreenCoordsXY{12,36},192,Name(),2);
-        if (!editing) DrawPlacementSteps(rt, p+ScreenCoordsXY{12,76}, 192, placing ? 0 : stage == Stage::entrance ? 1 : 2);
-        else DrawStrongText(rt,p+ScreenCoordsXY{12,80},stage == Stage::entrance ? "{WHITE}Move entrance" : "{WHITE}Move exit",192);
+        DrawWrappedLabel(rt, p + ScreenCoordsXY{ 12, 36 }, 192, Name(), 2);
+        if (!editing)
+            DrawPlacementSteps(rt, p + ScreenCoordsXY{ 12, 76 }, 192, placing ? 0 : stage == Stage::entrance ? 1 : 2);
+        else
+            DrawStrongText(
+                rt, p + ScreenCoordsXY{ 12, 80 }, stage == Stage::entrance ? "{WHITE}Move entrance" : "{WHITE}Move exit", 192);
         if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject(ObjectType::ride, selected))
         {
             Drawing::RenderTarget thumbnail;
-            if (ClipRenderTarget(thumbnail, rt, p+ScreenCoordsXY{12,110},64,64))
+            if (ClipRenderTarget(thumbnail, rt, p + ScreenCoordsXY{ 12, 110 }, 64, 64))
             {
-                thumbnail.zoom_level=ZoomLevel{1};
-                object->DrawPreview(thumbnail,128,128);
+                thumbnail.zoom_level = ZoomLevel{ 1 };
+                object->DrawPreview(thumbnail, 128, 128);
             }
         }
-        DrawStrongText(rt,p+ScreenCoordsXY{86,116},placing ? "{WHITE}Place ride" : stage == Stage::entrance ? "{WHITE}Place entrance" : "{WHITE}Place exit",118);
-        if (!notice.empty() && !placing) DrawModernEllipsised(rt,p+ScreenCoordsXY{86,140},118,"{CAUTION}"+notice); else
-        DrawModernEllipsised(rt,p+ScreenCoordsXY{86,140},118,placing ? "{MUTED}Faces "+std::string(std::array{"NW","SW","SE","NE"}[direction & 3]) : "{MUTED}Station "+std::to_string(stationIndex.ToUnderlying()+1));
-        if (!editing) DrawCommand(rt,p+ScreenCoordsXY{86,163},32,placing ? "SELECT" : "Y",placing ? "Turn" : "Auto + paths");
+        DrawStrongText(
+            rt, p + ScreenCoordsXY{ 86, 116 },
+            placing                        ? "{WHITE}Place ride"
+                : stage == Stage::entrance ? "{WHITE}Place entrance"
+                                           : "{WHITE}Place exit",
+            118);
+        if (!notice.empty() && !placing)
+            DrawModernEllipsised(rt, p + ScreenCoordsXY{ 86, 140 }, 118, "{CAUTION}" + notice);
+        else
+            DrawModernEllipsised(
+                rt, p + ScreenCoordsXY{ 86, 140 }, 118,
+                placing ? "{MUTED}Faces " + std::string(std::array{ "NW", "SW", "SE", "NE" }[direction & 3])
+                        : "{MUTED}Station " + std::to_string(stationIndex.ToUnderlying() + 1));
+        if (!editing)
+            DrawCommand(rt, p + ScreenCoordsXY{ 86, 163 }, 32, placing ? "SELECT" : "Y", placing ? "Turn" : "Auto + paths");
         DrawActionStrip(rt, screen);
 
         std::vector<ControlHint> hints{ { "D-pad", "Move" },
@@ -377,5 +411,5 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
         else if (!editing)
             hints.push_back({ "Y", "Auto" });
         DrawFooter(rt, screen, hints);
-        }
+    }
 } // namespace OpenRCT2::Ui::Handheld::FlatRides

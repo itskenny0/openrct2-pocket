@@ -17,7 +17,7 @@ namespace OpenRCT2::Ui::Handheld::Guide
     // picture and the list always agree with what the buttons do.
     struct Line
     {
-        std::string key;  // As printed: "A", "D-pad", "L1/R1", "SELECT"
+        std::string key; // As printed: "A", "D-pad", "L1/R1", "SELECT"
         std::string text;
     };
 
@@ -114,8 +114,9 @@ namespace OpenRCT2::Ui::Handheld::Guide
         Fill(rt, pad - ScreenCoordsXY{ 2, 2 }, { 5, 5 }, edge);
         // Face buttons in the usual diamond: X top, Y left, A right, B bottom.
         const auto face = body + ScreenCoordsXY{ kDeviceSize.width - 40, 96 };
-        const std::array<std::pair<const char*, ScreenCoordsXY>, 4> buttons{ {
-            { "X", { 0, -17 } }, { "Y", { -17, 0 } }, { "A", { 17, 0 } }, { "B", { 0, 17 } } } };
+        const std::array<std::pair<const char*, ScreenCoordsXY>, 4> buttons{
+            { { "X", { 0, -17 } }, { "Y", { -17, 0 } }, { "A", { 17, 0 } }, { "B", { 0, 17 } } }
+        };
         for (const auto& [name, offset] : buttons)
         {
             const auto centre = face + offset;
@@ -149,8 +150,7 @@ namespace OpenRCT2::Ui::Handheld::Guide
         }
         DrawModernEllipsised(rt, { 20, h - 10 }, w - 24, "{MUTED}Every screen lists its own buttons along the bottom.");
         DrawFooter(
-            rt, canvas,
-            { { "D-pad", "Section" }, { Key(Action::contextSecondary), "Intro" }, { Key(Action::back), "Back" } });
+            rt, canvas, { { "D-pad", "Section" }, { Key(Action::contextSecondary), "Intro" }, { Key(Action::back), "Back" } });
     }
 
     // The first-run intro: four cards, each with the buttons it is about ringed on the device.
@@ -168,16 +168,16 @@ namespace OpenRCT2::Ui::Handheld::Guide
                   + " turns the view.",
               { "D-pad", "L1/R1", Key(Action::contextPrimary) } },
             { "Point and open",
-              Key(Action::confirm) + " opens whatever is under the cross: a ride, a shop or a guest. "
-                  + Key(Action::back) + " goes back.",
+              Key(Action::confirm) + " opens whatever is under the cross: a ride, a shop or a guest. " + Key(Action::back)
+                  + " goes back.",
               { Key(Action::confirm), Key(Action::back) } },
             { "Build and run the park",
               Key(Action::openBuild) + " opens Build. " + Key(Action::openMenu)
                   + " opens the park menu: rides, guests, staff, money and settings.",
               { Key(Action::openBuild), Key(Action::openMenu) } },
             { "Shortcuts",
-              "Hold L2 for the quick menu. " + Key(Action::contextSecondary) + " steps through alerts; hold it for the inbox. In a tool, hold "
-                  + Key(Action::back) + " to undo.",
+              "Hold L2 for the quick menu. " + Key(Action::contextSecondary)
+                  + " steps through alerts; hold it for the inbox. In a tool, hold " + Key(Action::back) + " to undo.",
               { "L2", Key(Action::contextSecondary), Key(Action::back) } },
         };
     }
@@ -188,7 +188,8 @@ namespace OpenRCT2::Ui::Handheld::Guide
         const auto& card = cards[index];
         const int w = canvas.width - 16, h = Layout::ContentHeight(canvas);
         DrawSurface(rt, { 8, 8 }, { w, h });
-        DrawModernText(rt, { 20, 20 }, "{MUTED}Controls intro  " + std::to_string(index + 1) + " / " + std::to_string(cards.size()));
+        DrawModernText(
+            rt, { 20, 20 }, "{MUTED}Controls intro  " + std::to_string(index + 1) + " / " + std::to_string(cards.size()));
         DrawDevice(rt, { 20, 60 }, card.keys);
         DrawHeadingText(rt, { 236, 66 }, std::string("{WHITE}") + card.title, w - 236);
         DrawWrappedLabel(rt, { 236, 96 }, w - 236, card.body, 7);

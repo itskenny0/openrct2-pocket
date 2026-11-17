@@ -4,7 +4,10 @@
 #include "RideManagement.h"
 
 #include <openrct2/ride/FlatRidePlacement.h>
-namespace OpenRCT2::Ui::Handheld::RideAccess { struct ExistingPoint; }
+namespace OpenRCT2::Ui::Handheld::RideAccess
+{
+    struct ExistingPoint;
+}
 namespace OpenRCT2::Ui::Handheld::FlatRides
 {
     enum class Stage

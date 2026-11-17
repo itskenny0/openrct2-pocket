@@ -6,7 +6,6 @@
 #include <openrct2/interface/WindowBase.h>
 #include <openrct2/ride/Ride.h>
 #include <openrct2/ride/Vehicle.h>
-
 #include <optional>
 #include <string>
 

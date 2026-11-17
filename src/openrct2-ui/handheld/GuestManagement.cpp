@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "GuestManagement.h"
-#include <openrct2/SpriteIds.h>
-#include <openrct2/drawing/Drawing.Sprite.h>
-#include <openrct2/Context.h>
-#include "GuestFollow.h"
 
+#include "GuestFollow.h"
 #include "TextEntry.h"
 
+#include <openrct2/Context.h>
 #include <openrct2/GameState.h>
+#include <openrct2/SpriteIds.h>
 #include <openrct2/actions/peep/GuestSetFlagsAction.h>
 #include <openrct2/actions/peep/GuestSetNameAction.h>
 #include <openrct2/core/EnumUtils.hpp>
 #include <openrct2/core/String.hpp>
+#include <openrct2/drawing/Drawing.Sprite.h>
 #include <openrct2/drawing/Drawing.String.h>
 #include <openrct2/entity/EntityList.h>
 #include <openrct2/interface/Viewport.h>
@@ -22,8 +22,8 @@
 #include <openrct2/localisation/StringIds.h>
 #include <openrct2/peep/PeepActionFormat.h>
 #include <openrct2/ride/Ride.h>
-#include <openrct2/ride/RideManager.hpp>
 #include <openrct2/ride/RideData.h>
+#include <openrct2/ride/RideManager.hpp>
 #include <unordered_map>
 
 namespace OpenRCT2::Ui::Handheld::GuestManagement
@@ -134,12 +134,18 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
         if (filter.ride)
         {
             const auto* ride = RideManagement::Resolve(filter.ride->ride);
-            if (!ride) return "Ride unavailable";
-            label = std::string(filter.ride->kind == RideFilterKind::riders ? "Riders / "
-                : filter.ride->kind == RideFilterKind::queue ? "Queue / " : "Thinking / ") + ride->getName();
+            if (!ride)
+                return "Ride unavailable";
+            label = std::string(
+                        filter.ride->kind == RideFilterKind::riders      ? "Riders / "
+                            : filter.ride->kind == RideFilterKind::queue ? "Queue / "
+                                                                         : "Thinking / ")
+                + ride->getName();
         }
-        if (!filter.name.empty()) label += " / Name: " + filter.name;
-        if (filter.tracked) label += " / Tracked";
+        if (!filter.name.empty())
+            label += " / Name: " + filter.name;
+        if (filter.tracked)
+            label += " / Tracked";
         return label;
     }
     std::vector<Target> Roster(const Filter& filter)
@@ -150,12 +156,16 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
         if (filter.ride)
         {
             const auto* ride = RideManagement::Resolve(filter.ride->ride);
-            if (!ride) return result;
+            if (!ride)
+                return result;
             Formatter ft(rideArgs.data());
             const auto kind = filter.ride->kind;
-            ft.Add<StringId>(kind == RideFilterKind::thoughts ? kStringIdNone
-                : kind == RideFilterKind::queue ? static_cast<StringId>(STR_GUESTS_QUEUING_FOR)
-                : ride->getRideTypeDescriptor().flags.has(RtdFlag::describeAsInside) ? static_cast<StringId>(STR_GUESTS_IN_RIDE) : static_cast<StringId>(STR_GUESTS_ON_RIDE));
+            ft.Add<StringId>(
+                kind == RideFilterKind::thoughts    ? kStringIdNone
+                    : kind == RideFilterKind::queue ? static_cast<StringId>(STR_GUESTS_QUEUING_FOR)
+                    : ride->getRideTypeDescriptor().flags.has(RtdFlag::describeAsInside)
+                    ? static_cast<StringId>(STR_GUESTS_IN_RIDE)
+                    : static_cast<StringId>(STR_GUESTS_ON_RIDE));
             ride->formatNameTo(ft);
             mode = kind == RideFilterKind::thoughts ? GroupMode::thoughts : GroupMode::actions;
         }
@@ -172,7 +182,8 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
                         const StringId wildcard = kStringIdNone;
                         std::memcpy(args.data(), &wildcard, sizeof(wildcard));
                     }
-                    if (args != rideArgs) continue;
+                    if (args != rideArgs)
+                        continue;
                 }
                 result.push_back(*target);
             }
@@ -318,11 +329,13 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
     {
         std::vector<RideManagement::Target> result;
         const auto* guest = Resolve(target);
-        if (!guest) return result;
+        if (!guest)
+            return result;
         // Desktop Guest::onUpdateRides uses this native set membership and RideManager order.
         for (const auto& ride : RideManager(getGameState()))
             if (ride.isRide() && guest->hasRidden(ride))
-                if (auto identity = RideManagement::Identify(ride.id)) result.push_back(*identity);
+                if (auto identity = RideManagement::Identify(ride.id))
+                    result.push_back(*identity);
         return result;
     }
     bool HistoryRideCurrent(const Target& target, const RideManagement::Target& rideTarget)
@@ -331,7 +344,8 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
         const auto* ride = RideManagement::Resolve(rideTarget);
         return guest && ride && ride->isRide() && guest->hasRidden(*ride);
     }
-    ManagementPresentation HistoryPresentation(const Target& target, const std::vector<RideManagement::Target>& list, size_t selected)
+    ManagementPresentation HistoryPresentation(
+        const Target& target, const std::vector<RideManagement::Target>& list, size_t selected)
     {
         ManagementPresentation model;
         model.breadcrumb = "Guests / Ride history";
@@ -372,10 +386,13 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
             const int happy = count == 0 ? 0 : static_cast<int>(happiness * 100 / (count * 255));
             ManagementPresentation::Hero hero;
             hero.picture = [](Drawing::RenderTarget& rt) { GfxDrawSprite(rt, ImageId(SPR_TAB_GUESTS_0), { 18, 18 }); };
-            hero.meters.push_back({ "Average happiness", count == 0 ? "-" : std::to_string(happy) + "%", happy,
-                                    happy >= 60 ? "{POSITIVE}" : happy < 30 ? "{DANGER}" : "{WHITE}" });
-            hero.caption = std::to_string(park.numGuestsInPark) + " in the park, " + std::to_string(park.numGuestsHeadingForPark)
-                + " on the way";
+            hero.meters.push_back(
+                { "Average happiness", count == 0 ? "-" : std::to_string(happy) + "%", happy,
+                  happy >= 60      ? "{POSITIVE}"
+                      : happy < 30 ? "{DANGER}"
+                                   : "{WHITE}" });
+            hero.caption = std::to_string(park.numGuestsInPark) + " in the park, "
+                + std::to_string(park.numGuestsHeadingForPark) + " on the way";
             model.hero = hero;
             auto thoughts = Groups(GroupMode::thoughts);
             std::stable_sort(thoughts.begin(), thoughts.end(), [](const auto& a, const auto& b) { return a.count > b.count; });
@@ -398,16 +415,28 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
         }
         if (view == View::roster)
         {
-            model.rows={"Map roster", "Name filter...", "Tracked only"};model.rowDetails.resize(3);
-            model.toolbarCount=3;model.denseRoster=true;model.listLabel="GUESTS / CURRENT ACTIVITY / HAPPINESS";
-            const auto capacity=MeasureManagement({ContextGetWidth()-16,Layout::ContentHeight({ContextGetWidth(),ContextGetHeight()})},model).capacity;
-            const auto first=std::max<size_t>(selected,3)-std::min(std::max<size_t>(selected,3)-3,capacity+3);
-                const auto last=std::max<size_t>(selected,3)+capacity+3;
-            for (const auto& entry : roster) {
-                const auto index=model.rows.size();
-                const auto* guest=index>=first && index<last ? Resolve(entry) : nullptr;
+            model.rows = { "Map roster", "Name filter...", "Tracked only" };
+            model.rowDetails.resize(3);
+            model.toolbarCount = 3;
+            model.denseRoster = true;
+            model.listLabel = "GUESTS / CURRENT ACTIVITY / HAPPINESS";
+            const auto capacity = MeasureManagement(
+                                      { ContextGetWidth() - 16,
+                                        Layout::ContentHeight({ ContextGetWidth(), ContextGetHeight() }) },
+                                      model)
+                                      .capacity;
+            const auto first = std::max<size_t>(selected, 3) - std::min(std::max<size_t>(selected, 3) - 3, capacity + 3);
+            const auto last = std::max<size_t>(selected, 3) + capacity + 3;
+            for (const auto& entry : roster)
+            {
+                const auto index = model.rows.size();
+                const auto* guest = index >= first && index < last ? Resolve(entry) : nullptr;
                 model.rows.push_back(guest ? guest->getName() : "");
-                model.rowDetails.push_back(guest && index>=first && index<last ? Status(*guest)+" / Happy "+std::to_string(guest->happiness*100/255)+"%"+(guest->peepFlags.has(PeepFlag::tracking)?" / Tracked":"") : "");
+                model.rowDetails.push_back(
+                    guest && index >= first && index < last
+                        ? Status(*guest) + " / Happy " + std::to_string(guest->happiness * 100 / 255) + "%"
+                            + (guest->peepFlags.has(PeepFlag::tracking) ? " / Tracked" : "")
+                        : "");
             }
             model.rows.push_back("Back to Guests");
             if (roster.empty())
@@ -430,8 +459,8 @@ namespace OpenRCT2::Ui::Handheld::GuestManagement
                 "Thoughts...",      "Spending...",
                 "Carried items...", "Back to roster",
                 "Name...",          guest->peepFlags.has(PeepFlag::tracking) ? "Tracking: On..." : "Tracking: Off...",
-                "Preferences...",   "Pick up...", "Ride history...",
-                GuestFollow::Current() == target ? "Stop following" : "Follow guest"
+                "Preferences...",   "Pick up...",
+                "Ride history...",  GuestFollow::Current() == target ? "Stop following" : "Follow guest"
             };
         }
         else if (view == View::needs)

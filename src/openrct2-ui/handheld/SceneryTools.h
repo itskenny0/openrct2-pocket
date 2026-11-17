@@ -30,7 +30,7 @@ namespace OpenRCT2::Ui::Handheld::SceneryTools
         ObjectEntryIndex object = kObjectEntryIndexNull;
         Direction direction = 3;
         uint8_t quadrant{};
-        int32_t height{}; // zero = native automatic ground/path height
+        int32_t height{};                  // zero = native automatic ground/path height
         std::optional<int32_t> pathHeight; // visible real path selected by the controller reticle
         std::array<Drawing::Colour, 3> colours{ Drawing::Colour::bordeauxRed, Drawing::Colour::yellow,
                                                 Drawing::Colour::darkBrown };

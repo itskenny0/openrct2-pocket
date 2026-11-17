@@ -52,7 +52,8 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
         }
         void Move(int x, int y)
         {
-            if (x || y) subject.reset();
+            if (x || y)
+                subject.reset();
             focus += CoordsXY{ y * 32, x * 32 }.rotate(-GetCurrentRotation());
             Clamp();
         }
@@ -159,7 +160,8 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
                      state.mode == 3, state.mode == 2 && state.filter != 0, state.mode == 3 ? state.filter - 1 : -1))
             {
                 if (state.mode == 2 && state.guestFilter
-                    && !std::binary_search(guestMembers.begin(), guestMembers.end(), peep.id.ToUnderlying())) continue;
+                    && !std::binary_search(guestMembers.begin(), guestMembers.end(), peep.id.ToUnderlying()))
+                    continue;
                 const auto point = project(peep.position);
                 if (point.x >= origin.x && point.x < origin.x + width - 1 && point.y >= origin.y
                     && point.y < origin.y + height - 1)
@@ -174,11 +176,12 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
         GfxDrawLine(rt, { marker - ScreenCoordsXY{ 5, 0 }, marker + ScreenCoordsXY{ 5, 0 } }, gold);
         GfxDrawLine(rt, { marker - ScreenCoordsXY{ 0, 5 }, marker + ScreenCoordsXY{ 0, 5 } }, gold);
         const auto* surface = MapGetSurfaceElementAt(state.focus);
-        const auto ownership = !surface ? "No surface"
-            : surface->hasOwnership(OwnershipFlag::landOwned) ? "Land owned"
-            : surface->hasOwnership(OwnershipFlag::constructionRightsOwned) ? "Rights owned"
-            : surface->hasOwnership(OwnershipFlag::landForSale) ? "Land for sale"
-            : surface->hasOwnership(OwnershipFlag::constructionRightsForSale) ? "Rights for sale" : "Land unavailable";
+        const auto ownership = !surface                                       ? "No surface"
+            : surface->hasOwnership(OwnershipFlag::landOwned)                 ? "Land owned"
+            : surface->hasOwnership(OwnershipFlag::constructionRightsOwned)   ? "Rights owned"
+            : surface->hasOwnership(OwnershipFlag::landForSale)               ? "Land for sale"
+            : surface->hasOwnership(OwnershipFlag::constructionRightsForSale) ? "Rights for sale"
+                                                                              : "Land unavailable";
         const ScreenCoordsXY card{ origin.x + width + 10, origin.y - 2 };
         const int cardW = 494 - card.x, cardH = height + 4;
         FillRound(rt, card, { cardW, cardH }, Theme::raised);
@@ -189,10 +192,16 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
         y += 20;
         DrawSectionLabel(rt, { card.x + 10, y }, cardW - 20, "KEY");
         y += 15;
-        const std::array<std::pair<int,std::string>,3> legend = state.rides
-            ? std::array<std::pair<int,std::string>,3>{{{61,"Rides"},{14,"Paths"},{195,"Water"}}}
-            : std::array<std::pair<int,std::string>,3>{{{state.mode==3?138:state.mode==2?172:98,
-                state.mode==3?"Staff":state.mode==2?"Guests":"Land"},{14,"Paths"},{195,"Water"}}};
+        const std::array<std::pair<int, std::string>, 3> legend = state.rides
+            ? std::array<std::pair<int, std::string>, 3>{ { { 61, "Rides" }, { 14, "Paths" }, { 195, "Water" } } }
+            : std::array<std::pair<int, std::string>, 3>{ { { state.mode == 3       ? 138
+                                                                  : state.mode == 2 ? 172
+                                                                                    : 98,
+                                                              state.mode == 3       ? "Staff"
+                                                                  : state.mode == 2 ? "Guests"
+                                                                                    : "Land" },
+                                                            { 14, "Paths" },
+                                                            { 195, "Water" } } };
         for (const auto& [colour, label] : legend)
         {
             FillRound(rt, { card.x + 10, y + 1 }, { 9, 9 }, static_cast<Drawing::PaletteIndex>(colour));
@@ -219,7 +228,15 @@ namespace OpenRCT2::Ui::Handheld::ParkMap
                 y += 14;
             }
         }
-        DrawFooter(rt,{512,384},{{"D-pad","Move"},{"A","Locate"},{"Y","Zoom"},{"SEL","Subjects"},{"R2","Details"},{"B","Back"},
-            {"X","Rotate",HintPriority::guide},{"L1/R1","View",HintPriority::guide}});
+        DrawFooter(
+            rt, { 512, 384 },
+            { { "D-pad", "Move" },
+              { "A", "Locate" },
+              { "Y", "Zoom" },
+              { "SEL", "Subjects" },
+              { "R2", "Details" },
+              { "B", "Back" },
+              { "X", "Rotate", HintPriority::guide },
+              { "L1/R1", "View", HintPriority::guide } });
     }
 } // namespace OpenRCT2::Ui::Handheld::ParkMap

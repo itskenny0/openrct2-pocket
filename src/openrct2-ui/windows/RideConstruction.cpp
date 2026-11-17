@@ -10,6 +10,7 @@
 #include <limits>
 #include <openrct2-ui/ProvisionalElements.h>
 #include <openrct2-ui/UiContext.h>
+#include <openrct2-ui/handheld/NativeTrackThumbnail.h>
 #include <openrct2-ui/input/InputManager.h>
 #include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2-ui/interface/ViewportInteraction.h>
@@ -17,7 +18,6 @@
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/ride/Construction.h>
 #include <openrct2-ui/windows/Windows.h>
-#include <openrct2-ui/handheld/NativeTrackThumbnail.h>
 #include <openrct2/Cheats.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
@@ -2802,8 +2802,12 @@ namespace OpenRCT2::Ui::Windows
         }
     };
 
-    void DrawNativeTrackThumbnail(Drawing::RenderTarget& rt, RideId ride, TrackElemType type, Direction direction, SelectedLiftAndInverted flags)
-    { auto clipped=rt; RideConstructionWindow::DrawTrackPiece(clipped,ride,type,direction,flags,rt.width,rt.height); }
+    void DrawNativeTrackThumbnail(
+        Drawing::RenderTarget& rt, RideId ride, TrackElemType type, Direction direction, SelectedLiftAndInverted flags)
+    {
+        auto clipped = rt;
+        RideConstructionWindow::DrawTrackPiece(clipped, ride, type, direction, flags, rt.width, rt.height);
+    }
 
     static void WindowRideConstructionUpdateDisabledPieces(ride_type_t rideType)
     {

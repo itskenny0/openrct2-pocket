@@ -85,12 +85,15 @@ namespace OpenRCT2::Ui::Handheld::MapSubjects
     }
     inline std::string FilterName(int mode, int filter, const std::optional<GuestManagement::Filter>& guestFilter = {})
     {
-        if (mode == 2 && guestFilter) return GuestManagement::FilterName(*guestFilter) + (filter ? " / Tracked" : "");
+        if (mode == 2 && guestFilter)
+            return GuestManagement::FilterName(*guestFilter) + (filter ? " / Tracked" : "");
         return mode == 2 ? (filter ? "Tracked guests" : "All guests")
             : mode == 3  ? (filter ? StaffManagement::RoleName(static_cast<StaffType>(filter - 1)) : "All staff roles")
                          : "All rides";
     }
-    inline ManagementPresentation Presentation(const std::vector<Target>& roster, int mode, int filter, size_t selected, const std::optional<GuestManagement::Filter>& guestFilter = {})
+    inline ManagementPresentation Presentation(
+        const std::vector<Target>& roster, int mode, int filter, size_t selected,
+        const std::optional<GuestManagement::Filter>& guestFilter = {})
     {
         ManagementPresentation model;
         model.breadcrumb = "Park map / Native subjects";
