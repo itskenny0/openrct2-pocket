@@ -185,11 +185,14 @@ namespace OpenRCT2::Ui::Handheld
             _lastTick = now;
             return result;
         }
+        result.leftTrigger = _leftTrigger; // Tracked from axis events (works for virtual pads too).
         const auto elapsed = std::min<uint32_t>(now - _lastTick, 50);
         _lastTick = now;
         result.actions = std::exchange(_actions, {});
         const int x = held(SDL_CONTROLLER_BUTTON_DPAD_RIGHT) - held(SDL_CONTROLLER_BUTTON_DPAD_LEFT);
         const int y = held(SDL_CONTROLLER_BUTTON_DPAD_DOWN) - held(SDL_CONTROLLER_BUTTON_DPAD_UP);
+        result.heldX = x;
+        result.heldY = y;
         if (x != _navigationX || y != _navigationY)
         {
             result.navigateX = x;

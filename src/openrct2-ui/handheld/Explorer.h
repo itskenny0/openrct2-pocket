@@ -4,6 +4,7 @@
  *****************************************************************************/
 
 #pragma once
+#include "QuickWheel.h"
 #include <openrct2/object/Object.h>
 #include "PeepPlacement.h"
 #include "RideManagement.h"
@@ -36,6 +37,7 @@ namespace OpenRCT2::Ui::Handheld
     // false when nothing needs attention.
     bool JumpToNextAlert();
     void UpdateExplorer(ControllerInput& input);
+    bool QuickWheelOpen();
     void HandleExplorerInput(ControllerInput& input, const Frame& frame);
     void EndTerrain();
     std::optional<CoordsXY> CurrentTerrainTile();
@@ -84,6 +86,8 @@ namespace OpenRCT2::Ui::Windows
     void HandheldRideAccessOpen(const Handheld::RideManagement::Target& target);
     Handheld::ManagementPresentation HandheldDashboardPresentation(size_t selected);
     void HandheldDashboardOpen();
+    void HandheldQuickJump(Handheld::QuickWheel::Target target);
+    std::pair<std::string, uint32_t> HandheldLastBuild();
     void HandheldDashboardPause();
     bool HandheldDashboardIsOpen();
     bool HandheldDashboardRailFocused();

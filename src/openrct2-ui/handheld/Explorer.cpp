@@ -1177,6 +1177,56 @@ namespace OpenRCT2::Ui::Handheld
         HandleExplorerInput(input, input.update(ContextHasFocus(), SDL_GetTicks()));
     }
 
+    static QuickWheel::State _wheel;
+    static void ChooseWheel(ControllerInput& input, size_t slot)
+    {
+        const auto target = QuickWheel::kSlots[slot].target;
+        _wheel.Close();
+        Audio::Play(Audio::SoundId::click1, -400, Audio::kAudioPlayAtCentre);
+        if (target == QuickWheel::Target::pause)
+            PauseToggle();
+        else
+            Windows::HandheldQuickJump(target);
+        input.suspend(); // The releasing press must not also act on what just opened.
+    }
+    // While the wheel is open it owns the controller: the D-pad points, releasing L2 (after a
+    // hold) or A takes the highlighted slot, B or a second L2 closes it.
+    static void HandleWheel(ControllerInput& input, const Frame& frame)
+    {
+        if (!CanExplore())
+        {
+            _wheel.Close();
+            return;
+        }
+        _wheel.Point(frame.heldX, frame.heldY);
+        for (const auto action : frame.actions)
+        {
+            if (action == Action::confirm && _wheel.selected)
+                return ChooseWheel(input, *_wheel.selected);
+            if (action == Action::back || (action == Action::slopeDown && !_wheel.selected))
+            {
+                _wheel.Close();
+                input.suspend();
+                return;
+            }
+            if (action == Action::slopeDown && _wheel.selected)
+                return ChooseWheel(input, *_wheel.selected);
+        }
+        if (!frame.leftTrigger && !_wheel.tapped)
+        {
+            if (MenuFeel::Clock() - _wheel.opened < QuickWheel::kHoldMs)
+                _wheel.tapped = true; // A quick tap: stay open for A / B.
+            else if (_wheel.selected)
+                return ChooseWheel(input, *_wheel.selected);
+            else
+                _wheel.Close();
+        }
+    }
+    bool QuickWheelOpen()
+    {
+        return _wheel.open;
+    }
+
     void HandleExplorerInput(ControllerInput& input, const Frame& frame)
     {
         auto* wm = GetWindowManager();
@@ -1189,6 +1239,8 @@ namespace OpenRCT2::Ui::Handheld
                 return;
             }
         }
+        if (_wheel.open)
+            return HandleWheel(input, frame);
         if (_ridePathAccess && !AccessTargetValid())
         {
             EndTerrain();
@@ -1785,6 +1837,15 @@ namespace OpenRCT2::Ui::Handheld
                     case Action::quit:
                     case Action::slopeDown:
                     case Action::slopeUp:
+                        // L2 with no tool in hand opens the quick wheel. Return without the usual
+                        // suspend, which would make the still-held L2 read as released.
+                        if (action == Action::slopeDown && !_terrainActive && !Paths::IsActive() && !Designs::Active()
+                            && !StaffPatrol::Active())
+                        {
+                            _wheel.Open(MenuFeel::Clock());
+                            Audio::Play(Audio::SoundId::click1, -600, Audio::kAudioPlayAtCentre);
+                            return;
+                        }
                         if (Designs::Active())
                             Designs::SetScenery(action == Action::slopeUp);
                         else if (StaffPatrol::Active())
@@ -1997,7 +2058,7 @@ namespace OpenRCT2::Ui::Handheld
                 DrawFooter(rt, { ContextGetWidth(), height },
                     { { "D-pad", "Move" }, { "A", Landscape::Name(Landscape::shape) }, { "Y", "Shape" },
                       { "L2/R2", "Brush size" }, { "B", "Back" }, { "L1/R1", "Zoom", HintPriority::guide } });
-            else
+            else if (!_wheel.open) // The wheel draws its own footer.
                 DrawGameplayFooter(
                     rt, { ContextGetWidth(), height }, status, _terrainActive, _surfaceTool || _colourRide.has_value(),
                     _inspect.verb, Alerts::HintLabel());
@@ -2014,7 +2075,7 @@ namespace OpenRCT2::Ui::Handheld
             DrawCostBadge(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), costAmount, Paths::BatchActive());
         if (GuestFollow::Current() && !_terrainActive && !Paths::IsActive())
             DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), status);
-        else if (!_inspect.name.empty() && !_terrainActive && !Paths::IsActive())
+        else if (!_wheel.open && !_inspect.name.empty() && !_terrainActive && !Paths::IsActive())
             DrawInspectChip(rt, InspectChipOrigin(), InspectChipSize(), _inspect.name, InspectColour(_inspect.kind));
         if (ToastVisible())
         {
@@ -2040,6 +2101,11 @@ namespace OpenRCT2::Ui::Handheld
             DrawTargetBrackets(rt, c, InspectColour(_inspect.kind), BracketPulse());
         else
             DrawMapFocus(rt, c);
+        if (_wheel.open)
+        {
+            const auto [label, sprite] = Windows::HandheldLastBuild();
+            QuickWheel::Draw(rt, { ContextGetWidth(), ContextGetHeight() }, _wheel, label, sprite, gGamePaused != 0);
+        }
     }
 
     void ShowToast(std::string_view title, std::string_view message)

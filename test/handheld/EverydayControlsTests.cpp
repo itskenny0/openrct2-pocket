@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
+#include <thread>
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/handheld/ControllerInput.h>
 #include <openrct2-ui/handheld/Explorer.h>
@@ -154,6 +155,29 @@ int main(int argc, char** argv)
         Check(H::PocketPalette::style==originalTheme,"Theme preference did not survive reload");
         press(H::Action::back);
         Check(gGamePaused==0 && state.park.cash==themeCash,"Theme altered simulation or money");
+        {
+            // Quick wheel: hold L2, point with the D-pad, release (after the hold time) to choose.
+            // A quick tap keeps it open for A / B instead.
+            auto step=[&]{pump();H::HandleExplorerInput(input,input.update(true,now+=20));WindowCullDead();};
+            auto trigger=[&](bool down){SDL_JoystickSetVirtualAxis(joystick,SDL_CONTROLLER_AXIS_TRIGGERLEFT,down?32767:-32768);step();};
+            auto dpad=[&](SDL_GameControllerButton key,bool down){SDL_JoystickSetVirtualButton(joystick,key,down);step();};
+            trigger(false);step();
+            trigger(true);Check(H::QuickWheelOpen(),"L2 did not open the quick wheel");
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT,true);capture("00d-quick-wheel.png");
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_UP,true);dpad(SDL_CONTROLLER_BUTTON_DPAD_UP,false); // Leaving a diagonal keeps it.
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT,false);
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT,true);dpad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT,false); // Back to Rides.
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+            trigger(false);
+            Check(!H::QuickWheelOpen()&&W::HandheldRidesIsOpen(),"Releasing L2 did not open Rides");
+            capture("00e-wheel-rides.png");
+            wm->CloseByClass(WindowClass::handheldMenu);step();step();
+            trigger(true);trigger(false);Check(H::QuickWheelOpen(),"A tapped wheel did not stay open");
+            press(H::Action::back);Check(!H::QuickWheelOpen()&&!menu(),"B did not close the wheel");
+            trigger(true);trigger(false);dpad(SDL_CONTROLLER_BUTTON_DPAD_DOWN,true);dpad(SDL_CONTROLLER_BUTTON_DPAD_DOWN,false);
+            press(H::Action::confirm);Check(!H::QuickWheelOpen()&&menu(),"A on a pointed slot did not open it");
+            wm->CloseByClass(WindowClass::handheldMenu);step();step();
+        }
         // B preserves the state before entry, including external native reasons.
         for (int initial : std::array<int, 4>{0, GAME_PAUSED_NORMAL, GAME_PAUSED_MODAL, GAME_PAUSED_NORMAL | GAME_PAUSED_MODAL}) {
             gGamePaused = initial; W::HandheldMenuOpen(); press(H::Action::back);

@@ -8,6 +8,7 @@
 #include "Currency.h"
 #include "CustomTracks.h"
 #include "Dashboard.h"
+#include "QuickWheel.h"
 #include "ChoiceCards.h"
 #include "Designs.h"
 #include "DesignAuthoring.h"
@@ -257,6 +258,11 @@ namespace OpenRCT2::Ui::Windows
         return model;
     }
 
+    // The last Build card confirmed, kept beyond the menu window: Build reopens on it and the
+    // quick wheel's "Again" repeats it.
+    static size_t sLastBuildCard = 8;
+    static std::string sLastBuildLabel;
+    static uint32_t sLastBuildSprite{};
     static fs::path SlotPath(size_t slot)
     {
         return fs::u8path(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user, DirId::saves))
@@ -274,7 +280,7 @@ namespace OpenRCT2::Ui::Windows
         std::array<std::array<size_t,5>,2> _toolGroupRows{};
         Handheld::ObjectPicker _picker;
         bool _pausedHere{};
-        size_t _buildFocus{8}, _pathModeFocus{}; // Build opens on Rides.
+        size_t _buildFocus{sLastBuildCard}, _pathModeFocus{}; // Build opens on the card used last (Rides at first).
         std::array<size_t, 2> _pathOptionsFocus{};
         bool _shopPickerFromBuild{};
         bool _ridePickerFromBuild{};
@@ -3036,6 +3042,40 @@ namespace OpenRCT2::Ui::Windows
         {
             page(Page::dashboard);
         }
+        // The quick wheel's destinations. Build reopens on the card used last (Build remembers
+        // its focus), and "Again" confirms that card straight away.
+        void quickJump(Handheld::QuickWheel::Target target)
+        {
+            using T = Handheld::QuickWheel::Target;
+            using S = Handheld::Dashboard::Section;
+            switch (target)
+            {
+                case T::build: page(Page::build); break;
+                case T::repeat:
+                    _buildFocus = sLastBuildCard;
+                    page(Page::build);
+                    if (!sLastBuildLabel.empty()) confirm();
+                    break;
+                case T::map:
+                    _parkMap.Begin();
+                    page(Page::parkMap);
+                    break;
+                case T::rides:
+                case T::staff:
+                case T::finances:
+                case T::guests:
+                    _dashboard.section = target == T::rides ? S::rides : target == T::staff ? S::staff
+                        : target == T::finances ? S::finances : S::guests;
+                    page(Page::dashboard);
+                    _dashboard.section = target == T::rides ? S::rides : target == T::staff ? S::staff
+                        : target == T::finances ? S::finances : S::guests;
+                    enterDashboardContent();
+                    break;
+                case T::pause: break;
+            }
+            invalidate();
+        }
+
         void dashboardPause()
         {
             if (guardLeave([this] { dashboardPause(); }))
@@ -4679,6 +4719,13 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::build:
+                    for (const auto& card : choices())
+                        if (card.action == choice)
+                        {
+                            sLastBuildCard = choice;
+                            sLastBuildLabel = card.label;
+                            sLastBuildSprite = card.sprite;
+                        }
                     if (choice == 12)
                     {
                         close();
@@ -7836,6 +7883,15 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->dashboardPause();
+    }
+    void HandheldQuickJump(Handheld::QuickWheel::Target target)
+    {
+        if (auto* window = OpenPanel())
+            window->quickJump(target);
+    }
+    std::pair<std::string, uint32_t> HandheldLastBuild()
+    {
+        return { sLastBuildLabel, sLastBuildSprite };
     }
     void HandheldDashboardOpen()
     {

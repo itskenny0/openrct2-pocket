@@ -44,6 +44,9 @@ namespace OpenRCT2::Ui::Handheld
         int32_t navigateY{};
         // True when navigateX/Y comes from holding the D-pad (auto-repeat), not a fresh press.
         bool navigateRepeat{};
+        // L2 is still down (the quick wheel picks on release), and the D-pad as held right now.
+        bool leftTrigger{};
+        int32_t heldX{}, heldY{};
         std::vector<Action> actions;
     };
 
