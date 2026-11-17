@@ -6752,8 +6752,34 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::DrawManagementContent(rt,{8,36},{240,312},model);
                 Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Choose"},{"A","Toggle / select"},{"B","Back"}});return;
             }
-            if (_page == Page::save || _page == Page::load || _page == Page::parkInspect || _page == Page::designInspect) {
-                const bool slots=_page==Page::save || _page==Page::load;
+            if (_page == Page::save || _page == Page::load) {
+                // Save slots as cards (picture, name, date, how the park is doing), then Browse.
+                const ScreenSize canvas{ ContextGetWidth(), ContextGetHeight() };
+                const ScreenCoordsXY p{ Handheld::Layout::margin, Handheld::Layout::margin };
+                const int w = canvas.width - 2 * Handheld::Layout::margin, h = Handheld::Layout::ContentHeight(canvas);
+                const bool saving = _page == Page::save;
+                Handheld::DrawSurface(rt, p, { w, h });
+                Handheld::DrawHeadingText(rt, p + ScreenCoordsXY{ 12, 11 }, saving ? "{WHITE}Save park" : "{WHITE}Load park", w - 24);
+                Handheld::Fill(rt, p + ScreenCoordsXY{ 12, 37 }, { w - 24, 1 }, Handheld::Theme::edge);
+                const int cardH = std::clamp((h - 46 - 46 - 12) / 3, 52, 70);
+                int y = 46;
+                for (size_t slot = 0; slot < 3; ++slot)
+                {
+                    std::error_code error;
+                    Handheld::SavedParkPresentation::DrawSlot(rt, p + ScreenCoordsXY{ 12, y }, { w - 24, cardH }, slot,
+                        _slotPreviews[slot], fs::exists(SlotPath(slot), error), _focus.index() == slot, saving);
+                    y += cardH + 6;
+                }
+                Handheld::DrawActionRow(rt, p + ScreenCoordsXY{ 12, y + 4 }, { w - 24, 30 },
+                    saving ? "Save with a name..." : "Browse parks and autosaves...", "", _focus.index() == 3, true,
+                    Handheld::PanelIcon::folder);
+                if (!_status.empty())
+                    Handheld::DrawModernEllipsised(rt, p + ScreenCoordsXY{ 12, h - 16 }, w - 24, "{WHITE}" + _status);
+                Handheld::DrawFooter(rt, canvas, { { "D-pad", "Choose" }, { "A", saving ? "Save" : "Load" }, { "B", "Back" } });
+                return;
+            }
+            if (_page == Page::parkInspect || _page == Page::designInspect) {
+                const bool slots=false;
                 const bool design=_page==Page::designInspect;
                 Handheld::ManagementPresentation model;model.rows=rows();model.selected=_focus.index();model.rowHeight=38;
                 model.title=slots?(_page==Page::save?"Save park":"Load park"):design?"Saved design":"Saved park";

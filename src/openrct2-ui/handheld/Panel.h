@@ -479,16 +479,19 @@ namespace OpenRCT2::Ui::Handheld
     }
     // Face buttons are round badges in fixed colours (A teal, B red, X and Y dark), the way console
     // games print them, so the same glyph means the same button on every screen.
-    inline void DrawButtonGlyph(Drawing::RenderTarget& rt, ScreenCoordsXY centre, const std::string& key)
+    // onAccent: the glyph sits on a filled button, often the same colour as the A disc, so it
+    // inverts to a light disc with a dark letter instead of vanishing into the button.
+    inline void DrawButtonGlyph(Drawing::RenderTarget& rt, ScreenCoordsXY centre, const std::string& key, bool onAccent = false)
     {
-        const auto face = static_cast<Drawing::PaletteIndex>(
-            key == "A"   ? PocketPalette::positive
-                : key == "B" ? PocketPalette::destructive
-                             : PocketPalette::secondary);
+        const auto face = onAccent ? Theme::raised
+                                   : static_cast<Drawing::PaletteIndex>(
+                                         key == "A"   ? PocketPalette::positive
+                                             : key == "B" ? PocketPalette::destructive
+                                                          : PocketPalette::secondary);
         if (PocketPalette::Pixel())
         {
             FillRound(rt, centre - ScreenCoordsXY{ 6, 5 }, { 13, 11 }, face);
-            DrawButtonLabel(rt, centre - ScreenCoordsXY{ 6, 6 }, { 13, 13 }, key);
+            DrawButtonLabel(rt, centre - ScreenCoordsXY{ 6, 6 }, { 13, 13 }, key, !onAccent);
             return;
         }
         // A true 13 px circle (the old 15 x 11 oval squeezed bold letters against its top and
@@ -496,7 +499,7 @@ namespace OpenRCT2::Ui::Handheld
         static constexpr int kSpan[]{ 2, 4, 5, 5, 6, 6, 6, 6, 6, 5, 5, 4, 2 };
         for (int row = 0; row < 13; ++row)
             Fill(rt, centre + ScreenCoordsXY{ -kSpan[row], row - 6 }, { 2 * kSpan[row] + 1, 1 }, face);
-        DrawButtonLabel(rt, centre - ScreenCoordsXY{ 6, 6 }, { 13, 13 }, key);
+        DrawButtonLabel(rt, centre - ScreenCoordsXY{ 6, 6 }, { 13, 13 }, key, !onAccent);
     }
     inline void DrawCommand(Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t, const char* key, const char* label)
     {
@@ -618,7 +621,7 @@ namespace OpenRCT2::Ui::Handheld
                 rt, p + ScreenCoordsXY{ inset, size.height - 13 }, size.width - inset - glyphRoom,
                 std::string(!enabled ? "{DISABLED}" : filled ? "{BLACK}" : "{MUTED}") + subtitle);
         if (focused && enabled)
-            DrawButtonGlyph(rt, p + ScreenCoordsXY{ size.width - 12, (size.height - 2) / 2 }, "A");
+            DrawButtonGlyph(rt, p + ScreenCoordsXY{ size.width - 12, (size.height - 2) / 2 }, "A", filled);
     }
 
     inline void DrawListBackground(Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, bool focused)
