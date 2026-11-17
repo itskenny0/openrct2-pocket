@@ -14,7 +14,10 @@ int main()
     std::ofstream(root/"backup.park.bak") << "backup";
     fs::create_symlink(root/"valid.park",root/"alias.park");
     State s; s.Open(root,"*.park;*.sv6");
-    require(s.entries.size()==3 && s.entries[0].directory && s.Rows().size()==5);
+    // Rows: "Up one folder" then the entries (opening a folder re-reads it, so no Refresh row).
+    require(s.entries.size()==3 && s.entries[0].directory && s.Rows().size()==kFirst+3 && s.Rows()[0]=="Up one folder");
+    require(DisplayName(root/"valid.park",false)=="valid" && DisplayName(root/"Pocket-1_b.park",false)=="Pocket 1 b");
+    require(!Modified(root/"valid.park").empty() && Modified(root/"missing.park").empty());
     auto id=Capture(root/"valid.park"); require(id && Current(*id));
     const auto stamp=fs::last_write_time(id->path);
     std::ofstream(id->path)<<"new bytes"; fs::last_write_time(id->path,stamp);

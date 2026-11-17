@@ -60,7 +60,9 @@ namespace OpenRCT2::Ui::Handheld::FileBrowsing
     // "Pocket-1.park" reads as "Pocket 1": no extension, separators as spaces.
     inline std::string DisplayName(const fs::path& path, bool directory)
     {
-        auto name = directory ? path.filename().u8string() : path.stem().u8string();
+        // Copy through iterators: u8string() is std::u8string in C++20 builds without -fno-char8_t.
+        const auto utf8 = directory ? path.filename().u8string() : path.stem().u8string();
+        std::string name(utf8.begin(), utf8.end());
         std::replace(name.begin(), name.end(), '_', ' ');
         std::replace(name.begin(), name.end(), '-', ' ');
         return name;
