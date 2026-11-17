@@ -1281,8 +1281,12 @@ namespace OpenRCT2::Ui::Windows
         void parkMapControl(int control)
         {
             if (!parkMapOpen()) return;
+            // 0 next view, 3 previous view (L1/R1, like tabs everywhere), 4 cycle zoom 1/2/4/8 (Y),
+            // 2 details (R2); -1/+1 step zoom.
             if (control == 2) _parkMap.details = !_parkMap.details;
-            else if (control == 0) _parkMap.Mode();
+            else if (control == 0) _parkMap.Mode(1);
+            else if (control == 3) _parkMap.Mode(-1);
+            else if (control == 4) _parkMap.zoom = _parkMap.zoom >= 8 ? 1 : _parkMap.zoom * 2;
             else _parkMap.zoom = std::clamp(_parkMap.zoom + control, 1, 8);
             _parkMap.Update();
             invalidate();

@@ -850,13 +850,13 @@ namespace OpenRCT2::Ui::Handheld
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::contextPrimary)
                     Invoke(ShortcutId::kViewGeneralRotateClockwise);
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::contextSecondary)
-                    Windows::HandheldParkMapControl(0);
+                    Windows::HandheldParkMapControl(4);
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::slopeUp)
                     Windows::HandheldParkMapControl(2);
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::previousOption)
-                    Windows::HandheldParkMapControl(-1);
+                    Windows::HandheldParkMapControl(3);
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::nextOption)
-                    Windows::HandheldParkMapControl(1);
+                    Windows::HandheldParkMapControl(0);
                 else if (action == Action::contextPrimary && Windows::HandheldObjectPickerCamera())
                 { /* Accessible without a stick-click; camera preserves the construction draft. */
                 }

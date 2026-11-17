@@ -27,6 +27,7 @@ namespace OpenRCT2::Ui::Handheld
         if (label == "Operations" || label == "Settings") return { SPR_TAB_GEARS_0, 4 };
         if (label == "Statistics" || label == "History" || label == "Graphs") return { SPR_TAB_GRAPH_0, 8 };
         if (label == "Needs" || label == "Guests") return { SPR_TAB_GUESTS_0, 8 };
+        if (label == "Terrain") return { SPR_G2_TAB_LAND };
         if (label == "Summary" || label == "Finances") return { SPR_TAB_FINANCES_SUMMARY_0, 8 };
         if (label == "Research") return { SPR_TAB_FINANCES_RESEARCH_0, 8 };
         if (label == "Marketing") return { SPR_TAB_FINANCES_MARKETING_0, 19 };
