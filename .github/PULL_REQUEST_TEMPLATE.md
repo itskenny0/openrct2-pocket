@@ -1,15 +1,14 @@
-### Description of changes
+### What changed
 
-<!-- Briefly describe what was changed in the PR -->
+<!-- A short description. -->
 
-### Rationale behind changes
+### Why
 
-<!-- Why were these changes made? What problem does it solve, or what does it improve? -->
+<!-- What problem does this solve, or what does it make feel better? -->
 
-### Suggested testing steps
+### How to test
 
-<!-- Any particular areas of the game we need to look at? You can include example save games if needed. -->
+<!-- Steps on the device or with OPENRCT2_HANDHELD=1. Screenshots welcome. -->
 
-### Did you use AI to help find, test, or implement this issue or feature?
-
-<!-- Please answer honestly. If you answer yes, please provide a brief explanation as to how you used it. -->
+- [ ] Code formatting, standalone tests and the in-game drivers I touched pass
+- [ ] No RCT2 game data is included

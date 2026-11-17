@@ -1,76 +1,46 @@
 name: Bug report
-description: Report an issue you encountered when playing OpenRCT2.
-labels: 
-- bug
-
+description: Something broke, crashed or behaved wrongly.
+labels: [bug]
 body:
-- type: markdown
-  attributes:
-    value: Before filing this bug, [please check if it hasn't already been reported](https://github.com/OpenRCT2/OpenRCT2/issues?q=is%3Aissue+label%3Abug). If it has, please add useful information to the existing issue instead.
-
-- type: input
-  attributes:
-    label: Operating System
-    placeholder: e.g. Windows 10, 64-bit
-  validations:
-    required: true
-
-- type: input
-  attributes:
-    label: OpenRCT2 build
-    placeholder: e.g. OpenRCT2, v0.4.2-53-g3fa7d59 (3fa7d59 on develop) provided by GitHub
-    description: You can see the version by running `openrct2 --version` or copy it from the About window. Open the "Disk and game options" menu (floppy disk on the top toolbar), choose "About 'OpenRCT2'" and click the copy button next to the version information.
-  validations:
-    required: true
-
-- type: dropdown
-  attributes:
-    label: Base game
-    description: With what base game do you have OpenRCT2 loaded? Did you test it with the other (select both if so)?
-    multiple: true
-    options:
-      - RollerCoaster Tycoon 2
-      - RollerCoaster Tycoon Classic
-  validations:
-    required: true
-
-- type: dropdown
-  attributes:
-    label: Area(s) with this issue?
-    description: What things had an issue? Check all that apply.
-    multiple: true
-    options:
-      - The bug also exists in the original game (RCT2/RCTC)
-      - This bug is specific to multiplayer
-      - This bug is a graphical glitch or error
-      - This issue has to do with park objects and/or asset packs
-      - This is a development issue
-  validations:
-    required: false
-
-- type: textarea
-  attributes:
-    label: Describe the issue
-    description: Please describe the issue you are experiencing here.
-  validations:
-    required: true
-
-- type: textarea
-  attributes:
-    label: Steps to reproduce
-    description: We highly suggest including a screenshot and a bug report log (System tray->Report bug).
-    placeholder: |
-      Tell us the steps required to trigger your bug. Example:
-      1. Open the attached park file
-      2. Click on the park entrance
-      3. The game crashes
-  validations:
-    required: true
-
-- type: textarea
-  attributes:
-    label: Attachments
-    description: Please add any screenshots, dump files and/or videos here that may help us fix the issue.
-    placeholder: Drag and drop files here to add them
-  validations:
-    required: false
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! If the problem is in RCT2's simulation itself and also happens in
+        desktop OpenRCT2, please report it to [OpenRCT2](https://github.com/OpenRCT2/OpenRCT2/issues) instead.
+  - type: input
+    id: version
+    attributes:
+      label: Pocket version
+      description: The release (e.g. v0.4.0-beta.1) or the testing build's commit.
+    validations:
+      required: true
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      options:
+        - TrimUI Brick (NextUI)
+        - Other handheld (say which below)
+        - Desktop with OPENRCT2_HANDHELD=1
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the park menu
+        2. ...
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log or save
+      description: |
+        The log is in `.userdata/tg5040/openrct2-pocket/`. Attach a save if it helps reproduce the problem.
+        Please don't attach any RCT2 game files.
