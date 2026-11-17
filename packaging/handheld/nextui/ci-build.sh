@@ -36,6 +36,14 @@ fi
 ROOT="$BRICK_SDK/compiler/aarch64-linux-gnu/aarch64-linux-gnu/sysroot"
 BIN="$BRICK_SDK/compiler/aarch64-linux-gnu/bin"
 
+# nlohmann-json is header-only: copy the host's 3.x headers into the private sysroot (BUILD.md).
+if [ ! -d "$ROOT/usr/include/nlohmann" ]; then
+    for dir in /usr/include/nlohmann /usr/local/include/nlohmann; do
+        [ -f "$dir/json_fwd.hpp" ] && cp -r "$dir" "$ROOT/usr/include/" && break
+    done
+    [ -d "$ROOT/usr/include/nlohmann" ] || { echo "nlohmann-json headers not found on the host" >&2; exit 1; }
+fi
+
 # 2. Generated graphics from a native build of this exact source (the target cannot run the
 #    sprite generator while cross-compiling).
 cmake -S . -B host-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOPENRCT2_USE_CCACHE=OFF \
