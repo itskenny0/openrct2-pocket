@@ -296,8 +296,8 @@ namespace OpenRCT2::Ui::Handheld
                 {
                     const auto& meter = hero.meters[i];
                     const auto at = origin + ScreenCoordsXY{ textLeft + static_cast<int>(i) * slot, meterTop };
-                    DrawModernEllipsised(rt, at, slot - 50, "{MUTED}" + meter.label);
                     const int vw = TextWidth(meter.value, true);
+                    DrawModernEllipsised(rt, at, std::max(20, slot - vw - 16), "{MUTED}" + meter.label);
                     DrawStrongText(rt, at + ScreenCoordsXY{ slot - 10 - vw, 0 }, meter.ink + meter.value);
                     const auto ink = meter.ink == "{DANGER}" ? static_cast<Drawing::PaletteIndex>(PocketPalette::destructive)
                         : meter.ink == "{CAUTION}"           ? static_cast<Drawing::PaletteIndex>(PocketPalette::caution)
