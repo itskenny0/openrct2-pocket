@@ -725,6 +725,29 @@ namespace OpenRCT2::Ui::Handheld
             DrawStrongText(rt, p + ScreenCoordsXY{ width - 8 - w, 6 }, "{WHITE}" + value);
         }
     }
+    // A settings row with a toggle switch on the right: the knob slides right and the track fills
+    // when on. value, when given, replaces the switch with text (for multi-choice rows).
+    inline void DrawToggleRow(Drawing::RenderTarget& rt, ScreenCoordsXY p, int width, const std::string& label, bool on,
+        bool focused, const std::string& value = {})
+    {
+        constexpr int height = 26;
+        if (focused)
+        {
+            FillRound(rt, p, { width, height }, Theme::raised);
+            DrawFocusRing(rt, p, { width, height });
+        }
+        DrawModernEllipsised(rt, p + ScreenCoordsXY{ 10, CapCentre(height) }, width - 70, "{WHITE}" + label);
+        if (!value.empty())
+        {
+            const int w = TextWidth(value, true);
+            DrawStrongText(rt, p + ScreenCoordsXY{ width - 10 - w, CapCentre(height) }, "{WHITE}" + value);
+            return;
+        }
+        const ScreenCoordsXY track = p + ScreenCoordsXY{ width - 42, (height - 14) / 2 };
+        FillRound(rt, track, { 32, 14 }, Theme::edge);
+        FillRound(rt, track + ScreenCoordsXY{ 1, 1 }, { 30, 12 }, on ? Theme::gold : Theme::ink);
+        FillRound(rt, track + ScreenCoordsXY{ on ? 19 : 2, 2 }, { 11, 10 }, on ? Theme::raised : Theme::edge);
+    }
     inline void DrawPauseScreen(Drawing::RenderTarget& rt, ScreenSize screen, const std::vector<std::string>& rows,
         size_t selected, const PauseSummary& summary, const std::string& status)
     {

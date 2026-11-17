@@ -108,6 +108,7 @@ namespace OpenRCT2::Ui::Windows
     {
         park,
         controls,
+        settings,
         build,
         paths,
         pathOptions,
@@ -1445,7 +1446,7 @@ namespace OpenRCT2::Ui::Windows
         mutable bool _sceneryArtReady{};
         bool constructionMenu() const
         {
-            return choiceCards() || _page == Page::controls || _page == Page::designOptions || _page == Page::researchCatalog || _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
+            return choiceCards() || _page == Page::controls || _page == Page::park || _page == Page::settings || _page == Page::designOptions || _page == Page::researchCatalog || _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
                 || _page == Page::staffPatrolClear || _page == Page::rightsOptions || _page == Page::rightsConfirm
                 || (_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) || _page == Page::areaOptions || _page == Page::terrainPaintConfirm || _page == Page::sceneryOptions || _page == Page::parkInspect || (_page == Page::designInspect || _page == Page::designVehicles || _page == Page::designWarnings || _page == Page::designConfirm) || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
                 || _page == Page::sceneryConfirm || _page == Page::sceneryGroups || _page == Page::sceneryStyle
@@ -1481,6 +1482,21 @@ namespace OpenRCT2::Ui::Windows
             }
             if (_page == Page::controls) {
                 _focus.move(x ? x : y,3);invalidate();return;
+            }
+            if (_page == Page::park && x) {
+                // Two columns: Right/Left cross between Game and the speed / display column at the
+                // same height (rows 0-7 and 8-14).
+                const size_t i = _focus.index();
+                const size_t target = x > 0 ? (i < 8 ? std::min<size_t>(8 + i, 14) : i) : (i >= 8 ? std::min<size_t>(i - 8, 7) : i);
+                _focus.move(static_cast<int>(target) - static_cast<int>(i), rows().size());
+                invalidate();
+                return;
+            }
+            if (_page == Page::settings) {
+                if (y) move(y);
+                else if (x) toggleSetting(_focus.index());
+                invalidate();
+                return;
             }
             if (choiceCards())
             {
@@ -1569,6 +1585,18 @@ namespace OpenRCT2::Ui::Windows
         }
 
     private:
+        // Pages that draw across the whole canvas. The window must cover what they draw, or the
+        // parts outside it are never repainted (stale highlights and toggles).
+        bool fullScreen() const
+        {
+            return choiceCards() || _page == Page::staffPatrolClear || _page == Page::rightsConfirm || _page == Page::parkInspect
+                || _page == Page::designInspect || _page == Page::designVehicles || _page == Page::designWarnings || _page == Page::designConfirm
+                || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
+                || _page == Page::sceneryConfirm || _page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles
+                || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement()
+                || managementShell() || _page == Page::park || _page == Page::settings || _page == Page::controls
+                || _page == Page::save || _page == Page::load;
+        }
         void layout()
         {
             auto size = Handheld::OverlaySize(std::min<size_t>(8, rows().size()));
@@ -1577,19 +1605,14 @@ namespace OpenRCT2::Ui::Windows
             const ScreenSize target{ _page == Page::overwrite || _page == Page::discard || _page == Page::exit || _page == Page::quitChoice ? 330
                                                                                                                : size.width,
                                      size.height };
-            const ScreenSize bounds = (choiceCards() || _page == Page::staffPatrolClear || _page == Page::rightsConfirm
-                                       || _page == Page::parkInspect || (_page == Page::designInspect || _page == Page::designVehicles || _page == Page::designWarnings || _page == Page::designConfirm) || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch || _page == Page::sceneryConfirm
-                                       || (_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement() || managementShell()
-                                       || _page == Page::park)
+            const ScreenSize bounds = fullScreen()
                 ? ScreenSize{ ContextGetWidth(), ContextGetHeight() }
                 : information() ? ScreenSize{ 330, _page == Page::ride ? 340 : 310 }
                                 : target;
             WindowSetResize(*this, bounds, bounds);
             WindowSetPosition(
                 *this,
-                (choiceCards() || _page == Page::staffPatrolClear || _page == Page::rightsConfirm || _page == Page::parkInspect || (_page == Page::designInspect || _page == Page::designVehicles || _page == Page::designWarnings || _page == Page::designConfirm) || _page == Page::saveName || _page == Page::saveReview || _page == Page::sceneryName || _page == Page::scenerySearch
-                 || _page == Page::sceneryConfirm || (_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles) || _page == Page::parkMap || parkInformation() || _page == Page::pathOptions || picker() || shopManagement()
-                 || managementShell() || _page == Page::park)
+                fullScreen()
                     ? ScreenCoordsXY{ 0, 0 }
                     : ScreenCoordsXY{ 8, std::max(8, (ContextGetHeight() - bounds.height) / 2) });
         }
@@ -1939,11 +1962,14 @@ namespace OpenRCT2::Ui::Windows
                     return { "Resume park",   "Build",     "Park dashboard",      "Save park",
                              "Save and quit", "Load park", "Quit...", "Controls...",
                              simulationChoice(0), simulationChoice(1), simulationChoice(2), simulationChoice(3), Handheld::MenuThemes::Choice(),
-                             Handheld::MenuThemes::MotionChoice() };
+                             Handheld::MenuThemes::MotionChoice(), "More settings..." };
                 case Page::quitChoice:
                     return { "Save and quit", "Quit without saving...", "Cancel" };
                 case Page::controls:
                     return { "Park", "Build", "Menus" };
+                case Page::settings:
+                    return { "Theme", "Motion", "Smart cursor", "Goal in the HUD", "Clock and battery in the HUD",
+                             "Continue last park on launch", "Save when the device sleeps" };
                 case Page::dashboard:
                     return HandheldDashboardPresentation(0).rows;
                 case Page::staff:
@@ -3042,6 +3068,20 @@ namespace OpenRCT2::Ui::Windows
         {
             page(Page::dashboard);
         }
+        // Settings: A or Left/Right flips a row. Theme and Motion keep their own files; the rest
+        // live in pocket-prefs.cfg.
+        void toggleSetting(size_t row)
+        {
+            auto& store = Handheld::MenuThemes::settings;
+            store.Load(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user));
+            static constexpr std::array<const char*, 5> keys{ "smartCursor", "hudGoal", "hudClock", "resumeOnLaunch", "saveOnSleep" };
+            bool saved = true;
+            if (row == 0) saved = store.Toggle();
+            else if (row == 1) saved = store.ToggleMotion();
+            else if (row >= 2 && row <= 6) saved = store.TogglePreference(keys[row - 2]);
+            _status = saved ? "" : "Changed for this session; the preference could not be saved";
+            invalidate();
+        }
         // The quick wheel's destinations. Build reopens on the card used last (Build remembers
         // its focus), and "Again" confirms that card straight away.
         void quickJump(Handheld::QuickWheel::Target target)
@@ -3732,6 +3772,10 @@ namespace OpenRCT2::Ui::Windows
                 case Page::controls:
                     page(Page::park);
                     _focus.move(7, rows().size());
+                    break;
+                case Page::settings:
+                    page(Page::park);
+                    _focus.move(14, rows().size());
                     break;
                 case Page::researchCatalog:
                     page(Page::research); break;
@@ -4435,7 +4479,13 @@ namespace OpenRCT2::Ui::Windows
                         case 8: case 9: case 10: case 11:
                             chooseSimulation(static_cast<uint8_t>(choice - 8));
                             break;
+                        case 14:
+                            page(Page::settings);
+                            break;
                     }
+                    break;
+                case Page::settings:
+                    toggleSetting(choice);
                     break;
                 case Page::sceneryCategory:
                     if (choice == 5) {close();Handheld::BeginSceneryClear();}
@@ -6720,6 +6770,45 @@ namespace OpenRCT2::Ui::Windows
                     _page == Page::build ? "Build your park" : _page == Page::paths ? "Paths & queues"
                         : _page == Page::customChoice ? "Build this ride" : "Scenery",
                     choices(), _focus.index(), _page == Page::build ? 4 : 3, _page == Page::build ? "Park" : "Back");
+                return;
+            }
+            if (_page == Page::settings)
+            {
+                // Grouped toggles, with what the focused one does spelled out underneath.
+                using namespace Handheld;
+                const ScreenSize canvas{ ContextGetWidth(), ContextGetHeight() };
+                const int w = canvas.width - 16, h = Layout::ContentHeight(canvas);
+                DrawSurface(rt, { 8, 8 }, { w, h });
+                DrawHeadingText(rt, { 20, 19 }, "{WHITE}Settings", w - 24);
+                Fill(rt, { 20, 45 }, { w - 24, 1 }, Theme::edge);
+                const auto& prefs = Handheld::preferences;
+                struct Row { const char* section; const char* label; bool on; std::string value; const char* help; };
+                const std::array<Row, 7> list{ {
+                    { "DISPLAY", "Theme", false, MenuThemes::Choice().substr(7), "Daylight, Slate or the classic Pixel look." },
+                    { nullptr, "Motion", false, MenuThemes::MotionChoice().substr(8), "Reduced turns off slides, glides and scrolling names." },
+                    { "PLAYING", "Smart cursor", prefs.smartCursor, {}, "The cursor slows over rides, stalls and guests so it is easier to stop on them." },
+                    { "HUD", "Goal in the HUD", prefs.hudGoal, {}, "Shows your scenario goal's progress under the money and date." },
+                    { nullptr, "Clock and battery in the HUD", prefs.hudClock, {}, "Shows the time and battery level in the top bar." },
+                    { "DEVICE", "Continue last park on launch", prefs.resumeOnLaunch, {}, "Skips the title screen and opens the park you played last." },
+                    { nullptr, "Save when the device sleeps", prefs.saveOnSleep, {}, "Autosaves when the device sleeps or the game is closed, so nothing is lost." },
+                } };
+                int y = 52;
+                const auto focused = _focus.index();
+                for (size_t i = 0; i < list.size(); ++i)
+                {
+                    if (list[i].section)
+                    {
+                        DrawSectionLabel(rt, { 22, y + 4 }, w - 28, list[i].section);
+                        y += 18;
+                    }
+                    DrawToggleRow(rt, { 16, y }, w - 16, list[i].label, list[i].on, i == focused, list[i].value);
+                    y += 28;
+                }
+                if (focused < list.size())
+                    DrawModernEllipsised(rt, { 20, h - 10 }, w - 24, "{MUTED}" + std::string(list[focused].help));
+                if (!_status.empty())
+                    DrawModernEllipsised(rt, { 20, h - 24 }, w - 24, "{CAUTION}" + _status);
+                Handheld::DrawFooter(rt, canvas, { { "D-pad", "Choose" }, { "A", "Change" }, { "B", "Back" } });
                 return;
             }
             if (_page == Page::controls)

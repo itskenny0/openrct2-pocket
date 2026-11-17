@@ -4,6 +4,7 @@
 #include <SDL.h>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <thread>
@@ -155,6 +156,19 @@ int main(int argc, char** argv)
         Check(H::PocketPalette::style==originalTheme,"Theme preference did not survive reload");
         press(H::Action::back);
         Check(gGamePaused==0 && state.park.cash==themeCash,"Theme altered simulation or money");
+        {
+            // Settings: "More settings..." under Display opens the toggles; Smart cursor saves.
+            W::HandheldMenuOpen();nav(14);press(H::Action::confirm);
+            const bool before=H::preferences.smartCursor;
+            nav(2);press(H::Action::confirm);
+            Check(H::preferences.smartCursor!=before,"Smart cursor did not toggle");
+            capture("00c2-settings.png");
+            std::ifstream file(std::filesystem::path(context->GetPlatformEnvironment().GetDirectoryPath(DirBase::user))/"pocket-prefs.cfg");
+            std::string saved((std::istreambuf_iterator<char>(file)),std::istreambuf_iterator<char>());
+            Check(saved.find(std::string("smartCursor=")+(H::preferences.smartCursor?"1":"0"))!=std::string::npos,"Smart cursor was not saved");
+            press(H::Action::confirm);Check(H::preferences.smartCursor==before,"Smart cursor did not toggle back");
+            press(H::Action::back);press(H::Action::back);Check(!menu(),"Settings did not back out to the park");
+        }
         {
             // Quick wheel: hold L2, point with the D-pad, release (after the hold time) to choose.
             // A quick tap keeps it open for A / B instead.

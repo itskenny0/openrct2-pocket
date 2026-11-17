@@ -911,10 +911,10 @@ namespace OpenRCT2::Ui::Handheld
 
     // What A would inspect at the fixed cursor, refreshed each update so the footer verb and the
     // name chip preview the press instead of leaving it to guesswork.
-    static InspectTarget ResolveInspectTarget()
+    static InspectTarget ResolveInspectTarget(std::optional<ScreenCoordsXY> at = {})
     {
         const auto info = GetMapCoordinatesFromPos(
-            Centre(), { ViewportInteractionItem::entity, ViewportInteractionItem::ride, ViewportInteractionItem::parkEntrance });
+            at.value_or(Centre()), { ViewportInteractionItem::entity, ViewportInteractionItem::ride, ViewportInteractionItem::parkEntrance });
         const auto rideTarget = [](const Ride* ride) {
             if (ride == nullptr)
                 return InspectTarget{};
@@ -1177,6 +1177,74 @@ namespace OpenRCT2::Ui::Handheld
         HandleExplorerInput(input, input.update(ContextHasFocus(), SDL_GetTicks()));
     }
 
+    // Smart cursor (Settings, off by default). Three small aids, no hard snapping:
+    // - friction: panning slows to under half speed over a ride, stall, guest or staff member you
+    //   are arriving at (not the one you set off from), so it is easy to stop on;
+    // - acceleration: after most of a second of holding, empty ground pans faster;
+    // - magnet: let go just short of something and the camera eases the last few pixels onto it.
+    static struct
+    {
+        float x{}, y{};
+        uint64_t started{};
+        bool panning{};
+        std::string leaving;
+        ScreenCoordsXY magnet{};
+    } _smart;
+    static ScreenCoordsXY SmartCursor(const Frame& frame, ScreenCoordsXY pan)
+    {
+        const bool held = frame.heldX != 0 || frame.heldY != 0;
+        const auto now = MenuFeel::Clock();
+        if (held)
+        {
+            _smart.magnet = {};
+            if (!_smart.panning)
+            {
+                _smart.panning = true;
+                _smart.started = now;
+                _smart.leaving = _inspect.name;
+            }
+            const bool arriving = !_inspect.name.empty() && _inspect.name != _smart.leaving;
+            if (_inspect.name.empty())
+                _smart.leaving.clear(); // Once clear of where you started, every target counts.
+            const float factor = arriving ? 0.4f : now - _smart.started > 800 ? 1.8f : 1.0f;
+            _smart.x += pan.x * factor;
+            _smart.y += pan.y * factor;
+            const ScreenCoordsXY step{ static_cast<int>(_smart.x), static_cast<int>(_smart.y) };
+            _smart.x -= step.x;
+            _smart.y -= step.y;
+            return step;
+        }
+        if (_smart.panning)
+        {
+            _smart.panning = false;
+            _smart.x = _smart.y = 0;
+            if (_inspect.kind == InspectKind::none)
+            {
+                // Nearest target in rings of 8 / 16 / 24 px around the cursor.
+                const auto centre = Centre();
+                for (int radius = 8; radius <= 24 && _smart.magnet == ScreenCoordsXY{}; radius += 8)
+                    for (const auto& [dx, dy] : std::array<std::pair<int, int>, 8>{
+                             { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 }, { 1, -1 }, { 1, 1 }, { -1, 1 }, { -1, -1 } } })
+                    {
+                        const ScreenCoordsXY offset{ dx * radius, dy * radius };
+                        if (ResolveInspectTarget(centre + offset).kind != InspectKind::none)
+                        {
+                            _smart.magnet = offset;
+                            break;
+                        }
+                    }
+            }
+        }
+        // Ease towards the magnet target: a third of the way each frame, at least a pixel.
+        if (_smart.magnet != ScreenCoordsXY{})
+        {
+            auto ease = [](int remaining) { return remaining == 0 ? 0 : remaining / 3 != 0 ? remaining / 3 : (remaining > 0 ? 1 : -1); };
+            const ScreenCoordsXY step{ ease(_smart.magnet.x), ease(_smart.magnet.y) };
+            _smart.magnet -= step;
+            return step;
+        }
+        return pan;
+    }
     static QuickWheel::State _wheel;
     static void ChooseWheel(ControllerInput& input, size_t slot)
     {
@@ -1869,14 +1937,17 @@ namespace OpenRCT2::Ui::Handheld
             input.suspend();
             return;
         }
-        if (CanExplore() && (frame.panX != 0 || frame.panY != 0))
+        auto pan = ScreenCoordsXY{ frame.panX, frame.panY };
+        if (preferences.smartCursor && CanExplore() && !_terrainActive && !Paths::IsActive())
+            pan = SmartCursor(frame, pan);
+        if (CanExplore() && (pan.x != 0 || pan.y != 0))
         {
             auto* main = WindowGetMain();
             _terrainStatus.clear();
             _scatterFeedback = false;
             GuestFollow::Stop();
             WindowUnfollowSprite(*main);
-            InputScrollViewportSmooth({ frame.panX, frame.panY }, main);
+            InputScrollViewportSmooth(pan, main);
         }
     }
 
