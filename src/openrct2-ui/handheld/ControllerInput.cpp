@@ -193,6 +193,7 @@ namespace OpenRCT2::Ui::Handheld
         const int y = held(SDL_CONTROLLER_BUTTON_DPAD_DOWN) - held(SDL_CONTROLLER_BUTTON_DPAD_UP);
         result.heldX = x;
         result.heldY = y;
+        result.backHeld = held(ButtonAction(SDL_CONTROLLER_BUTTON_B) == Action::back ? SDL_CONTROLLER_BUTTON_B : SDL_CONTROLLER_BUTTON_A);
         if (x != _navigationX || y != _navigationY)
         {
             result.navigateX = x;

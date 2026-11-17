@@ -47,6 +47,8 @@ namespace OpenRCT2::Ui::Handheld
         // L2 is still down (the quick wheel picks on release), and the D-pad as held right now.
         bool leftTrigger{};
         int32_t heldX{}, heldY{};
+        // The Back button (B, or A when swapped) is still down: holding it in a tool undoes.
+        bool backHeld{};
         std::vector<Action> actions;
     };
 

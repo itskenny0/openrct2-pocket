@@ -20,6 +20,7 @@
 #include <openrct2-ui/handheld/ParkOverview.h>
 #include <openrct2-ui/handheld/ShopManagement.h>
 #include <openrct2-ui/handheld/Shops.h>
+#include <openrct2-ui/handheld/Undo.h>
 #include <openrct2/world/TileElementsView.h>
 #include <openrct2/world/tile_element/TrackElement.h>
 #include <openrct2/ride/Track.h>
@@ -228,6 +229,37 @@ int main(int argc, char** argv)
             L::shape=L::Shape::hill;Check(L::Action(CoordsXY{544,800},true).error==GameActions::Status::ok,"Hill failed beside ride");GameActions::ProcessQueue(state);
             L::shape=L::Shape::pond;focus({720,600,48});H::UpdateExplorer(input);capture("06c-landscape.png");
             L::brush=1;H::EndTerrain();
+        }
+        {
+            // Undo (hold B): land comes back to its exact heights, a placed shop is demolished.
+            namespace L=H::Landscape;
+            const CoordsXY hill{1248,1024};
+            const auto before=MapGetSurfaceElementAt(hill)->baseHeight;
+            H::BeginWater();L::shape=L::Shape::hill;L::brush=3;
+            const auto cashBefore=state.park.cash;
+            H::Undo::Prepare(H::Undo::Kind::land,hill,8,"land change");
+            const auto raised=L::Action(hill,true);
+            Check(raised.error==GameActions::Status::ok,"Undo fixture hill failed");GameActions::ProcessQueue(state);
+            H::Undo::Commit(raised.cost);
+            Check(MapGetSurfaceElementAt(hill)->baseHeight!=before,"Hill did not change the land");
+            const auto undone=H::Undo::Perform();GameActions::ProcessQueue(state);
+            Check(undone.error==GameActions::Status::ok&&MapGetSurfaceElementAt(hill)->baseHeight==before&&!H::Undo::Available(),
+                "Undo did not restore the land");
+            Check(state.park.cash==cashBefore,"Undo did not give the money back");
+            L::brush=1;H::EndTerrain();
+            auto* stall=objects.LoadObject("rct2.ride.drnks");Check(stall,"Stall object missing");
+            const auto stallObject=objects.GetLoadedObjectEntryIndex(stall);
+            ResearchInsertRideEntry(stallObject,true);RideEntrySetInvented(stallObject);RideTypeSetInvented(RIDE_TYPE_DRINK_STALL);
+            const CoordsXY shopTile{1312,1120};
+            const auto shopCash=state.park.cash;
+            H::Undo::Prepare(H::Undo::Kind::shop,shopTile,1,"shop");
+            const auto placed=H::Shops::Action(shopTile,stallObject,0,true);
+            Check(placed.error==GameActions::Status::ok,"Undo fixture shop failed");GameActions::ProcessQueue(state);
+            H::Undo::Commit(placed.cost);
+            auto tracks=[&]{auto view=TileElementsView<TrackElement>(shopTile);return view.begin()!=view.end();};Check(tracks(),"Shop was not placed");
+            Check(H::Undo::Perform().error==GameActions::Status::ok,"Undo did not demolish the shop");GameActions::ProcessQueue(state);
+            Check(!tracks(),"Shop survived undo");
+            Check(state.park.cash==shopCash,"Shop undo did not give the money back");
         }
         const auto wooden=load("rct2.ride.ptct1",RIDE_TYPE_WOODEN_ROLLER_COASTER);
         Check(H::BeginCustomTrack(wooden,RIDE_TYPE_WOODEN_ROLLER_COASTER),"Coaster start failed");GameActions::ProcessQueue(state);C::Update(CoordsXY{1408,640});focus({1424,656,64});

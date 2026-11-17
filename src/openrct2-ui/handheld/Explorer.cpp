@@ -21,6 +21,7 @@
 #include "Mazes.h"
 #include "Panel.h"
 #include "MenuThemes.h"
+#include "Undo.h"
 #include <openrct2/PlatformEnvironment.h>
 #include "Paths.h"
 #include "RideAccess.h"
@@ -408,6 +409,7 @@ namespace OpenRCT2::Ui::Handheld
     std::optional<CoordsXY> CurrentTerrainTile() { return _terrainTile; }
     void EndTerrain()
     {
+        Undo::Clear(); // Undo belongs to the tool session it came from.
         RideNavigation::construction.reset();
         _constructionAdjust.reset();
         PeepPlacement::End();
@@ -505,6 +507,33 @@ namespace OpenRCT2::Ui::Handheld
         if (_waterTool)
             return Water::Action(_terrainTile, _raiseLand, execute);
         return Landscape::Action(_terrainTile, execute);
+    }
+
+    // Before A changes the park, remember enough to put it back (hold B). Land shaping covers a
+    // generous square, since smoothing reaches past the brush; placements cover the brush or the
+    // object's footprint. Painting, removal, colours and ride building have their own flows.
+    static bool PrepareUndo()
+    {
+        if (!_terrainTile || CustomTracks::Active() || Designs::Active() || FlatRides::CurrentStage() != FlatRides::Stage::inactive
+            || PeepPlacement::Active() || StaffPatrol::Active() || _rightsTool || _sceneryClearTool || _colourRide
+            || _sceneryRemovalTool || _surfaceTool)
+            return false;
+        const auto tile = *_terrainTile;
+        if (_sceneryTool)
+        {
+            if (SceneryTools::Current().mode != SceneryTools::Mode::place)
+                return false;
+            Undo::Prepare(Undo::Kind::scenery, tile, 5, "scenery");
+        }
+        else if (_treeTool)
+            Undo::Prepare(Undo::Kind::trees, tile, 2, "tree");
+        else if (_shopTool)
+            Undo::Prepare(Undo::Kind::shop, tile, 1, "shop");
+        else if (_areaTool && AreaTools::settings.operation == AreaTools::Operation::paint)
+            return false;
+        else
+            Undo::Prepare(Undo::Kind::land, tile, 8, _waterTool ? "water change" : "land change");
+        return true;
     }
 
     static bool HasTextOrModalInput()
@@ -1262,6 +1291,58 @@ namespace OpenRCT2::Ui::Handheld
         }
         return pan;
     }
+    // Leaving a tool returns to wherever it was opened from (a ride, a guest, a staff member,
+    // the design browser), as B always has.
+    static void LeaveTool()
+    {
+        const bool designBrowser=Designs::Active() && Designs::BrowserReturn();
+        const auto access = _ridePathAccess;
+        const auto ride=ConstructionRide();
+        const auto context=RideNavigation::Take();
+        const auto person = PeepPlacement::target;
+        const auto employee = StaffPatrol::target;
+        EndTerrain();
+        if(designBrowser) Windows::HandheldDesignFilesOpen();
+        if (person && person->guest && GuestManagement::Resolve(*person->guest))
+            Windows::HandheldGuestOpen(*person->guest);
+        if (person && person->staff && StaffManagement::Resolve(*person->staff))
+            Windows::HandheldStaffOpen(*person->staff);
+        if (employee && StaffManagement::Resolve(*employee))
+            Windows::HandheldStaffOpen(employee);
+        if (ride && RideManagement::Resolve(*ride)) Windows::HandheldRideReturn(*ride,context);
+        else if (access && RideManagement::Resolve(*access)) Windows::HandheldRideAccessOpen(*access);
+    }
+    // Hold B in a tool to undo its last change; a tap still leaves the tool.
+    static constexpr uint64_t kUndoHoldMs = 450;
+    static uint64_t _backHold{};
+    static void HandleBackHold(ControllerInput& input, const Frame& frame)
+    {
+        const auto elapsed = MenuFeel::Clock() - _backHold;
+        if (frame.backHeld && elapsed < kUndoHoldMs)
+            return; // Still deciding.
+        _backHold = 0;
+        if (!frame.backHeld)
+        {
+            LeaveTool();
+            input.suspend();
+            return;
+        }
+        if (Undo::Available())
+        {
+            const auto result = Undo::Perform();
+            _terrainStatus = result.getErrorMessage();
+        }
+        else if (Paths::IsActive())
+        {
+            if (const auto draft = Paths::BeginUndo())
+            {
+                const auto result = Paths::Undo(*draft, true);
+                _terrainStatus = result.error == GameActions::Status::ok ? "Undone: last path section" : result.getErrorMessage();
+            }
+        }
+        Audio::Play(Audio::SoundId::click1, -400, Audio::kAudioPlayAtCentre);
+        input.suspend(); // The held B must not also leave the tool on release.
+    }
     static QuickWheel::State _wheel;
     static void ChooseWheel(ControllerInput& input, size_t slot)
     {
@@ -1326,6 +1407,8 @@ namespace OpenRCT2::Ui::Handheld
         }
         if (_wheel.open)
             return HandleWheel(input, frame);
+        if (_backHold)
+            return HandleBackHold(input, frame);
         if (_ridePathAccess && !AccessTargetValid())
         {
             EndTerrain();
@@ -1691,22 +1774,14 @@ namespace OpenRCT2::Ui::Handheld
                     wm->CloseByClass(WindowClass::dropdown);
                 else if ((_terrainActive || Paths::IsActive()) && CanExplore())
                 {
-                    const bool designBrowser=Designs::Active() && Designs::BrowserReturn();
-                    const auto access = _ridePathAccess;
-                    const auto ride=ConstructionRide();
-                    const auto context=RideNavigation::Take();
-                    const auto person = PeepPlacement::target;
-                    const auto employee = StaffPatrol::target;
-                    EndTerrain();
-                    if(designBrowser) Windows::HandheldDesignFilesOpen();
-                    if (person && person->guest && GuestManagement::Resolve(*person->guest))
-                        Windows::HandheldGuestOpen(*person->guest);
-                    if (person && person->staff && StaffManagement::Resolve(*person->staff))
-                        Windows::HandheldStaffOpen(*person->staff);
-                    if (employee && StaffManagement::Resolve(*employee))
-                        Windows::HandheldStaffOpen(employee);
-                    if (ride && RideManagement::Resolve(*ride)) Windows::HandheldRideReturn(*ride,context);
-                    else if (access && RideManagement::Resolve(*access)) Windows::HandheldRideAccessOpen(*access);
+                    // With something to undo, B waits to see whether it is a tap (leave the tool)
+                    // or a hold (undo). Return without suspending, so the held button stays visible.
+                    if (Undo::Available() || (Paths::IsActive() && Paths::BeginUndo()))
+                    {
+                        _backHold = MenuFeel::Clock();
+                        return;
+                    }
+                    LeaveTool();
                 }
                 else if (const auto followed = GuestFollow::Current(); followed && CanExplore())
                     Windows::HandheldGuestOpen(*followed);
@@ -1789,7 +1864,10 @@ namespace OpenRCT2::Ui::Handheld
                                     return;
                                 }
                                 const bool picking = _sceneryTool && SceneryTools::Current().mode == SceneryTools::Mode::pick;
+                                const bool undoable = PrepareUndo();
                                 const auto result = TerrainAction(true);
+                                if (undoable && result.error == GameActions::Status::ok)
+                                    Undo::Commit(result.cost);
                                 if (picking && result.error == GameActions::Status::ok)
                                 {
                                     _terrainStatus = "Object selected / Move, then A Place";
@@ -1816,6 +1894,8 @@ namespace OpenRCT2::Ui::Handheld
                                            : Landscape::shape == Landscape::Shape::flatten     ? "Levelled one step"
                                                                                                : "Land shaped.")
                                     : result.getErrorMessage();
+                                if (undoable && result.error == GameActions::Status::ok && Undo::Available())
+                                    _terrainStatus += _terrainStatus.empty() ? "Hold B: undo" : "  |  Hold B: undo";
                             }
                         }
                         else
