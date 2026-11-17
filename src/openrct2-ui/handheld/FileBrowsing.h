@@ -2,6 +2,8 @@
 #pragma once
 #include "../../openrct2/core/FileIdentity.h"
 #include <algorithm>
+#include <chrono>
+#include <ctime>
 #include <cctype>
 #include <cstdint>
 #include <filesystem>
@@ -33,6 +35,36 @@ namespace OpenRCT2::Ui::Handheld::FileBrowsing
     using OpenRCT2::FileIdentity::Capture;
     using OpenRCT2::FileIdentity::Current;
     struct Entry { fs::path path; bool directory{}; };
+    // Rows are "Up one folder" then the entries. Opening a folder always re-reads it, so there is
+    // no separate Refresh row.
+    inline constexpr size_t kFirst = 1;
+    // When a file was last written, as "16 Nov, 22:40". The file clock is converted through "now"
+    // on both clocks, which works on every C++17 standard library (no clock_cast).
+    inline std::string Modified(const fs::path& path)
+    {
+        std::error_code error;
+        const auto written = fs::last_write_time(path, error);
+        if (error) return {};
+        const auto system = std::chrono::system_clock::now()
+            + std::chrono::duration_cast<std::chrono::system_clock::duration>(written - fs::file_time_type::clock::now());
+        const std::time_t time = std::chrono::system_clock::to_time_t(system);
+        std::tm local{};
+#ifdef _WIN32
+        localtime_s(&local, &time);
+#else
+        localtime_r(&time, &local);
+#endif
+        char text[32];
+        return std::strftime(text, sizeof(text), "%d %b, %H:%M", &local) ? text : "";
+    }
+    // "Pocket-1.park" reads as "Pocket 1": no extension, separators as spaces.
+    inline std::string DisplayName(const fs::path& path, bool directory)
+    {
+        auto name = directory ? path.filename().u8string() : path.stem().u8string();
+        std::replace(name.begin(), name.end(), '_', ' ');
+        std::replace(name.begin(), name.end(), '-', ' ');
+        return name;
+    }
     struct State
     {
         fs::path directory;
@@ -69,7 +101,7 @@ namespace OpenRCT2::Ui::Handheld::FileBrowsing
         void Parent() { const auto parent=directory.parent_path(); if (!parent.empty()) directory=parent; Refresh(); }
         std::vector<std::string> Rows() const
         {
-            std::vector<std::string> rows{"Parent folder", "Refresh folder"};
+            std::vector<std::string> rows{"Up one folder"};
             for (const auto& e:entries) rows.push_back((e.directory ? "Folder: " : "") + e.path.filename().string());
             return rows;
         }

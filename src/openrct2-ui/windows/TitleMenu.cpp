@@ -152,7 +152,9 @@ namespace OpenRCT2::Ui::Windows
             std::vector<int> rows;
             if (_continuePath)
                 rows.push_back(kContinueRow);
-            for (auto index : { WIDX_START_NEW_GAME, WIDX_CONTINUE_SAVED_GAME, WIDX_MULTIPLAYER, WIDX_GAME_TOOLS })
+            // Game tools (scenario editor, track designer and manager, open folder) need a mouse and
+            // a desktop, so the handheld menu leaves them out rather than offer a dead button.
+            for (auto index : { WIDX_START_NEW_GAME, WIDX_CONTINUE_SAVED_GAME, WIDX_MULTIPLAYER })
                 if (widgets[index].isVisible())
                     rows.push_back(index);
             return rows;

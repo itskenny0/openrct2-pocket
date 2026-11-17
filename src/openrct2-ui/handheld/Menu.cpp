@@ -350,7 +350,7 @@ namespace OpenRCT2::Ui::Windows
         std::optional<Handheld::NamedSave::Draft> _saveDraft;
         std::string fileDetailPath() const
         {
-            const size_t offset=_page==Page::saveFiles ? 3 : 2;
+            const size_t offset=(_page==Page::saveFiles ? 1 : 0)+Handheld::FileBrowsing::kFirst;
             return _focus.index()>=offset && _focus.index()-offset<_files.entries.size()
                 ? _files.entries[_focus.index()-offset].path.u8string() : _files.directory.u8string();
         }
@@ -2239,7 +2239,7 @@ namespace OpenRCT2::Ui::Windows
             _fileLoad = browsing;
             if (browsing) {
                 _files.Open(folder, pattern); _fileFocus=0;
-                for(size_t i=0;i<_files.entries.size();++i)if(_files.entries[i].path==selected)_fileFocus=i+2;
+                for(size_t i=0;i<_files.entries.size();++i)if(_files.entries[i].path==selected)_fileFocus=i+Handheld::FileBrowsing::kFirst;
                 page(Page::parkFiles);
             }
             else page(Page::load);
@@ -2504,7 +2504,7 @@ namespace OpenRCT2::Ui::Windows
             if(!Handheld::Designs::Selection().empty()) folder=fs::u8path(Handheld::Designs::Selection()).parent_path();
             _files.Open(folder,Ui::FileBrowser::GetFilterPatternByType(LoadSaveType::track,false));
             _fileFocus=0;_fileDetail=0;
-            for(size_t i=0;i<_files.entries.size();++i)if(_files.entries[i].path.u8string()==Handheld::Designs::Selection())_fileFocus=i+2;
+            for(size_t i=0;i<_files.entries.size();++i)if(_files.entries[i].path.u8string()==Handheld::Designs::Selection())_fileFocus=i+Handheld::FileBrowsing::kFirst;
             page(Page::designFiles);
         }
         void openDesignPicker(bool fromBuild = false)
@@ -6456,9 +6456,8 @@ namespace OpenRCT2::Ui::Windows
                 case Page::saveFiles:
                     if(choice==0) editSaveName(fs::u8path(gScenarioSavePath).stem().u8string());
                     else if(choice==1) { _files.Parent(); _fileFocus=0; page(Page::saveFiles); }
-                    else if(choice==2) { _files.Refresh(); _fileFocus=0; _focus={}; invalidate(); }
-                    else if(choice-3<_files.entries.size()) {
-                        const auto entry=_files.entries[choice-3];
+                    else if(choice-1-Handheld::FileBrowsing::kFirst<_files.entries.size()) {
+                        const auto entry=_files.entries[choice-1-Handheld::FileBrowsing::kFirst];
                         if(entry.directory) { _files.Open(entry.path,_files.pattern); _fileFocus=0; page(Page::saveFiles); }
                         else editSaveName(entry.path.stem().u8string());
                     }
@@ -6483,11 +6482,11 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 case Page::designFiles:
                     if(choice==0) { const auto child=_files.directory;_files.Parent();_fileFocus=0;
-                        for(size_t i=0;i<_files.entries.size();++i)if(_files.entries[i].path==child)_fileFocus=i+2;
+                        for(size_t i=0;i<_files.entries.size();++i)if(_files.entries[i].path==child)_fileFocus=i+Handheld::FileBrowsing::kFirst;
                         page(Page::designFiles);
-                    } else if(choice==1) { TrackRepositoryScan();_files.Refresh();_focus={};_fileFocus=0;invalidate(); }
-                    else if(choice-2<_files.entries.size()) {
-                        const auto entry=_files.entries[choice-2];
+                    }
+                    else if(choice-Handheld::FileBrowsing::kFirst<_files.entries.size()) {
+                        const auto entry=_files.entries[choice-Handheld::FileBrowsing::kFirst];
                         if(entry.directory) {_files.Open(entry.path,_files.pattern);_fileFocus=0;page(Page::designFiles);}
                         else {
                             _designFile=Handheld::FileBrowsing::Capture(entry.path);
@@ -6543,18 +6542,15 @@ namespace OpenRCT2::Ui::Windows
                 {
                     if (choice == 0) {
                         const auto previous = _files.directory; _files.Parent(); _fileFocus=0;
-                        for (size_t i=0;i<_files.entries.size();++i) if (_files.entries[i].path == previous) _fileFocus=i+2;
+                        for (size_t i=0;i<_files.entries.size();++i) if (_files.entries[i].path == previous) _fileFocus=i+Handheld::FileBrowsing::kFirst;
                         _fileDetail=0; page(Page::parkFiles);
                     }
-                    else if (choice == 1) {
-                        _files.Refresh(); _focus={}; _fileFocus=0; invalidate();
-                    }
-                    else if (choice - 2 < _files.entries.size()) {
-                        const auto entry = _files.entries[choice - 2];
+                    else if (choice - Handheld::FileBrowsing::kFirst < _files.entries.size()) {
+                        const auto entry = _files.entries[choice - Handheld::FileBrowsing::kFirst];
                         if (entry.directory) { _files.Open(entry.path, _files.pattern); _fileFocus=0; _fileDetail=0; page(Page::parkFiles); }
                         else {
                             _loadFile = Handheld::FileBrowsing::Capture(entry.path);
-                            if (!_loadFile) { _status="File unavailable. Refresh the folder."; invalidate(); }
+                            if (!_loadFile) { _status="File unavailable. Open the folder again."; invalidate(); }
                             else {
                                 _parkFilePreview.reset(); _parkPreviewStatus="Preview unavailable for this format";
                                 if(ParkImporter::ExtensionIsOpenRCT2ParkFile(_loadFile->path.extension().u8string())) {
@@ -6940,16 +6936,35 @@ namespace OpenRCT2::Ui::Windows
             }
             if ((_page == Page::parkFiles || _page == Page::saveFiles || _page == Page::designFiles))
             {
+                // Files as a list you would see on a console: friendly names, what each one is and
+                // when it was saved, folders marked as folders, and the folder's name (not its path)
+                // in the header.
+                namespace FB = Handheld::FileBrowsing;
                 Handheld::ManagementPresentation model;
                 model.breadcrumb = std::string(_page == Page::designFiles ? "Designs / " : _page == Page::saveFiles ? "Save / " : "Load / ") + _files.directory.u8string();
-                model.title = _page == Page::designFiles ? "Track design files" : _page == Page::saveFiles ? "Save As destination" : "Parks and autosaves";
-                model.rows = rows(); model.selected = _focus.index();
-                model.bodyLines={Handheld::FileBrowsing::Detail(fileDetailPath(),_fileDetail)};
+                model.title = _page == Page::designFiles ? "Track designs" : _page == Page::saveFiles ? "Choose where to save" : "Browse parks";
+                const auto folder = _files.directory.filename().u8string();
+                model.headerStatus = folder == "save" ? "Saves" : folder == "autosave" ? "Autosaves" : folder == "track" ? "Designs"
+                    : folder.empty() ? _files.directory.u8string() : folder;
+                model.selected = _focus.index();
+                model.denseRoster = true;
+                const size_t lead = _page == Page::saveFiles ? 1 : 0;
+                if (lead) { model.rows.push_back("Save in this folder..."); model.rowDetails.push_back("Name the park on the next screen"); }
+                model.rows.push_back("Up one folder");
+                model.rowDetails.push_back(_files.directory.parent_path().filename().u8string());
+                for (const auto& entry : _files.entries)
+                {
+                    model.rows.push_back(FB::DisplayName(entry.path, entry.directory));
+                    const auto when = entry.directory ? std::string{} : FB::Modified(entry.path);
+                    const auto kind = entry.directory ? std::string("Folder")
+                        : _page == Page::designFiles ? std::string("Track design") : std::string("Saved park");
+                    model.rowDetails.push_back(when.empty() ? kind : kind + " / " + when);
+                }
                 model.status = !_status.empty() ? _status : !_files.error.empty() ? _files.error
-                    : _files.entries.empty() ? "No supported files or folders" : "";
-                Handheld::DrawManagementContent(rt, {8,8}, {496,348}, model);
-                Handheld::Concept::Box(rt,{8,359},{496,25});
-                Handheld::DrawModernText(rt,{16,369},"Up/Down Select  Left/Right Detail  A Open  B Back",{},480);
+                    : _files.entries.empty() ? "No parks or folders here" : "";
+                const ScreenSize canvas{ ContextGetWidth(), ContextGetHeight() };
+                Handheld::DrawManagementContent(rt, { 8, 8 }, { canvas.width - 16, Handheld::Layout::ContentHeight(canvas) }, model);
+                Handheld::DrawFooter(rt, canvas, { { "D-pad", "Choose" }, { "A", "Open" }, { "B", "Back" } });
                 return;
             }
             if (_page == Page::saveReview)
