@@ -225,7 +225,6 @@ namespace OpenRCT2::Ui::Windows
         marketingConfirm,
         ride,
         shop,
-        shopPrices,
         shopAppearance,
         shopAppearanceEditor,
         shopAppearanceReview,
@@ -385,7 +384,6 @@ namespace OpenRCT2::Ui::Windows
         std::string _status;
         RideId _rideId = RideId::GetNull();
         std::optional<Handheld::ShopManagement::Target> _shop;
-        std::optional<money64> _priceDraft;
         std::optional<Handheld::Finances::Draft> _financeDraft;
         Handheld::TabFocus<4> _financeTabs;
         Handheld::TabFocus<2> _researchTabs, _marketingTabs;
@@ -1240,7 +1238,7 @@ namespace OpenRCT2::Ui::Windows
     private:
         bool shopManagement() const
         {
-            return _page == Page::shop || _page == Page::shopPrices || _page == Page::shopDemolish || _page==Page::shopAppearance || _page==Page::shopAppearanceEditor || _page==Page::shopAppearanceReview;
+            return _page == Page::shop || _page == Page::shopDemolish || _page==Page::shopAppearance || _page==Page::shopAppearanceEditor || _page==Page::shopAppearanceReview;
         }
         void pauseManagement()
         {
@@ -1855,7 +1853,6 @@ namespace OpenRCT2::Ui::Windows
             if (next == Page::paths) _focus.move(static_cast<int>(_pathModeFocus), rows().size());
             if (next == Page::pathOptions) _focus.move(static_cast<int>(_pathOptionsFocus[Handheld::Paths::IsConnected()]), rows().size());
             _status.clear();
-            _priceDraft.reset();
             layout();
             if (next == Page::parkFiles || next == Page::saveFiles || next == Page::designFiles) _focus.move(static_cast<int>(_fileFocus), rows().size());
             if (next == Page::staff)
@@ -2053,14 +2050,6 @@ namespace OpenRCT2::Ui::Windows
                 case Page::shopAppearanceEditor:
                     return _shopAppearanceDraft?_shopAppearanceDraft->setting.labels:std::vector<std::string>{"Shop unavailable"};
                 case Page::shopAppearanceReview:return {"Cancel","Apply change"};
-                case Page::shopPrices:
-                {
-                    std::vector<std::string> result;
-                    if (_shop)
-                        for (const auto& price : Handheld::ShopManagement::Prices(*_shop))
-                            result.push_back(price.name);
-                    return result;
-                }
                 case Page::shopDemolish:
                     return { "Demolish", "Cancel" };
                 case Page::ride:
@@ -2814,7 +2803,6 @@ namespace OpenRCT2::Ui::Windows
             if (shopManagement() && _shop && !Handheld::ShopManagement::Find(*_shop))
             {
                 _shop.reset();
-                _priceDraft.reset();
                 _status = "Shop no longer available";
                 invalidate();
             }
@@ -3492,18 +3480,7 @@ namespace OpenRCT2::Ui::Windows
                 return;
             }
             if (y != 0)
-            {
                 move(y);
-                _priceDraft.reset();
-            }
-            if (_page == Page::shopPrices && _shop && x != 0)
-            {
-                const auto prices = Handheld::ShopManagement::Prices(*_shop);
-                if (_focus.index() < prices.size())
-                    _priceDraft = std::clamp(
-                        _priceDraft.value_or(prices[_focus.index()].value) + x, kRideMinPrice, kRideMaxPrice);
-                invalidate();
-            }
         }
         void setShopOpen(bool open)
         {
@@ -3850,7 +3827,6 @@ namespace OpenRCT2::Ui::Windows
                     break;
                 }
                 case Page::shopAppearance:
-                case Page::shopPrices:
                 case Page::shopDemolish:
                     page(Page::shop);
                     break;
@@ -6398,21 +6374,6 @@ namespace OpenRCT2::Ui::Windows
                     if(choice==0) {back();break;}
                     applyShopAppearanceDraft();
                     break;
-                case Page::shopPrices:
-                    if (_shop)
-                    {
-                        const auto prices = Handheld::ShopManagement::Prices(*_shop);
-                        if (choice < prices.size() && _priceDraft)
-                        {
-                            const auto result = Handheld::ShopManagement::SetPrice(
-                                *_shop, prices[choice].primary, *_priceDraft);
-                            _status = result.error == GameActions::Status::ok ? "Price updated"
-                                                                              : result.getErrorMessage();
-                            _priceDraft.reset();
-                        }
-                    }
-                    invalidate();
-                    break;
                 case Page::shopDemolish:
                     if (choice == 1)
                         page(Page::shop);
@@ -7171,17 +7132,6 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::DrawManagementContent(rt, { 8, 8 }, { 330, 348 }, model);
                 Handheld::DrawActionStrip(rt, { ContextGetWidth(), ContextGetHeight() });
                 Handheld::DrawFooter(rt, { ContextGetWidth(), ContextGetHeight() }, { { "D-pad", "Choose" }, { "A", "Select" }, { "B", "Cancel" } });
-                return;
-            }
-            if (shopManagement())
-            {
-                using Handheld::ShopManagement::View;
-                Handheld::ShopManagement::Draw(
-                    rt, { ContextGetWidth(), ContextGetHeight() }, _shop,
-                    _page == Page::shop             ? View::inspection
-                        : _page == Page::shopPrices ? View::prices
-                                                    : View::demolition,
-                    _focus.index(), _priceDraft, _status);
                 return;
             }
             if (_page == Page::trackPiecePicker)

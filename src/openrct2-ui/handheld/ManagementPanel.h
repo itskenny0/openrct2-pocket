@@ -362,22 +362,7 @@ namespace OpenRCT2::Ui::Handheld
             {
                 // The state switch: every option visible, the current one filled. Left/Right on it
                 // changes the state in place when it has focus.
-                const int cell = area / static_cast<int>(hero.states.size());
-                FillRound(rt, origin + ScreenCoordsXY{ textLeft, y }, { area, 22 }, Theme::edge);
-                FillRound(rt, origin + ScreenCoordsXY{ textLeft + 1, y + 1 }, { area - 2, 20 }, Theme::ink);
-                for (size_t i = 0; i < hero.states.size(); ++i)
-                {
-                    const auto cellPos = origin + ScreenCoordsXY{ textLeft + 2 + static_cast<int>(i) * cell, y + 2 };
-                    const bool current = i == hero.state;
-                    if (current)
-                        FillRound(rt, cellPos, { cell - 4, 18 }, Theme::gold);
-                    const int w = TextWidth(hero.states[i], current);
-                    const auto ink = current ? std::string("{BLACK}") : std::string("{MUTED}");
-                    if (current)
-                        DrawStrongText(rt, cellPos + ScreenCoordsXY{ (cell - 4 - w) / 2, CapCentre(18) }, ink + hero.states[i]);
-                    else
-                        DrawModernText(rt, cellPos + ScreenCoordsXY{ (cell - 4 - w) / 2, CapCentre(18) }, ink + hero.states[i]);
-                }
+                DrawSegmented(rt, origin + ScreenCoordsXY{ textLeft, y }, { area, 22 }, hero.states, hero.state);
                 if (hero.stateFocused && focused)
                     DrawFocusRing(rt, origin + ScreenCoordsXY{ textLeft, y }, { area, 22 });
                 y += 30;
