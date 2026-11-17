@@ -1974,7 +1974,18 @@ namespace OpenRCT2::Ui::Handheld
                             else if (FlatRides::CurrentStage() == FlatRides::Stage::ride && !FlatRides::Busy())
                                 Windows::HandheldRidePickerOpen();
                             else if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
-                                break;
+                            {
+                                // Entrance or exit: Y places both and lays their paths.
+                                // Success hands back to the ride overview once it is built, so the
+                                // summary travels with it; a refusal stays here in the status line.
+                                std::string summary;
+                                const auto placed = FlatRides::AutoPlace(summary);
+                                if (placed.error == GameActions::Status::ok)
+                                    Windows::HandheldRideReturnNotice(summary);
+                                _terrainStatus = summary;
+                                input.suspend();
+                                return;
+                            }
                             else if (_shopTool)
                                 Windows::HandheldShopPickerOpen();
                             else if (PeepPlacement::Active())

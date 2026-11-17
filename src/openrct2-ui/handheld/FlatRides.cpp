@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "FlatRides.h"
 
+#include "AutoAccess.h"
+
 #include "TrackPreview.h"
 #include "AccessPreview.h"
 #include "RideAccess.h"
@@ -19,6 +21,7 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
     static std::optional<RideAccess::ExistingPoint> editing;
     static StationIndex stationIndex{ StationIndex::FromUnderlying(0) };
     static uint64_t revision{};
+    static std::string notice; // Why Auto could not place, until the stage changes.
     struct Request
     {
         CoordsXYZD origin;
@@ -84,6 +87,7 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
     }
     void End()
     {
+        notice.clear();
         ClearPreview();
         stage = Stage::inactive;
         editing.reset();
@@ -116,6 +120,7 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
     }
     static void NextStation()
     {
+        notice.clear();
         stage = Stage::inactive;
         const auto* ride = target ? RideManagement::Resolve(*target) : nullptr;
         if (!ride)
@@ -271,6 +276,30 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
             busy = false;
         return queued;
     }
+    GameActions::Result AutoPlace(std::string& summary)
+    {
+        if (busy)
+            return Invalid("Placement pending");
+        if ((stage != Stage::entrance && stage != Stage::exit) || editing || !target || !RideManagement::Resolve(*target))
+            return Invalid("Nothing to place");
+        const auto plan = AutoAccess::Make(*target, stationIndex, summary);
+        if (!plan)
+        {
+            notice = summary;
+            return Invalid(summary);
+        }
+        ClearPreview();
+        const auto token = revision;
+        busy = true;
+        auto result = AutoAccess::Execute(*plan, *target, stationIndex, [token] {
+            if (token != revision)
+                return;
+            busy = false;
+            NextStation();
+        });
+        summary = result.error == GameActions::Status::ok ? AutoAccess::Summary(*plan) : result.getErrorMessage();
+        return result;
+    }
     void UpdatePreview(std::optional<CoordsXY> tile)
     {
         if((stage==Stage::entrance || stage==Stage::exit) && !busy && target) {
@@ -331,19 +360,22 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
             }
         }
         DrawStrongText(rt,p+ScreenCoordsXY{86,116},placing ? "{WHITE}Place ride" : stage == Stage::entrance ? "{WHITE}Place entrance" : "{WHITE}Place exit",118);
+        if (!notice.empty() && !placing) DrawModernEllipsised(rt,p+ScreenCoordsXY{86,140},118,"{CAUTION}"+notice); else
         DrawModernEllipsised(rt,p+ScreenCoordsXY{86,140},118,placing ? "{MUTED}Faces "+std::string(std::array{"NW","SW","SE","NE"}[direction & 3]) : "{MUTED}Station "+std::to_string(stationIndex.ToUnderlying()+1));
-        if (!editing) DrawCommand(rt,p+ScreenCoordsXY{86,163},32,"SELECT","Turn");
+        if (!editing) DrawCommand(rt,p+ScreenCoordsXY{86,163},32,placing ? "SELECT" : "Y",placing ? "Turn" : "Auto + paths");
         DrawActionStrip(rt, screen);
 
         std::vector<ControlHint> hints{ { "D-pad", "Move" },
                                         { "A", editing ? "Review" : "Place" },
                                         { "B", target ? "Ride" : "Cancel" },
                                         { "START", target ? "Ride" : "Park", HintPriority::guide } };
-        if (!editing)
+        if (!editing && placing)
         {
             hints.push_back({ "Y", "Rides" });
             hints.push_back({ "SELECT", "Turn", HintPriority::guide });
         }
+        else if (!editing)
+            hints.push_back({ "Y", "Auto" });
         DrawFooter(rt, screen, hints);
         }
 } // namespace OpenRCT2::Ui::Handheld::FlatRides

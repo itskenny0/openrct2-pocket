@@ -81,6 +81,7 @@ namespace OpenRCT2::Ui::Handheld
 namespace OpenRCT2::Ui::Windows
 {
     void HandheldRideOpen(RideId ride);
+    void HandheldRideReturnNotice(std::string notice);
     void HandheldRideReturn(const Handheld::RideManagement::Target& target, const std::optional<Handheld::RideNavigation::Context>& context = {});
     bool HandheldRideQuickAccess();
     void HandheldRideAccessOpen(const Handheld::RideManagement::Target& target);

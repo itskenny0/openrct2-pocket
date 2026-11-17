@@ -205,6 +205,37 @@ int main(int argc, char** argv)
             Check(!H::Paths::IsActive(),"Extend path tool did not end");
         }
         {
+            // Auto access: Y while placing the entrance puts the entrance and exit beside the ride
+            // and lays a queue and an exit path to the nearest footpath.
+            auto* surface=objects.LoadObject("rct2.footpath_surface.tarmac");auto* queue=objects.LoadObject("rct2.footpath_surface.queue_blue");
+            auto* railing=objects.LoadObject("rct2.footpath_railings.wood");Check(surface&&queue&&railing,"Auto access path objects missing");
+            for(int x=1376;x<=1856;x+=32)
+            {
+                const CoordsXY t{x,1408};
+                GameActions::FootpathPlaceAction a({t,MapGetSurfaceElementAt(t)->getBaseZ()},FootpathSlope{},
+                    objects.GetLoadedObjectEntryIndex(surface),objects.GetLoadedObjectEntryIndex(railing));
+                Check(GameActions::Execute(&a,state).error==GameActions::Status::ok,"Auto access path fixture failed");
+            }
+            GameActions::ProcessQueue(state);
+            Check(H::BeginFlatRide(flat),"Auto access ride start failed");
+            Check(F::Action(CoordsXY{1600,1600},true).error==GameActions::Status::ok,"Auto access ride placement failed");GameActions::ProcessQueue(state);
+            const auto autoRide=*F::Target();Check(F::CurrentStage()==F::Stage::entrance,"Auto access ride did not ask for an entrance");
+            focus({1616,1616,MapGetSurfaceElementAt(CoordsXY{1600,1600})->getBaseZ()});H::UpdateExplorer(input);capture("06g-auto-access.png");
+            const auto autoCash=state.park.cash;
+            press(H::Action::contextSecondary);Check(F::Busy(),"Y did not start auto access");
+            // Two passes: the exit and its path are queued once the entrance exists.
+            GameActions::ProcessQueue(state);GameActions::ProcessQueue(state);
+            const auto& autoStation=GetRide(autoRide.id)->getStation(StationIndex::FromUnderlying(0));
+            Check(!autoStation.entrance.isNull()&&!autoStation.exit.isNull(),"Auto access did not place both entrance and exit");
+            const auto access=H::RideAccess::Inspect(autoRide);
+            Check(access&&access->entrance.reachesNormalPath&&access->exit.reachesNormalPath,"Auto access did not join both to the path");
+            Check(state.park.cash<autoCash,"Auto access was free");
+            H::UpdateExplorer(input);
+            const auto overview=W::HandheldRidesPresentation();
+            Check(overview.tabs.size()==4&&overview.status.find("joined to the path")!=std::string::npos,"Auto access did not report back on the ride");
+            capture("06h-auto-access-done.png");closeMenu();focus({1616,1520,MapGetSurfaceElementAt(CoordsXY{1600,1600})->getBaseZ()});capture("06i-auto-access-world.png");
+        }
+        {
             // Attention: a broken ride becomes the first alert, Y glides the camera to it, and the
             // overview home leads with it. With no problems, Y is News as before.
             auto* ride=GetRide(target.id);ride->flags.set(RideFlag::brokenDown);H::Alerts::Invalidate();

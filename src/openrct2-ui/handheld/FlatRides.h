@@ -30,6 +30,9 @@ namespace OpenRCT2::Ui::Handheld::FlatRides
     std::optional<CoordsXYZD> EntranceLocation(std::optional<CoordsXY> tile);
     void Rotate();
     GameActions::Result Action(std::optional<CoordsXY> tile, bool execute);
+    // Y while placing access: entrance, exit and their paths in one go (see AutoAccess). The
+    // summary is what was built, or why nothing was.
+    GameActions::Result AutoPlace(std::string& summary);
     void UpdatePreview(std::optional<CoordsXY> tile);
     void ClearPreview();
     void RemovePreviewTemporarily();

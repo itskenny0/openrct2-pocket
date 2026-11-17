@@ -262,6 +262,7 @@ namespace OpenRCT2::Ui::Windows
     // The last Build card confirmed, kept beyond the menu window: Build reopens on it and the
     // quick wheel's "Again" repeats it.
     static size_t sLastBuildCard = 8;
+    static std::string sRideReturnNotice; // Set by a tool just before it hands back to the ride.
     static std::string sLastBuildLabel;
     static uint32_t sLastBuildSprite{};
     static fs::path SlotPath(size_t slot)
@@ -2866,6 +2867,8 @@ namespace OpenRCT2::Ui::Windows
         {
             if(!Handheld::RideManagement::Resolve(target)) { close();return; }
             openRide(target.id);
+            // What the tool just did (auto-placed access, say), shown until the next page change.
+            if(!sRideReturnNotice.empty()) {_status=std::exchange(sRideReturnNotice,{});invalidate();}
             if(context && context->target==target)
             {
                 _rideTabs=context->tabs;_rideFromPark=context->fromPark;_ridesRosterFocus=context->rosterFocus;
@@ -7723,6 +7726,10 @@ namespace OpenRCT2::Ui::Windows
     {
         if (auto* window = GetWindowManager()->FindByClass(WindowClass::handheldMenu))
             static_cast<HandheldMenuWindow*>(window)->back();
+    }
+    void HandheldRideReturnNotice(std::string notice)
+    {
+        sRideReturnNotice=std::move(notice);
     }
     void HandheldRideReturn(const Handheld::RideManagement::Target& target, const std::optional<Handheld::RideNavigation::Context>& context)
     {
