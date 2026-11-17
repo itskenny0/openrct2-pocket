@@ -21,6 +21,7 @@
 #include "Mazes.h"
 #include "Panel.h"
 #include "MenuThemes.h"
+#include "RideFollow.h"
 #include "Undo.h"
 #include <openrct2/PlatformEnvironment.h>
 #include "Paths.h"
@@ -1000,9 +1001,18 @@ namespace OpenRCT2::Ui::Handheld
         return {};
     }
 
+    // Riding along with more than one train: A moves to the next.
+    static bool RideAlongCycles()
+    {
+        const auto riding = RideFollow::Current();
+        const auto* ride = riding ? GetRide(riding->ride) : nullptr;
+        return ride && RideFollow::Trains(*ride) > 1 && !_terrainActive && !Paths::IsActive();
+    }
+
     void UpdateExplorer(ControllerInput& input)
     {
         GuestFollow::Update();
+        RideFollow::Update();
         _inspect = !_terrainActive && !Paths::IsActive() && CanExplore() && ContextHasFocus() ? ResolveInspectTarget()
                                                                                              : InspectTarget{};
         if (gLegacyScene != LegacyScene::playing)
@@ -1785,6 +1795,11 @@ namespace OpenRCT2::Ui::Handheld
                 }
                 else if (const auto followed = GuestFollow::Current(); followed && CanExplore())
                     Windows::HandheldGuestOpen(*followed);
+                else if (const auto riding = RideFollow::Current(); riding && CanExplore())
+                {
+                    // Back to the ride; the camera stays with the train until something moves it.
+                    Windows::HandheldRideOpen(riding->ride);
+                }
                 else
                     wm->CloseTop();
             }
@@ -1835,6 +1850,12 @@ namespace OpenRCT2::Ui::Handheld
                 switch (action)
                 {
                     case Action::confirm:
+                        if (RideAlongCycles())
+                        {
+                            RideFollow::Next();
+                            input.suspend();
+                            return;
+                        }
                         if (Paths::IsActive())
                         {
                             const auto result = Paths::Action(true);
@@ -2078,6 +2099,7 @@ namespace OpenRCT2::Ui::Handheld
             _terrainStatus.clear();
             _scatterFeedback = false;
             GuestFollow::Stop();
+            RideFollow::Stop();
             WindowUnfollowSprite(*main);
             InputScrollViewportSmooth(pan, main);
         }
@@ -2126,7 +2148,9 @@ namespace OpenRCT2::Ui::Handheld
                 DrawMapFocus(rt, c);
             return;
         }
-        std::string status = GuestFollow::Current() ? "Follow / B Guest / D-pad Stop" : "L/R: Zoom   X: Rotate";
+        std::string status = GuestFollow::Current() ? "Follow / B Guest / D-pad Stop"
+            : RideFollow::Current()                 ? RideFollow::Label()
+                                                    : "L/R: Zoom   X: Rotate";
         std::string costAmount;
         if (_terrainActive)
         {
@@ -2264,7 +2288,7 @@ namespace OpenRCT2::Ui::Handheld
             else if (!_wheel.open) // The wheel draws its own footer.
                 DrawGameplayFooter(
                     rt, { ContextGetWidth(), height }, status, _terrainActive, _surfaceTool || _colourRide.has_value(),
-                    _inspect.verb, Alerts::HintLabel());
+                    RideAlongCycles() ? "Next" : _inspect.verb, Alerts::HintLabel());
         }
         // A colour palette owns the D-pad; placement feedback/cursor is unrelated
         // here and suggested a placement error while merely choosing a colour.
@@ -2276,7 +2300,7 @@ namespace OpenRCT2::Ui::Handheld
             DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), status);
         else if (!costAmount.empty())
             DrawCostBadge(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), costAmount, Paths::BatchActive());
-        if (GuestFollow::Current() && !_terrainActive && !Paths::IsActive())
+        if ((GuestFollow::Current() || RideFollow::Current()) && !_terrainActive && !Paths::IsActive())
             DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), status);
         else if (!_wheel.open && !_inspect.name.empty() && !_terrainActive && !Paths::IsActive())
             DrawInspectChip(rt, InspectChipOrigin(), InspectChipSize(), _inspect.name, InspectColour(_inspect.kind));

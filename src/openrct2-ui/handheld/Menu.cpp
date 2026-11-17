@@ -9,6 +9,7 @@
 #include "CustomTracks.h"
 #include "Dashboard.h"
 #include "QuickWheel.h"
+#include "RideFollow.h"
 #include "ChoiceCards.h"
 #include "Designs.h"
 #include "DesignAuthoring.h"
@@ -5541,6 +5542,20 @@ namespace OpenRCT2::Ui::Windows
                     if (choice >= indices.size()) break;
                     choice = indices[choice];
                     auto rows = nativeModel.rows;
+                    if (const auto along = std::find(rows.begin(), rows.end(), "Ride along"); along != rows.end())
+                    {
+                        const auto index = static_cast<size_t>(along - rows.begin());
+                        if (choice == index)
+                        {
+                            const auto ride = _ridesTarget->id;
+                            Handheld::GuestFollow::Stop();
+                            close();
+                            if (!Handheld::RideFollow::Start(ride))
+                                GetWindowManager()->ShowError("Ride along", "This ride has no trains yet");
+                            break;
+                        }
+                        rows.erase(along); if (choice > index) --choice;
+                    }
                     const auto accessRow = std::find(rows.begin(), rows.end(), "Entrances / exits...");
                     if (accessRow != rows.end())
                     {

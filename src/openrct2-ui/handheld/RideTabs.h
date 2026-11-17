@@ -34,7 +34,7 @@ namespace OpenRCT2::Ui::Handheld::RideTabs
         // Status controls form one immediate group, rather than being interspersed
         // with inspection/navigation. Everything maps back to its native row.
         const std::vector<std::string_view> order = tab == overview
-            ? std::vector<std::string_view>{"Admission price...", "Price unavailable", "Place entrance / exit...", "Locate", "Entrances / exits..."}
+            ? std::vector<std::string_view>{"Admission price...", "Price unavailable", "Place entrance / exit...", "Locate", "Ride along", "Entrances / exits..."}
             : tab == operations ? std::vector<std::string_view>{"Operations...", "Vehicles...", "Dispatch...", "Maintenance..."}
             : tab == settings ? std::vector<std::string_view>{"Rename...", "Appearance...", "Music...", "Save design...", "Demolish...", "Back to roster"}
             : std::vector<std::string_view>{};

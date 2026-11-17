@@ -12,6 +12,7 @@
 #include <openrct2-ui/handheld/CustomTracks.h>
 #include <openrct2-ui/handheld/Explorer.h>
 #include <openrct2-ui/handheld/FlatRides.h>
+#include <openrct2-ui/handheld/RideFollow.h>
 #include <openrct2-ui/handheld/Paths.h>
 #include <openrct2-ui/handheld/RideAccess.h>
 #include <openrct2-ui/handheld/TrackEditing.h>
@@ -234,6 +235,21 @@ int main(int argc, char** argv)
             const auto overview=W::HandheldRidesPresentation();
             Check(overview.tabs.size()==4&&overview.status.find("joined to the path")!=std::string::npos,"Auto access did not report back on the ride");
             capture("06h-auto-access-done.png");closeMenu();focus({1616,1520,MapGetSurfaceElementAt(CoordsXY{1600,1600})->getBaseZ()});capture("06i-auto-access-world.png");
+            // Ride along: once the ride has trains, the overview offers it; the camera follows the
+            // train zoomed in, B returns to the ride, and panning ends it and gives the zoom back.
+            Check(!H::RideFollow::Available(autoRide.id),"Ride along offered before the ride has trains");
+            {GameActions::RideSetStatusAction open(autoRide.id,RideStatus::testing);GameActions::Execute(&open,state);GameActions::ProcessQueue(state);}
+            Check(H::RideFollow::Available(autoRide.id),"Testing ride has no train to ride along");
+            auto* main=WindowGetMain();main->viewport->zoom=ZoomLevel{2};const auto zoomBefore=main->viewport->zoom;
+            W::HandheldRideOpen(autoRide.id);FocusRideTabAction("Ride along");press(H::Action::confirm);WindowCullDead();
+            Check(!wm->FindByClass(WindowClass::handheldMenu)&&H::RideFollow::Current()&&main->viewportSmartFollowSprite==H::RideFollow::Current()->vehicle,
+                "Ride along did not follow the train");
+            Check(main->viewport->zoom==ZoomLevel{0},"Ride along did not zoom in");
+            H::UpdateExplorer(input);
+            press(H::Action::back);Check(W::HandheldRidesPresentation().tabs.size()==4,"B while riding did not return to the ride");closeMenu();
+            H::Frame panAway;panAway.panX=8;H::HandleExplorerInput(input,panAway);H::UpdateExplorer(input);
+            Check(!H::RideFollow::Current()&&main->viewport->zoom==zoomBefore,"Panning did not end ride along and restore the zoom");
+            {GameActions::RideSetStatusAction close(autoRide.id,RideStatus::closed);GameActions::Execute(&close,state);GameActions::ProcessQueue(state);}
         }
         {
             // Attention: a broken ride becomes the first alert, Y glides the camera to it, and the

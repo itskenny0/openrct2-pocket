@@ -55,6 +55,7 @@ namespace OpenRCT2::Ui::Handheld
         if (label == "Close..." || label == "Close" || label == "Close park...") return { SPR_CLOSED };
         if (label == "Test..." || label == "Test unavailable") return { SPR_TESTING };
         if (label == "Locate" || label == "Locate ride" || label == "Locate subject") return { SPR_LOCATE };
+        if (label == "Ride along") return { SPR_TAB_RIDE_0 };
         if (label == "Statistics..." || label == "Statistics") return { SPR_GRAPH };
         if (label == "Save park" || label == "Save and quit" || label == "Save") return { SPR_FLOPPY };
         if (label == "Load park" || label == "Browse...") return { SPR_G2_FOLDER };
