@@ -229,6 +229,31 @@ namespace OpenRCT2::Ui::Handheld
         if (focused)
             DrawFocusRing(rt, pos, size, kind == ButtonKind::primary);
     }
+    // A segmented switch: every option visible, the current one filled. The same look as a hero's
+    // state switch, for any short set of modes (Single / Line / Fill).
+    inline void DrawSegmented(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size,
+        const std::vector<std::string>& labels, size_t current)
+    {
+        if (labels.empty())
+            return;
+        FillRound(rt, pos, size, Theme::edge);
+        FillRound(rt, pos + ScreenCoordsXY{ 1, 1 }, { size.width - 2, size.height - 2 }, Theme::ink);
+        const int cell = (size.width - 4) / static_cast<int>(labels.size());
+        for (size_t i = 0; i < labels.size(); ++i)
+        {
+            const auto at = pos + ScreenCoordsXY{ 2 + static_cast<int>(i) * cell, 2 };
+            const bool on = i == current;
+            if (on)
+                FillRound(rt, at, { cell, size.height - 4 }, Theme::gold);
+            const int w = TextWidth(labels[i], on);
+            const auto text = std::string(on ? "{BLACK}" : "{MUTED}") + labels[i];
+            const auto origin = at + ScreenCoordsXY{ (cell - w) / 2, CapCentre(size.height - 4) };
+            if (on)
+                DrawStrongText(rt, origin, text);
+            else
+                DrawModernText(rt, origin, text);
+        }
+    }
     // A thin rounded bar: loan against its limit, research progress, happiness. Shapes read faster
     // than numbers on a small screen.
     inline void DrawMeter(

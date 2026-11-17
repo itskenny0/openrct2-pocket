@@ -6,16 +6,13 @@ namespace OpenRCT2::Ui::Handheld
     // Presentation only: progress reflects the caller's actual construction stage.
     inline void DrawPlacementSteps(Drawing::RenderTarget& rt, ScreenCoordsXY p, int width, size_t active)
     {
-        static constexpr std::array labels{"Ride", "Entry", "Exit"};
-        const int pitch = width / 3;
-        for (size_t i=0; i<labels.size(); ++i)
-        {
-            const auto cell = p + ScreenCoordsXY{static_cast<int>(i)*pitch, 0};
-            Fill(rt, cell, {pitch-3, 24}, i == active ? Theme::gold : Theme::raised);
-            DrawModernEllipsised(rt, cell + ScreenCoordsXY{4, 7}, pitch-10,
-                std::string(i == active ? "{BLACK}" : "{MUTED}") + labels[i]);
-            if (i < active) Fill(rt, cell + ScreenCoordsXY{3, 21}, {pitch-9, 2}, static_cast<Drawing::PaletteIndex>(PocketPalette::positive));
-        }
+        // The segmented track the mode switches use, with finished steps underlined in green: a
+        // step indicator, read left to right.
+        DrawSegmented(rt, p, { width - 3, 24 }, { "Ride", "Entry", "Exit" }, active);
+        const int cell = (width - 7) / 3;
+        for (size_t i = 0; i < active && i < 3; ++i)
+            Fill(rt, p + ScreenCoordsXY{ 2 + static_cast<int>(i) * cell + 6, 19 }, { cell - 12, 2 },
+                static_cast<Drawing::PaletteIndex>(PocketPalette::positive));
     }
     inline void DrawConstructionOverlay(
         Drawing::RenderTarget& rt, ScreenCoordsXY p, const std::string& title, const std::string& object,

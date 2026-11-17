@@ -207,8 +207,13 @@ namespace OpenRCT2::Ui::Handheld
                 }
             }
             int y = artH + 12;
-            DrawMarquee(rt, pane + ScreenCoordsXY{ 8, y }, paneW - 16, "{WHITE}", focused->name, MarqueeTime(), true);
-            y += 20;
+            // With reduced motion a long name wraps instead of freezing mid-scroll.
+            const bool wrapName = MenuFeel::reduceMotion && TextWidth(focused->name, true) > paneW - 16;
+            if (wrapName)
+                DrawWrappedLabel(rt, pane + ScreenCoordsXY{ 8, y }, paneW - 16, "{WHITE}" + focused->name, 2);
+            else
+                DrawMarquee(rt, pane + ScreenCoordsXY{ 8, y }, paneW - 16, "{WHITE}", focused->name, MarqueeTime(), true);
+            y += wrapName ? 36 : 20;
             if (!focused->detail.empty())
             {
                 const int lines = std::max(1, (gridHeight - 4 - y - 30) / 16);
