@@ -1367,15 +1367,15 @@ namespace OpenRCT2::Ui::Windows
                     {7,"Shops","Food, drinks, shops and guest facilities",I::folder,SPR_SHOP_ITEM_BURGER,0,1,BuildPicture(BuildArt::shop)},
                     {2,"Paths","Footpaths and queues",I::path,0,0,1,BuildPicture(BuildArt::path)},
                     {10,"Scenery","Trees, buildings, fences, signs and path furniture",I::largeScenery,0,0,1,BuildPicture(BuildArt::scenery)},
-                    {9,"Saved designs","Rides you or others saved, ready to place",I::folder,0,0},
+                    {9,"Saved designs","Rides you or others saved, ready to place",I::folder,SPR_TOOLBAR_CONSTRUCT_RIDE,0},
                     {0,"Raise hill","Gentle hills; Y also digs, makes ponds or flattens",I::raise,0,1},
                     {1,"Dig","Lower the ground with gentle slopes",I::lower,0,1},
                     {3,"Pond","Dig a pond that fills with water",I::terrain,SPR_TAB_WATER,1},
                     {4,"Surfaces","Choose a ground surface",I::terrain,SPR_G2_TAB_LAND,1},
                     {6,"Trees","Plant from the tree catalog",I::tree,0,1},
                     {5,"Remove scenery","Pick up placed scenery",I::remove,0,2},
-                    {12,"Land & rights","Buy land or construction rights",I::terrain,0,2},
-                    {11,"Advanced","Corners, edges, water levels and terrain painting",I::terrain,SPR_G2_TAB_LAND,2}};
+                    {12,"Land & rights","Buy land or construction rights",I::terrain,SPR_BUY_LAND_RIGHTS,2},
+                    {11,"Advanced","Corners, edges, water levels and terrain painting",I::terrain,SPR_TOOLBAR_LAND,2}};
             if (_page == Page::paths)
                 return {{0,"Footpath","Place individual tiles; Y Adjust also offers Line and Fill",I::path},
                     {1,"Queue","Build a queue for a ride entrance",I::path},
@@ -1387,14 +1387,54 @@ namespace OpenRCT2::Ui::Windows
                 return {{1,"Ready-made design","Pick a finished ride from the design catalog",I::folder},
                     {0,"Build track","Construct your own track, piece by piece",I::play,SPR_TAB_RIDE_0},
                     {2,"Back","Return to the ride catalog",I::back}};
-            return {{0,"Trees & small","Plants, trees and small scenery objects",I::tree},
-                {1,"Buildings","Large scenery and building objects",I::largeScenery},
-                {2,"Walls & fences","Choose a wall or fence",I::walls},
-                {3,"Signs","Banners and signs",I::furniture},
-                {4,"Path furniture","Benches, bins, lamps and other path additions",I::furniture},
-                {5,"Clear area","Select which scenery types to clear with a brush",I::remove},
-                {6,"Build menu","Return to the other building tools",I::back}};
+            // Each category shows a real object from it, drawn the way the catalog draws it, like
+            // the Build menu's big cards. "Build menu" is gone: B does that.
+            if (!_sceneryArtReady)
+            {
+                for (size_t c = 0; c < _sceneryArt.size(); ++c)
+                {
+                    using SC = Handheld::SceneryTools::Category;
+                    const auto category = static_cast<SC>(c);
+                    const auto entries = Handheld::SceneryTools::Entries(category);
+                    if (entries.empty()) continue;
+                    // A representative object rather than whatever loaded first: a tree, the
+                    // biggest building, a bench or lamp.
+                    auto entry = entries.front();
+                    auto named = [&](std::initializer_list<const char*> words) {
+                        for (const auto& candidate : entries)
+                            for (const auto* word : words)
+                                if (candidate.name.find(word) != std::string::npos) { entry = candidate; return; }
+                    };
+                    if (category == SC::small) named({ "Tree", "tree" });
+                    else if (category == SC::additions) named({ "Bench", "Lamp", "bench", "lamp" });
+                    else if (category == SC::large)
+                    {
+                        size_t most = 0;
+                        for (const auto& candidate : entries)
+                            if (const auto* large = ObjectEntryManager::GetObjectEntry<LargeSceneryEntry>(candidate.identity.index))
+                                if (large->tiles.size() > most) { most = large->tiles.size(); entry = candidate; }
+                    }
+                    _sceneryArt[c] = [entry](RenderTarget& rt) {
+                        if (entry.drawPreview) { entry.drawPreview(rt); return; }
+                        if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject(entry.identity.type, entry.identity.index))
+                        {
+                            RenderTarget art = rt;
+                            art.zoom_level = ZoomLevel{ 1 };
+                            object->DrawPreview(art, art.zoom_level.ApplyTo(art.width), art.zoom_level.ApplyTo(art.height));
+                        }
+                    };
+                }
+                _sceneryArtReady = true;
+            }
+            return {{0,"Trees & small","Plants, trees and small scenery objects",I::tree,0,0,1,_sceneryArt[0]},
+                {1,"Buildings","Large scenery and building objects",I::largeScenery,0,0,1,_sceneryArt[1]},
+                {2,"Walls & fences","Choose a wall or fence",I::walls,0,0,1,_sceneryArt[2]},
+                {3,"Signs","Banners and signs",I::furniture,0,0,1,_sceneryArt[3]},
+                {4,"Path furniture","Benches, bins, lamps and other path additions",I::furniture,0,0,1,_sceneryArt[4]},
+                {5,"Clear area","Select which scenery types to clear with a brush",I::remove,SPR_DEMOLISH}};
         }
+        mutable std::array<std::function<void(RenderTarget&)>, 5> _sceneryArt;
+        mutable bool _sceneryArtReady{};
         bool constructionMenu() const
         {
             return choiceCards() || _page == Page::controls || _page == Page::designOptions || _page == Page::researchCatalog || _page == Page::financeHistory || _page == Page::financeLedger || _page == Page::parkMap || _page == Page::peepOptions || _page == Page::peepCancel || _page == Page::staffPatrolOptions
@@ -6806,15 +6846,8 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::DrawObjectPicker(rt,{ContextGetWidth(),ContextGetHeight()},picker,
                     research?"Research catalog":"Choose vehicle", research?"Y: "+Handheld::ResearchCatalog::Category(_researchFilter):"Compatible vehicles",
                     research?"No researched items":"No compatible vehicles");
-                Handheld::Concept::Box(rt,{336,36},{168,312});
-                if (const auto* entry=picker.selected()) {
-                    Handheld::DrawWrappedLabel(rt,{346,54},148,entry->name,5);
-                    if (research && _focus.index()<_researchCatalog.size()) {
-                        const auto& item=_researchCatalog[_focus.index()];
-                        Handheld::DrawWrappedLabel(rt,{346,164},148,Handheld::ResearchCatalog::Category(EnumValue(item.item.category)+1),3);
-                        Handheld::DrawWrappedLabel(rt,{346,235},148,Handheld::ResearchCatalog::Invented(item.item)?"Researched":Handheld::ResearchCatalog::Loaded(item.item)?"Not researched":"Object unavailable",3);
-                    } else Handheld::DrawWrappedLabel(rt,{346,200},148,"Train settings and compatibility warnings remain in Details.",5);
-                }
+                // The full-screen picker has its own detail pane (name, preview, detail line); the old
+                // overlay box drew on top of it, and of its empty state.
                 Handheld::DrawFooter(rt,{ContextGetWidth(),ContextGetHeight()},{{"D-pad","Choose"},{"A",research?"Details":"Use vehicle"},{"Y",research?"Category":""},{"B","Back"}});
                 return;
             }

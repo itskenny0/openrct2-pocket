@@ -80,29 +80,58 @@ namespace OpenRCT2::Ui::Handheld
         const int press = ButtonPressOffset(focused);
         cell.y += press;
         size.height -= press;
-        if (card.picture && size.height >= 80)
+        // Labels are centred under the art on every card, splitting onto two centred lines when
+        // they do not fit (a left-aligned label under a centred icon looks off-centre).
+        auto label = [&](ScreenCoordsXY origin, int width, int bottom) {
+            std::string first = card.label, second;
+            if (TextWidth(first, true) > width)
+                for (auto cut = card.label.rfind(' '); cut != std::string::npos && cut > 0; cut = card.label.rfind(' ', cut - 1))
+                    if (TextWidth(card.label.substr(0, cut), true) <= width)
+                    {
+                        first = card.label.substr(0, cut);
+                        second = card.label.substr(cut + 1);
+                        break;
+                    }
+            const int lines = second.empty() ? 1 : 2;
+            int y = bottom - lines * 13;
+            for (const auto& line : { first, second })
+            {
+                if (line.empty())
+                    continue;
+                const int w = std::min(TextWidth(line, true), width);
+                DrawStrongText(rt, origin + ScreenCoordsXY{ (width - w) / 2, y }, "{WHITE}" + line, width);
+                y += 13;
+            }
+            return lines;
+        };
+        DrawButtonFace(rt, cell, size, ButtonKind::secondary, focused);
+        if (size.height >= 80)
         {
-            // Big card: the object itself fills the top, the name sits centred underneath.
-            DrawButtonFace(rt, cell, size, ButtonKind::secondary, focused);
+            // Big card: the object (or its icon) fills the top, the name sits centred underneath.
+            const bool twoLines = TextWidth(card.label, true) > size.width - 8;
+            const int artHeight = size.height - (twoLines ? 38 : 26);
             Drawing::RenderTarget art;
-            if (ClipRenderTarget(art, rt, cell + ScreenCoordsXY{ 3, 3 }, size.width - 6, size.height - 26))
-                card.picture(art);
-            const int w = std::min(TextWidth(card.label, true), size.width - 8);
-            DrawStrongText(rt, cell + ScreenCoordsXY{ (size.width - w) / 2, size.height - 19 }, "{WHITE}" + card.label, size.width - 8);
+            if (card.picture)
+            {
+                if (ClipRenderTarget(art, rt, cell + ScreenCoordsXY{ 3, 3 }, size.width - 6, artHeight))
+                    card.picture(art);
+            }
+            else if (!card.sprite
+                || !DrawNativeMenuArt(rt, cell + ScreenCoordsXY{ 3, 3 }, { size.width - 6, artHeight }, { card.sprite, card.frames }, focused))
+                DrawIcon(rt, cell + ScreenCoordsXY{ size.width / 2 - 8, 3 + artHeight / 2 - 8 }, card.icon, focused);
+            label(cell + ScreenCoordsXY{ 4, 0 }, size.width - 8, size.height - 6);
             return;
         }
-        DrawButtonFace(rt, cell, size, ButtonKind::secondary, focused);
-        Drawing::RenderTarget inside;
-        if (!ClipRenderTarget(inside, rt, cell + ScreenCoordsXY{ 3, 3 }, size.width - 6, size.height - 6)) return;
-        // Reserve two complete 16px label lines, including glyph descenders.
-        // Dense 4-row Build cards need less art/text gap than large categories.
+        // Reserve two complete label lines, including glyph descenders.
         const bool twoLines = TextWidth(card.label, true) > size.width - 14;
         const int artSize = std::clamp(size.height - (twoLines ? 38 : 34), 20, 38);
-        const auto icon = ScreenCoordsXY{ (size.width - artSize) / 2 - 3, 1 };
+        Drawing::RenderTarget inside;
+        if (!ClipRenderTarget(inside, rt, cell + ScreenCoordsXY{ 3, 3 }, size.width - 6, size.height - 6)) return;
+        const auto icon = ScreenCoordsXY{ (size.width - 6 - artSize) / 2, 1 };
         if (card.sprite)
             DrawNativeMenuArt(inside, icon, { artSize, artSize }, { card.sprite, card.frames }, focused);
         else DrawIcon(inside, icon + ScreenCoordsXY{ artSize / 2 - 8, artSize / 2 - 8 }, card.icon, focused);
-        DrawWrappedLabel(inside, {4, artSize + 2}, size.width - 14, "{WHITE}" + card.label, 2);
+        label(cell + ScreenCoordsXY{ 7, 0 }, size.width - 14, size.height - 5);
     }
     // Small groups draw as compact chips: icon and label side by side.
     inline void DrawChoiceChip(Drawing::RenderTarget& rt, ScreenCoordsXY cell, ScreenSize size, const ChoiceCard& card, bool focused)

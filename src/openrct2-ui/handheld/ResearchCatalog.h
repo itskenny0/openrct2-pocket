@@ -94,8 +94,14 @@ namespace OpenRCT2::Ui::Handheld::ResearchCatalog
     {
         std::vector<PickerEntry> entries;
         for (const auto& target : roster)
-            entries.push_back({{target.item.type == Research::EntryType::ride ? ObjectType::ride : ObjectType::sceneryGroup,
-                target.item.entryIndex, std::to_string(target.item.rawValue) + ":" + std::to_string(target.occurrence)}, Name(target), target.item.type == Research::EntryType::ride ? ZoomLevel{1} : ZoomLevel{2}});
+        {
+            PickerEntry entry{{target.item.type == Research::EntryType::ride ? ObjectType::ride : ObjectType::sceneryGroup,
+                target.item.entryIndex, std::to_string(target.item.rawValue) + ":" + std::to_string(target.occurrence)}, Name(target), target.item.type == Research::EntryType::ride ? ZoomLevel{1} : ZoomLevel{2}};
+            // The picker's own detail pane says what it is and whether you have it yet.
+            entry.detail = Category(EnumValue(target.item.category) + 1) + ". "
+                + (Invented(target.item) ? "Researched" : Loaded(target.item) ? "Not researched yet" : "Object unavailable");
+            entries.push_back(std::move(entry));
+        }
         std::optional<PickerIdentity> preferred;
         if (selected < entries.size()) preferred = entries[selected].identity;
         ObjectPicker picker; picker.setEntries(std::move(entries),preferred); return picker;
