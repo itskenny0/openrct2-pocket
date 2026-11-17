@@ -28,6 +28,39 @@ The park renderer, simulation, game actions and save format are OpenRCT2's own, 
   <img src="docs/handheld/screenshots/paths.png" width="32%" alt="Path tool with live cost">
 </p>
 
+## Made for a handheld
+
+Shortcuts and habits that only make sense with a controller in your hands.
+
+<p align="center">
+  <img src="docs/handheld/screenshots/quick-menu.png" width="49%" alt="Quick menu: hold L2 and point with the D-pad">
+  <img src="docs/handheld/screenshots/goal-hud.png" width="49%" alt="The scenario goal as a progress card under the HUD">
+</p>
+
+- **Quick menu (hold L2).** Build, Rides, Staff, Guests, Finances, the park map, pause, and "Again" (the last Build card) around the cursor. Point and release.
+- **Undo (hold B in a tool).** Takes back your last land, scenery, tree or shop change and refunds what it cost.
+- **Entrance, exit and paths in one press.** While placing a ride's entrance, Y picks the best sides of the station and lays a queue and exit path to the nearest footpath.
+- **Context A.** On the end of a path, A carries on building it; on a sign, A edits it.
+- **Your goal at a glance.** The scenario objective sits under the HUD as a progress bar, with the months left (or the park rating, if that's what's holding you back). The clock and battery level can go in the top bar too.
+- **Inbox (hold Y).** Everything that needs you right now (breakdowns, full queues, hungry guests), above the park news. A tap on Y glides to each problem in turn.
+
+<p align="center">
+  <img src="docs/handheld/screenshots/auto-access.png" width="49%" alt="Entrance, exit, queue and exit path laid automatically">
+  <img src="docs/handheld/screenshots/inbox.png" width="49%" alt="Inbox: problems that need attention, with what fixes them">
+</p>
+
+- **Ride along.** From a ride's page, the camera follows a train, zoomed in. A switches trains.
+- **Photo mode (L2, then Y).** All UI hidden; A saves a clean screenshot, Y freezes time.
+- **Never lose a park.** When the system closes the game (exiting from NextUI, low battery, power off), the park is autosaved first. You can also have the game skip the title and continue your last park.
+- **A controls guide and a first-run intro** that draw the device and ring the buttons each page is talking about.
+- **Settings:** theme (Daylight, Slate, Pixel), reduced motion, an optional smart cursor that settles onto rides and guests, and the HUD and device options above.
+
+<p align="center">
+  <img src="docs/handheld/screenshots/ride-along.png" width="32%" alt="Riding along with a train">
+  <img src="docs/handheld/screenshots/controls-guide.png" width="32%" alt="Controls guide with the device drawn">
+  <img src="docs/handheld/screenshots/photo-mode.png" width="32%" alt="A photo taken in photo mode">
+</p>
+
 ## Controls
 
 | In the park | |
@@ -36,8 +69,9 @@ The park renderer, simulation, game actions and save format are OpenRCT2's own, 
 | A | Inspect what's under the cursor |
 | B | Back / close |
 | X | Rotate the view |
-| Y | Park news |
+| Y | Next alert (hold: inbox; news when all is well) |
 | L1 / R1 | Zoom out / in |
+| L2 (hold) | Quick menu (then Y: photo mode) |
 | Select | Build menu |
 | Start | Park dashboard (press again for the pause menu) |
 | Start + Select | Quit, with a Save and quit prompt |
@@ -48,9 +82,9 @@ The park renderer, simulation, game actions and save format are OpenRCT2's own, 
 | X | Remove | A | Select |
 | Y | Adjust (turn, height, mode) | L1 / R1 | Change tab |
 | L2 / R2 | Height | X | Contextual action, when shown |
-| B | Back | B | Back |
+| B | Back (hold: undo) | B | Back |
 
-The pause menu's **Controls...** page lists the shortcuts in-game.
+The pause menu's **Controls...** page shows all of this in-game, including the hold gestures, and can replay the intro.
 
 ## Install on a TrimUI Brick (NextUI)
 
@@ -74,14 +108,17 @@ The handheld layer lives in [`src/openrct2-ui/handheld/`](src/openrct2-ui/handhe
 
 ## Known issues
 
-- The scenario picker still uses desktop window chrome (title bar, tabs, close button) around Pocket-styled rows.
-- When an action fails, OpenRCT2's red desktop error box appears and hides the Pocket HUD and footer for a few seconds.
-- Some build-menu icons are mismatched in size or reused across tiles.
+- Saving on sleep relies on the power button reaching the game as a key; if NextUI doesn't pass it through, the park is still saved whenever the system closes the game.
+- Auto entrance/exit only finds level routes; on a raised station it places both and tells you the paths still need building.
 - Large, late-game parks haven't been performance-tested on the Brick's CPU.
 - Changes since the last device-tested release are verified with native builds and test drivers only until they're checked on hardware.
 
 ## Licence and credits
 
-OpenRCT2 Pocket is a fork of [OpenRCT2](https://github.com/OpenRCT2/OpenRCT2) and, like it, is licensed under the GNU General Public License v3 or later; see [licence.txt](licence.txt). Full credit to the OpenRCT2 developers and contributors ([contributors.md](contributors.md)), whose work makes this possible. The upstream README is kept at [docs/handheld/history/UPSTREAM-README.md](docs/handheld/history/UPSTREAM-README.md).
+OpenRCT2 Pocket is a fork of [OpenRCT2](https://github.com/OpenRCT2/OpenRCT2) and, like it, is licensed under the GNU General Public License v3 or later; see [licence.txt](licence.txt).
+
+**This project stands entirely on the work of the OpenRCT2 team and its many contributors** ([contributors.md](contributors.md)). Over more than a decade they reverse-engineered RollerCoaster Tycoon 2, rebuilt it as open source, and kept extending it. The simulation, renderer, game actions, save format and nearly everything that makes a park feel alive are theirs; Pocket only adds a handheld layer on top. If you enjoy this, please support and contribute to [upstream OpenRCT2](https://github.com/OpenRCT2/OpenRCT2).
+
+Thanks also to Chris Sawyer, who created RollerCoaster Tycoon, and to the NextUI and TrimUI communities for the platform this runs on. The upstream README is kept at [docs/handheld/history/UPSTREAM-README.md](docs/handheld/history/UPSTREAM-README.md).
 
 This is an unofficial fan project. It isn't affiliated with or endorsed by the OpenRCT2 team or Atari. RollerCoaster Tycoon is a trademark of its respective owner. Pocket Sans is a raster derivative of DejaVu Sans, distributed under the DejaVu font licence ([PocketSans.LICENSE](src/openrct2-ui/handheld/PocketSans.LICENSE)).
