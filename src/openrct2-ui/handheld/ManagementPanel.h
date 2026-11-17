@@ -278,15 +278,16 @@ namespace OpenRCT2::Ui::Handheld
                     const int w = TextWidth(hero.states[i], current);
                     const auto ink = current ? std::string("{BLACK}") : std::string("{MUTED}");
                     if (current)
-                        DrawStrongText(rt, cellPos + ScreenCoordsXY{ (cell - 4 - w) / 2, 4 }, ink + hero.states[i]);
+                        DrawStrongText(rt, cellPos + ScreenCoordsXY{ (cell - 4 - w) / 2, CapCentre(18) }, ink + hero.states[i]);
                     else
-                        DrawModernText(rt, cellPos + ScreenCoordsXY{ (cell - 4 - w) / 2, 4 }, ink + hero.states[i]);
+                        DrawModernText(rt, cellPos + ScreenCoordsXY{ (cell - 4 - w) / 2, CapCentre(18) }, ink + hero.states[i]);
                 }
                 if (hero.stateFocused && focused)
                     DrawFocusRing(rt, origin + ScreenCoordsXY{ textLeft, y }, { area, 22 });
                 y += 30;
             }
-            if (!hero.caption.empty() && hero.states.empty())
+            // A caption sits under the meters, or under the switch when there are none (a shop).
+            if (!hero.caption.empty() && (hero.states.empty() || hero.meters.empty()))
                 DrawStrongText(rt, origin + ScreenCoordsXY{ textLeft, kHeroHeight - 22 }, "{WHITE}" + hero.caption, area);
             if (!hero.meters.empty())
             {

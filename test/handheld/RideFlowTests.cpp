@@ -18,6 +18,10 @@
 #include <openrct2-ui/handheld/Alerts.h>
 #include <openrct2-ui/handheld/Landscape.h>
 #include <openrct2-ui/handheld/ParkOverview.h>
+#include <openrct2-ui/handheld/ShopManagement.h>
+#include <openrct2-ui/handheld/Shops.h>
+#include <openrct2/world/TileElementsView.h>
+#include <openrct2/world/tile_element/TrackElement.h>
 #include <openrct2/ride/Track.h>
 #include <openrct2/ride/TrackData.h>
 #include <openrct2/ride/ted/TrackElementDescriptor.h>
@@ -156,6 +160,30 @@ int main(int argc, char** argv)
         press(H::Action::confirm);GameActions::ProcessQueue(state);Check(GetRide(target.id)->status!=RideStatus::closed,"A did not step the state");
         for(int i=0;i<3;++i){W::HandheldDashboardMove(-1,0);GameActions::ProcessQueue(state);}
         FocusRideTabAction("Demolish...");press(H::Action::confirm);Check(W::HandheldRidesPresentation().selected==1,"Demolition review is not Cancel-first");capture("06-demolition-review.png");press(H::Action::back);Check(H::RideManagement::Resolve(target),"Cancel demolished ride");closeMenu();
+        {
+            // Shops: Open/Closed is the hero switch and each price steps in place with Left/Right.
+            auto* object=objects.LoadObject("rct2.ride.burgb");Check(object,"Shop object missing");
+            const auto shopObject=objects.GetLoadedObjectEntryIndex(object);
+            ResearchInsertRideEntry(shopObject,true);RideEntrySetInvented(shopObject);RideTypeSetInvented(RIDE_TYPE_FOOD_STALL);
+            const CoordsXY tile{800,640};
+            Check(H::Shops::Action(tile,shopObject,0,true).error==GameActions::Status::ok,"Shop placement failed");GameActions::ProcessQueue(state);
+            const auto shop=(*TileElementsView<TrackElement>(tile).begin())->getRideIndex();
+            W::HandheldRideOpen(shop);Check(W::HandheldShopManagementIsOpen(),"Shop inspection did not open");
+            W::HandheldShopManagementMove(-1,0);GameActions::ProcessQueue(state);
+            Check(GetRide(shop)->status==RideStatus::closed,"Shop switch did not close in place");
+            W::HandheldShopManagementMove(1,0);GameActions::ProcessQueue(state);
+            Check(GetRide(shop)->status==RideStatus::open,"Shop switch did not open in place");
+            const auto price=GetRide(shop)->price[0];
+            W::HandheldShopManagementMove(0,1);
+            W::HandheldShopManagementMove(1,0);GameActions::ProcessQueue(state);W::HandheldShopManagementMove(1,0);GameActions::ProcessQueue(state);
+            Check(GetRide(shop)->price[0]==price+2,"Shop price did not step up in place");
+            W::HandheldShopManagementMove(-1,0);GameActions::ProcessQueue(state);
+            Check(GetRide(shop)->price[0]==price+1,"Shop price did not step down in place");
+            focus({816,656,48});capture("06d-shop-prices.png");
+            W::HandheldShopManagementMove(0,1);W::HandheldMenuConfirm();
+            Check(W::HandheldShopManagementIsOpen()&&GetRide(shop),"Shop grid Demolish did not open its review");
+            capture("06e-shop-demolish.png");W::HandheldMenuBack();closeMenu();
+        }
         {
             // Attention: a broken ride becomes the first alert, Y glides the camera to it, and the
             // overview home leads with it. With no problems, Y is News as before.

@@ -39,6 +39,7 @@ static void TestPocketPresentation()
     state.park.flags.unset(ParkFlag::noMoney);
     state.park.numGuestsInPark = 100000;
     state.date = Date::FromYMD(32, MONTH_OCTOBER, 30);
+    H::MenuFeel::reduceMotion = true; // The cash ticker rolls toward new values; this checks formatting.
     for (money64 cash : { money64{ 0 }, money64{ -10000000 }, money64{ 100000000000 } })
         for (uint8_t speed : { 1, 2, 3, 4, 8 })
             for (uint8_t paused : { 0, 1, 2 })

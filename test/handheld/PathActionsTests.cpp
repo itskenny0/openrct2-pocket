@@ -1385,28 +1385,27 @@ static void TestShopManagement(IContext& context, const std::string& profile, bo
         Require(H::HandleMenuInput(input, frame), "Inspection did not consume A");
         GameActions::ProcessQueue(state);
         Require(GetRide(first.id)->status == RideStatus::closed, "Duplicate confirm toggled status twice");
+        // Prices are setting rows under the status switch: Left/Right applies one native step in
+        // place (the game processes its queue every frame, between key repeats).
         W::HandheldShopManagementMove(0, 1);
         W::HandheldMenuConfirm();
-        W::HandheldShopManagementMove(1, 0);
-        W::HandheldMenuBack();
-        Require(GetRide(first.id)->price[0] == 190, "Cancelled price draft applied");
-        W::HandheldMenuMove(1);
-        W::HandheldMenuConfirm();
-        for (int i = 0; i < 300; ++i)
-            W::HandheldShopManagementMove(1, 0);
-        W::HandheldMenuConfirm();
         GameActions::ProcessQueue(state);
+        Require(GetRide(first.id)->price[0] == 190, "A on a price row changed the price");
+        for (int i = 0; i < 300; ++i)
+        {
+            W::HandheldShopManagementMove(1, 0);
+            GameActions::ProcessQueue(state);
+        }
         Require(
             GetRide(first.id)->price[0] == kRideMaxPrice && GetRide(second.id)->price[0] == kRideMaxPrice,
             "Controller price upper bound/common price failed");
         for (int i = 0; i < 300; ++i)
+        {
             W::HandheldShopManagementMove(-1, 0);
-        W::HandheldMenuConfirm();
-        GameActions::ProcessQueue(state);
+            GameActions::ProcessQueue(state);
+        }
         Require(GetRide(first.id)->price[0] == kRideMinPrice, "Controller price lower bound failed");
-        W::HandheldMenuBack();
-        W::HandheldMenuMove(1);
-        W::HandheldMenuMove(1);
+        W::HandheldShopManagementMove(0, 1);
         frame.actions = { H::Action::confirm, H::Action::confirm };
         H::HandleMenuInput(input, frame);
         GameActions::ProcessQueue(state);
@@ -1430,10 +1429,8 @@ static void TestShopManagement(IContext& context, const std::string& profile, bo
         gGamePaused = 0;
         state.park.flags.set(ParkFlag::noMoney);
         W::HandheldRideOpen(first.id);
-        W::HandheldMenuMove(1);
-        W::HandheldMenuConfirm();
+        W::HandheldShopManagementMove(0, 1);
         W::HandheldShopManagementMove(1, 0);
-        W::HandheldMenuConfirm();
         GameActions::ProcessQueue(state);
         Require(GetRide(first.id)->price[0] == kRideMinPrice, "No-money park exposed editable prices");
         W::HandheldMenuBack();

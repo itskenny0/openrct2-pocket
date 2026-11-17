@@ -83,11 +83,17 @@ namespace OpenRCT2::Ui::Handheld::ParkManagementTabs
         }
         else
         {
+            // Admission changes in place with Left/Right (A still opens the exact editor). The loan
+            // keeps its review: borrowing is a decision, not a nudge.
             m.title="Financial controls";m.stats={{"Cash",Money(park.cash)},{"Loan",Money(park.bankLoan)},
-                {"Loan limit",Money(park.maxBankLoan)},{"Admission",park.flags.has(ParkFlag::noMoney)?"Free":FormatMoney(Park::GetEntranceFee(park))}};
-            m.metricColumns=2;m.bodyLines={"Choose a value, adjust its draft, then review."};
-            m.rows={"Borrow / repay...","Admission price..."};
-            m.rowEnabled={Finances::Available(Finances::Field::loan),Finances::Available(Finances::Field::admission)};
+                {"Loan limit",Money(park.maxBankLoan)}};
+            m.metricColumns=3;m.bodyLines.clear();
+            const bool admission=Finances::Available(Finances::Field::admission);
+            m.rows={"Admission","Borrow / repay..."};
+            m.rowEnabled={admission,Finances::Available(Finances::Field::loan)};
+            m.settingRows={0};
+            m.settingValues={park.flags.has(ParkFlag::noMoney)?"Free":FormatMoney(Park::GetEntranceFee(park))};
+            if(row==0&&admission){m.navigationHint="Price";m.primaryAction="Editor";}
         }
         if(!status.empty())m.status=status;
         return m;

@@ -110,6 +110,12 @@ int main(int argc,char** argv)
         press(H::Action::confirm);Check(model().title=="Weekly profit history","Next native graph unavailable");nav(-1,0);capture("04-finance-profit-history.png");
         press(H::Action::previousOption);Check(model().selected==ledgerFocus,"Ledger focus lost across tabs");press(H::Action::nextOption);press(H::Action::nextOption);
         Check(model().selectedTab==3,"Financial controls unavailable");capture("05-finance-controls.png");
+        {
+            // Admission is a setting row on Controls: Left/Right applies one native step in place.
+            const auto fee=park.entranceFee;select("Admission");nav(1,0);GameActions::ProcessQueue(state);
+            Check(park.entranceFee>fee&&model().selectedTab==3&&!model().editing,"Controls admission did not change in place");
+            nav(-1,0);GameActions::ProcessQueue(state);Check(park.entranceFee==fee,"Controls admission did not step back");
+        }
         select("Borrow / repay...");const auto cash=park.cash;const auto loan=park.bankLoan;press(H::Action::confirm);nav(1,0);capture("06-finance-loan-draft.png");
         Check(park.cash==cash&&park.bankLoan==loan,"Finance draft spent cash");press(H::Action::confirm);Check(model().confirmation&&model().selected==0,"Finance review does not start on Apply");
         W::HandheldMenuMove(1);press(H::Action::confirm);Check(park.cash==cash,"Cancel applied loan");Check(model().selectedTab==3,"Cancel lost Controls tab");

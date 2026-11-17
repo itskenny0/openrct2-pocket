@@ -201,7 +201,12 @@ namespace OpenRCT2::Ui::Handheld::Dashboard
                 const int y = 8 + static_cast<int>(i) * pitch;
                 const bool active = i == state.index();
                 if (active)
+                {
+                    // The section colour as a ring around a light tile: the icon keeps its contrast
+                    // even when it shares the section's colour (the gold coin on Finances).
                     FillRound(rt, rail + ScreenCoordsXY{ 4, y }, { compactRail - 8, pitch - 4 }, Theme::gold);
+                    FillRound(rt, rail + ScreenCoordsXY{ 6, y + 2 }, { compactRail - 12, pitch - 8 }, Theme::raised);
+                }
                 if (!DrawNativeMenuArt(rt, rail + ScreenCoordsXY{ 6, y + (pitch - 4 - 30) / 2 }, { 28, 30 }, { sprites[i], frames[i] }, active))
                     DrawCategoryMark(rt, rail + ScreenCoordsXY{ 11, y + 6 }, i, active);
             }

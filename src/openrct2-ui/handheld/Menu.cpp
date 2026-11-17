@@ -1179,6 +1179,62 @@ namespace OpenRCT2::Ui::Windows
             if(_shopAppearanceBusy)model.status="Applying colour...";
             return model;
         }
+        // A shop reads like a ride: its picture with Open/Closed as a switch, each product's price
+        // changed in place with Left/Right (one native step, the same action the old editor sent),
+        // then the less frequent actions as buttons. Rows: 0 status, 1..n prices, then the grid.
+        size_t shopPriceCount() const
+        {
+            return _shop && Handheld::ShopManagement::Find(*_shop) ? Handheld::ShopManagement::Prices(*_shop).size() : 0;
+        }
+        Handheld::ManagementPresentation shopPresentation() const
+        {
+            using namespace Handheld;
+            ManagementPresentation model;
+            const auto* ride = _shop ? ShopManagement::Find(*_shop) : nullptr;
+            model.title = ride ? ride->getName() : "Shop unavailable";
+            model.rows = rows();
+            model.selected = _focus.index();
+            model.status = _status;
+            if (!ride) return model;
+            const bool noMoney = getGameState().park.flags.has(ParkFlag::noMoney);
+            auto status = Formatter();
+            ride->formatStatusTo(status);
+            model.headerStatus = FormatStringIDLegacy(STR_STRINGID, status.Data());
+            model.headerInk = ride->status == RideStatus::open ? "{POSITIVE}" : "{MUTED}";
+            ManagementPresentation::Hero hero;
+            const auto subtype = ride->subtype;
+            hero.picture = [subtype](RenderTarget& rt) {
+                if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject(ObjectType::ride, subtype))
+                {
+                    rt.zoom_level = ZoomLevel{ 1 };
+                    object->DrawPreview(rt, 128, 120);
+                }
+            };
+            hero.states = { "Closed", "Open" };
+            hero.state = ride->status == RideStatus::open ? 1 : 0;
+            hero.caption = std::to_string(RideCustomersPerHour(*ride)) + " customers / hour";
+            model.hero = hero;
+            model.heroRow = 0;
+            const auto prices = ShopManagement::Prices(*_shop);
+            for (size_t i = 0; i < prices.size(); ++i)
+            {
+                model.settingRows.push_back(1 + i);
+                // Some items (burgers, drinks) share one price across every stall that sells them.
+                if (prices[i].shared) model.rows[1 + i] = prices[i].name + "  (park-wide)";
+                model.settingValues.push_back(noMoney ? "Free" : ShopManagement::Money(prices[i].value));
+            }
+            auto earnings = [noMoney](money64 value) {
+                return noMoney ? std::string("-") : value == kMoney64Undefined ? std::string("-") : ShopManagement::Money(value);
+            };
+            model.stats = { { "Customers", std::to_string(ride->totalCustomers) },
+                            { "Income / hr", earnings(ride->incomePerHour) },
+                            { "Profit / hr", earnings(ride->profit) } };
+            model.summaryMetrics = true;
+            model.metricColumns = 3;
+            model.metricHeight = 34;
+            model.actionGrid = true;
+            return model;
+        }
     private:
         bool shopManagement() const
         {
@@ -1934,7 +1990,14 @@ namespace OpenRCT2::Ui::Windows
                 case Page::researchConfirm:
                     return researchPresentation().rows;
                 case Page::shop:
-                    return { "Status", "Prices", "Demolish", "Rename", "Appearance" };
+                {
+                    std::vector<std::string> result{ "Status" };
+                    if (_shop && Handheld::ShopManagement::Find(*_shop))
+                        for (const auto& price : Handheld::ShopManagement::Prices(*_shop))
+                            result.push_back(price.name);
+                    result.insert(result.end(), { "Demolish...", "Rename...", "Appearance..." });
+                    return result;
+                }
                 case Page::shopAppearance: {
                     std::vector<std::string> result;
                     if(_shop)for(const auto& setting:Handheld::ShopAppearance::Settings(*_shop))
@@ -3007,6 +3070,8 @@ namespace OpenRCT2::Ui::Windows
                     if (row == 0) stepRideState(dx, false); else adjustRidePrice(dx);
                 });
             }
+            else if (_page == Page::finances && _financeTabs.tab == 3)
+                controlsThenGridMove(x, y, 1, [this](size_t, int dx) { adjustAdmission(dx); });
             else if (_page == Page::research && _researchTabs.tab == 0)
                 controlsThenGridMove(x, y, 1, [this](size_t, int dx) { stepFunding(dx, false); });
             else if (_page == Page::overview && !_overviewDraft)
@@ -3345,6 +3410,14 @@ namespace OpenRCT2::Ui::Windows
                 invalidate();
                 return;
             }
+            if (_page == Page::shop)
+            {
+                controlsThenGridMove(x, y, 1 + shopPriceCount(), [this](size_t row, int dx) {
+                    if (row == 0) setShopOpen(dx > 0);
+                    else adjustShopPrice(row - 1, dx);
+                });
+                return;
+            }
             if (y != 0)
             {
                 move(y);
@@ -3358,6 +3431,26 @@ namespace OpenRCT2::Ui::Windows
                         _priceDraft.value_or(prices[_focus.index()].value) + x, kRideMinPrice, kRideMaxPrice);
                 invalidate();
             }
+        }
+        void setShopOpen(bool open)
+        {
+            const auto* ride = _shop ? Handheld::ShopManagement::Find(*_shop) : nullptr;
+            if (!ride || (ride->status == RideStatus::open) == open) return;
+            const auto result = Handheld::ShopManagement::SetStatus(*_shop, open);
+            _status = result.error == GameActions::Status::ok ? "" : result.getErrorMessage();
+            invalidate();
+        }
+        void adjustShopPrice(size_t index, int direction)
+        {
+            if (!_shop) return;
+            if (getGameState().park.flags.has(ParkFlag::noMoney)) { _status = "This park does not charge"; invalidate(); return; }
+            const auto prices = Handheld::ShopManagement::Prices(*_shop);
+            if (index >= prices.size()) return;
+            const auto next = std::clamp<money64>(prices[index].value + direction, kRideMinPrice, kRideMaxPrice);
+            if (next == prices[index].value) return;
+            const auto result = Handheld::ShopManagement::SetPrice(*_shop, prices[index].primary, next);
+            _status = result.error == GameActions::Status::ok ? "" : result.getErrorMessage();
+            invalidate();
         }
         void shopPause()
         {
@@ -4902,7 +4995,7 @@ namespace OpenRCT2::Ui::Windows
                     if(_financeTabs.tab==2){_financeGraph=(_financeGraph+1)%3;invalidate();break;}
                     if(_financeTabs.tab==0&&choice>0){financeTab(choice);break;}
                     {
-                        const auto field=choice==0?Handheld::Finances::Field::loan:Handheld::Finances::Field::admission;
+                        const auto field=choice==0?Handheld::Finances::Field::admission:Handheld::Finances::Field::loan;
                         if(Handheld::Finances::Available(field))
                         {_financeReturnPage=Page::finances;_financeDraft=Handheld::Finances::Begin(field);page(Page::financeEditor);}
                     }
@@ -6179,14 +6272,12 @@ namespace OpenRCT2::Ui::Windows
                     }
                     break;
                 case Page::shop:
+                {
+                    const size_t priceRows = shopPriceCount();
+                    if (choice >= 1 + priceRows) choice = choice - priceRows + 1; // Map the grid onto 2..4.
+                    else if (choice >= 1) { invalidate(); break; } // Prices change with Left/Right.
                     if (!_shop || !Handheld::ShopManagement::Find(*_shop))
                         _status = "Shop no longer available";
-                    else if (choice == 1)
-                    {
-                        if (!getGameState().park.flags.has(ParkFlag::noMoney)
-                            && !Handheld::ShopManagement::Prices(*_shop).empty())
-                            page(Page::shopPrices);
-                    }
                     else if (choice == 4) {page(Page::shopAppearance);_shopAppearanceChannel=0;}
                     else if (choice == 3)
                     {
@@ -6205,11 +6296,11 @@ namespace OpenRCT2::Ui::Windows
                     {
                         const auto result = Handheld::ShopManagement::SetStatus(
                             *_shop, Handheld::ShopManagement::Find(*_shop)->status != RideStatus::open);
-                        _status = result.error == GameActions::Status::ok ? "Status updated"
-                                                                          : result.getErrorMessage();
+                        _status = result.error == GameActions::Status::ok ? "" : result.getErrorMessage();
                     }
                     invalidate();
                     break;
+                }
                 case Page::shopAppearance:
                     if(!_shop || choice>=Handheld::ShopAppearance::Settings(*_shop).size())page(Page::shop);
                     else {
@@ -6933,6 +7024,45 @@ namespace OpenRCT2::Ui::Windows
                 Handheld::DrawFooter(
                     rt, { ContextGetWidth(), ContextGetHeight() },
                     { { "D-pad", "Choose" }, { "A", _page == Page::shopAppearanceEditor ? "Apply" : "Select" }, { "B", "Back" } });
+                return;
+            }
+            if (_page == Page::shop)
+            {
+                const auto model = shopPresentation();
+                Handheld::DrawManagementContent(rt, { 8, 8 }, { 330, 348 }, model);
+                Handheld::DrawActionStrip(rt, { ContextGetWidth(), ContextGetHeight() });
+                const auto row = _focus.index();
+                const bool onPrice = row >= 1 && row <= shopPriceCount();
+                using Hints = std::vector<Handheld::ControlHint>;
+                Handheld::DrawFooter(rt, { ContextGetWidth(), ContextGetHeight() },
+                    row == 0  ? Hints{ { "D-pad", "Open / close" }, { "A", "Switch" }, { "B", "Back" } }
+                    : onPrice ? Hints{ { "D-pad", "Price" }, { "B", "Back" } }
+                              : Hints{ { "D-pad", "Choose" }, { "A", "Select" }, { "B", "Back" } });
+                return;
+            }
+            if (_page == Page::shopDemolish)
+            {
+                // The same review card as ride demolition: what you get back, Cancel focused first.
+                Handheld::ManagementPresentation model;
+                const auto* ride = _shop ? Handheld::ShopManagement::Find(*_shop) : nullptr;
+                model.title = ride ? ride->getName() : "Shop unavailable";
+                model.confirmation = true;
+                model.destructive = true;
+                model.selected = _focus.index();
+                model.status = _status;
+                model.rows = { "Demolish shop", "Cancel" };
+                if (ride)
+                {
+                    const auto quote = Handheld::ShopManagement::Demolish(*_shop, false);
+                    const bool noMoney = getGameState().park.flags.has(ParkFlag::noMoney);
+                    model.stats = { { "Removes", "This building" },
+                                    { "Refund", quote.error != GameActions::Status::ok ? quote.getErrorMessage()
+                                                    : noMoney                          ? std::string("None")
+                                                                                       : Handheld::FormatMoney(-quote.cost) } };
+                }
+                Handheld::DrawManagementContent(rt, { 8, 8 }, { 330, 348 }, model);
+                Handheld::DrawActionStrip(rt, { ContextGetWidth(), ContextGetHeight() });
+                Handheld::DrawFooter(rt, { ContextGetWidth(), ContextGetHeight() }, { { "D-pad", "Choose" }, { "A", "Select" }, { "B", "Cancel" } });
                 return;
             }
             if (shopManagement())
