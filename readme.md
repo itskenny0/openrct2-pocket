@@ -1,11 +1,19 @@
-<h1 align="center">OpenRCT2 Pocket</h1>
+<p align="center">
+  <img src="docs/handheld/branding/social-preview.png" alt="OpenRCT2 Pocket: RollerCoaster Tycoon 2 built to play like a handheld game" width="100%">
+</p>
 
 <p align="center"><b>RollerCoaster Tycoon 2, rebuilt to play like a handheld game.</b><br>
-A controller-first fork of <a href="https://github.com/OpenRCT2/OpenRCT2">OpenRCT2</a> for the TrimUI Brick running NextUI.</p>
+A controller-first build of <a href="https://github.com/OpenRCT2/OpenRCT2">OpenRCT2</a> for the TrimUI Brick running NextUI.</p>
 
 <p align="center">
-  <img src="docs/handheld/screenshots/explore.png" width="49%" alt="Exploring a park: the footer names the ride under the cursor">
-  <img src="docs/handheld/screenshots/ride.png" width="49%" alt="Ride sheet with tabs and status actions">
+  <a href="https://github.com/keewhi/openrct2-pocket/releases"><img src="https://img.shields.io/badge/Download-latest%20release-2ea44f?style=for-the-badge&logo=github" alt="Download the latest release"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/keewhi/openrct2-pocket/releases"><img src="https://img.shields.io/github/v/release/keewhi/openrct2-pocket?include_prereleases&label=version" alt="Latest version"></a>
+  <a href="https://github.com/keewhi/openrct2-pocket/actions/workflows/testing.yml"><img src="https://img.shields.io/github/actions/workflow/status/keewhi/openrct2-pocket/testing.yml?branch=main&label=build" alt="Build status"></a>
+  <a href="licence.txt"><img src="https://img.shields.io/badge/licence-GPLv3-blue" alt="Licence: GPLv3"></a>
+  <img src="https://img.shields.io/badge/device-TrimUI%20Brick-orange" alt="Device: TrimUI Brick">
 </p>
 
 Most ways of playing RCT2 on a handheld map the stick to a mouse and leave you squinting at desktop windows. Pocket takes a different approach: the camera moves and the cursor stays in the middle of the screen, every screen has a button footer, and management happens in sheets you page through with the shoulder buttons. It's meant to feel like a GBA-era sim that happens to run RCT2's simulation underneath.
