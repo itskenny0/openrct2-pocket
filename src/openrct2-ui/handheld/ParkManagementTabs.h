@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
+#include <openrct2/Context.h>
+#include <openrct2/object/ObjectManager.h>
+#include <openrct2/drawing/Drawing.Sprite.h>
+#include <openrct2/SpriteIds.h>
 #include "Finances.h"
 #include "FinanceInformation.h"
 #include "MarketingManagement.h"
@@ -101,11 +105,38 @@ namespace OpenRCT2::Ui::Handheld::ParkManagementTabs
             const bool finished=s.researchProgressStage==RESEARCH_STAGE_FINISHED_ALL;
             const bool known=s.researchProgressStage<=RESEARCH_STAGE_COMPLETING_DESIGN;
             const int progress=finished?100:known?static_cast<uint32_t>(s.researchProgress)*100/0x10000:-1;
-            m.stats={native[3],native[4],{"This stage",progress<0?"Unavailable":std::to_string(progress)+"%"}};
-            m.meters={-1,-1,progress};
-            m.bodyLines={"Project: "+native[0].second,"Stage: "+native[1].second,"Expected: "+native[2].second};
-            m.rows={"Funding & priorities","Invention catalog..."};
-            m.rowEnabled={ResearchManagement::FundingAvailable()||ResearchManagement::AvailableCategories(),true};
+            // What is being invented, how far along, and funding as a switch changed in place
+            // (the monthly cost updates straight away; priorities stay on their own tab).
+            ManagementPresentation::Hero hero;
+            const bool named=s.researchProgressStage==RESEARCH_STAGE_COMPLETING_DESIGN&&s.researchNextItem&&s.researchNextItem->exists();
+            if(named)
+            {
+                const auto item=*s.researchNextItem;
+                hero.picture=[item](Drawing::RenderTarget& rt){
+                    const auto type=item.type==Research::EntryType::ride?ObjectType::ride:ObjectType::sceneryGroup;
+                    if(const auto* object=GetContext()->GetObjectManager().GetLoadedObject(type,item.entryIndex))
+                    {
+                        Drawing::RenderTarget inner;
+                        if(type==ObjectType::ride&&ClipRenderTarget(inner,rt,{4,2},56,56)){inner.zoom_level=ZoomLevel{1};object->DrawPreview(inner,112,112);}
+                        else object->DrawPreview(rt,rt.width,rt.height);
+                    }
+                };
+            }
+            else hero.picture=[](Drawing::RenderTarget& rt){GfxDrawSprite(rt,ImageId(SPR_TAB_FINANCES_RESEARCH_0),{20,18});};
+            if(ResearchManagement::FundingAvailable())
+            {
+                hero.states={"None","Minimum","Normal","Maximum"};
+                hero.state=std::min<size_t>(s.researchFundingLevel,3);
+            }
+            hero.meters.push_back({native[1].second,progress<0?"-":std::to_string(progress)+"%",std::max(progress,0)});
+            hero.caption=native[0].second;
+            m.hero=hero;
+            m.stats={native[4],{"Expected",native[2].second}};
+            m.metricColumns=2;
+            m.bodyLines={"Researching: "+native[0].second};
+            m.rows={"Funding","Priorities","Invention catalog..."};
+            m.rowEnabled={ResearchManagement::FundingAvailable(),ResearchManagement::FundingAvailable()||ResearchManagement::AvailableCategories()!=0,true};
+            m.heroRow=0;
         }
         else
         {

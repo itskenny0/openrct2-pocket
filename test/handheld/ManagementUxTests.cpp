@@ -129,7 +129,13 @@ int main(int argc,char** argv)
         select("Park news...");press(H::Action::confirm);press(H::Action::back);Check(model().selectedTab==2&&model().selected==0,"News return lost Records");
         press(H::Action::nextOption);select("Park map...");press(H::Action::confirm);Check(W::HandheldParkMapIsOpen(),"Native park map unavailable");press(H::Action::back);Check(model().tabs.size()==3,"Map Back lost park workspace");
         // Current native project, stage normalization, all seven priority categories, draft-only funding shortcut.
-        open(5);Check(model().tabs.size()==2&&model().meters[2]==50,"Research native stage progress incorrect");capture("13-research-project.png");
+        open(5);Check(model().tabs.size()==2&&model().hero&&model().hero->meters.front().percent==50&&model().hero->states.size()==4,"Research native stage progress incorrect");capture("13-research-project.png");
+        {
+            // Funding is the hero's switch on the project tab: Left/Right changes it in place.
+            const auto before=state.researchFundingLevel;W::HandheldMenuMove(-static_cast<int>(model().selected));
+            W::HandheldDashboardMove(1,0);GameActions::ProcessQueue(state);Check(state.researchFundingLevel==before+1,"In-place funding step failed");
+            W::HandheldDashboardMove(-1,0);GameActions::ProcessQueue(state);Check(state.researchFundingLevel==before,"In-place funding did not reverse");
+        }
         const auto funding=state.researchFundingLevel,priorities=state.researchPriorities;press(H::Action::nextOption);
         Check(model().rows.size()==9&&model().rowEnabled.size()==9,"Research priority group missing");capture("14-research-settings.png");
         press(H::Action::contextPrimary);Check(state.researchFundingLevel==funding,"X funding applied without review");
@@ -200,7 +206,7 @@ int main(int argc,char** argv)
         press(H::Action::nextOption);
         Check(state.researchFundingLevel == 2, "Research cycle fixture did not restore normal funding");
         const auto beforeResearch=park.cash;FinancePayResearch();Check(park.cash==beforeResearch-kResearchCosts[2]/4,"Native recurring research charge changed");
-        press(H::Action::previousOption);select("Invention catalog...");press(H::Action::confirm);capture("17-research-catalog.png");press(H::Action::back);Check(model().selectedTab==0&&model().selected==1,"Catalog return lost focus");
+        press(H::Action::previousOption);select("Invention catalog...");press(H::Action::confirm);capture("17-research-catalog.png");press(H::Action::back);Check(model().selectedTab==0&&model().selected==2,"Catalog return lost focus");
         // Campaign selection is now at the workspace root; target and duration adjust inline, full target browsing remains.
         open(6);Check(model().tabs.size()==2,"Marketing tabs absent");capture("18-marketing-empty.png");press(H::Action::nextOption);
         // Start a different native campaign first, so the next queued success must restore a nonzero active row.

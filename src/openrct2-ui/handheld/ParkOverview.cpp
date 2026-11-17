@@ -143,14 +143,12 @@ namespace OpenRCT2::Ui::Handheld::ParkOverview
         // objective text (which has its own page) so the action grid still fits on a small screen.
         if (const auto& alerts = Alerts::Current(); !alerts.empty())
         {
-            model.bodyLines.push_back("{CAUTION}Needs attention  -  Y in the park visits each one");
-            for (size_t i = 0; i < std::min<size_t>(alerts.size(), 3); ++i)
-                model.bodyLines.push_back(
-                    std::string(alerts[i].kind <= Alerts::Kind::breakdown ? "{DANGER}" : "{WHITE}") + alerts[i].title
-                    + "  -  " + alerts[i].fix);
-            if (alerts.size() > 3)
-                model.bodyLines.push_back("{MUTED}and " + std::to_string(alerts.size() - 3) + " more");
-            model.bodyLines.push_back("{MUTED}Objective: " + Outcome());
+            // Kept to two lines so the switch, admission and every button stay on screen: the most
+            // urgent problem, then how many more and how to visit them.
+            model.bodyLines.push_back(std::string(alerts[0].kind <= Alerts::Kind::breakdown ? "{DANGER}" : "{CAUTION}")
+                + alerts[0].title + "  -  " + alerts[0].fix);
+            model.bodyLines.push_back("{MUTED}" + (alerts.size() > 1 ? std::to_string(alerts.size() - 1) + " more need attention.  " : std::string())
+                + "Y in the park visits each one");
             model.rows = { StatusPermitted() ? (park.flags.has(ParkFlag::parkOpen) ? "Close park..." : "Open park...")
                                              : "Park status locked",
                            Finances::Available(Finances::Field::admission) ? "Admission..." : "Admission unavailable",

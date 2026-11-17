@@ -189,9 +189,12 @@ namespace OpenRCT2::Ui::Handheld
     }
     // The focus ring sits just outside a card: the card keeps its own colour, so a focused primary
     // still reads as primary and a focused secondary never pretends to be one.
-    inline void DrawFocusRing(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size)
+    inline void DrawFocusRing(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, bool onAccent = false)
     {
-        OutlineRound(rt, pos - ScreenCoordsXY{ 2, 2 }, { size.width + 4, size.height + 4 }, Theme::gold, 2);
+        // Around a card already filled with the section colour the ring switches to dark ink, or
+        // it would vanish into the card.
+        OutlineRound(rt, pos - ScreenCoordsXY{ 2, 2 }, { size.width + 4, size.height + 4 },
+            onAccent ? static_cast<Drawing::PaletteIndex>(PocketPalette::primary) : Theme::gold, 2);
         if (activeMenuFeel)
             ReportSelected(rt, pos, size);
     }
@@ -215,7 +218,7 @@ namespace OpenRCT2::Ui::Handheld
             Fill(rt, pos + ScreenCoordsXY{ 2, 2 }, { size.width - 4, 1 },
                 filled ? Theme::goldLight : static_cast<Drawing::PaletteIndex>(PocketPalette::highlight));
             if (focused)
-                DrawFocusRing(rt, pos, size);
+                DrawFocusRing(rt, pos, size, kind == ButtonKind::primary);
             return;
         }
         const auto face = ButtonFaceColour(kind);
@@ -224,7 +227,7 @@ namespace OpenRCT2::Ui::Handheld
         if (kind == ButtonKind::secondary)
             Fill(rt, pos + ScreenCoordsXY{ 3, 1 }, { size.width - 6, 1 }, Theme::highlight);
         if (focused)
-            DrawFocusRing(rt, pos, size);
+            DrawFocusRing(rt, pos, size, kind == ButtonKind::primary);
     }
     // A thin rounded bar: loan against its limit, research progress, happiness. Shapes read faster
     // than numbers on a small screen.

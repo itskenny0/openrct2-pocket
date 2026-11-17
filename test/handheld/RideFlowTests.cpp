@@ -169,7 +169,7 @@ int main(int argc, char** argv)
             main->viewport->viewPos=main->savedViewPos;main->flags.unset(WindowFlag::scrollingToLocation);
             capture("06a-alert-jump.png");
             const auto home=H::ParkOverview::Presentation(0);
-            Check(!home.bodyLines.empty()&&home.bodyLines.front().find("Needs attention")!=std::string::npos,"Overview does not lead with alerts");
+            Check(home.bodyLines.size()>=2&&home.bodyLines.front().find("broke down")!=std::string::npos,"Overview does not lead with alerts");
             press(H::Action::openMenu);capture("06b-overview-alerts.png");closeMenu();
             ride->flags.unset(RideFlag::brokenDown);H::Alerts::Invalidate();
         }

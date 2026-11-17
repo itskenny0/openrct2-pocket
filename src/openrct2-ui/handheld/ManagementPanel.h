@@ -404,7 +404,10 @@ namespace OpenRCT2::Ui::Handheld
             const auto origin = p + ScreenCoordsXY{ 12, contentTop + statRows * statHeight + static_cast<int>(model.bodyLines.size()) * 16 + 2 };
             const int chartWidth = width - 24;
             FillRound(rt, origin, { chartWidth, kChartHeight }, Theme::raised);
-            const int half = chartWidth / 2;
+            // A chart with no columns gives its bars the full width and a wider label column.
+            const bool wide = chart.columns.empty() && chart.columnsTitle.empty();
+            const int half = wide ? chartWidth : chartWidth / 2;
+            const int labelWidth = wide ? std::min(220, chartWidth / 2) : 48;
             DrawModernEllipsised(rt, origin + ScreenCoordsXY{ 8, 6 }, half - 12, "{MUTED}" + chart.splitTitle);
             int64_t largest = 1;
             for (const auto& [label, value, ink] : chart.split)
@@ -412,16 +415,18 @@ namespace OpenRCT2::Ui::Handheld
             for (size_t i = 0; i < chart.split.size(); ++i)
             {
                 const auto& [label, value, ink] = chart.split[i];
-                const int y = 24 + static_cast<int>(i) * 22;
-                DrawModernText(rt, origin + ScreenCoordsXY{ 8, y + 1 }, "{WHITE}" + label);
-                const int barRoom = half - 120;
+                const int y = 24 + static_cast<int>(i) * 18;
+                DrawModernEllipsised(rt, origin + ScreenCoordsXY{ 8, y + 1 }, labelWidth - 4, "{WHITE}" + label);
+                const int barLeft = 8 + labelWidth;
+                const int barRoom = half - barLeft - 60;
                 const int bar = std::max<int>(2, static_cast<int>(barRoom * std::abs(value) / largest));
-                FillRound(rt, origin + ScreenCoordsXY{ 56, y + 1 }, { bar, 9 },
+                FillRound(rt, origin + ScreenCoordsXY{ barLeft, y + 1 }, { bar, 9 },
                     static_cast<Drawing::PaletteIndex>(ink == "{DANGER}" ? PocketPalette::destructive : PocketPalette::positive));
                 if (i < chart.splitValues.size())
-                    DrawStrongText(rt, origin + ScreenCoordsXY{ 60 + bar, y + 1 }, "{WHITE}" + chart.splitValues[i], half - 64 - bar);
+                    DrawStrongText(rt, origin + ScreenCoordsXY{ barLeft + bar + 4, y + 1 }, "{WHITE}" + chart.splitValues[i], half - barLeft - bar - 8);
             }
-            Fill(rt, origin + ScreenCoordsXY{ half, 8 }, { 1, kChartHeight - 16 }, Theme::edge);
+            if (!wide)
+                Fill(rt, origin + ScreenCoordsXY{ half, 8 }, { 1, kChartHeight - 16 }, Theme::edge);
             DrawModernEllipsised(rt, origin + ScreenCoordsXY{ half + 8, 6 }, half - 16, "{MUTED}" + chart.columnsTitle);
             if (!chart.columns.empty())
             {

@@ -2880,6 +2880,17 @@ namespace OpenRCT2::Ui::Windows
             _focus.move(static_cast<int>(next) - static_cast<int>(current), count);
             invalidate();
         }
+        void stepFunding(int direction, bool wrap)
+        {
+            if (!Handheld::ResearchManagement::FundingAvailable()) { _status = "Research funding unavailable"; invalidate(); return; }
+            auto draft = Handheld::ResearchManagement::Begin();
+            const int next = wrap ? (draft.funding + direction + 4) % 4 : std::clamp<int>(draft.funding + direction, 0, 3);
+            if (next == draft.funding) return;
+            draft.funding = static_cast<uint8_t>(next);
+            const auto result = Handheld::ResearchManagement::Action(draft, true);
+            _status = result.error == GameActions::Status::ok ? "" : Handheld::Finances::Feedback(result);
+            invalidate();
+        }
         void setParkOpen(bool open)
         {
             auto draft = Handheld::ParkOverview::Begin();
@@ -2994,13 +3005,15 @@ namespace OpenRCT2::Ui::Windows
                     if (row == 0) stepRideState(dx, false); else adjustRidePrice(dx);
                 });
             }
+            else if (_page == Page::research && _researchTabs.tab == 0)
+                controlsThenGridMove(x, y, 1, [this](size_t, int dx) { stepFunding(dx, false); });
             else if (_page == Page::overview && !_overviewDraft)
             {
                 controlsThenGridMove(x, y, 2, [this](size_t row, int dx) {
                     if (row == 0) setParkOpen(dx > 0); else adjustAdmission(dx);
                 });
             }
-            else if (_page == Page::ridesInspect || _page == Page::overview || _page==Page::finances || _page==Page::research
+            else if (_page == Page::ridesInspect || _page == Page::overview || _page==Page::finances || _page==Page::research || _page==Page::guests
                 || (_page==Page::marketing&&_marketingTabs.tab==1)
                 || (_page==Page::staffInspect && _staffTabs.tab!=1) || (_page==Page::guestInspect && _guestTabs.tab!=1 && _guestTabs.tab!=2))
             {
@@ -5722,16 +5735,17 @@ namespace OpenRCT2::Ui::Windows
                     else applyRideDraft();
                     break;
                 case Page::guests:
-                    if (choice == 2 || choice == 3)
+                    // Rows: roster, thoughts, actions, tracked, (hidden) back.
+                    if (choice == 1 || choice == 2)
                     {
                         _guestGroupMode = choice == 2 ? Handheld::GuestManagement::GroupMode::actions
                                                       : Handheld::GuestManagement::GroupMode::thoughts;
                         _guestGroupFocus = 0;
                         page(Page::guestGroups);
                     }
-                    else if (choice == 0 || choice == 4)
+                    else if (choice == 0 || choice == 3)
                     {
-                        _guestFilter = { {}, choice == 4 };
+                        _guestFilter = { {}, choice == 3 };
                         _guestRosterParent = Page::guests;
                         _guestRosterFocus = 3;
                         page(Page::guestRoster);
@@ -6096,7 +6110,9 @@ namespace OpenRCT2::Ui::Windows
                 case Page::research:
                     if(_researchTabs.tab==0)
                     {
-                        if(choice==0)researchTab(1);
+                        // Rows: funding switch, priorities, catalog.
+                        if(choice==0)stepFunding(1,true);
+                        else if(choice==1)researchTab(1);
                         else {_researchFilter=0;_researchCatalog=Handheld::ResearchCatalog::Roster(0);page(Page::researchCatalog);}
                     }
                     else if(_researchDraft)
