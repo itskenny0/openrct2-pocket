@@ -358,9 +358,20 @@ namespace OpenRCT2::Ui::Handheld
         for(size_t i=0;i<model.toolbarCount && i<model.rows.size();++i)
         {
             const int cellWidth=(width-20)/static_cast<int>(model.toolbarCount);
-            DrawActionRow(rt,p+ScreenCoordsXY{10+static_cast<int>(i)*cellWidth,rowStart-47},{cellWidth-4,28},model.rows[i],"",focused&&model.selected==i);
+            DrawActionRow(rt,p+ScreenCoordsXY{10+static_cast<int>(i)*cellWidth,rowStart-47},{cellWidth-4,28},model.rows[i],"",focused&&model.selected==i,true,PanelIcon::none,false,false,false,true);
         }
         for (size_t i = 0; i < model.bodyLines.size(); ++i)
+            if (const auto tab = model.bodyLines[i].find('\t'); tab != std::string::npos)
+            {
+                // "Label\tvalue": a muted label and a strong value, like a stat card laid flat. Text
+                // only honours a leading colour code, so the two parts are drawn separately.
+                const auto label = model.bodyLines[i].substr(0, tab);
+                const auto origin = p + ScreenCoordsXY{ 12, contentTop + 4 + statRows * statHeight + static_cast<int>(i) * 16 };
+                DrawModernText(rt, origin, "{MUTED}" + label);
+                const int x = TextWidth(label) + 6;
+                DrawStrongText(rt, origin + ScreenCoordsXY{ x, 0 }, "{WHITE}" + model.bodyLines[i].substr(tab + 1), width - 24 - x);
+            }
+            else
             DrawModernEllipsised(rt, p + ScreenCoordsXY{12, contentTop + 4 + statRows * statHeight + static_cast<int>(i) * 16},
                 width - 24, model.bodyLines[i].starts_with("{") ? model.bodyLines[i] : "{WHITE}" + model.bodyLines[i]);
         if (!model.changes.empty())
@@ -561,7 +572,10 @@ namespace OpenRCT2::Ui::Handheld
             DrawModernEllipsised(rt, p + ScreenCoordsXY{12, size.height - 29}, width - 24, "{WHITE}" + model.status);
         if(count>capacity)
         {
-            DrawModernText(rt,p+ScreenCoordsXY{12,size.height-13},"{MUTED}"+std::to_string(std::min(selectedItem+1,count))+" / "+std::to_string(count));
+            // The pager counts items, so a trailing "Back to ..." row (kept for B-less navigation) is
+            // not one of them: 20 employees read "1 / 20", not "1 / 21".
+            const size_t items = count - (count > 0 && IsBackRow(model.rows.back()) ? 1 : 0);
+            DrawModernText(rt,p+ScreenCoordsXY{12,size.height-13},"{MUTED}"+std::to_string(std::min(selectedItem+1,items))+" / "+std::to_string(items));
             const int totalHeight=std::max(listHeight,static_cast<int>(totalRows)*rowHeight);
             const int thumb=std::max(8,listHeight*listHeight/totalHeight);
             Fill(rt,p+ScreenCoordsXY{width-6,rowStart},{2,listHeight},Theme::raised);

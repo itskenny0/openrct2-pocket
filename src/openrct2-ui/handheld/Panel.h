@@ -582,7 +582,7 @@ namespace OpenRCT2::Ui::Handheld
     inline void DrawActionRow(
         Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& rawTitle, const std::string& subtitle,
         bool focused, bool enabled = true, PanelIcon icon = PanelIcon::none, bool destructive = false, bool allowNativeArt = true,
-        bool primary = false)
+        bool primary = false, bool centred = false)
     {
         const int press = ButtonPressOffset(focused);
         p.y += press;
@@ -598,7 +598,12 @@ namespace OpenRCT2::Ui::Handheld
         const bool roomForArt = allowNativeArt && TextWidth(title, true) + 58 <= size.width;
         const bool native = roomForArt && DrawNativeMenuArt(rt, p + ScreenCoordsXY{ 5, (size.height - 24) / 2 },
             { 26, 24 }, ActionArt(rawTitle), filled);
-        const int inset = native || (roomForArt && icon != PanelIcon::none) ? 36 : 10;
+        int inset = native || (roomForArt && icon != PanelIcon::none) ? 36 : 10;
+        // Short labels in a row of equal buttons (toolbars) read as a set when centred. The A glyph
+        // takes the right edge when focused, so the label never slides under it.
+        if (centred && !native)
+            inset = std::clamp((size.width - TextWidth(title, true)) / 2, 6,
+                std::max(6, size.width - (focused && enabled ? 22 : 8) - TextWidth(title, true)));
         if (!native && roomForArt) DrawIcon(rt, p + ScreenCoordsXY{9, 8}, icon, filled);
         // The focused button carries the A glyph where a desktop menu would put a chevron: it says
         // which button acts and how, without reading the footer.
@@ -786,15 +791,15 @@ namespace OpenRCT2::Ui::Handheld
             const bool active = i == selected;
             if (active)
                 FillRound(rt, tabPos, { tabWidth - 2, height - 6 }, Theme::gold);
-            const bool showArt = TextWidth(labels[i], active) + 34 <= tabWidth;
-            // Tab sprites are taller than the strip; clip them to its inside so they never poke
-            // through the outline.
-            Drawing::RenderTarget strip;
-            const bool clipped = ClipRenderTarget(strip, rt, pos + ScreenCoordsXY{ 1, 2 }, width - 2, height - 4);
+            const bool showArt = TextWidth(labels[i], active) + 36 <= tabWidth;
+            // Tab sprites draw at their own size, which can be taller than the strip and wider than
+            // their slot. Clip each one to its slot so it never pokes through the outline or under
+            // the label.
+            Drawing::RenderTarget slot;
+            const bool clipped = ClipRenderTarget(slot, rt, tabPos + ScreenCoordsXY{ 1, -1 }, 26, height - 4);
             const bool native = showArt && clipped
-                && DrawNativeMenuArt(strip, tabPos - pos - ScreenCoordsXY{ 1, 2 } + ScreenCoordsXY{ 2, -1 }, { 24, height - 4 },
-                    TabArt(labels[i], context), active);
-            const int inset = native ? 28 : 0;
+                && DrawNativeMenuArt(slot, { 1, 0 }, { 24, height - 4 }, TabArt(labels[i], context), active);
+            const int inset = native ? 30 : 0; // 4 px of air after the 26 px art slot
             const int textWidth = TextWidth(labels[i], active);
             const int x = native ? inset : std::max(4, (tabWidth - 2 - textWidth) / 2);
             const auto ink = active ? std::string("{BLACK}") : std::string("{WHITE}");

@@ -53,8 +53,14 @@ namespace OpenRCT2::Ui::Handheld::PixelFont
             code = '?';
         return static_cast<int>(code - 32);
     }
+    // RCT2's font has no '|', which the menus use as a separator ("Handyman | Walking"). The small
+    // font's 'I' is a plain one-pixel bar, so '|' borrows it with a pixel of air each side.
+    constexpr int kBarIndex = '|' - 32;
+    constexpr int kCapIIndex = 'I' - 32;
     inline int Advance(Style style, int index)
     {
+        if (index == kBarIndex)
+            return Advance(Style::regular, kCapIIndex) + 2;
         if (index == 0)
             return style == Style::bold ? 5 : 4; // space
         const auto* glyph = Glyph(Base(style) + index);
@@ -99,7 +105,9 @@ namespace OpenRCT2::Ui::Handheld::PixelFont
         for (size_t at = 0; at < text.size();)
         {
             const int index = GlyphIndex(text, at);
-            if (index > 0)
+            if (index == kBarIndex)
+                DrawGlyph(rt, pos + ScreenCoordsXY{ scale, 0 }, Style::regular, kCapIIndex, ink, scale);
+            else if (index > 0)
                 DrawGlyph(rt, pos, style, index, ink, scale);
             pos.x += Advance(style, index) * scale;
         }

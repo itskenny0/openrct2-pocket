@@ -962,8 +962,10 @@ namespace OpenRCT2::Ui::Windows
                         if(selected==0) {model.navigationHint="Change";model.primaryAction="Next";}
                         if(!model.settingRows.empty())
                         {
-                            model.settingValues={Handheld::RideManagement::PricePermitted(*ride)?Handheld::FormatMoney(ride->price[0]):"Not charged"};
-                            if(selected==model.settingRows.front()) {model.navigationHint="Price";model.primaryAction="Editor";}
+                            const bool priced=Handheld::RideManagement::PricePermitted(*ride);
+                            model.settingValues={priced?Handheld::FormatMoney(ride->price[0]):"Not charged"};
+                            // A free ride has nothing to adjust, so the footer offers nothing for it.
+                            if(selected==model.settingRows.front() && priced) {model.navigationHint="Price";model.primaryAction="Editor";}
                         }
                     }
                 }

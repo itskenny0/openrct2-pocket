@@ -243,9 +243,9 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         };
         if (view == View::roster)
         {
-            model.rows = { "Hire employee...", "Filter role...", "Counts / wages..." };
+            model.rows = { "Hire staff...", "Filter role...", "Wages..." };
             model.rowDetails.resize(3);
-            model.toolbarCount=3;model.denseRoster=true;model.listLabel="EMPLOYEES / ROLE / CURRENT ACTIVITY";
+            model.toolbarCount=3;model.denseRoster=true;model.listLabel=std::to_string(roster.size())+(roster.size()==1?" EMPLOYEE":" EMPLOYEES")+" / ROLE / CURRENT ACTIVITY";
             const auto capacity=MeasureManagement({ContextGetWidth()-16,Layout::ContentHeight({ContextGetWidth(),ContextGetHeight()})},model).capacity;
             for (const auto& entry : roster)
             {
