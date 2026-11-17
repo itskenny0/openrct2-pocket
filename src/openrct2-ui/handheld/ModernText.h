@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "PixelFont.h"
+#include <cmath>
 #include "PocketPalette.h"
 #include "PocketSansData.h"
 #include "PocketSansStrongData.h"
@@ -325,6 +326,17 @@ namespace OpenRCT2::Ui::Handheld
     }
 
     // Button labels centre the visible ink, rather than the font advance/baseline.
+    // Pocket Sans capitals sit on rows 0-8 below a text position (heading caps on rows 2-13). These
+    // return the y offset that centres capitals in a box of the given height, so labels are
+    // optically centred instead of riding low.
+    inline int CapCentre(int height)
+    {
+        return (height - 9 + 1) / 2;
+    }
+    inline int HeadingCapCentre(int height)
+    {
+        return (height - 12 + 1) / 2 - 2;
+    }
     inline void DrawButtonLabel(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, const std::string& text)
     {
         if (PocketPalette::Pixel())
@@ -332,35 +344,58 @@ namespace OpenRCT2::Ui::Handheld
             // Bold when it fits; shoulder labels like "L1/R1" drop to the regular weight.
             const auto style = PixelFont::Width(text, PixelFont::Style::bold) <= size.width - 2 ? PixelFont::Style::bold
                                                                                                : PixelFont::Style::regular;
-            const int width = PixelFont::Width(text, style);
-            PixelFont::Draw(rt, pos + ScreenCoordsXY{ (size.width - width) / 2, (size.height - 8) / 2 }, text, style,
+            // The bold advance includes a trailing spacing column; centre the inked part.
+            const int width = PixelFont::Width(text, style) - (style == PixelFont::Style::bold ? 1 : 0);
+            PixelFont::Draw(rt, pos + ScreenCoordsXY{ (size.width - width + 1) / 2, (size.height - 8) / 2 }, text, style,
                 InkColour(Ink::dark));
             return;
         }
-        int left = 10000, top = 10000, right = -1, bottom = -1, advance = 0;
-        for (const unsigned char c : text)
-        {
-            if (c < 32 || c >= 127)
-                return;
-            const auto glyph = PocketSans::kCoverage[c - 32];
-            for (int y = 0; y < PocketSans::kHeight; ++y)
-                for (int x = 0; x < PocketSans::kWidth; ++x)
-                    if (glyph[y * PocketSans::kWidth + x] != '0')
+        // Centre by optical weight, not by the advance box: the coverage-weighted centre of the
+        // inked pixels lands on the badge's centre pixel. Advance boxes carry side bearings, so
+        // box centring left single letters like A or Y sitting a pixel left of centre. Bold
+        // glyphs read better at this size; long labels drop to regular so they still fit.
+        auto measure = [&](bool strong, double& cx, double& cy, int& inkWidth) {
+            const int glyphWidth = strong ? PocketSansStrong::kWidth : PocketSans::kWidth;
+            double sum = 0, sx = 0, sy = 0;
+            int left = 10000, right = -1, advance = 0;
+            for (const unsigned char c : text)
+            {
+                if (c < 32 || c >= 127)
+                    return false;
+                const auto glyph = GlyphCoverage(c - 32, strong, false);
+                for (int y = 0; y < PocketSans::kHeight; ++y)
+                    for (int x = 0; x < glyphWidth; ++x)
                     {
+                        const char value = glyph[y * glyphWidth + x];
+                        const int w = value <= '9' ? value - '0' : value - 'a' + 10;
+                        if (!w)
+                            continue;
+                        sum += w;
+                        sx += w * (advance + x);
+                        sy += w * y;
                         left = std::min(left, advance + x);
                         right = std::max(right, advance + x);
-                        top = std::min(top, y);
-                        bottom = std::max(bottom, y);
                     }
-            advance += PocketSans::kAdvance[c - 32];
-        }
-        if (right < left)
+                advance += GlyphAdvance(c - 32, strong, false);
+            }
+            if (sum <= 0)
+                return false;
+            cx = sx / sum;
+            cy = sy / sum;
+            inkWidth = right - left + 1;
+            return true;
+        };
+        double cx = 0, cy = 0;
+        int inkWidth = 0;
+        bool strong = measure(true, cx, cy, inkWidth) && inkWidth <= size.width - 2;
+        if (!strong && !measure(false, cx, cy, inkWidth))
             return;
-        DrawModernText(
-            rt,
-            pos
-                + ScreenCoordsXY{ (size.width - (right - left + 1)) / 2 - left,
-                                  (size.height - (bottom - top + 1)) / 2 - top + 3 },
-            "{BLACK}" + text);
+        const double targetX = (size.width - 1) / 2.0, targetY = (size.height - 1) / 2.0;
+        const ScreenCoordsXY at = pos
+            + ScreenCoordsXY{ static_cast<int>(std::lround(targetX - cx)), static_cast<int>(std::lround(targetY - cy)) + 3 };
+        if (strong)
+            DrawStrongText(rt, at, "{BLACK}" + text);
+        else
+            DrawModernText(rt, at, "{BLACK}" + text);
     }
 } // namespace OpenRCT2::Ui::Handheld

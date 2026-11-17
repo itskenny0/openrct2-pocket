@@ -110,7 +110,7 @@ namespace OpenRCT2::Ui::Handheld
         DrawButtonFace(rt, cell, size, ButtonKind::secondary, focused);
         const bool art = card.sprite && DrawNativeMenuArt(rt, cell + ScreenCoordsXY{ 4, (size.height - 24) / 2 }, { 24, 24 }, { card.sprite, card.frames }, false);
         if (!art) DrawIcon(rt, cell + ScreenCoordsXY{ 8, (size.height - 16) / 2 }, card.icon, false);
-        DrawStrongText(rt, cell + ScreenCoordsXY{ 32, (size.height - 12) / 2 + 2 }, "{WHITE}" + card.label, size.width - 38);
+        DrawStrongText(rt, cell + ScreenCoordsXY{ 32, CapCentre(size.height - 2) }, "{WHITE}" + card.label, size.width - 38);
     }
     inline void DrawChoiceGroups(Drawing::RenderTarget& rt, ScreenSize screen, const std::string& title,
         const std::vector<ChoiceCard>& cards, const std::vector<ChoiceGroup>& groups, size_t selected, const std::string& back)

@@ -469,7 +469,7 @@ namespace OpenRCT2::Ui::Handheld
     }
     inline int ControlKeyWidth(const std::string& key)
     {
-        return key == "D-pad" || key.size() == 1 ? 16 : TextWidth(key) + 8;
+        return key == "D-pad" || key.size() == 1 ? 16 : TextWidth(key, true) + 10; // Pills print the key in bold.
     }
     inline int ControlHintWidth(const ControlHint& hint)
     {
@@ -489,10 +489,12 @@ namespace OpenRCT2::Ui::Handheld
             DrawButtonLabel(rt, centre - ScreenCoordsXY{ 6, 6 }, { 13, 13 }, key);
             return;
         }
-        static constexpr int kSpan[]{ 3, 5, 6, 7, 7, 7, 7, 7, 6, 5, 3 }; // half-widths of an 15x11 disc
-        for (int row = 0; row < 11; ++row)
-            Fill(rt, centre + ScreenCoordsXY{ -kSpan[row], row - 5 }, { 2 * kSpan[row] + 1, 1 }, face);
-        DrawButtonLabel(rt, centre - ScreenCoordsXY{ 7, 6 }, { 15, 13 }, key);
+        // A true 13 px circle (the old 15 x 11 oval squeezed bold letters against its top and
+        // bottom). The label is centred on the circle's centre pixel by optical weight.
+        static constexpr int kSpan[]{ 2, 4, 5, 5, 6, 6, 6, 6, 6, 5, 5, 4, 2 };
+        for (int row = 0; row < 13; ++row)
+            Fill(rt, centre + ScreenCoordsXY{ -kSpan[row], row - 6 }, { 2 * kSpan[row] + 1, 1 }, face);
+        DrawButtonLabel(rt, centre - ScreenCoordsXY{ 6, 6 }, { 13, 13 }, key);
     }
     inline void DrawCommand(Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t, const char* key, const char* label)
     {
@@ -514,7 +516,8 @@ namespace OpenRCT2::Ui::Handheld
             FillRound(rt, { pos.x, top + 1 }, { width, 15 }, face);
             DrawButtonLabel(rt, { pos.x, top }, { width, 17 }, name);
         }
-        DrawModernText(rt, { pos.x + width + 5, pos.y }, std::string("{WHITE}") + label);
+        // Capitals centred on the glyph's centre row (top + 8).
+        DrawModernText(rt, { pos.x + width + 5, top + 8 - 4 }, std::string("{WHITE}") + label);
     }
     inline void DrawFooter(Drawing::RenderTarget&, ScreenSize, const std::vector<ControlHint>&);
     inline void DrawFooterAt(Drawing::RenderTarget&, ScreenCoordsXY, ScreenSize, const std::vector<ControlHint>&);
@@ -601,14 +604,14 @@ namespace OpenRCT2::Ui::Handheld
         // which button acts and how, without reading the footer.
         const int glyphRoom = focused && enabled ? 22 : 8;
         DrawStrongText(
-            rt, p + ScreenCoordsXY{ inset, subtitle.empty() || size.height < 34 ? (size.height - 12) / 2 + 3 : 8 },
+            rt, p + ScreenCoordsXY{ inset, subtitle.empty() || size.height < 34 ? CapCentre(size.height - 2) : 8 },
             std::string(colour) + title, size.width - inset - glyphRoom);
         if (!subtitle.empty() && size.height >= 34)
             DrawModernEllipsised(
                 rt, p + ScreenCoordsXY{ inset, size.height - 13 }, size.width - inset - glyphRoom,
                 std::string(!enabled ? "{DISABLED}" : filled ? "{BLACK}" : "{MUTED}") + subtitle);
         if (focused && enabled)
-            DrawButtonGlyph(rt, p + ScreenCoordsXY{ size.width - 12, size.height / 2 - 1 }, "A");
+            DrawButtonGlyph(rt, p + ScreenCoordsXY{ size.width - 12, (size.height - 2) / 2 }, "A");
     }
 
     inline void DrawListBackground(Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, bool focused)
@@ -639,7 +642,7 @@ namespace OpenRCT2::Ui::Handheld
         const int glyphRoom = focused && enabled ? 22 : 8;
         const auto ink = enabled ? "{WHITE}" : "{DISABLED}";
         DrawStrongText(
-            rt, p + ScreenCoordsXY{ inset, subtitle.empty() || size.height < 34 ? (size.height - 12) / 2 + 2 : 6 },
+            rt, p + ScreenCoordsXY{ inset, subtitle.empty() || size.height < 34 ? CapCentre(size.height - 1) : 6 },
             std::string(ink) + title, size.width - inset - glyphRoom);
         if (!subtitle.empty() && size.height >= 34)
             DrawModernEllipsised(rt, p + ScreenCoordsXY{ inset, size.height - 15 }, size.width - inset - glyphRoom,
@@ -773,8 +776,8 @@ namespace OpenRCT2::Ui::Handheld
         constexpr int height = 26;
         FillRound(rt, pos, { width, height }, Theme::edge);
         FillRound(rt, pos + ScreenCoordsXY{ 1, 1 }, { width - 2, height - 2 }, Theme::raised);
-        DrawModernText(rt, pos + ScreenCoordsXY{ 6, 10 }, "{MUTED}L1");
-        DrawModernText(rt, pos + ScreenCoordsXY{ width - 19, 10 }, "{MUTED}R1");
+        DrawModernText(rt, pos + ScreenCoordsXY{ 6, CapCentre(height) }, "{MUTED}L1");
+        DrawModernText(rt, pos + ScreenCoordsXY{ width - 6 - TextWidth("R1"), CapCentre(height) }, "{MUTED}R1");
         const int inner = width - 50;
         const auto tabWidth = inner / static_cast<int32_t>(labels.size());
         for (size_t i = 0; i < labels.size(); ++i)
@@ -784,16 +787,22 @@ namespace OpenRCT2::Ui::Handheld
             if (active)
                 FillRound(rt, tabPos, { tabWidth - 2, height - 6 }, Theme::gold);
             const bool showArt = TextWidth(labels[i], active) + 34 <= tabWidth;
-            const bool native = showArt
-                && DrawNativeMenuArt(rt, tabPos + ScreenCoordsXY{ 2, -1 }, { 24, 22 }, TabArt(labels[i], context), active);
+            // Tab sprites are taller than the strip; clip them to its inside so they never poke
+            // through the outline.
+            Drawing::RenderTarget strip;
+            const bool clipped = ClipRenderTarget(strip, rt, pos + ScreenCoordsXY{ 1, 2 }, width - 2, height - 4);
+            const bool native = showArt && clipped
+                && DrawNativeMenuArt(strip, tabPos - pos - ScreenCoordsXY{ 1, 2 } + ScreenCoordsXY{ 2, -1 }, { 24, height - 4 },
+                    TabArt(labels[i], context), active);
             const int inset = native ? 28 : 0;
             const int textWidth = TextWidth(labels[i], active);
             const int x = native ? inset : std::max(4, (tabWidth - 2 - textWidth) / 2);
             const auto ink = active ? std::string("{BLACK}") : std::string("{WHITE}");
+            const int textY = CapCentre(height - 6);
             if (active)
-                DrawStrongText(rt, tabPos + ScreenCoordsXY{ x, 7 }, ink + labels[i], tabWidth - x - 4);
+                DrawStrongText(rt, tabPos + ScreenCoordsXY{ x, textY }, ink + labels[i], tabWidth - x - 4);
             else
-                DrawModernEllipsised(rt, tabPos + ScreenCoordsXY{ x, 7 }, tabWidth - x - 4, ink + labels[i]);
+                DrawModernEllipsised(rt, tabPos + ScreenCoordsXY{ x, textY }, tabWidth - x - 4, ink + labels[i]);
         }
     }
 
