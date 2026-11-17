@@ -61,8 +61,7 @@ namespace OpenRCT2::Ui::Handheld
     public:
         static uint64_t Clock()
         {
-            return std::chrono::duration_cast<std::chrono::milliseconds>(
-                       std::chrono::steady_clock::now().time_since_epoch())
+            return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
                 .count();
         }
         Event Observe(const std::string& page, size_t selected, uint64_t now = Clock(), int pageId = -1)

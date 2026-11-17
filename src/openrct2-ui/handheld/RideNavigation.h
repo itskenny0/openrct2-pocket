@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
-#include "RideTabs.h"
 #include "RideManagement.h"
+#include "RideTabs.h"
+
 #include <optional>
 namespace OpenRCT2::Ui::Handheld::RideNavigation
 {
@@ -10,12 +11,14 @@ namespace OpenRCT2::Ui::Handheld::RideNavigation
     {
         RideManagement::Target target;
         RideTabs::State tabs;
-        bool fromPark=true;
+        bool fromPark = true;
         size_t rosterFocus{};
     };
     inline std::optional<Context> construction;
     inline std::optional<Context> Take()
     {
-        auto context=construction;construction.reset();return context;
+        auto context = construction;
+        construction.reset();
+        return context;
     }
-}
+} // namespace OpenRCT2::Ui::Handheld::RideNavigation

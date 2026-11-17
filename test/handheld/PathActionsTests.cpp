@@ -821,17 +821,19 @@ static void TestShops(IContext& context, const std::string& profile, bool realUi
         const auto pausedCash = state.park.cash;
         const bool focusCleanup = H::IsEnabled() && !ContextHasFocus();
         gameStateTick();
-        Require(tracks(next,false)==0 && state.park.cash==pausedCash,"Paused shop frame changed real track/cash");
+        Require(tracks(next, false) == 0 && state.park.cash == pausedCash, "Paused shop frame changed real track/cash");
         if (focusCleanup)
         {
             // The full Pocket frame intentionally clears unfocused previews.
             // Provisional restoration must not resurrect that cleared request.
-            Require(tracks(next,true)==0 && rides()==baselineRides+1,
+            Require(
+                tracks(next, true) == 0 && rides() == baselineRides + 1,
                 "Unfocused paused frame retained/resurrected shop ghost or borrowed ride");
-            Require(H::IsShopToolActive(),"Focus cleanup ended the selected shop tool");
+            Require(H::IsShopToolActive(), "Focus cleanup ended the selected shop tool");
         }
         else
-            Require(tracks(next,true)==1 && rides()==baselineRides+2,
+            Require(
+                tracks(next, true) == 1 && rides() == baselineRides + 2,
                 "Paused native tick stranded shop record/changed cash");
         gGamePaused = 0;
         state.cheats.buildInPauseMode = false;
@@ -2752,10 +2754,11 @@ static void TestGuests(IContext& context, const std::string& profile, bool realU
         Require(W::HandheldGuestsPresentation().title == "Action groups", "Held A skipped native groups");
         press(H::Action::confirm);
         const auto filteredModel = W::HandheldGuestsPresentation();
-        Require(filteredModel.title == G::Groups(G::GroupMode::actions).front().label,
+        Require(
+            filteredModel.title == G::Groups(G::GroupMode::actions).front().label,
             "Filtered roster did not identify its actual native group");
-        Require(filteredModel.rows.size() >= 4
-                && filteredModel.rows[filteredModel.rows.size() - 4] == "Show roster on map"
+        Require(
+            filteredModel.rows.size() >= 4 && filteredModel.rows[filteredModel.rows.size() - 4] == "Show roster on map"
                 && filteredModel.rows[filteredModel.rows.size() - 3] == "Filter by name..."
                 && filteredModel.rows[filteredModel.rows.size() - 2] == "Show tracked only"
                 && filteredModel.rows.back() == "Back to groups",
@@ -2915,7 +2918,8 @@ static void TestGuests(IContext& context, const std::string& profile, bool realU
         press(H::Action::confirm);
         const auto remainingGuests = G::Roster();
         const auto staleModel = W::HandheldGuestsPresentation();
-        Require(W::HandheldGuestsIsOpen() && remainingGuests.size() == 19
+        Require(
+            W::HandheldGuestsIsOpen() && remainingGuests.size() == 19
                 && std::find(remainingGuests.begin(), remainingGuests.end(), target) == remainingGuests.end()
                 && staleModel.rows.size() == remainingGuests.size() + 4
                 && staleModel.rows[remainingGuests.size()] == "Show roster on map"
@@ -3412,8 +3416,13 @@ static void TestOverview(IContext& context, const std::string& profile, bool rea
     const auto ledger = park.expenditureTable;
     const auto commonPrices = park.samePriceThroughoutPark;
     auto model = O::Presentation(0);
-    Require(model.title == park.name && model.stats.size() == 4 && model.rows.size() == 6, "Overview summary or information entry points missing");
-    Require(model.rows[2] == "Park map..." && model.rows[3] == "Park news..." && model.rows[4] == "Park awards..." && model.rows[5] == "Park history...", "Overview native information routes changed");
+    Require(
+        model.title == park.name && model.stats.size() == 4 && model.rows.size() == 6,
+        "Overview summary or information entry points missing");
+    Require(
+        model.rows[2] == "Park map..." && model.rows[3] == "Park news..." && model.rows[4] == "Park awards..."
+            && model.rows[5] == "Park history...",
+        "Overview native information routes changed");
     Require(
         model.stats[0].second == "Closed" && model.stats[1].second == "321" && model.stats[2].second == "733 / 999"
             && model.stats[3].second == H::FormatMoney(park.value),

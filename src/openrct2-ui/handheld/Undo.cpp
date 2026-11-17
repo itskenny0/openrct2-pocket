@@ -2,9 +2,7 @@
 #include "Undo.h"
 
 #include <algorithm>
-#include <optional>
 #include <openrct2/GameState.h>
-#include <openrct2/management/Finance.h>
 #include <openrct2/actions/GameActionRunner.h>
 #include <openrct2/actions/ride/RideDemolishAction.h>
 #include <openrct2/actions/scenery/BannerRemoveAction.h>
@@ -13,6 +11,7 @@
 #include <openrct2/actions/scenery/WallRemoveAction.h>
 #include <openrct2/actions/terraform/LandSetHeightAction.h>
 #include <openrct2/actions/terraform/WaterSetHeightAction.h>
+#include <openrct2/management/Finance.h>
 #include <openrct2/ride/Ride.h>
 #include <openrct2/ride/RideData.h>
 #include <openrct2/world/Map.h>
@@ -23,6 +22,7 @@
 #include <openrct2/world/tile_element/SurfaceElement.h>
 #include <openrct2/world/tile_element/TrackElement.h>
 #include <openrct2/world/tile_element/WallElement.h>
+#include <optional>
 #include <vector>
 
 namespace OpenRCT2::Ui::Handheld::Undo
@@ -63,12 +63,15 @@ namespace OpenRCT2::Ui::Handheld::Undo
         {
             switch (kind)
             {
-                case Kind::trees: return type == TileElementType::smallScenery;
+                case Kind::trees:
+                    return type == TileElementType::smallScenery;
                 case Kind::scenery:
                     return type == TileElementType::smallScenery || type == TileElementType::largeScenery
                         || type == TileElementType::wall || type == TileElementType::banner;
-                case Kind::shop: return type == TileElementType::track;
-                default: return false;
+                case Kind::shop:
+                    return type == TileElementType::track;
+                default:
+                    return false;
             }
         }
         std::optional<Identity> Identify(Kind kind, const TileElement& element)
@@ -196,7 +199,8 @@ namespace OpenRCT2::Ui::Handheld::Undo
                 const auto* surface = MapGetSurfaceElementAt(tile.location);
                 if (surface && tile.surface && surface->getWaterHeight() != tile.surface->water)
                 {
-                    GameActions::WaterSetHeightAction action(tile.location, static_cast<uint8_t>(tile.surface->water / kCoordsZStep));
+                    GameActions::WaterSetHeightAction action(
+                        tile.location, static_cast<uint8_t>(tile.surface->water / kCoordsZStep));
                     run(action);
                 }
             }
@@ -219,7 +223,8 @@ namespace OpenRCT2::Ui::Handheld::Undo
                     {
                         case TileElementType::smallScenery:
                         {
-                            GameActions::SmallSceneryRemoveAction action(at, id.detail, static_cast<ObjectEntryIndex>(id.object));
+                            GameActions::SmallSceneryRemoveAction action(
+                                at, id.detail, static_cast<ObjectEntryIndex>(id.object));
                             run(action);
                             break;
                         }
@@ -275,7 +280,8 @@ namespace OpenRCT2::Ui::Handheld::Undo
         // demolition's refund is negative, so it nets out). Booked as a negative payment so the
         // finance records still balance.
         if (undone > 0 && !state.park.flags.has(ParkFlag::noMoney))
-            FinancePayment(-(step.cost + spent),
+            FinancePayment(
+                -(step.cost + spent),
                 step.kind == Kind::shop ? ExpenditureType::rideConstruction : ExpenditureType::landscaping);
         if (undone == 0 && message.empty())
             message = "Nothing left to undo here";

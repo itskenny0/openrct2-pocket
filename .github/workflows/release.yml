@@ -1,0 +1,31 @@
+# Push a tag such as v0.4.0 to build the Pak and publish it as a GitHub release. Tags with a
+# hyphen (v0.4.0-beta.1) are marked as pre-releases.
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  pak:
+    uses: ./.github/workflows/brick-pak.yml
+    with:
+      name: OpenRCT2-Pocket-${{ github.ref_name }}.zip
+  publish:
+    name: Publish release
+    needs: pak
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: OpenRCT2-Pocket-${{ github.ref_name }}.zip
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: OpenRCT2-Pocket-${{ github.ref_name }}.zip
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          body: |
+            OpenRCT2 Pocket for the TrimUI Brick (NextUI). Extract to the SD card root, then copy
+            your own RollerCoaster Tycoon 2 `Data`, `ObjData` and `Scenarios` folders into
+            `Tools/tg5040/OpenRCT2 Pocket.pak/RCT2/`. No RCT2 game data is included.
+            See the README for install details.

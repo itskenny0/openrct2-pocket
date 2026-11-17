@@ -132,11 +132,14 @@ namespace OpenRCT2::Ui::Handheld::ShopManagement
             model.headerStatus = FormatStringIDLegacy(STR_STRINGID, status.Data());
             model.headerInk = ride->status == RideStatus::open ? "{POSITIVE}" : "{WHITE}";
             auto earnings = [noMoney](money64 value) {
-                return noMoney ? std::string("Not applicable") : value == kMoney64Undefined ? std::string("Unavailable") : Money(value);
+                return noMoney                   ? std::string("Not applicable")
+                    : value == kMoney64Undefined ? std::string("Unavailable")
+                                                 : Money(value);
             };
-            model.stats = {{"Customers", std::to_string(ride->totalCustomers)},
-                           {"Customers / hr", std::to_string(RideCustomersPerHour(*ride))},
-                           {"Income / hr", earnings(ride->incomePerHour)}, {"Profit / hr", earnings(ride->profit)}};
+            model.stats = { { "Customers", std::to_string(ride->totalCustomers) },
+                            { "Customers / hr", std::to_string(RideCustomersPerHour(*ride)) },
+                            { "Income / hr", earnings(ride->incomePerHour) },
+                            { "Profit / hr", earnings(ride->profit) } };
             model.summaryMetrics = true;
             model.metricColumns = 2;
             model.metricHeight = 34;
@@ -144,15 +147,17 @@ namespace OpenRCT2::Ui::Handheld::ShopManagement
             for (const auto& price : prices)
             {
                 const auto sold = price.primary ? ride->numPrimaryItemsSold : ride->numSecondaryItemsSold;
-                model.bodyLines.push_back(price.name + "  " + (noMoney ? "Free" : Money(price.value))
+                model.bodyLines.push_back(
+                    price.name + "  " + (noMoney ? "Free" : Money(price.value))
                     + (price.item == ShopItem::admission ? "" : " / " + std::to_string(sold) + " sold"));
             }
-            model.rows = {ride->status == RideStatus::open ? "Close shop" : "Open shop", "Prices...", "Demolish...", "Rename...", "Appearance..."};
-            model.rowEnabled = {true, !noMoney && !prices.empty(), true, true, true};
+            model.rows = { ride->status == RideStatus::open ? "Close shop" : "Open shop", "Prices...", "Demolish...",
+                           "Rename...", "Appearance..." };
+            model.rowEnabled = { true, !noMoney && !prices.empty(), true, true, true };
             model.selected = focus;
             model.status = feedback;
-            DrawManagementContent(rt, p, {320, Layout::ContentHeight(screen)}, model);
-            DrawFooter(rt, screen, {{"D-pad", "Choose"}, {"A", "Select"}, {"B", "Back"}});
+            DrawManagementContent(rt, p, { 320, Layout::ContentHeight(screen) }, model);
+            DrawFooter(rt, screen, { { "D-pad", "Choose" }, { "A", "Select" }, { "B", "Back" } });
             return;
         }
         Box(rt, p, { width, view == View::inspection ? 348 : 252 });
@@ -164,7 +169,7 @@ namespace OpenRCT2::Ui::Handheld::ShopManagement
         };
         auto row = [&](int y, const std::string& s, bool selected) {
             if (selected)
-                Box(rt, p + ScreenCoordsXY{ 8, y }, { width - 16, view==View::inspection?23:28 }, true);
+                Box(rt, p + ScreenCoordsXY{ 8, y }, { width - 16, view == View::inspection ? 23 : 28 }, true);
             text(y + 9, (selected ? "{BLACK}" : "{WHITE}") + s, selected);
         };
         text(12, "{MUTED}Shops / Facilities");

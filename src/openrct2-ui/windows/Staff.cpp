@@ -7,15 +7,15 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
+#include <openrct2-ui/handheld/ControllerInput.h>
+#include <openrct2-ui/handheld/Explorer.h>
+#include <openrct2-ui/handheld/PeopleNavigation.h>
 #include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2-ui/interface/Theme.h>
 #include <openrct2-ui/interface/ViewportQuery.h>
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
-#include <openrct2-ui/handheld/ControllerInput.h>
-#include <openrct2-ui/handheld/Explorer.h>
-#include <openrct2-ui/handheld/PeopleNavigation.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
 #include <openrct2/SpriteIds.h>
@@ -1231,11 +1231,13 @@ namespace OpenRCT2::Ui::Windows
 
     WindowBase* StaffOpen(Peep* peep)
     {
-        if (!peep) return nullptr;
+        if (!peep)
+            return nullptr;
         if (Handheld::IsEnabled() && gLegacyScene == LegacyScene::playing)
         {
             const auto target = Handheld::StaffManagement::Identify(peep->id);
-            if (!target) return nullptr;
+            if (!target)
+                return nullptr;
             Handheld::PeopleNavigation::staff.reset();
             HandheldStaffOpen(*target);
             return GetWindowManager()->FindByClass(WindowClass::handheldMenu);

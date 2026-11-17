@@ -105,7 +105,7 @@ namespace OpenRCT2::Ui::Handheld::Finances
         const bool loan = draft->field == Field::loan;
         model.title = loan ? "Loan balance" : "Park admission";
         model.editing = view == View::editor;
-        model.contentSized=true;
+        model.contentSized = true;
         model.confirmation = view == View::confirmation;
         // Show what the decision changes, not every related number: the value itself (with the
         // loan against its limit), what it does to cash, and the ongoing cost.
@@ -113,11 +113,15 @@ namespace OpenRCT2::Ui::Handheld::Finances
         {
             const auto change = draft->value - draft->baseline;
             const int meter = park.maxBankLoan > 0 ? static_cast<int>(draft->value * 100 / park.maxBankLoan) : -1;
-            model.changes.push_back({ "Loan, limit " + FormatMoney(park.maxBankLoan), FormatMoney(draft->baseline),
-                                      FormatMoney(draft->value), "{WHITE}", meter });
+            model.changes.push_back(
+                { "Loan, limit " + FormatMoney(park.maxBankLoan), FormatMoney(draft->baseline), FormatMoney(draft->value),
+                  "{WHITE}", meter });
             if (park.cash != kMoney64Undefined)
-                model.changes.push_back({ "Cash", FormatMoney(park.cash), FormatMoney(park.cash + change),
-                                          change > 0 ? "{POSITIVE}" : change < 0 ? "{DANGER}" : "{WHITE}" });
+                model.changes.push_back(
+                    { "Cash", FormatMoney(park.cash), FormatMoney(park.cash + change),
+                      change > 0       ? "{POSITIVE}"
+                          : change < 0 ? "{DANGER}"
+                                       : "{WHITE}" });
             model.changes.push_back({ "Interest", "", std::to_string(park.bankLoanInterestRate) + "% a year" });
         }
         else
@@ -131,7 +135,7 @@ namespace OpenRCT2::Ui::Handheld::Finances
             ? std::vector<std::string>{ loan ? "Review loan change" : "Apply price", "Cancel" }
             : std::vector<std::string>{ loan ? draft->value >= draft->baseline ? "Borrow" : "Repay" : "Set admission",
                                         "Cancel" };
-        model.primaryAction=model.editing && !loan ? "Apply" : "Review";
+        model.primaryAction = model.editing && !loan ? "Apply" : "Review";
         const auto result = Action(*draft, false);
         if (model.status.empty())
             model.status = result.error == GameActions::Status::ok

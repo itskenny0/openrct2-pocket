@@ -1,76 +1,109 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
-#include "TabbedActions.h"
-#include "StaffManagement.h"
-#include "StaffPatrol.h"
 #include "GuestManagement.h"
 #include "ParkInformation.h"
+#include "StaffManagement.h"
+#include "StaffPatrol.h"
+#include "TabbedActions.h"
 namespace OpenRCT2::Ui::Handheld::PeopleTabs
 {
     using State = TabFocus<4>;
     inline std::vector<size_t> StaffActions(size_t tab)
     {
-        return tab == 0 ? std::vector<size_t>{0,9}
-            : tab == 2 ? std::vector<size_t>{6}
-            : std::vector<size_t>{2,7,8,4,3};
+        return tab == 0 ? std::vector<size_t>{ 0, 9 }
+            : tab == 2  ? std::vector<size_t>{ 6 }
+                        : std::vector<size_t>{ 2, 7, 8, 4, 3 };
     }
     inline std::vector<size_t> GuestActions(size_t tab)
     {
-        return tab == 0 ? std::vector<size_t>{0,11,9} : std::vector<size_t>{3,4,8,10,6,7};
+        return tab == 0 ? std::vector<size_t>{ 0, 11, 9 } : std::vector<size_t>{ 3, 4, 8, 10, 6, 7 };
     }
     inline void Actions(ManagementPresentation& model, const ManagementPresentation& native, const std::vector<size_t>& indices)
     {
-        model.rows.clear();model.rowEnabled.clear();model.rowDetails.clear();
-        for(auto index:indices) {
-            if(index>=native.rows.size()) continue;
+        model.rows.clear();
+        model.rowEnabled.clear();
+        model.rowDetails.clear();
+        for (auto index : indices)
+        {
+            if (index >= native.rows.size())
+                continue;
             model.rows.push_back(native.rows[index]);
-            model.rowEnabled.push_back(index<native.rowEnabled.size()?native.rowEnabled[index]:true);
+            model.rowEnabled.push_back(index < native.rowEnabled.size() ? native.rowEnabled[index] : true);
         }
-        model.actionGrid=true;
+        model.actionGrid = true;
     }
     inline void Activity(ManagementPresentation& model, const std::string& status)
     {
-        const auto wrapped=GuestManagement::TextLines(status);
-        model.bodyLines.assign(wrapped.begin(),wrapped.begin()+std::min<size_t>(2,wrapped.size()));
+        const auto wrapped = GuestManagement::TextLines(status);
+        model.bodyLines.assign(wrapped.begin(), wrapped.begin() + std::min<size_t>(2, wrapped.size()));
     }
-    inline ManagementPresentation Staff(const StaffManagement::Target& target,const State& tabs,size_t selected,uint8_t draft)
+    inline ManagementPresentation Staff(
+        const StaffManagement::Target& target, const State& tabs, size_t selected, uint8_t draft)
     {
-        using V=StaffManagement::View;
-        auto native=StaffManagement::Presentation(V::inspection,selected,{},target);
-        auto model=native;
-        if(!StaffManagement::Resolve(target))return model;
-        model.tabs={"Overview","Duties","Patrol","Details"};model.selectedTab=tabs.tab;model.selected=selected;
-        model.headerStatus=StaffManagement::RoleName(target.type);model.summaryMetrics=true;model.metricHeight=40;
-        if(tabs.tab==1) {
-            const auto orders=StaffManagement::Presentation(V::orders,selected,{},target,StaffType::handyman,draft);
-            model.stats.clear();model.rows=orders.rows;model.actionGrid=false;model.rowHeight=26;
+        using V = StaffManagement::View;
+        auto native = StaffManagement::Presentation(V::inspection, selected, {}, target);
+        auto model = native;
+        if (!StaffManagement::Resolve(target))
+            return model;
+        model.tabs = { "Overview", "Duties", "Patrol", "Details" };
+        model.selectedTab = tabs.tab;
+        model.selected = selected;
+        model.headerStatus = StaffManagement::RoleName(target.type);
+        model.summaryMetrics = true;
+        model.metricHeight = 40;
+        if (tabs.tab == 1)
+        {
+            const auto orders = StaffManagement::Presentation(V::orders, selected, {}, target, StaffType::handyman, draft);
+            model.stats.clear();
+            model.rows = orders.rows;
+            model.actionGrid = false;
+            model.rowHeight = 26;
             const bool changed = draft != StaffManagement::Resolve(target)->staffOrders;
             model.headerStatus = changed ? "Unsaved duties" : "Current duties";
             model.headerInk = changed ? "{CAUTION}" : "{WHITE}";
             model.status = changed ? "Unsaved duties" : "";
             model.bodyLines.clear();
-            if(StaffManagement::Orders(target.type).empty()) {model.rows={"Back to overview"};model.bodyLines={"This role has no configurable duties."};}
-        } else {
-            Actions(model,native,StaffActions(tabs.tab));
-            if(tabs.tab==0) {
-                Activity(model,native.stats.back().second);
-                // Labelled like the stat cards above it, so the activity reads as a field, not a stray caption.
-                if(!model.bodyLines.empty())model.bodyLines.front()="Now\t"+model.bodyLines.front();
-                model.stats.resize(2);
-                const auto counters=StaffManagement::Presentation(V::statistics,0,{},target);
-                for(size_t i=1;i<counters.stats.size();++i)model.stats.push_back(counters.stats[i]);
-            } else if(tabs.tab==2) {
-                const auto count=StaffPatrol::Snapshot(target).size();
-                model.stats={{"Patrol tiles",std::to_string(count)},{"Coverage",count?"Assigned area":"Unrestricted"}};
-                model.bodyLines={"Paint this employee's patrol area in the park.","A applies brush / B returns to this tab."};
-            } else {
-                model.stats={native.stats[1],StaffManagement::Presentation(V::statistics,0,{},target).stats.front()};
+            if (StaffManagement::Orders(target.type).empty())
+            {
+                model.rows = { "Back to overview" };
+                model.bodyLines = { "This role has no configurable duties." };
             }
-            const auto* staff=StaffManagement::Resolve(target);
-            for(size_t i=0;i<model.rows.size();++i) {
-                if(model.rows[i]=="Costume...")model.rowEnabled[i]=target.type==StaffType::entertainer;
-                if(model.rows[i]=="Uniform colour...")model.rowEnabled[i]=target.type!=StaffType::entertainer;
-                if(model.rows[i]=="Pick up...")model.rowEnabled[i]=staff->canBePickedUp();
+        }
+        else
+        {
+            Actions(model, native, StaffActions(tabs.tab));
+            if (tabs.tab == 0)
+            {
+                Activity(model, native.stats.back().second);
+                // Labelled like the stat cards above it, so the activity reads as a field, not a stray caption.
+                if (!model.bodyLines.empty())
+                    model.bodyLines.front() = "Now\t" + model.bodyLines.front();
+                model.stats.resize(2);
+                const auto counters = StaffManagement::Presentation(V::statistics, 0, {}, target);
+                for (size_t i = 1; i < counters.stats.size(); ++i)
+                    model.stats.push_back(counters.stats[i]);
+            }
+            else if (tabs.tab == 2)
+            {
+                const auto count = StaffPatrol::Snapshot(target).size();
+                model.stats = { { "Patrol tiles", std::to_string(count) },
+                                { "Coverage", count ? "Assigned area" : "Unrestricted" } };
+                model.bodyLines = { "Paint this employee's patrol area in the park.",
+                                    "A applies brush / B returns to this tab." };
+            }
+            else
+            {
+                model.stats = { native.stats[1], StaffManagement::Presentation(V::statistics, 0, {}, target).stats.front() };
+            }
+            const auto* staff = StaffManagement::Resolve(target);
+            for (size_t i = 0; i < model.rows.size(); ++i)
+            {
+                if (model.rows[i] == "Costume...")
+                    model.rowEnabled[i] = target.type == StaffType::entertainer;
+                if (model.rows[i] == "Uniform colour...")
+                    model.rowEnabled[i] = target.type != StaffType::entertainer;
+                if (model.rows[i] == "Pick up...")
+                    model.rowEnabled[i] = staff->canBePickedUp();
             }
         }
         return model;
@@ -80,25 +113,39 @@ namespace OpenRCT2::Ui::Handheld::PeopleTabs
     // face; other scripts retain the engine fallback and the full native text.
     inline std::string ThoughtLabel(std::string text)
     {
-        for(const auto& [from,to]:std::array<std::pair<std::string_view,std::string_view>,4>{
-            std::pair{"\xE2\x80\x98","'"}, {"\xE2\x80\x99","'"},
-            {"\xE2\x80\x9C","\""}, {"\xE2\x80\x9D","\""}})
+        for (const auto& [from, to] :
+             std::array<std::pair<std::string_view, std::string_view>, 4>{ std::pair{ "\xE2\x80\x98", "'" },
+                                                                           { "\xE2\x80\x99", "'" },
+                                                                           { "\xE2\x80\x9C", "\"" },
+                                                                           { "\xE2\x80\x9D", "\"" } })
         {
-            size_t pos=0;
-            while((pos=text.find(from,pos))!=std::string::npos){text.replace(pos,from.size(),to);pos+=to.size();}
+            size_t pos = 0;
+            while ((pos = text.find(from, pos)) != std::string::npos)
+            {
+                text.replace(pos, from.size(), to);
+                pos += to.size();
+            }
         }
         return text;
     }
-    inline ManagementPresentation Guest(const GuestManagement::Target& target,const State& tabs,size_t selected)
+    inline ManagementPresentation Guest(const GuestManagement::Target& target, const State& tabs, size_t selected)
     {
-        using V=GuestManagement::View;
-        const auto native=GuestManagement::Presentation(V::inspection,selected,{},target);
-        auto model=native;const auto* guest=GuestManagement::Resolve(target);if(!guest)return model;
-        model.tabs={"Overview","Needs","Thoughts","Details"};model.selectedTab=tabs.tab;model.selected=selected;
-        model.stats.clear();model.headerStatus=guest->peepFlags.has(PeepFlag::tracking)?"Tracked":"Guest";
-        model.summaryMetrics=true;model.metricHeight=40;
-        if(tabs.tab==1) {
-            model.stats=GuestManagement::Presentation(V::needs,0,{},target).stats;
+        using V = GuestManagement::View;
+        const auto native = GuestManagement::Presentation(V::inspection, selected, {}, target);
+        auto model = native;
+        const auto* guest = GuestManagement::Resolve(target);
+        if (!guest)
+            return model;
+        model.tabs = { "Overview", "Needs", "Thoughts", "Details" };
+        model.selectedTab = tabs.tab;
+        model.selected = selected;
+        model.stats.clear();
+        model.headerStatus = guest->peepFlags.has(PeepFlag::tracking) ? "Tracked" : "Guest";
+        model.summaryMetrics = true;
+        model.metricHeight = 40;
+        if (tabs.tab == 1)
+        {
+            model.stats = GuestManagement::Presentation(V::needs, 0, {}, target).stats;
             model.metricHeight = 56;
             model.rows = { "Back to overview" };
             for (size_t i = 0; i < model.stats.size(); ++i)
@@ -116,25 +163,41 @@ namespace OpenRCT2::Ui::Handheld::PeopleTabs
             for (size_t i = 0; i < model.stats.size(); ++i)
                 model.meterAttention.push_back(attention[i]);
             model.bodyLines.clear();
-        } else if(tabs.tab==2) {
+        }
+        else if (tabs.tab == 2)
+        {
             model.rows = GuestManagement::Thoughts(*guest);
-            for(auto& thought:model.rows)thought=ThoughtLabel(ParkInformation::PlainText(thought,true));
+            for (auto& thought : model.rows)
+                thought = ThoughtLabel(ParkInformation::PlainText(thought, true));
             model.actionGrid = false;
             model.rowHeight = 44;
             model.listLabel = "CURRENT THOUGHTS / A READ FULL TEXT";
-            if(model.rows.empty()){model.listLabel="NO CURRENT THOUGHTS";model.bodyLines={"Nothing on their mind right now."};model.rows={"Back to overview"};}
-        } else {
-            Actions(model,native,GuestActions(tabs.tab));
-            if(tabs.tab==0) {
-                model.stats={{"Happiness",std::to_string(guest->happiness*100/255)+"%"},{"Rides ridden",std::to_string(guest->guestNumRides)},{"Tracking",guest->peepFlags.has(PeepFlag::tracking)?"On":"Off"}};
-                Activity(model,GuestManagement::Status(*guest));
-                for(size_t i=0;i<model.rows.size();++i)if(model.rows[i]=="Pick up...")model.rowEnabled[i]=guest->canBePickedUp();
-            } else {
-                auto spending=GuestManagement::Presentation(V::spending,0,{},target);
-                model.stats={spending.stats[0],spending.stats[1]};
+            if (model.rows.empty())
+            {
+                model.listLabel = "NO CURRENT THOUGHTS";
+                model.bodyLines = { "Nothing on their mind right now." };
+                model.rows = { "Back to overview" };
+            }
+        }
+        else
+        {
+            Actions(model, native, GuestActions(tabs.tab));
+            if (tabs.tab == 0)
+            {
+                model.stats = { { "Happiness", std::to_string(guest->happiness * 100 / 255) + "%" },
+                                { "Rides ridden", std::to_string(guest->guestNumRides) },
+                                { "Tracking", guest->peepFlags.has(PeepFlag::tracking) ? "On" : "Off" } };
+                Activity(model, GuestManagement::Status(*guest));
+                for (size_t i = 0; i < model.rows.size(); ++i)
+                    if (model.rows[i] == "Pick up...")
+                        model.rowEnabled[i] = guest->canBePickedUp();
+            }
+            else
+            {
+                auto spending = GuestManagement::Presentation(V::spending, 0, {}, target);
+                model.stats = { spending.stats[0], spending.stats[1] };
             }
         }
         return model;
     }
-}
-
+} // namespace OpenRCT2::Ui::Handheld::PeopleTabs

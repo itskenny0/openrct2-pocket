@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
-#include "TrackDesignAction.h"
 #include "../../core/FileIdentity.h"
+#include "TrackDesignAction.h"
 namespace OpenRCT2::GameActions
 {
     // Strict object/research selection for Pocket; desktop design fallback stays unchanged.
@@ -14,7 +14,7 @@ namespace OpenRCT2::GameActions
         money64 _expectedCost{ kMoney64Undefined };
         bool _noMoney{};
         bool _placeScenery{};
-        int32_t _expectedSceneryOmitted{-1};
+        int32_t _expectedSceneryOmitted{ -1 };
         std::vector<int32_t> _objectContext;
         std::string _sourcePath;
         uint64_t _sourceDigest{}, _sourceSize{};

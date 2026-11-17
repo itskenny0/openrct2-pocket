@@ -3,8 +3,8 @@
 
 #include "ConstructionPanel.h"
 #include "PathBatch.h"
-#include "RideAccess.h"
 #include "PathSurfacePicker.h"
+#include "RideAccess.h"
 
 #include <algorithm>
 #include <cstring>
@@ -172,10 +172,22 @@ namespace OpenRCT2::Ui::Handheld::Paths
                         flags,    ConnectionDirection(position, selectedSlope) };
     }
 
-    bool BatchActive() { return active && !connected && !removing && batch.mode != BuildMode::single; }
-    BuildMode Mode() { return batch.mode; }
-    std::string BatchMessage() { return batch.notice; }
-    bool SelectionOwnsInput() { return BatchActive() && (batch.review || batch.busy); }
+    bool BatchActive()
+    {
+        return active && !connected && !removing && batch.mode != BuildMode::single;
+    }
+    BuildMode Mode()
+    {
+        return batch.mode;
+    }
+    std::string BatchMessage()
+    {
+        return batch.notice;
+    }
+    bool SelectionOwnsInput()
+    {
+        return BatchActive() && (batch.review || batch.busy);
+    }
     static BatchMaterial Material()
     {
         auto type = gFootpathSelection.getSelectedSurface();
@@ -189,20 +201,30 @@ namespace OpenRCT2::Ui::Handheld::Paths
     }
     bool CycleMode(int delta)
     {
-        if (!active || connected || batch.busy) return false;
+        if (!active || connected || batch.busy)
+            return false;
         ClearPreview();
         const auto next = (static_cast<int>(batch.mode) + delta % 3 + 3) % 3;
-        if (batch.mode == BuildMode::single && next != 0) singleGeometry = SingleGeometry{fixedHeight,fixedSlope};
-        batch.reset(); batch.mode = static_cast<BuildMode>(next); removing = false;
+        if (batch.mode == BuildMode::single && next != 0)
+            singleGeometry = SingleGeometry{ fixedHeight, fixedSlope };
+        batch.reset();
+        batch.mode = static_cast<BuildMode>(next);
+        removing = false;
         batch.followsGround = !fixedHeight;
-        if (batch.mode != BuildMode::single) fixedSlope = FootpathSlope{FootpathSlopeType::flat,0};
+        if (batch.mode != BuildMode::single)
+            fixedSlope = FootpathSlope{ FootpathSlopeType::flat, 0 };
         else if (singleGeometry)
         {
-            fixedHeight=singleGeometry->height; fixedSlope=singleGeometry->slope; singleGeometry.reset();
+            fixedHeight = singleGeometry->height;
+            fixedSlope = singleGeometry->slope;
+            singleGeometry.reset();
         }
         return true;
     }
-    bool CancelSelection() { return BatchActive() && batch.cancel(); }
+    bool CancelSelection()
+    {
+        return BatchActive() && batch.cancel();
+    }
 
     static void RemoveGhost()
     {
@@ -286,7 +308,8 @@ namespace OpenRCT2::Ui::Handheld::Paths
     void Begin(bool queue, bool remove)
     {
         ClearPreview();
-        batch.reset(); singleGeometry.reset();
+        batch.reset();
+        singleGeometry.reset();
         available = Windows::WindowFootpathSelectDefault();
         gFootpathSelection.isQueueSelected = queue;
         active = true;
@@ -306,7 +329,8 @@ namespace OpenRCT2::Ui::Handheld::Paths
     void End()
     {
         ClearPreview();
-        batch.reset(); singleGeometry.reset();
+        batch.reset();
+        singleGeometry.reset();
         active = false;
         adjusting = false;
         connected = connectedBusy = false;
@@ -459,9 +483,18 @@ namespace OpenRCT2::Ui::Handheld::Paths
         RefreshConnected();
         return true;
     }
-    bool LevelConnected() { return SlopeConnected(-connectedGrade); }
-    bool IsAdjusting() { return IsActive() && adjusting; }
-    void SetAdjusting(bool enabled) { adjusting = IsActive() && enabled; }
+    bool LevelConnected()
+    {
+        return SlopeConnected(-connectedGrade);
+    }
+    bool IsAdjusting()
+    {
+        return IsActive() && adjusting;
+    }
+    void SetAdjusting(bool enabled)
+    {
+        adjusting = IsActive() && enabled;
+    }
     bool IsActive()
     {
         return active;
@@ -477,7 +510,8 @@ namespace OpenRCT2::Ui::Handheld::Paths
     void ToggleRemove()
     {
         ClearPreview();
-        if (batch.mode != BuildMode::single) CycleMode(-static_cast<int>(batch.mode));
+        if (batch.mode != BuildMode::single)
+            CycleMode(-static_cast<int>(batch.mode));
         batch.reset();
         removing = !removing;
     }
@@ -505,13 +539,21 @@ namespace OpenRCT2::Ui::Handheld::Paths
     void FollowGround()
     {
         ClearPreview();
-        if (BatchActive()) { batch.start.reset(); batch.end.reset(); batch.invalidate(); }
+        if (BatchActive())
+        {
+            batch.start.reset();
+            batch.end.reset();
+            batch.invalidate();
+        }
         fixedHeight.reset();
         heightPlane = false;
         batch.followsGround = true;
-        if (singleGeometry) singleGeometry = SingleGeometry{};
-        if (BatchActive()) fixedSlope=FootpathSlope{FootpathSlopeType::flat,0};
-        else fixedSlope.reset();
+        if (singleGeometry)
+            singleGeometry = SingleGeometry{};
+        if (BatchActive())
+            fixedSlope = FootpathSlope{ FootpathSlopeType::flat, 0 };
+        else
+            fixedSlope.reset();
     }
     bool SetPlacementHeight(int32_t z)
     {
@@ -520,7 +562,11 @@ namespace OpenRCT2::Ui::Handheld::Paths
         ClearPreview();
         fixedHeight = z;
         batch.followsGround = false;
-        if (batch.start) { batch.start->z = z; batch.invalidate(); }
+        if (batch.start)
+        {
+            batch.start->z = z;
+            batch.invalidate();
+        }
         fixedSlope = FootpathSlope{ FootpathSlopeType::flat, 0 };
         return true;
     }
@@ -535,7 +581,11 @@ namespace OpenRCT2::Ui::Handheld::Paths
         ClearPreview();
         fixedHeight = next;
         batch.followsGround = false;
-        if (batch.start) { batch.start->z = next; batch.invalidate(); }
+        if (batch.start)
+        {
+            batch.start->z = next;
+            batch.invalidate();
+        }
         RefocusHeight();
         if (!fixedSlope)
             fixedSlope = slope;
@@ -620,7 +670,8 @@ namespace OpenRCT2::Ui::Handheld::Paths
 
     void UpdateTarget(ScreenCoordsXY cursor)
     {
-        if (SelectionOwnsInput()) return;
+        if (SelectionOwnsInput())
+            return;
         if (ConnectedReady())
         {
             RefreshConnected();
@@ -661,7 +712,8 @@ namespace OpenRCT2::Ui::Handheld::Paths
             RefreshConnected();
             return;
         }
-        if (SelectionOwnsInput()) return;
+        if (SelectionOwnsInput())
+            return;
         target.reset();
         targetIsPath = false;
         if (!info.Element)
@@ -714,7 +766,8 @@ namespace OpenRCT2::Ui::Handheld::Paths
                 result.errorMessage = "A: set start / Y: Adjust";
                 if (execute)
                 {
-                    ClearPreview(); batch.notice.clear();
+                    ClearPreview();
+                    batch.notice.clear();
                     batch.start = CoordsXYZ{ CoordsXY(*target), fixedHeight.value_or(target->z) };
                     // A ground anchor selects an area, not an elevation plane.
                     // Keep ground following after completion/cancel and on other terrain.
@@ -728,7 +781,8 @@ namespace OpenRCT2::Ui::Handheld::Paths
                         }
                     }
                     fixedSlope = FootpathSlope{ FootpathSlopeType::flat, 0 };
-                    batch.invalidate(); batch.update(TargetTile(), Material(), true);
+                    batch.invalidate();
+                    batch.update(TargetTile(), Material(), true);
                 }
                 return result;
             }
@@ -868,69 +922,77 @@ namespace OpenRCT2::Ui::Handheld::Paths
     }
     void DrawBatchWorld(Drawing::RenderTarget& rt)
     {
-        if (!BatchActive() || !batch.start) return;
+        if (!BatchActive() || !batch.start)
+            return;
         const auto* window = WindowGetMain();
-        if (!window || !window->viewport) return;
+        if (!window || !window->viewport)
+            return;
         Drawing::RenderTarget canvas;
         const int top = Layout::hudTop + Layout::hudHeight;
-        if (!ClipRenderTarget(canvas,rt,{0,top},ContextGetWidth(),ContextGetHeight()-top-Layout::actionHeight)) return;
+        if (!ClipRenderTarget(canvas, rt, { 0, top }, ContextGetWidth(), ContextGetHeight() - top - Layout::actionHeight))
+            return;
         canvas.y += top; // Keep projection in absolute screen coordinates after clipping.
         const auto& viewport = *window->viewport;
         auto project = [&](CoordsXYZ world) {
             const auto view = Translate3DTo2DWithZ(viewport.rotation, world) - viewport.viewPos;
-            return viewport.pos + ScreenCoordsXY{viewport.zoom.ApplyInversedTo(view.x),viewport.zoom.ApplyInversedTo(view.y)};
+            return viewport.pos
+                + ScreenCoordsXY{ viewport.zoom.ApplyInversedTo(view.x), viewport.zoom.ApplyInversedTo(view.y) };
         };
         auto line = [&](ScreenCoordsXY a, ScreenCoordsXY b, uint8_t colour) {
-            GfxDrawLine(canvas,{a+ScreenCoordsXY{0,1},b+ScreenCoordsXY{0,1}},static_cast<Drawing::PaletteIndex>(PocketPalette::dark));
-            GfxDrawLine(canvas,{a,b},static_cast<Drawing::PaletteIndex>(colour));
+            GfxDrawLine(
+                canvas, { a + ScreenCoordsXY{ 0, 1 }, b + ScreenCoordsXY{ 0, 1 } },
+                static_cast<Drawing::PaletteIndex>(PocketPalette::dark));
+            GfxDrawLine(canvas, { a, b }, static_cast<Drawing::PaletteIndex>(colour));
         };
-        for (size_t i=0; i<batch.selection.tiles.size(); ++i)
+        for (size_t i = 0; i < batch.selection.tiles.size(); ++i)
         {
-            const auto tile=batch.selection.tiles[i];
-            const bool valid=i<batch.valid.size() && batch.valid[i];
-            const auto colour=valid ? PocketPalette::positive : PocketPalette::destructive;
-            std::array<ScreenCoordsXY,4> corners{project(tile),project(tile+CoordsXYZ{32,0,0}),
-                project(tile+CoordsXYZ{32,32,0}),project(tile+CoordsXYZ{0,32,0})};
-            for(size_t side=0;side<4;++side) line(corners[side],corners[(side+1)%4],colour);
-            const auto centre=project(tile+CoordsXYZ{16,16,0});
+            const auto tile = batch.selection.tiles[i];
+            const bool valid = i < batch.valid.size() && batch.valid[i];
+            const auto colour = valid ? PocketPalette::positive : PocketPalette::destructive;
+            std::array<ScreenCoordsXY, 4> corners{ project(tile), project(tile + CoordsXYZ{ 32, 0, 0 }),
+                                                   project(tile + CoordsXYZ{ 32, 32, 0 }),
+                                                   project(tile + CoordsXYZ{ 0, 32, 0 }) };
+            for (size_t side = 0; side < 4; ++side)
+                line(corners[side], corners[(side + 1) % 4], colour);
+            const auto centre = project(tile + CoordsXYZ{ 16, 16, 0 });
             if (!valid)
             {
-                line(centre-ScreenCoordsXY{4,4},centre+ScreenCoordsXY{4,4},colour);
-                line(centre-ScreenCoordsXY{4,-4},centre+ScreenCoordsXY{4,-4},colour);
+                line(centre - ScreenCoordsXY{ 4, 4 }, centre + ScreenCoordsXY{ 4, 4 }, colour);
+                line(centre - ScreenCoordsXY{ 4, -4 }, centre + ScreenCoordsXY{ 4, -4 }, colour);
             }
-            else if (const auto* path=MapGetFootpathElement(tile); path && !path->isGhost())
-                DrawModernText(canvas,centre-ScreenCoordsXY{3,4},"{WHITE}=");
+            else if (const auto* path = MapGetFootpathElement(tile); path && !path->isGhost())
+                DrawModernText(canvas, centre - ScreenCoordsXY{ 3, 4 }, "{WHITE}=");
             else
             {
-                line(centre-ScreenCoordsXY{2,0},centre+ScreenCoordsXY{2,0},colour);
-                line(centre-ScreenCoordsXY{0,2},centre+ScreenCoordsXY{0,2},colour);
+                line(centre - ScreenCoordsXY{ 2, 0 }, centre + ScreenCoordsXY{ 2, 0 }, colour);
+                line(centre - ScreenCoordsXY{ 0, 2 }, centre + ScreenCoordsXY{ 0, 2 }, colour);
             }
         }
-        const auto first=project(*batch.start+CoordsXYZ{16,16,0});
-        Fill(canvas,first-ScreenCoordsXY{6,19},{13,14},Theme::ink);
-        DrawModernText(canvas,first-ScreenCoordsXY{3,16},"{WHITE}S");
-        if(batch.end)
+        const auto first = project(*batch.start + CoordsXYZ{ 16, 16, 0 });
+        Fill(canvas, first - ScreenCoordsXY{ 6, 19 }, { 13, 14 }, Theme::ink);
+        DrawModernText(canvas, first - ScreenCoordsXY{ 3, 16 }, "{WHITE}S");
+        if (batch.end)
         {
-            const auto last=project(CoordsXYZ{*batch.end,batch.start->z}+CoordsXYZ{16,16,0});
-            Fill(canvas,last+ScreenCoordsXY{8,-19},{13,14},Theme::ink);
-            DrawModernText(canvas,last+ScreenCoordsXY{11,-16},"{WHITE}D");
+            const auto last = project(CoordsXYZ{ *batch.end, batch.start->z } + CoordsXYZ{ 16, 16, 0 });
+            Fill(canvas, last + ScreenCoordsXY{ 8, -19 }, { 13, 14 }, Theme::ink);
+            DrawModernText(canvas, last + ScreenCoordsXY{ 11, -16 }, "{WHITE}D");
         }
     }
     void DrawFooter(Drawing::RenderTarget& rt, ScreenSize screen)
     {
         if (!BatchActive())
         {
-            DrawPathFooter(rt,screen,"",IsRemoving(),IsConnected(),IsAdjusting(),ConnectedReady());
+            DrawPathFooter(rt, screen, "", IsRemoving(), IsConnected(), IsAdjusting(), ConnectedReady());
             return;
         }
-        DrawActionStrip(rt,screen);
+        DrawActionStrip(rt, screen);
 
         if (batch.review || batch.busy)
         {
             Handheld::DrawFooter(
                 rt, screen, { { "A", batch.busy ? "Wait" : "Build selection" }, { "B", batch.busy ? "Wait" : "Preview" } });
         }
-        else if(IsAdjusting())
+        else if (IsAdjusting())
         {
             Handheld::DrawFooter(rt, screen, { { "D-pad", "Height" }, { "L/R", "Mode" }, { "X", "More" }, { "B", "Build" } });
         }
@@ -951,56 +1013,73 @@ namespace OpenRCT2::Ui::Handheld::Paths
         const auto p = position;
         const bool review = BatchActive() && batch.review;
         const int height = review ? 242 : IsAdjusting() ? 228 : BatchActive() ? 206 : 184;
-        DrawSurface(rt,p,{216,height});
-        DrawHeadingText(rt,p+ScreenCoordsXY{12,12},IsAdjusting() ? "{WHITE}Adjust path"
-            : IsRemoving() ? "{WHITE}Remove path" : IsQueue() ? "{WHITE}Queue" : "{WHITE}Footpath",192);
+        DrawSurface(rt, p, { 216, height });
+        DrawHeadingText(
+            rt, p + ScreenCoordsXY{ 12, 12 },
+            IsAdjusting()      ? "{WHITE}Adjust path"
+                : IsRemoving() ? "{WHITE}Remove path"
+                : IsQueue()    ? "{WHITE}Queue"
+                               : "{WHITE}Footpath",
+            192);
         if (!IsConnected())
         {
-            DrawSegmented(rt,p+ScreenCoordsXY{12,36},{192,24},{"Single","Line","Fill"},static_cast<size_t>(Mode()));
+            DrawSegmented(
+                rt, p + ScreenCoordsXY{ 12, 36 }, { 192, 24 }, { "Single", "Line", "Fill" }, static_cast<size_t>(Mode()));
         }
-        else DrawStrongText(rt,p+ScreenCoordsXY{12,42},"{WHITE}EXTEND",192);
-        if (const auto current=PathSurfaces::Current())
-            if (const auto* object=GetContext()->GetObjectManager().GetLoadedObject(current->type,current->index))
+        else
+            DrawStrongText(rt, p + ScreenCoordsXY{ 12, 42 }, "{WHITE}EXTEND", 192);
+        if (const auto current = PathSurfaces::Current())
+            if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject(current->type, current->index))
             {
                 Drawing::RenderTarget preview;
-                if (ClipRenderTarget(preview,rt,p+ScreenCoordsXY{12,70},48,44))
+                if (ClipRenderTarget(preview, rt, p + ScreenCoordsXY{ 12, 70 }, 48, 44))
                 {
-                    preview.zoom_level=ZoomLevel{1};
-                    object->DrawPreview(preview,96,88);
+                    preview.zoom_level = ZoomLevel{ 1 };
+                    object->DrawPreview(preview, 96, 88);
                 }
             }
-        DrawWrappedLabel(rt,p+ScreenCoordsXY{68,72},136,SurfaceName(),3);
+        DrawWrappedLabel(rt, p + ScreenCoordsXY{ 68, 72 }, 136, SurfaceName(), 3);
         if (BatchActive())
         {
-            const auto dims=std::to_string(batch.selection.width)+" x "+std::to_string(batch.selection.height)
-                +" / "+std::to_string(batch.selection.width*batch.selection.height)+" tiles";
-            DrawStrongText(rt,p+ScreenCoordsXY{12,124},"{WHITE}"+(batch.start ? dims : "Choose a start tile"),192);
-            DrawModernText(rt,p+ScreenCoordsXY{12,146},"{MUTED}" + (batch.followsGround ? std::string("Follows ground") : PlacementName()));
+            const auto dims = std::to_string(batch.selection.width) + " x " + std::to_string(batch.selection.height) + " / "
+                + std::to_string(batch.selection.width * batch.selection.height) + " tiles";
+            DrawStrongText(rt, p + ScreenCoordsXY{ 12, 124 }, "{WHITE}" + (batch.start ? dims : "Choose a start tile"), 192);
+            DrawModernText(
+                rt, p + ScreenCoordsXY{ 12, 146 },
+                "{MUTED}" + (batch.followsGround ? std::string("Follows ground") : PlacementName()));
             if (review)
             {
-                DrawStrongText(rt,p+ScreenCoordsXY{12,169},"{CAUTION}Build this selection?",192);
-                DrawWrappedLabel(rt,p+ScreenCoordsXY{12,192},192,
-                    "Stops at the first problem. Completed tiles stay and are charged.",3);
+                DrawStrongText(rt, p + ScreenCoordsXY{ 12, 169 }, "{CAUTION}Build this selection?", 192);
+                DrawWrappedLabel(
+                    rt, p + ScreenCoordsXY{ 12, 192 }, 192, "Stops at the first problem. Completed tiles stay and are charged.",
+                    3);
             }
             else if (IsAdjusting())
             {
-                DrawCommand(rt,p+ScreenCoordsXY{12,170},38,"L1/R1","Mode");
-                DrawCommand(rt,p+ScreenCoordsXY{12,196},38,"D-pad","Height");
+                DrawCommand(rt, p + ScreenCoordsXY{ 12, 170 }, 38, "L1/R1", "Mode");
+                DrawCommand(rt, p + ScreenCoordsXY{ 12, 196 }, 38, "D-pad", "Height");
             }
-            else DrawWrappedLabel(rt,p+ScreenCoordsXY{12,169},192,
-                batch.notice.empty() ? batch.start ? "+ New   = Existing   X Blocked" : "Up to 64 tiles per selection" : batch.notice,2);
+            else
+                DrawWrappedLabel(
+                    rt, p + ScreenCoordsXY{ 12, 169 }, 192,
+                    batch.notice.empty() ? batch.start ? "+ New   = Existing   X Blocked" : "Up to 64 tiles per selection"
+                                         : batch.notice,
+                    2);
         }
         else
         {
-            auto geometry=PlacementName();
-            if (const auto hint=geometry.find(" / Y turn"); hint!=std::string::npos) geometry.erase(hint);
-            DrawWrappedLabel(rt,p+ScreenCoordsXY{12,124},192,"{MUTED}"+geometry,2);
+            auto geometry = PlacementName();
+            if (const auto hint = geometry.find(" / Y turn"); hint != std::string::npos)
+                geometry.erase(hint);
+            DrawWrappedLabel(rt, p + ScreenCoordsXY{ 12, 124 }, 192, "{MUTED}" + geometry, 2);
             if (IsAdjusting())
             {
-                DrawCommand(rt,p+ScreenCoordsXY{12,166},38,"D-pad",IsConnected() ? "Turn / slope" : "Turn / height");
-                if (!IsConnected()) DrawCommand(rt,p+ScreenCoordsXY{12,196},38,"L1/R1","Mode");
+                DrawCommand(rt, p + ScreenCoordsXY{ 12, 166 }, 38, "D-pad", IsConnected() ? "Turn / slope" : "Turn / height");
+                if (!IsConnected())
+                    DrawCommand(rt, p + ScreenCoordsXY{ 12, 196 }, 38, "L1/R1", "Mode");
             }
-            else DrawCommand(rt,p+ScreenCoordsXY{12,164},38,"L2/R2",IsConnected() ? "Slope" : "Height");
+            else
+                DrawCommand(rt, p + ScreenCoordsXY{ 12, 164 }, 38, "L2/R2", IsConnected() ? "Slope" : "Height");
         }
     }
     std::string SurfaceName()
@@ -1015,4 +1094,3 @@ namespace OpenRCT2::Ui::Handheld::Paths
         return object ? object->GetName() : "No surface loaded";
     }
 } // namespace OpenRCT2::Ui::Handheld::Paths
-

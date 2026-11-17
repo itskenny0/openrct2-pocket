@@ -9,8 +9,8 @@
 
 #include "InputManager.h"
 
-#include "ShortcutIds.h"
 #include "../handheld/Explorer.h"
+#include "ShortcutIds.h"
 
 #include <SDL_events.h>
 #include <SDL_timer.h>

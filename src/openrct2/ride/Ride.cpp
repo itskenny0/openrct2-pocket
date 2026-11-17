@@ -8,7 +8,6 @@
  *****************************************************************************/
 
 #include "Ride.h"
-#include "RideIdentity.h"
 
 #include "../Cheats.h"
 #include "../Context.h"
@@ -64,6 +63,7 @@
 #include "RideConstruction.h"
 #include "RideData.h"
 #include "RideEntry.h"
+#include "RideIdentity.h"
 #include "RideManager.hpp"
 #include "ShopItem.h"
 #include "Station.h"

@@ -11,7 +11,8 @@ namespace OpenRCT2::Ui::Handheld
         DrawSegmented(rt, p, { width - 3, 24 }, { "Ride", "Entry", "Exit" }, active);
         const int cell = (width - 7) / 3;
         for (size_t i = 0; i < active && i < 3; ++i)
-            Fill(rt, p + ScreenCoordsXY{ 2 + static_cast<int>(i) * cell + 6, 19 }, { cell - 12, 2 },
+            Fill(
+                rt, p + ScreenCoordsXY{ 2 + static_cast<int>(i) * cell + 6, 19 }, { cell - 12, 2 },
                 static_cast<Drawing::PaletteIndex>(PocketPalette::positive));
     }
     inline void DrawConstructionOverlay(

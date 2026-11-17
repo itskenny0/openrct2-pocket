@@ -29,7 +29,10 @@ namespace OpenRCT2::GameActions
             const CoordsXY& loc, Direction direction, RideId rideIndex, StationIndex stationNum, bool isExit);
 
         // Opt-in provisional mode: never change real station, maze or path state.
-        void SetPureGhost(bool value=true) { _pureGhost=value; }
+        void SetPureGhost(bool value = true)
+        {
+            _pureGhost = value;
+        }
 
         void AcceptParameters(GameActionParameterVisitor&) final;
 

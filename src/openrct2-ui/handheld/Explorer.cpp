@@ -3,40 +3,37 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
-#include "GuestFollow.h"
 #include "Explorer.h"
-#include "Alerts.h"
-#include "Landscape.h"
 
+#include "Alerts.h"
 #include "AreaTools.h"
+#include "ConstructionAdjust.h"
 #include "ConstructionPanel.h"
 #include "ControllerInput.h"
-#include "ConstructionAdjust.h"
 #include "Currency.h"
 #include "CustomTracks.h"
-#include "Designs.h"
 #include "DesignAuthoring.h"
+#include "Designs.h"
 #include "FlatRides.h"
+#include "GuestFollow.h"
 #include "Hud.h"
+#include "Landscape.h"
 #include "Mazes.h"
-#include "Panel.h"
 #include "MenuThemes.h"
-#include "RideFollow.h"
-#include <openrct2/core/Path.hpp>
-#include <openrct2/interface/Screenshot.h>
-#include "Undo.h"
-#include <openrct2/PlatformEnvironment.h>
+#include "Panel.h"
 #include "Paths.h"
 #include "RideAccess.h"
+#include "RideFollow.h"
 #include "RightsTools.h"
+#include "SceneryClear.h"
 #include "SceneryRemoval.h"
 #include "SceneryTools.h"
-#include "SceneryClear.h"
 #include "ShopManagement.h"
 #include "Shops.h"
 #include "StaffPatrol.h"
 #include "Surface.h"
 #include "Trees.h"
+#include "Undo.h"
 #include "Water.h"
 
 #include <SDL_timer.h>
@@ -53,33 +50,37 @@
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
 #include <openrct2/GameState.h>
-#include <openrct2/audio/Audio.h>
-#include <openrct2/entity/Peep.h>
-#include <openrct2/ride/Ride.h>
-#include <openrct2/ride/RideData.h>
-#include <openrct2/ride/Vehicle.h>
-#include <openrct2/world/tile_element/EntranceElement.h>
-#include <openrct2/world/tile_element/PathElement.h>
-#include <openrct2/world/tile_element/TrackElement.h>
 #include <openrct2/Input.h>
 #include <openrct2/OpenRCT2.h>
+#include <openrct2/PlatformEnvironment.h>
 #include <openrct2/actions/GameActionRunner.h>
 #include <openrct2/actions/terraform/LandLowerAction.h>
 #include <openrct2/actions/terraform/LandRaiseAction.h>
+#include <openrct2/audio/Audio.h>
+#include <openrct2/core/Path.hpp>
 #include <openrct2/drawing/Line.h>
 #include <openrct2/drawing/PaletteIndex.h>
 #include <openrct2/drawing/Rectangle.h>
 #include <openrct2/drawing/Text.h>
+#include <openrct2/entity/Peep.h>
+#include <openrct2/interface/Screenshot.h>
 #include <openrct2/interface/Viewport.h>
+#include <openrct2/ride/Ride.h>
+#include <openrct2/ride/RideData.h>
+#include <openrct2/ride/Vehicle.h>
 #include <openrct2/ui/WindowManager.h>
 #include <openrct2/world/MapSelection.h>
+#include <openrct2/world/tile_element/EntranceElement.h>
+#include <openrct2/world/tile_element/PathElement.h>
 #include <openrct2/world/tile_element/TileElement.h>
+#include <openrct2/world/tile_element/TrackElement.h>
 #include <sstream>
 
 namespace OpenRCT2::Ui::Handheld
 {
     // The Pixel theme's bitmap font reads glyphs from g1.dat through this hook.
-    static const bool kPixelFontReady = (PixelFont::glyphSource = [](uint32_t sprite) { return GfxGetG1Element(sprite); }, true);
+    static const bool kPixelFontReady
+        = (PixelFont::glyphSource = [](uint32_t sprite) { return GfxGetG1Element(sprite); }, true);
     static ConstructionAdjust::State _constructionAdjust;
     static bool _terrainActive{};
     static bool _waterTool{};
@@ -112,25 +113,30 @@ namespace OpenRCT2::Ui::Handheld
 
     static bool SimpleTerrain()
     {
-        return _terrainActive && !_areaTool && !_surfaceTool && !_treeTool && !_shopTool
-            && !_sceneryRemovalTool && !_sceneryTool && !_sceneryClearTool && !_rightsTool && !_colourRide
-            && !PeepPlacement::Active() && !StaffPatrol::Active() && !Designs::Active()
-            && !CustomTracks::Active() && !Mazes::Active() && FlatRides::CurrentStage()==FlatRides::Stage::inactive;
+        return _terrainActive && !_areaTool && !_surfaceTool && !_treeTool && !_shopTool && !_sceneryRemovalTool
+            && !_sceneryTool && !_sceneryClearTool && !_rightsTool && !_colourRide && !PeepPlacement::Active()
+            && !StaffPatrol::Active() && !Designs::Active() && !CustomTracks::Active() && !Mazes::Active()
+            && FlatRides::CurrentStage() == FlatRides::Stage::inactive;
     }
 
     static std::optional<RideManagement::Target> ConstructionRide()
     {
-        if(CustomTracks::Active()) return CustomTracks::Target();
-        if(Mazes::Active()) return Mazes::Target();
-        if(FlatRides::CurrentStage()!=FlatRides::Stage::inactive) return FlatRides::Target();
-        if(Paths::IsActive() && _ridePathAccess) return _ridePathAccess;
+        if (CustomTracks::Active())
+            return CustomTracks::Target();
+        if (Mazes::Active())
+            return Mazes::Target();
+        if (FlatRides::CurrentStage() != FlatRides::Stage::inactive)
+            return FlatRides::Target();
+        if (Paths::IsActive() && _ridePathAccess)
+            return _ridePathAccess;
         return {};
     }
     static void ReturnFromRideTool(const std::optional<RideManagement::Target>& target)
     {
-        const auto context=RideNavigation::Take();
+        const auto context = RideNavigation::Take();
         EndTerrain();
-        if(target && RideManagement::Resolve(*target)) Windows::HandheldRideReturn(*target,context);
+        if (target && RideManagement::Resolve(*target))
+            Windows::HandheldRideReturn(*target, context);
     }
 
     static bool AccessTargetValid()
@@ -227,7 +233,11 @@ namespace OpenRCT2::Ui::Handheld
         BeginTerrain(true);
         _areaTool = true;
     }
-    void BeginSceneryClear() { BeginTerrain(true); _sceneryClearTool = true; }
+    void BeginSceneryClear()
+    {
+        BeginTerrain(true);
+        _sceneryClearTool = true;
+    }
     void BeginScenery()
     {
         BeginTerrain(true);
@@ -286,8 +296,8 @@ namespace OpenRCT2::Ui::Handheld
         BeginTerrain(true);
         return CustomTracks::ResumeFrom(target, std::pair{ origin, type }, backward);
     }
-    bool ResumeCustomTrackReplacement(const RideManagement::Target& target,
-        const TrackConstructionSupport::BlockSnapshot& removed, uint8_t colour)
+    bool ResumeCustomTrackReplacement(
+        const RideManagement::Target& target, const TrackConstructionSupport::BlockSnapshot& removed, uint8_t colour)
     {
         BeginTerrain(true);
         return CustomTracks::ResumeReplacement(target, removed, colour);
@@ -302,13 +312,16 @@ namespace OpenRCT2::Ui::Handheld
     bool BeginSavedDesign(const std::string& path, std::optional<ObjectEntryDescriptor> vehicle)
     {
         auto td = TrackDesignImport(path.c_str());
-        if (td && vehicle) td->trackAndVehicle.vehicleObject=*vehicle;
-        if (td && !vehicle && Designs::Active() && Designs::Selection()==path && Designs::Draft())
-            td->trackAndVehicle.vehicleObject=Designs::Draft()->trackAndVehicle.vehicleObject;
-        if (!td || !Designs::Eligible(*td)) return false;
-        if(Designs::Active() && Designs::Selection()==path) return Designs::Begin(path,vehicle);
+        if (td && vehicle)
+            td->trackAndVehicle.vehicleObject = *vehicle;
+        if (td && !vehicle && Designs::Active() && Designs::Selection() == path && Designs::Draft())
+            td->trackAndVehicle.vehicleObject = Designs::Draft()->trackAndVehicle.vehicleObject;
+        if (!td || !Designs::Eligible(*td))
+            return false;
+        if (Designs::Active() && Designs::Selection() == path)
+            return Designs::Begin(path, vehicle);
         BeginTerrain(true);
-        return Designs::Begin(path,vehicle);
+        return Designs::Begin(path, vehicle);
     }
     bool ResumeFlatRide(RideId id)
     {
@@ -409,7 +422,10 @@ namespace OpenRCT2::Ui::Handheld
         _sceneryTarget.reset();
     }
 
-    std::optional<CoordsXY> CurrentTerrainTile() { return _terrainTile; }
+    std::optional<CoordsXY> CurrentTerrainTile()
+    {
+        return _terrainTile;
+    }
     void EndTerrain()
     {
         Undo::Clear(); // Undo belongs to the tool session it came from.
@@ -473,7 +489,8 @@ namespace OpenRCT2::Ui::Handheld
             return RightsTools::Query(_terrainTile, RightsTools::settings);
         if (_areaTool)
             return AreaTools::Action(_terrainTile, AreaTools::settings, execute);
-        if (_sceneryClearTool) return SceneryClear::Query(_terrainTile, SceneryClear::settings);
+        if (_sceneryClearTool)
+            return SceneryClear::Query(_terrainTile, SceneryClear::settings);
         if (_sceneryTool)
         {
             const auto& settings = SceneryTools::Current();
@@ -517,9 +534,9 @@ namespace OpenRCT2::Ui::Handheld
     // object's footprint. Painting, removal, colours and ride building have their own flows.
     static bool PrepareUndo()
     {
-        if (!_terrainTile || CustomTracks::Active() || Designs::Active() || FlatRides::CurrentStage() != FlatRides::Stage::inactive
-            || PeepPlacement::Active() || StaffPatrol::Active() || _rightsTool || _sceneryClearTool || _colourRide
-            || _sceneryRemovalTool || _surfaceTool)
+        if (!_terrainTile || CustomTracks::Active() || Designs::Active()
+            || FlatRides::CurrentStage() != FlatRides::Stage::inactive || PeepPlacement::Active() || StaffPatrol::Active()
+            || _rightsTool || _sceneryClearTool || _colourRide || _sceneryRemovalTool || _surfaceTool)
             return false;
         const auto tile = *_terrainTile;
         if (_sceneryTool)
@@ -603,14 +620,22 @@ namespace OpenRCT2::Ui::Handheld
     {
         switch (kind)
         {
-            case InspectKind::ride: return NearestPaletteIndex(70, 200, 110);
-            case InspectKind::shop: return NearestPaletteIndex(245, 150, 40);
-            case InspectKind::guest: return NearestPaletteIndex(250, 215, 60);
-            case InspectKind::staff: return NearestPaletteIndex(90, 160, 245);
-            case InspectKind::park: return NearestPaletteIndex(225, 110, 220);
-            case InspectKind::path: return NearestPaletteIndex(170, 200, 230);
-            case InspectKind::sign: return NearestPaletteIndex(200, 170, 255);
-            default: return NearestPaletteIndex(240, 240, 240);
+            case InspectKind::ride:
+                return NearestPaletteIndex(70, 200, 110);
+            case InspectKind::shop:
+                return NearestPaletteIndex(245, 150, 40);
+            case InspectKind::guest:
+                return NearestPaletteIndex(250, 215, 60);
+            case InspectKind::staff:
+                return NearestPaletteIndex(90, 160, 245);
+            case InspectKind::park:
+                return NearestPaletteIndex(225, 110, 220);
+            case InspectKind::path:
+                return NearestPaletteIndex(170, 200, 230);
+            case InspectKind::sign:
+                return NearestPaletteIndex(200, 170, 255);
+            default:
+                return NearestPaletteIndex(240, 240, 240);
         }
     }
     static constexpr int kCursorWindow = 41;
@@ -672,7 +697,7 @@ namespace OpenRCT2::Ui::Handheld
                 left = std::max(left, window->windowPos.x + window->width + Layout::gutter);
         }
         const int room = width - Layout::margin - left;
-        const int x = left == 0 ? (width - size.width) / 2
+        const int x = left == 0  ? (width - size.width) / 2
             : room >= size.width ? left + (room - size.width) / 2
                                  : std::max(Layout::margin, width - Layout::margin - size.width);
         return { x, y };
@@ -864,7 +889,9 @@ namespace OpenRCT2::Ui::Handheld
     {
         if (GetWindowManager()->FindByClass(WindowClass::handheldMenu) != nullptr)
         {
-            if (Windows::HandheldTrackSelectionMove(frame.navigateX,frame.navigateY)) {}
+            if (Windows::HandheldTrackSelectionMove(frame.navigateX, frame.navigateY))
+            {
+            }
             else if (Windows::HandheldDashboardIsOpen())
                 Windows::HandheldDashboardMove(frame.navigateX, frame.navigateY);
             else if (Windows::HandheldObjectPickerIsOpen())
@@ -879,11 +906,19 @@ namespace OpenRCT2::Ui::Handheld
                 Windows::HandheldMenuMove(frame.navigateY);
             for (const auto action : frame.actions)
             {
-                if (Windows::HandheldTextEntryKey(static_cast<int>(action))) {}
-                else if ((action==Action::previousOption || action==Action::nextOption)
-                    && Windows::HandheldToolSettingsPage(action==Action::previousOption ? -1 : 1)) {}
-                else if ((action==Action::previousOption || action==Action::nextOption)
-                    && Windows::HandheldTrackSelectionMove(action==Action::previousOption ? -1 : 1,0)) {}
+                if (Windows::HandheldTextEntryKey(static_cast<int>(action)))
+                {
+                }
+                else if (
+                    (action == Action::previousOption || action == Action::nextOption)
+                    && Windows::HandheldToolSettingsPage(action == Action::previousOption ? -1 : 1))
+                {
+                }
+                else if (
+                    (action == Action::previousOption || action == Action::nextOption)
+                    && Windows::HandheldTrackSelectionMove(action == Action::previousOption ? -1 : 1, 0))
+                {
+                }
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::openBuild)
                     Windows::HandheldParkMapSubjects();
                 else if (Windows::HandheldParkMapIsOpen() && action == Action::contextPrimary)
@@ -899,23 +934,31 @@ namespace OpenRCT2::Ui::Handheld
                 else if (action == Action::contextPrimary && Windows::HandheldObjectPickerCamera())
                 { /* Accessible without a stick-click; camera preserves the construction draft. */
                 }
-                else if (action==Action::contextSecondary && Windows::HandheldObjectPickerGroup()) {}
-                else if (action==Action::contextSecondary && Windows::HandheldDashboardNews()) {}
-                else if (action==Action::contextSecondary && Windows::HandheldControlsIntro()) {}
+                else if (action == Action::contextSecondary && Windows::HandheldObjectPickerGroup())
+                {
+                }
+                else if (action == Action::contextSecondary && Windows::HandheldDashboardNews())
+                {
+                }
+                else if (action == Action::contextSecondary && Windows::HandheldControlsIntro())
+                {
+                }
                 else if (
                     Windows::HandheldObjectPickerIsOpen() && (action == Action::previousOption || action == Action::nextOption))
                     Windows::HandheldObjectPickerMove(0, action == Action::nextOption ? 2 : -2);
                 else if (Windows::HandheldSceneryPickerIsOpen() && action == Action::contextPrimary)
                     Windows::HandheldScenerySearchOpen();
-                else if(Windows::HandheldDesignPickerIsOpen() && action==Action::contextPrimary)
+                else if (Windows::HandheldDesignPickerIsOpen() && action == Action::contextPrimary)
                     Windows::HandheldDesignFilesOpen();
-                else if (Windows::HandheldDashboardIsOpen()
-                    && (action == Action::previousOption || action == Action::nextOption))
+                else if (
+                    Windows::HandheldDashboardIsOpen() && (action == Action::previousOption || action == Action::nextOption))
                     Windows::HandheldDashboardPage(action == Action::previousOption ? -1 : 1);
                 else if (action == Action::contextPrimary && Windows::HandheldManagementContext())
-                { /* Draft-only research funding shortcut. */ }
+                { /* Draft-only research funding shortcut. */
+                }
                 else if (action == Action::contextPrimary && Windows::HandheldRideQuickAccess())
-                { /* Contextual access shortcut at the tab root only. */ }
+                { /* Contextual access shortcut at the tab root only. */
+                }
                 else if (action == Action::confirm)
                     Windows::HandheldMenuConfirm();
                 else if (action == Action::openBuild && Windows::HandheldDashboardIsOpen())
@@ -954,13 +997,13 @@ namespace OpenRCT2::Ui::Handheld
     static InspectTarget ResolveInspectTarget(std::optional<ScreenCoordsXY> at = {})
     {
         const auto info = GetMapCoordinatesFromPos(
-            at.value_or(Centre()), { ViewportInteractionItem::entity, ViewportInteractionItem::ride, ViewportInteractionItem::parkEntrance });
+            at.value_or(Centre()),
+            { ViewportInteractionItem::entity, ViewportInteractionItem::ride, ViewportInteractionItem::parkEntrance });
         const auto rideTarget = [](const Ride* ride) {
             if (ride == nullptr)
                 return InspectTarget{};
             const bool shop = ride->getRideTypeDescriptor().flags.has(RtdFlag::isShopOrFacility);
-            return InspectTarget{ "Open", ride->getName(),
-                                  shop ? InspectKind::shop : InspectKind::ride };
+            return InspectTarget{ "Open", ride->getName(), shop ? InspectKind::shop : InspectKind::ride };
         };
         switch (info.interactionType)
         {
@@ -970,8 +1013,7 @@ namespace OpenRCT2::Ui::Handheld
                 if (const auto* peep = info.Entity->as<Peep>(); peep != nullptr)
                 {
                     const bool staff = info.Entity->type == EntityType::staff;
-                    return { "Inspect", peep->getName(),
-                             staff ? InspectKind::staff : InspectKind::guest };
+                    return { "Inspect", peep->getName(), staff ? InspectKind::staff : InspectKind::guest };
                 }
                 if (const auto* vehicle = info.Entity->as<Vehicle>(); vehicle != nullptr && !vehicle->IsCableLift())
                     return rideTarget(GetRide(vehicle->ride));
@@ -992,7 +1034,8 @@ namespace OpenRCT2::Ui::Handheld
                 break;
         }
         // Nothing to inspect: a sign can be edited, a plain path or queue extended.
-        const auto sign = SceneryTools::Capture(GetMapCoordinatesFromPos(at.value_or(Centre()),
+        const auto sign = SceneryTools::Capture(GetMapCoordinatesFromPos(
+            at.value_or(Centre()),
             { ViewportInteractionItem::banner, ViewportInteractionItem::wall, ViewportInteractionItem::largeScenery }));
         if (sign && sign->banner != BannerIndex::GetNull())
             return { "Edit", sign->text.empty() ? std::string("Sign") : sign->text, InspectKind::sign };
@@ -1019,7 +1062,7 @@ namespace OpenRCT2::Ui::Handheld
         RideFollow::Update();
         UpdatePhoto();
         _inspect = !_terrainActive && !Paths::IsActive() && CanExplore() && ContextHasFocus() ? ResolveInspectTarget()
-                                                                                             : InspectTarget{};
+                                                                                              : InspectTarget{};
         if (gLegacyScene != LegacyScene::playing)
         {
             EndTerrain();
@@ -1027,25 +1070,29 @@ namespace OpenRCT2::Ui::Handheld
         if (CustomTracks::Completed())
         {
             const auto target = *CustomTracks::Completed();
-            const auto context=RideNavigation::Take();
+            const auto context = RideNavigation::Take();
             EndTerrain();
             if (FlatRides::CanResume(target))
             {
-                if(ResumeFlatRide(target.id)) RideNavigation::construction=context;
+                if (ResumeFlatRide(target.id))
+                    RideNavigation::construction = context;
             }
-            else Windows::HandheldRideReturn(target,context);
+            else
+                Windows::HandheldRideReturn(target, context);
             input.suspend();
         }
         if (Designs::Completed())
         {
             const auto target = *Designs::Completed();
-            const auto context=RideNavigation::Take();
+            const auto context = RideNavigation::Take();
             EndTerrain();
             if (FlatRides::CanResume(target))
             {
-                if(ResumeFlatRide(target.id)) RideNavigation::construction=context;
+                if (ResumeFlatRide(target.id))
+                    RideNavigation::construction = context;
             }
-            else Windows::HandheldRideReturn(target,context);
+            else
+                Windows::HandheldRideReturn(target, context);
             input.suspend();
         }
         if (_terrainActive && FlatRides::CurrentStage() == FlatRides::Stage::inactive && FlatRides::Target())
@@ -1099,17 +1146,22 @@ namespace OpenRCT2::Ui::Handheld
             }
             if (_sceneryTool)
             {
-                const auto pathHit = GetMapCoordinatesFromPos(Centre(),
-                    { ViewportInteractionItem::footpath, ViewportInteractionItem::terrain });
+                const auto pathHit = GetMapCoordinatesFromPos(
+                    Centre(), { ViewportInteractionItem::footpath, ViewportInteractionItem::terrain });
                 const auto* path = pathHit.Element ? pathHit.Element->asPath() : nullptr;
-                SceneryTools::SetPathTarget(path && !path->isGhost()
-                    ? std::optional<CoordsXYZ>{CoordsXYZ{pathHit.Loc, path->getBaseZ()}} : std::nullopt);
-                if (path && !path->isGhost() && (SceneryTools::Current().category == SceneryTools::Category::additions
-                    || SceneryTools::Current().category == SceneryTools::Category::banners)) coords = pathHit.Loc;
-                constexpr ViewportInteractionItems pickTypes = { ViewportInteractionItem::scenery,
-                    ViewportInteractionItem::wall, ViewportInteractionItem::largeScenery,
-                    ViewportInteractionItem::banner, ViewportInteractionItem::pathAddition };
-                _sceneryEdit = SceneryTools::Capture(GetMapCoordinatesFromPos(Centre(),
+                SceneryTools::SetPathTarget(
+                    path && !path->isGhost() ? std::optional<CoordsXYZ>{ CoordsXYZ{ pathHit.Loc, path->getBaseZ() } }
+                                             : std::nullopt);
+                if (path && !path->isGhost()
+                    && (SceneryTools::Current().category == SceneryTools::Category::additions
+                        || SceneryTools::Current().category == SceneryTools::Category::banners))
+                    coords = pathHit.Loc;
+                constexpr ViewportInteractionItems pickTypes = {
+                    ViewportInteractionItem::scenery, ViewportInteractionItem::wall, ViewportInteractionItem::largeScenery,
+                    ViewportInteractionItem::banner, ViewportInteractionItem::pathAddition
+                };
+                _sceneryEdit = SceneryTools::Capture(GetMapCoordinatesFromPos(
+                    Centre(),
                     SceneryTools::Current().mode == SceneryTools::Mode::pick ? pickTypes : kViewportInteractionItemAll));
             }
             if (_sceneryTool && SceneryTools::Current().mode != SceneryTools::Mode::place)
@@ -1128,8 +1180,9 @@ namespace OpenRCT2::Ui::Handheld
                 gMapSelectType = MapSelectType::full;
                 if (_sceneryTool && SceneryTools::ScatterActive())
                 {
-                    const auto bounds=SceneryTools::ScatterBounds(*_terrainTile);
-                    gMapSelectPositionA=bounds.first; gMapSelectPositionB=bounds.second;
+                    const auto bounds = SceneryTools::ScatterBounds(*_terrainTile);
+                    gMapSelectPositionA = bounds.first;
+                    gMapSelectPositionB = bounds.second;
                 }
                 if (StaffPatrol::Active())
                 {
@@ -1154,9 +1207,17 @@ namespace OpenRCT2::Ui::Handheld
                         gMapSelectPositionB = { r->getX2(), r->getY2() };
                     }
                 }
-                if (_sceneryClearTool) {
-                    const auto range=AreaTools::Range(_terrainTile,SceneryClear::settings.width,SceneryClear::settings.height);
-                    if(!range)_terrainTile.reset(); else {gMapSelectPositionA={range->getX1(),range->getY1()};gMapSelectPositionB={range->getX2(),range->getY2()};}
+                if (_sceneryClearTool)
+                {
+                    const auto range = AreaTools::Range(
+                        _terrainTile, SceneryClear::settings.width, SceneryClear::settings.height);
+                    if (!range)
+                        _terrainTile.reset();
+                    else
+                    {
+                        gMapSelectPositionA = { range->getX1(), range->getY1() };
+                        gMapSelectPositionB = { range->getX2(), range->getY2() };
+                    }
                 }
                 if (SimpleTerrain())
                 {
@@ -1299,7 +1360,9 @@ namespace OpenRCT2::Ui::Handheld
         // Ease towards the magnet target: a third of the way each frame, at least a pixel.
         if (_smart.magnet != ScreenCoordsXY{})
         {
-            auto ease = [](int remaining) { return remaining == 0 ? 0 : remaining / 3 != 0 ? remaining / 3 : (remaining > 0 ? 1 : -1); };
+            auto ease = [](int remaining) {
+                return remaining == 0 ? 0 : remaining / 3 != 0 ? remaining / 3 : (remaining > 0 ? 1 : -1);
+            };
             const ScreenCoordsXY step{ ease(_smart.magnet.x), ease(_smart.magnet.y) };
             _smart.magnet -= step;
             return step;
@@ -1310,22 +1373,25 @@ namespace OpenRCT2::Ui::Handheld
     // the design browser), as B always has.
     static void LeaveTool()
     {
-        const bool designBrowser=Designs::Active() && Designs::BrowserReturn();
+        const bool designBrowser = Designs::Active() && Designs::BrowserReturn();
         const auto access = _ridePathAccess;
-        const auto ride=ConstructionRide();
-        const auto context=RideNavigation::Take();
+        const auto ride = ConstructionRide();
+        const auto context = RideNavigation::Take();
         const auto person = PeepPlacement::target;
         const auto employee = StaffPatrol::target;
         EndTerrain();
-        if(designBrowser) Windows::HandheldDesignFilesOpen();
+        if (designBrowser)
+            Windows::HandheldDesignFilesOpen();
         if (person && person->guest && GuestManagement::Resolve(*person->guest))
             Windows::HandheldGuestOpen(*person->guest);
         if (person && person->staff && StaffManagement::Resolve(*person->staff))
             Windows::HandheldStaffOpen(*person->staff);
         if (employee && StaffManagement::Resolve(*employee))
             Windows::HandheldStaffOpen(employee);
-        if (ride && RideManagement::Resolve(*ride)) Windows::HandheldRideReturn(*ride,context);
-        else if (access && RideManagement::Resolve(*access)) Windows::HandheldRideAccessOpen(*access);
+        if (ride && RideManagement::Resolve(*ride))
+            Windows::HandheldRideReturn(*ride, context);
+        else if (access && RideManagement::Resolve(*access))
+            Windows::HandheldRideAccessOpen(*access);
     }
     // Hold B in a tool to undo its last change; a tap still leaves the tool.
     static constexpr uint64_t kUndoHoldMs = 450;
@@ -1352,7 +1418,8 @@ namespace OpenRCT2::Ui::Handheld
             if (const auto draft = Paths::BeginUndo())
             {
                 const auto result = Paths::Undo(*draft, true);
-                _terrainStatus = result.error == GameActions::Status::ok ? "Undone: last path section" : result.getErrorMessage();
+                _terrainStatus = result.error == GameActions::Status::ok ? "Undone: last path section"
+                                                                         : result.getErrorMessage();
             }
         }
         Audio::Play(Audio::SoundId::click1, -400, Audio::kAudioPlayAtCentre);
@@ -1393,8 +1460,8 @@ namespace OpenRCT2::Ui::Handheld
     struct Photo
     {
         bool active{};
-        bool pending{};      // A pressed: waiting for a clean frame.
-        int cleanFrames{};   // Frames drawn with nothing on top since A.
+        bool pending{};    // A pressed: waiting for a clean frame.
+        int cleanFrames{}; // Frames drawn with nothing on top since A.
         bool pausedHere{};
         uint64_t hintUntil{}; // The hint shows on entry and after each button, then fades away.
         std::string note;
@@ -1492,7 +1559,8 @@ namespace OpenRCT2::Ui::Handheld
         const ScreenCoordsXY at{ (screen.width - width) / 2, Layout::hudTop };
         DrawCard(rt, at, { width, 40 });
         DrawStrongText(rt, at + ScreenCoordsXY{ 12, 7 }, "{WHITE}" + text, width - 24);
-        DrawModernText(rt, at + ScreenCoordsXY{ 12, 23 },
+        DrawModernText(
+            rt, at + ScreenCoordsXY{ 12, 23 },
             std::string("{MUTED}") + ActionKey(Action::confirm).data() + " photo  " + ActionKey(Action::contextSecondary).data()
                 + (GameIsPaused() ? " resume  " : " freeze  ") + ActionKey(Action::back).data() + " done");
     }
@@ -1566,100 +1634,124 @@ namespace OpenRCT2::Ui::Handheld
             input.suspend();
             return;
         }
-        const auto constructionRide=ConstructionRide();
-        if(constructionRide && std::find(frame.actions.begin(),frame.actions.end(),Action::openMenu)!=frame.actions.end()
-            && !CustomTracks::Busy() && !FlatRides::Busy() && !Mazes::Busy()
-            && !HasTextOrModalInput() && (CanExplore() || wm->FindByClass(WindowClass::handheldMenu)))
+        const auto constructionRide = ConstructionRide();
+        if (constructionRide && std::find(frame.actions.begin(), frame.actions.end(), Action::openMenu) != frame.actions.end()
+            && !CustomTracks::Busy() && !FlatRides::Busy() && !Mazes::Busy() && !HasTextOrModalInput()
+            && (CanExplore() || wm->FindByClass(WindowClass::handheldMenu)))
         {
-            const auto context=RideNavigation::Take();
+            const auto context = RideNavigation::Take();
             wm->CloseByClass(WindowClass::handheldMenu);
-            RideNavigation::construction=context;
+            RideNavigation::construction = context;
             ReturnFromRideTool(constructionRide);
-            input.suspend();return;
+            input.suspend();
+            return;
         }
         if (HandleMenuInput(input, frame))
             return;
         if (_constructionAdjust.active && (_sceneryTool || _areaTool) && CanExplore())
         {
-            auto indices=_sceneryTool ? ConstructionAdjust::SceneryRows(_constructionAdjust.focus.tab)
-                : ConstructionAdjust::TerrainRows(_constructionAdjust.focus.tab);
+            auto indices = _sceneryTool ? ConstructionAdjust::SceneryRows(_constructionAdjust.focus.tab)
+                                        : ConstructionAdjust::TerrainRows(_constructionAdjust.focus.tab);
             _constructionAdjust.move(0, indices.size());
             if (_constructionAdjust.palette && !ConstructionAdjust::PickerAction(_constructionAdjust, _sceneryTool))
                 _constructionAdjust.palette = false;
             if (_constructionAdjust.palette)
             {
-                _constructionAdjust.colourChoice=MoveColourGrid(_constructionAdjust.colourChoice,72,frame.navigateX,frame.navigateY);
-                for (const auto action:frame.actions)
+                _constructionAdjust.colourChoice = MoveColourGrid(
+                    _constructionAdjust.colourChoice, 72, frame.navigateX, frame.navigateY);
+                for (const auto action : frame.actions)
                 {
-                    if (action==Action::back || action==Action::contextSecondary) _constructionAdjust.palette=false;
-                    else if (action==Action::confirm)
+                    if (action == Action::back || action == Action::contextSecondary)
+                        _constructionAdjust.palette = false;
+                    else if (action == Action::confirm)
                     {
-                        const auto colourRow=indices[_constructionAdjust.row];
-                        const auto currentColour=ConstructionAdjust::CurrentColour(_sceneryTool,colourRow);
-                        const auto delta=static_cast<int>(_constructionAdjust.colourChoice)
-                            -static_cast<int>(ConstructionAdjust::ColourIndex(currentColour));
-                        if (_sceneryTool) SceneryTools::Configure(colourRow,delta);
-                        else AreaTools::Configure(colourRow,delta);
-                        _constructionAdjust.palette=false;
+                        const auto colourRow = indices[_constructionAdjust.row];
+                        const auto currentColour = ConstructionAdjust::CurrentColour(_sceneryTool, colourRow);
+                        const auto delta = static_cast<int>(_constructionAdjust.colourChoice)
+                            - static_cast<int>(ConstructionAdjust::ColourIndex(currentColour));
+                        if (_sceneryTool)
+                            SceneryTools::Configure(colourRow, delta);
+                        else
+                            AreaTools::Configure(colourRow, delta);
+                        _constructionAdjust.palette = false;
                     }
-                    input.suspend();break;
+                    input.suspend();
+                    break;
                 }
                 return; // Palette navigation cannot pan, place, or recolour the park.
             }
-            _constructionAdjust.move(frame.navigateY,indices.size());
-            const auto row=indices[_constructionAdjust.row];
-            const bool enabled=_sceneryTool ? ConstructionAdjust::SceneryEnabled(row) : ConstructionAdjust::TerrainEnabled(row);
-            if(frame.navigateX)
+            _constructionAdjust.move(frame.navigateY, indices.size());
+            const auto row = indices[_constructionAdjust.row];
+            const bool enabled = _sceneryTool ? ConstructionAdjust::SceneryEnabled(row)
+                                              : ConstructionAdjust::TerrainEnabled(row);
+            if (frame.navigateX)
             {
-                if(!enabled) _terrainStatus="Unavailable for this object or operation";
+                if (!enabled)
+                    _terrainStatus = "Unavailable for this object or operation";
                 else
                 {
-                    if(_sceneryTool) SceneryTools::Configure(row==6 ? (frame.navigateX>0 ? 4 : 5) : row,frame.navigateX);
-                    else AreaTools::Configure(row,frame.navigateX);
-                    _terrainStatus.clear();_scatterFeedback=false;
+                    if (_sceneryTool)
+                        SceneryTools::Configure(row == 6 ? (frame.navigateX > 0 ? 4 : 5) : row, frame.navigateX);
+                    else
+                        AreaTools::Configure(row, frame.navigateX);
+                    _terrainStatus.clear();
+                    _scatterFeedback = false;
                 }
             }
-            for(const auto action:frame.actions)
+            for (const auto action : frame.actions)
             {
-                if(action==Action::back || action==Action::contextSecondary) _constructionAdjust.active=false;
-                else if(action==Action::confirm)
+                if (action == Action::back || action == Action::contextSecondary)
+                    _constructionAdjust.active = false;
+                else if (action == Action::confirm)
                 {
-                    if (enabled && _sceneryTool && row==6)
+                    if (enabled && _sceneryTool && row == 6)
                     {
                         SceneryTools::Configure(6);
                         _terrainStatus.clear();
                     }
-                    else if (enabled && ConstructionAdjust::ColourRow(_sceneryTool,row))
+                    else if (enabled && ConstructionAdjust::ColourRow(_sceneryTool, row))
                     {
-                        _constructionAdjust.colourChoice=ConstructionAdjust::ColourIndex(ConstructionAdjust::CurrentColour(_sceneryTool,row));
-                        _constructionAdjust.palette=true;
+                        _constructionAdjust.colourChoice = ConstructionAdjust::ColourIndex(
+                            ConstructionAdjust::CurrentColour(_sceneryTool, row));
+                        _constructionAdjust.palette = true;
                     }
-                    else if(_areaTool && _constructionAdjust.focus.tab==2 && row<=6)
-                        Windows::HandheldTerrainMaterialPickerOpen(row==6);
-                    else _constructionAdjust.active=false; // Return to building, never place on this press.
+                    else if (_areaTool && _constructionAdjust.focus.tab == 2 && row <= 6)
+                        Windows::HandheldTerrainMaterialPickerOpen(row == 6);
+                    else
+                        _constructionAdjust.active = false; // Return to building, never place on this press.
                 }
-                else if(action==Action::contextPrimary)
+                else if (action == Action::contextPrimary)
                 {
-                    if(_sceneryTool) Windows::HandheldSceneryOptionsOpen();else Windows::HandheldAreaOptionsOpen();
+                    if (_sceneryTool)
+                        Windows::HandheldSceneryOptionsOpen();
+                    else
+                        Windows::HandheldAreaOptionsOpen();
                 }
-                else if(action==Action::openBuild)
+                else if (action == Action::openBuild)
                 {
-                    if(_sceneryTool) Windows::HandheldSceneryCatalogOpen();
-                    else Windows::HandheldTerrainMaterialPickerOpen(_constructionAdjust.focus.tab==2 && row==6);
+                    if (_sceneryTool)
+                        Windows::HandheldSceneryCatalogOpen();
+                    else
+                        Windows::HandheldTerrainMaterialPickerOpen(_constructionAdjust.focus.tab == 2 && row == 6);
                 }
-                else if(action==Action::previousOption || action==Action::nextOption)
+                else if (action == Action::previousOption || action == Action::nextOption)
                 {
-                    _constructionAdjust.tab(action==Action::nextOption ? 1 : -1,_sceneryTool ? 4 : 3);
+                    _constructionAdjust.tab(action == Action::nextOption ? 1 : -1, _sceneryTool ? 4 : 3);
                     _terrainStatus.clear();
                 }
-                else if(action==Action::slopeDown || action==Action::slopeUp)
+                else if (action == Action::slopeDown || action == Action::slopeUp)
                 {
-                    if(_sceneryTool) SceneryTools::Configure(action==Action::slopeUp ? 4 : 5);
-                    else AreaTools::Configure(1,action==Action::slopeUp ? 1 : -1);
-                    _terrainStatus.clear();_scatterFeedback=false;
+                    if (_sceneryTool)
+                        SceneryTools::Configure(action == Action::slopeUp ? 4 : 5);
+                    else
+                        AreaTools::Configure(1, action == Action::slopeUp ? 1 : -1);
+                    _terrainStatus.clear();
+                    _scatterFeedback = false;
                 }
-                else if(action==Action::openMenu) Windows::HandheldDashboardOpen();
-                input.suspend();break;
+                else if (action == Action::openMenu)
+                    Windows::HandheldDashboardOpen();
+                input.suspend();
+                break;
             }
             return; // Adjustment owns the D-pad; never leaks into viewport pan or purchase.
         }
@@ -1667,13 +1759,15 @@ namespace OpenRCT2::Ui::Handheld
         {
             for (const auto action : frame.actions)
             {
-                if (action == Action::back) Paths::CancelSelection();
+                if (action == Action::back)
+                    Paths::CancelSelection();
                 else if (action == Action::confirm)
                 {
-                    const auto result=Paths::Action(true);
-                    _terrainStatus=result.error==GameActions::Status::ok ? "" : result.getErrorMessage();
+                    const auto result = Paths::Action(true);
+                    _terrainStatus = result.error == GameActions::Status::ok ? "" : result.getErrorMessage();
                 }
-                input.suspend(); break;
+                input.suspend();
+                break;
             }
             return;
         }
@@ -1681,33 +1775,49 @@ namespace OpenRCT2::Ui::Handheld
         {
             bool changed = true;
             if (frame.navigateX)
-                changed = Paths::BatchActive() ? true : Paths::IsConnected() ? Paths::TurnConnected(frame.navigateX) : Paths::RotateSlope(frame.navigateX);
+                changed = Paths::BatchActive() ? true
+                    : Paths::IsConnected()     ? Paths::TurnConnected(frame.navigateX)
+                                               : Paths::RotateSlope(frame.navigateX);
             if (frame.navigateY)
-                changed = Paths::IsConnected() ? Paths::SlopeConnected(-frame.navigateY) : Paths::ChangeHeight(-frame.navigateY);
-            if (!changed) _terrainStatus = "Choose a target or check the height limit";
-            else if (frame.navigateX || frame.navigateY) _terrainStatus.clear();
+                changed = Paths::IsConnected() ? Paths::SlopeConnected(-frame.navigateY)
+                                               : Paths::ChangeHeight(-frame.navigateY);
+            if (!changed)
+                _terrainStatus = "Choose a target or check the height limit";
+            else if (frame.navigateX || frame.navigateY)
+                _terrainStatus.clear();
             for (const auto action : frame.actions)
             {
-                if (action == Action::back || action == Action::contextSecondary) Paths::SetAdjusting(false);
+                if (action == Action::back || action == Action::contextSecondary)
+                    Paths::SetAdjusting(false);
                 else if (action == Action::confirm)
                 {
-                    if (Paths::BatchActive()) Paths::SetAdjusting(false);
-                    else if (Paths::IsConnected()) Paths::LevelConnected();
-                    else Paths::CycleSlope();
+                    if (Paths::BatchActive())
+                        Paths::SetAdjusting(false);
+                    else if (Paths::IsConnected())
+                        Paths::LevelConnected();
+                    else
+                        Paths::CycleSlope();
                 }
-                else if (action == Action::contextPrimary) Windows::HandheldPathOptionsOpen();
-                else if (action == Action::openBuild) Windows::HandheldPathSurfacePickerOpen();
-                else if (action == Action::openMenu) Windows::HandheldDashboardOpen();
+                else if (action == Action::contextPrimary)
+                    Windows::HandheldPathOptionsOpen();
+                else if (action == Action::openBuild)
+                    Windows::HandheldPathSurfacePickerOpen();
+                else if (action == Action::openMenu)
+                    Windows::HandheldDashboardOpen();
                 else if (action == Action::previousOption || action == Action::nextOption)
                 {
-                    if (!Paths::IsConnected()) Paths::CycleMode(action == Action::nextOption ? 1 : -1);
-                    else Windows::MainWindowZoom(action == Action::nextOption, false);
+                    if (!Paths::IsConnected())
+                        Paths::CycleMode(action == Action::nextOption ? 1 : -1);
+                    else
+                        Windows::MainWindowZoom(action == Action::nextOption, false);
                     _terrainStatus.clear();
                 }
                 else if (action == Action::slopeDown || action == Action::slopeUp)
                 {
-                    if (Paths::IsConnected()) Paths::SlopeConnected(action == Action::slopeUp ? 1 : -1);
-                    else Paths::ChangeHeight(action == Action::slopeUp ? 1 : -1);
+                    if (Paths::IsConnected())
+                        Paths::SlopeConnected(action == Action::slopeUp ? 1 : -1);
+                    else
+                        Paths::ChangeHeight(action == Action::slopeUp ? 1 : -1);
                 }
                 input.suspend();
                 break;
@@ -1735,8 +1845,10 @@ namespace OpenRCT2::Ui::Handheld
                     {
                         if (Mazes::Reviewing())
                             Mazes::Cancel();
-                        else if(Mazes::CameraMode()) Mazes::ToggleCamera();
-                        else ReturnFromRideTool(Mazes::Target());
+                        else if (Mazes::CameraMode())
+                            Mazes::ToggleCamera();
+                        else
+                            ReturnFromRideTool(Mazes::Target());
                     }
                     else if (action == Action::previousOption || action == Action::nextOption)
                     {
@@ -1796,7 +1908,8 @@ namespace OpenRCT2::Ui::Handheld
                     }
                     else if (action == Action::back)
                     {
-                        if(CustomTracks::CameraMode()) CustomTracks::ToggleCamera();
+                        if (CustomTracks::CameraMode())
+                            CustomTracks::ToggleCamera();
                         else if (CustomTracks::Replacing() || CustomTracks::StationPlacement())
                             ReturnFromRideTool(CustomTracks::Target());
                         else
@@ -1917,7 +2030,9 @@ namespace OpenRCT2::Ui::Handheld
             {
                 if (Paths::IsActive() && CanExplore() && Paths::CancelSelection())
                 {
-                    _terrainStatus.clear(); input.suspend(); return;
+                    _terrainStatus.clear();
+                    input.suspend();
+                    return;
                 }
                 if (wm->FindByClass(WindowClass::error) != nullptr || gInputFlags.has(InputFlag::toolActive))
                     Invoke(ShortcutId::kInterfaceCancelConstruction);
@@ -1962,9 +2077,12 @@ namespace OpenRCT2::Ui::Handheld
                     Windows::HandheldRightsOptionsOpen();
                 else if (_surfaceTool)
                 {
-                    AreaTools::settings={};AreaTools::settings.operation=AreaTools::Operation::paint;
-                    AreaTools::settings.surface=_surfaceIndex;AreaTools::ResetColours();
-                    _surfaceTool=false;_areaTool=true;
+                    AreaTools::settings = {};
+                    AreaTools::settings.operation = AreaTools::Operation::paint;
+                    AreaTools::settings.surface = _surfaceIndex;
+                    AreaTools::ResetColours();
+                    _surfaceTool = false;
+                    _areaTool = true;
                     Windows::HandheldTerrainMaterialPickerOpen(false);
                 }
                 else if (_areaTool)
@@ -1973,8 +2091,10 @@ namespace OpenRCT2::Ui::Handheld
                     Windows::HandheldSceneryClearOptionsOpen();
                 else if (_sceneryTool)
                 {
-                    if(ConstructionAdjust::SceneryEnabled(2)) SceneryTools::Configure(2);
-                    else _terrainStatus="Rotation is automatic for this object";
+                    if (ConstructionAdjust::SceneryEnabled(2))
+                        SceneryTools::Configure(2);
+                    else
+                        _terrainStatus = "Rotation is automatic for this object";
                 }
                 else if (_shopTool)
                     RotateShop();
@@ -2000,7 +2120,10 @@ namespace OpenRCT2::Ui::Handheld
                         if (Paths::IsActive())
                         {
                             const auto result = Paths::Action(true);
-                            _terrainStatus = result.error == GameActions::Status::ok ? Paths::BatchActive() ? "" : Paths::IsRemoving() ? "Path removed." : Paths::IsQueue() ? "Queue placed." : "Path placed."
+                            _terrainStatus = result.error == GameActions::Status::ok ? Paths::BatchActive() ? ""
+                                    : Paths::IsRemoving()                                                   ? "Path removed."
+                                    : Paths::IsQueue()                                                      ? "Queue placed."
+                                                                                                            : "Path placed."
                                                                                      : result.getErrorMessage();
                         }
                         else if (_sceneryClearTool && _terrainTile)
@@ -2019,7 +2142,7 @@ namespace OpenRCT2::Ui::Handheld
                                         _terrainStatus = Designs::Query(_terrainTile).getErrorMessage();
                                     break;
                                 }
-                                if (_areaTool && AreaTools::settings.operation==AreaTools::Operation::paint)
+                                if (_areaTool && AreaTools::settings.operation == AreaTools::Operation::paint)
                                 {
                                     Windows::HandheldTerrainPaintReviewOpen(*_terrainTile);
                                     input.suspend();
@@ -2038,23 +2161,24 @@ namespace OpenRCT2::Ui::Handheld
                                 }
                                 if (_sceneryTool && SceneryTools::ScatterActive())
                                 {
-                                    _scatterFeedback=result.error==GameActions::Status::ok;
-                                    _terrainStatus=result.error==GameActions::Status::ok ? SceneryTools::ScatterStatus() : result.getErrorMessage();
+                                    _scatterFeedback = result.error == GameActions::Status::ok;
+                                    _terrainStatus = result.error == GameActions::Status::ok ? SceneryTools::ScatterStatus()
+                                                                                             : result.getErrorMessage();
                                     input.suspend(); // One review/apply transition per released press.
                                     return;
                                 }
                                 _terrainStatus = result.error == GameActions::Status::ok
                                     ? (FlatRides::CurrentStage() != FlatRides::Stage::inactive ? ""
                                            : _shopTool                                         ? "Shop placed."
-                                           : _treeTool                                         ? "Tree planted / move, then A again"
-                                           : _sceneryTool                                      ? "Scenery placed / move, then A again"
-                                           : _colourRide                                       ? "Track colour scheme applied."
-                                           : _sceneryRemovalTool                               ? "Removed."
-                                           : _surfaceTool                                      ? "Surface painted."
-                                           : _waterTool                                        ? "Water level changed."
-                                           : Landscape::shape == Landscape::Shape::pond        ? "Pond dug / A again to go deeper"
-                                           : Landscape::shape == Landscape::Shape::flatten     ? "Levelled one step"
-                                                                                               : "Land shaped.")
+                                           : _treeTool                                  ? "Tree planted / move, then A again"
+                                           : _sceneryTool                               ? "Scenery placed / move, then A again"
+                                           : _colourRide                                ? "Track colour scheme applied."
+                                           : _sceneryRemovalTool                        ? "Removed."
+                                           : _surfaceTool                               ? "Surface painted."
+                                           : _waterTool                                 ? "Water level changed."
+                                           : Landscape::shape == Landscape::Shape::pond ? "Pond dug / A again to go deeper"
+                                           : Landscape::shape == Landscape::Shape::flatten ? "Levelled one step"
+                                                                                           : "Land shaped.")
                                     : result.getErrorMessage();
                                 if (undoable && result.error == GameActions::Status::ok && Undo::Available())
                                     _terrainStatus += _terrainStatus.empty() ? "Hold B: undo" : "  |  Hold B: undo";
@@ -2089,8 +2213,10 @@ namespace OpenRCT2::Ui::Handheld
                             }
                             else if (_inspect.kind == InspectKind::sign)
                             {
-                                _sceneryEdit = SceneryTools::Capture(GetMapCoordinatesFromPos(Centre(),
-                                    { ViewportInteractionItem::banner, ViewportInteractionItem::wall, ViewportInteractionItem::largeScenery }));
+                                _sceneryEdit = SceneryTools::Capture(GetMapCoordinatesFromPos(
+                                    Centre(),
+                                    { ViewportInteractionItem::banner, ViewportInteractionItem::wall,
+                                      ViewportInteractionItem::largeScenery }));
                                 Windows::HandheldSignEditOpen();
                                 input.suspend();
                                 return;
@@ -2157,11 +2283,11 @@ namespace OpenRCT2::Ui::Handheld
                             else if (_rightsTool)
                                 Windows::HandheldRightsOptionsOpen();
                             else if (_areaTool)
-                                _constructionAdjust.active=true;
+                                _constructionAdjust.active = true;
                             else if (_sceneryClearTool)
                                 Windows::HandheldSceneryClearOptionsOpen();
                             else if (_sceneryTool)
-                                _constructionAdjust.active=true;
+                                _constructionAdjust.active = true;
                             else if (_treeTool)
                             {
                                 Windows::HandheldTreePickerOpen();
@@ -2170,22 +2296,26 @@ namespace OpenRCT2::Ui::Handheld
                                 _colourScheme = (_colourScheme + 1) % kNumRideColourSchemes;
                             else if (_surfaceTool)
                             {
-                                AreaTools::settings={}; AreaTools::settings.operation=AreaTools::Operation::paint;
-                                AreaTools::settings.surface=_surfaceIndex; AreaTools::ResetColours();
-                                _surfaceTool=false; _areaTool=true;
-                                _constructionAdjust.active=true;
-                                _constructionAdjust.focus.tab=2; _constructionAdjust.row=0;
+                                AreaTools::settings = {};
+                                AreaTools::settings.operation = AreaTools::Operation::paint;
+                                AreaTools::settings.surface = _surfaceIndex;
+                                AreaTools::ResetColours();
+                                _surfaceTool = false;
+                                _areaTool = true;
+                                _constructionAdjust.active = true;
+                                _constructionAdjust.focus.tab = 2;
+                                _constructionAdjust.row = 0;
                             }
                             else if (SimpleTerrain())
                                 Landscape::Cycle(1);
                             else if (!_sceneryRemovalTool)
                             {
-                                _areaTool=true;
-                                AreaTools::settings.operation=_waterTool
+                                _areaTool = true;
+                                AreaTools::settings.operation = _waterTool
                                     ? (_raiseLand ? AreaTools::Operation::waterRaise : AreaTools::Operation::waterLower)
                                     : (_raiseLand ? AreaTools::Operation::raise : AreaTools::Operation::lower);
-                                _waterTool=false;
-                                _constructionAdjust.active=true;
+                                _waterTool = false;
+                                _constructionAdjust.active = true;
                             }
                             _terrainStatus.clear();
                             _scatterFeedback = false;
@@ -2226,8 +2356,8 @@ namespace OpenRCT2::Ui::Handheld
                         else if (_sceneryTool)
                             SceneryTools::Configure(action == Action::slopeUp ? 4 : 5);
                         else if (_areaTool)
-                            AreaTools::Configure(1,action == Action::slopeUp ? 1 : -1);
-                        else if(SimpleTerrain())
+                            AreaTools::Configure(1, action == Action::slopeUp ? 1 : -1);
+                        else if (SimpleTerrain())
                             Landscape::Resize(action == Action::slopeUp ? 1 : -1);
                         break;
                     case Action::cameraMode:
@@ -2264,12 +2394,14 @@ namespace OpenRCT2::Ui::Handheld
         using namespace Drawing;
         const auto c = Centre();
         const auto height = ContextGetHeight();
-        if(!_terrainActive && !Paths::IsActive()) {
-            const auto& recent=getGameState().park.newsItems.getRecent();
-            if(!recent.empty()) {
-                Concept::Box(rt,{8,36},{ContextGetWidth()-16,28});
-                DrawModernText(rt,{16,46},"{GOLD}Y News");
-                DrawModernEllipsised(rt,{74,46},ContextGetWidth()-90,Windows::HandheldNewsText(recent.front().text));
+        if (!_terrainActive && !Paths::IsActive())
+        {
+            const auto& recent = getGameState().park.newsItems.getRecent();
+            if (!recent.empty())
+            {
+                Concept::Box(rt, { 8, 36 }, { ContextGetWidth() - 16, 28 });
+                DrawModernText(rt, { 16, 46 }, "{GOLD}Y News");
+                DrawModernEllipsised(rt, { 74, 46 }, ContextGetWidth() - 90, Windows::HandheldNewsText(recent.front().text));
             }
         }
         const auto context = _terrainActive || Paths::IsActive() ? Layout::Context::construction : Layout::Context::park;
@@ -2308,19 +2440,19 @@ namespace OpenRCT2::Ui::Handheld
         std::string costAmount;
         if (_terrainActive)
         {
-            status = StaffPatrol::Active() ? "PATROL / Select Brush"
-                : PeepPlacement::Active()                              ? "PLACE PERSON"
+            status = StaffPatrol::Active()                                ? "PATROL / Select Brush"
+                : PeepPlacement::Active()                                 ? "PLACE PERSON"
                 : Designs::Active()                                       ? "PLACE DESIGN"
                 : FlatRides::CurrentStage() != FlatRides::Stage::inactive ? "PLACE RIDE"
                 : _shopTool                                               ? "PLACE SHOP"
                 : _treeTool                                               ? "PLACE TREE"
                 : _sceneryTool                                            ? "SCENERY"
-                : _areaTool                                               ? AreaTools::operations[static_cast<size_t>(AreaTools::settings.operation)]
-                : _colourRide                                             ? "TRACK SCHEME " + std::to_string(_colourScheme + 1)
-                : _sceneryRemovalTool                                     ? "REMOVE SCENERY"
-                : _surfaceTool                                            ? "PAINT SURFACE"
-                : _waterTool                                              ? (_raiseLand ? "RAISE WATER" : "LOWER WATER")
-                                                                          : std::string(Landscape::Name(Landscape::shape));
+                : _areaTool           ? AreaTools::operations[static_cast<size_t>(AreaTools::settings.operation)]
+                : _colourRide         ? "TRACK SCHEME " + std::to_string(_colourScheme + 1)
+                : _sceneryRemovalTool ? "REMOVE SCENERY"
+                : _surfaceTool        ? "PAINT SURFACE"
+                : _waterTool          ? (_raiseLand ? "RAISE WATER" : "LOWER WATER")
+                                      : std::string(Landscape::Name(Landscape::shape));
             if (_terrainTile)
             {
                 const auto result = TerrainAction(false);
@@ -2333,11 +2465,12 @@ namespace OpenRCT2::Ui::Handheld
             }
             else
                 status = _sceneryTool && SceneryTools::Current().mode == SceneryTools::Mode::pick ? "Point at placed scenery"
-                    : _colourRide     ? "Point at this ride's track"
-                    : _sceneryRemovalTool ? "Point at small scenery"
-                                          : "Move onto land";
+                    : _colourRide                                                                 ? "Point at this ride's track"
+                    : _sceneryRemovalTool                                                         ? "Point at small scenery"
+                                                                                                  : "Move onto land";
             if (!_terrainStatus.empty())
-                status = _sceneryTool && SceneryTools::ScatterActive() && _scatterFeedback ? SceneryTools::ScatterStatus() : _terrainStatus;
+                status = _sceneryTool && SceneryTools::ScatterActive() && _scatterFeedback ? SceneryTools::ScatterStatus()
+                                                                                           : _terrainStatus;
         }
         if (Paths::IsActive())
         {
@@ -2350,15 +2483,18 @@ namespace OpenRCT2::Ui::Handheld
             else
                 status = result.getErrorMessage();
             if (!_terrainStatus.empty())
-                status = _sceneryTool && SceneryTools::ScatterActive() && _scatterFeedback ? SceneryTools::ScatterStatus() : _terrainStatus;
+                status = _sceneryTool && SceneryTools::ScatterActive() && _scatterFeedback ? SceneryTools::ScatterStatus()
+                                                                                           : _terrainStatus;
             if (Paths::BatchActive())
             {
-                if (!Paths::BatchMessage().empty()) status=Paths::BatchMessage();
-                else if (result.error != GameActions::Status::ok) status=result.getErrorMessage();
+                if (!Paths::BatchMessage().empty())
+                    status = Paths::BatchMessage();
+                else if (result.error != GameActions::Status::ok)
+                    status = result.getErrorMessage();
             }
             Paths::DrawBatchWorld(rt);
             Paths::DrawOverlay(rt, Concept::kOrigin);
-            Paths::DrawFooter(rt, {ContextGetWidth(),height});
+            Paths::DrawFooter(rt, { ContextGetWidth(), height });
         }
         else
         {
@@ -2381,11 +2517,11 @@ namespace OpenRCT2::Ui::Handheld
                         std::to_string(RightsTools::settings.width) + " x " + std::to_string(RightsTools::settings.height)
                             + " tiles");
                 else if ((_areaTool || _sceneryTool) && _constructionAdjust.active)
-                    ConstructionAdjust::Draw(rt,Concept::kOrigin,_constructionAdjust,_sceneryTool);
+                    ConstructionAdjust::Draw(rt, Concept::kOrigin, _constructionAdjust, _sceneryTool);
                 else if (_areaTool)
                 {
-                    AreaTools::DrawOverlay(rt,Concept::kOrigin);
-                    DrawModernEllipsised(rt,Concept::kOrigin+ScreenCoordsXY{12,154},140,"{MUTED}L2/R2 Operation");
+                    AreaTools::DrawOverlay(rt, Concept::kOrigin);
+                    DrawModernEllipsised(rt, Concept::kOrigin + ScreenCoordsXY{ 12, 154 }, 140, "{MUTED}L2/R2 Operation");
                 }
                 else if (_sceneryClearTool)
                     SceneryClear::DrawOverlay(rt, Concept::kOrigin);
@@ -2415,17 +2551,19 @@ namespace OpenRCT2::Ui::Handheld
             else if (_rightsTool)
                 DrawConstructionFooter(rt, { ContextGetWidth(), height }, "Review", "Options");
             else if (_sceneryClearTool)
-                DrawConstructionFooter(rt, {ContextGetWidth(), height}, "Review", "Options");
+                DrawConstructionFooter(rt, { ContextGetWidth(), height }, "Review", "Options");
             else if (_areaTool || _sceneryTool)
-                ConstructionAdjust::Footer(rt,{ContextGetWidth(),height},_constructionAdjust.active,_sceneryTool,
-                    _areaTool ? AreaTools::settings.operation==AreaTools::Operation::paint ? "Review" : "Apply"
-                    : SceneryTools::Current().mode==SceneryTools::Mode::pick ? "Pick"
-                    : SceneryTools::ScatterActive() ? SceneryTools::ScatterReviewed() ? "Apply" : "Review"
-                    : SceneryTools::Current().mode==SceneryTools::Mode::remove ? "Remove"
-                    : SceneryTools::Current().mode==SceneryTools::Mode::recolour ? "Paint" : "Place",
-                    _constructionAdjust.active && ConstructionAdjust::PickerAction(_constructionAdjust,_sceneryTool),
+                ConstructionAdjust::Footer(
+                    rt, { ContextGetWidth(), height }, _constructionAdjust.active, _sceneryTool,
+                    _areaTool ? AreaTools::settings.operation == AreaTools::Operation::paint ? "Review" : "Apply"
+                        : SceneryTools::Current().mode == SceneryTools::Mode::pick ? "Pick"
+                        : SceneryTools::ScatterActive() ? SceneryTools::ScatterReviewed() ? "Apply" : "Review"
+                        : SceneryTools::Current().mode == SceneryTools::Mode::remove   ? "Remove"
+                        : SceneryTools::Current().mode == SceneryTools::Mode::recolour ? "Paint"
+                                                                                       : "Place",
+                    _constructionAdjust.active && ConstructionAdjust::PickerAction(_constructionAdjust, _sceneryTool),
                     _constructionAdjust.palette,
-                    _sceneryTool && _constructionAdjust.focus.tab==0 && _constructionAdjust.row==2
+                    _sceneryTool && _constructionAdjust.focus.tab == 0 && _constructionAdjust.row == 2
                         && ConstructionAdjust::SceneryEnabled(6));
             else if (_treeTool)
                 DrawTreeFooter(rt, { ContextGetWidth(), height });
@@ -2433,12 +2571,17 @@ namespace OpenRCT2::Ui::Handheld
                 DrawTrackColourFooter(rt, { ContextGetWidth(), height });
             else if (_sceneryRemovalTool)
                 DrawSceneryRemovalFooter(rt, { ContextGetWidth(), height });
-            else if(_surfaceTool)
-                ConstructionAdjust::Footer(rt,{ContextGetWidth(),height},false,false,"Paint");
-            else if(SimpleTerrain())
-                DrawFooter(rt, { ContextGetWidth(), height },
-                    { { "D-pad", "Move" }, { "A", Landscape::Name(Landscape::shape) }, { "Y", "Shape" },
-                      { "L2/R2", "Brush size" }, { "B", "Back" }, { "L1/R1", "Zoom", HintPriority::guide } });
+            else if (_surfaceTool)
+                ConstructionAdjust::Footer(rt, { ContextGetWidth(), height }, false, false, "Paint");
+            else if (SimpleTerrain())
+                DrawFooter(
+                    rt, { ContextGetWidth(), height },
+                    { { "D-pad", "Move" },
+                      { "A", Landscape::Name(Landscape::shape) },
+                      { "Y", "Shape" },
+                      { "L2/R2", "Brush size" },
+                      { "B", "Back" },
+                      { "L1/R1", "Zoom", HintPriority::guide } });
             else if (!_wheel.open) // The wheel draws its own footer.
                 DrawGameplayFooter(
                     rt, { ContextGetWidth(), height }, status, _terrainActive, _surfaceTool || _colourRide.has_value(),
@@ -2446,14 +2589,16 @@ namespace OpenRCT2::Ui::Handheld
         }
         // A colour palette owns the D-pad; placement feedback/cursor is unrelated
         // here and suggested a placement error while merely choosing a colour.
-        if (_constructionAdjust.active && _constructionAdjust.palette && (_sceneryTool || _areaTool)) return;
+        if (_constructionAdjust.active && _constructionAdjust.palette && (_sceneryTool || _areaTool))
+            return;
         const bool feedback = !_terrainStatus.empty() || (Paths::BatchActive() && !Paths::BatchMessage().empty());
         if (Paths::BatchActive() && (feedback || costAmount.empty()))
-            DrawConstructionMessage(rt,{ContextGetWidth(),height},status);
+            DrawConstructionMessage(rt, { ContextGetWidth(), height }, status);
         else if ((_terrainActive || Paths::IsActive()) && (feedback || costAmount.empty()))
             DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), status);
         else if (!costAmount.empty())
-            DrawCostBadge(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), costAmount, Paths::BatchActive());
+            DrawCostBadge(
+                rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), costAmount, Paths::BatchActive());
         if ((GuestFollow::Current() || RideFollow::Current()) && !_terrainActive && !Paths::IsActive())
             DrawContextMessage(rt, Layout::ContextAnchor({ ContextGetWidth(), height }, kContextSize), status);
         else if (!_wheel.open && !_inspect.name.empty() && !_terrainActive && !Paths::IsActive())
@@ -2467,7 +2612,8 @@ namespace OpenRCT2::Ui::Handheld
             {
                 const ScreenCoordsXY origin{ 0, ToastOffset() };
                 DrawCard(slot, origin, size);
-                Fill(slot, origin + ScreenCoordsXY{ 5, 4 }, { 4, size.height - 8 },
+                Fill(
+                    slot, origin + ScreenCoordsXY{ 5, 4 }, { 4, size.height - 8 },
                     static_cast<Drawing::PaletteIndex>(_toast.notice ? PocketPalette::caution : PocketPalette::destructive));
                 DrawStrongText(
                     slot, origin + ScreenCoordsXY{ 16, 6 }, (_toast.notice ? "{CAUTION}" : "{DANGER}") + _toast.title,
@@ -2531,4 +2677,3 @@ namespace OpenRCT2::Ui::Handheld
         _toast.notice = true;
     }
 } // namespace OpenRCT2::Ui::Handheld
-

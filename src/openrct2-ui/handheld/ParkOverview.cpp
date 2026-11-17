@@ -2,13 +2,13 @@
 #include "ParkOverview.h"
 
 #include "Alerts.h"
-#include <openrct2/SpriteIds.h>
-#include <openrct2/drawing/Drawing.Sprite.h>
 #include "Finances.h"
 
 #include <openrct2-ui/interface/Objective.h>
 #include <openrct2/GameState.h>
+#include <openrct2/SpriteIds.h>
 #include <openrct2/actions/park/ParkSetParameterAction.h>
+#include <openrct2/drawing/Drawing.Sprite.h>
 #include <openrct2/drawing/Drawing.String.h>
 #include <openrct2/localisation/Formatter.h>
 #include <openrct2/localisation/Formatting.h>
@@ -29,9 +29,9 @@ namespace OpenRCT2::Ui::Handheld::ParkOverview
         const auto& park = getGameState().park;
         model.heroRow = 0;
         model.settingRows = { 1 };
-        model.settingValues = { park.flags.has(ParkFlag::noMoney)              ? "Free"
+        model.settingValues = { park.flags.has(ParkFlag::noMoney)                     ? "Free"
                                     : Finances::Available(Finances::Field::admission) ? FormatMoney(Park::GetEntranceFee(park))
-                                                                                  : "Locked" };
+                                                                                      : "Locked" };
         if (model.hero && !StatusPermitted())
         {
             model.hero->states = { std::string(park.flags.has(ParkFlag::parkOpen) ? "Open (locked)" : "Closed (locked)") };
@@ -136,8 +136,11 @@ namespace OpenRCT2::Ui::Handheld::ParkOverview
         hero.states = { "Closed", "Open" };
         hero.state = park.flags.has(ParkFlag::parkOpen) ? 1 : 0;
         const int rating = park.rating;
-        hero.meters.push_back({ "Park rating", std::to_string(rating) + " / 999", rating * 100 / 999,
-                                rating >= 600 ? "{POSITIVE}" : rating < 300 ? "{DANGER}" : "{WHITE}" });
+        hero.meters.push_back(
+            { "Park rating", std::to_string(rating) + " / 999", rating * 100 / 999,
+              rating >= 600      ? "{POSITIVE}"
+                  : rating < 300 ? "{DANGER}"
+                                 : "{WHITE}" });
         model.hero = hero;
         // The home screen leads with what needs the player. When something does, it replaces the long
         // objective text (which has its own page) so the action grid still fits on a small screen.
@@ -145,14 +148,19 @@ namespace OpenRCT2::Ui::Handheld::ParkOverview
         {
             // Kept to two lines so the switch, admission and every button stay on screen: the most
             // urgent problem, then how many more and how to visit them.
-            model.bodyLines.push_back(std::string(alerts[0].kind <= Alerts::Kind::breakdown ? "{DANGER}" : "{CAUTION}")
-                + alerts[0].title + "  -  " + alerts[0].fix);
-            model.bodyLines.push_back("{MUTED}" + (alerts.size() > 1 ? std::to_string(alerts.size() - 1) + " more need attention.  " : std::string())
+            model.bodyLines.push_back(
+                std::string(alerts[0].kind <= Alerts::Kind::breakdown ? "{DANGER}" : "{CAUTION}") + alerts[0].title + "  -  "
+                + alerts[0].fix);
+            model.bodyLines.push_back(
+                "{MUTED}" + (alerts.size() > 1 ? std::to_string(alerts.size() - 1) + " more need attention.  " : std::string())
                 + "Y visits each; hold Y to list them");
             model.rows = { StatusPermitted() ? (park.flags.has(ParkFlag::parkOpen) ? "Close park..." : "Open park...")
                                              : "Park status locked",
                            Finances::Available(Finances::Field::admission) ? "Admission..." : "Admission unavailable",
-                           "Park map...", "Park news...", "Park awards...", "Park history..." };
+                           "Park map...",
+                           "Park news...",
+                           "Park awards...",
+                           "Park history..." };
             MarkControls(model);
             return model;
         }
@@ -161,7 +169,11 @@ namespace OpenRCT2::Ui::Handheld::ParkOverview
         model.bodyLines.push_back("Objective: " + Outcome());
         model.rows = { StatusPermitted() ? (park.flags.has(ParkFlag::parkOpen) ? "Close park..." : "Open park...")
                                          : "Park status locked",
-                       Finances::Available(Finances::Field::admission) ? "Admission..." : "Admission unavailable", "Park map...", "Park news...", "Park awards...", "Park history..." };
+                       Finances::Available(Finances::Field::admission) ? "Admission..." : "Admission unavailable",
+                       "Park map...",
+                       "Park news...",
+                       "Park awards...",
+                       "Park history..." };
         MarkControls(model);
         return model;
     }

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "Designs.h"
-#include "FileBrowsing.h"
-#include "DesignAvailability.h"
 
 #include "Currency.h"
+#include "DesignAvailability.h"
+#include "FileBrowsing.h"
 #include "FlatRides.h"
 #include "Mazes.h"
 
@@ -56,15 +56,21 @@ namespace OpenRCT2::Ui::Handheld::Designs
     }
     std::string UnavailableReason(const TrackDesign& td)
     {
-        if(Eligible(td)) return {};
-        const auto type=td.trackAndVehicle.rtdIndex;
-        if(type!=RIDE_TYPE_MAZE && !TrackConstructionSupport::Type(type)) return "Ride family has no Pocket saved-design placement";
-        const auto index=GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(td.trackAndVehicle.vehicleObject);
-        const auto* entry=GetRideEntryByIndex(index);
-        if(!entry) return "Required vehicle object is not loaded";
-        if(std::find(std::begin(entry->ride_type),std::end(entry->ride_type),type)==std::end(entry->ride_type)) return "Vehicle and ride family are incompatible";
-        if(FlatRidePlacement::StationObject()==kObjectEntryIndexNull) return "Required station object is not loaded";
-        if(!getGameState().cheats.ignoreResearchStatus && (!RideTypeIsInvented(type) || !RideEntryIsInvented(index))) return "Ride type or vehicle is not researched";
+        if (Eligible(td))
+            return {};
+        const auto type = td.trackAndVehicle.rtdIndex;
+        if (type != RIDE_TYPE_MAZE && !TrackConstructionSupport::Type(type))
+            return "Ride family has no Pocket saved-design placement";
+        const auto index = GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(td.trackAndVehicle.vehicleObject);
+        const auto* entry = GetRideEntryByIndex(index);
+        if (!entry)
+            return "Required vehicle object is not loaded";
+        if (std::find(std::begin(entry->ride_type), std::end(entry->ride_type), type) == std::end(entry->ride_type))
+            return "Vehicle and ride family are incompatible";
+        if (FlatRidePlacement::StationObject() == kObjectEntryIndexNull)
+            return "Required station object is not loaded";
+        if (!getGameState().cheats.ignoreResearchStatus && (!RideTypeIsInvented(type) || !RideEntryIsInvented(index)))
+            return "Ride type or vehicle is not researched";
         return "Native geometry is unsupported for placement";
     }
     struct PreviewImage
@@ -76,65 +82,76 @@ namespace OpenRCT2::Ui::Handheld::Designs
     static std::map<std::string, std::weak_ptr<PreviewImage>> images;
     static std::optional<FileBrowsing::Identity> selectedFile;
     static bool browserReturn{};
-    bool BrowserReturn() { return browserReturn; }
-    void SetBrowserReturn(bool value) { browserReturn=value; }
-    std::optional<PickerEntry> FileEntry(const std::string& path, std::optional<ObjectEntryDescriptor> vehicle, int width, int height, Direction orientation)
+    bool BrowserReturn()
     {
-                const auto identity = FileBrowsing::Capture(std::filesystem::u8path(path));
-                if (!identity) return {};
-                auto imported = TrackDesignImport(path.c_str());
-                if (imported && vehicle) {
-                    const auto i=GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(*vehicle);
-                    if (!DesignAvailability::Compatible(*imported,i)) return {};
-                    imported->trackAndVehicle.vehicleObject=*vehicle;
-                }
-                if (!imported || !Eligible(*imported) || !FileBrowsing::Current(*identity))
-                    return {};
-                auto td = std::shared_ptr<TrackDesign>(std::move(imported));
-                std::error_code error;
-                const auto stamp = std::filesystem::last_write_time(path, error);
-                const auto imageKey=path+":"+td->trackAndVehicle.vehicleObject.ToString();
-                auto image = images[imageKey].lock();
-                if (!image || error || image->stamp != stamp || image->digest != identity->digest)
+        return browserReturn;
+    }
+    void SetBrowserReturn(bool value)
+    {
+        browserReturn = value;
+    }
+    std::optional<PickerEntry> FileEntry(
+        const std::string& path, std::optional<ObjectEntryDescriptor> vehicle, int width, int height, Direction orientation)
+    {
+        const auto identity = FileBrowsing::Capture(std::filesystem::u8path(path));
+        if (!identity)
+            return {};
+        auto imported = TrackDesignImport(path.c_str());
+        if (imported && vehicle)
+        {
+            const auto i = GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(*vehicle);
+            if (!DesignAvailability::Compatible(*imported, i))
+                return {};
+            imported->trackAndVehicle.vehicleObject = *vehicle;
+        }
+        if (!imported || !Eligible(*imported) || !FileBrowsing::Current(*identity))
+            return {};
+        auto td = std::shared_ptr<TrackDesign>(std::move(imported));
+        std::error_code error;
+        const auto stamp = std::filesystem::last_write_time(path, error);
+        const auto imageKey = path + ":" + td->trackAndVehicle.vehicleObject.ToString();
+        auto image = images[imageKey].lock();
+        if (!image || error || image->stamp != stamp || image->digest != identity->digest)
+        {
+            image = std::make_shared<PreviewImage>();
+            image->stamp = stamp;
+            image->digest = identity->digest;
+            images[imageKey] = image;
+        }
+        const auto index = GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(td->trackAndVehicle.vehicleObject);
+        PickerEntry entry{ { ObjectType::ride, index, path }, std::filesystem::path(path).stem().string(), ZoomLevel{ 3 } };
+        entry.drawPreview = [td, image, identity, width, height, orientation](Drawing::RenderTarget& rt) {
+            if (gLegacyScene != LegacyScene::playing || !Eligible(*td) || !FileBrowsing::Current(*identity))
+                return;
+            if (image->pixels.empty())
+            {
+                // The native renderer stashes/restores the map. In playing mode it
+                // does not load objects. Preserve the unused ride slot it borrows.
+                const auto id = GetNextFreeRideId();
+                if (id.IsNull())
+                    return;
+                auto previous = std::move(getGameState().rides[id.ToUnderlying()]);
+                auto pixels = std::make_unique<TrackDesignPreviewBuffer>();
+                TrackDesignDrawPreview(*td, *pixels, false);
+                image->pixels.assign(pixels->begin(), pixels->end());
+                getGameState().rides[id.ToUnderlying()] = std::move(previous);
+            }
+            // Sample the real native four-orientation image into this viewport.
+            // Respect dirty render-target clipping; never write outside the target.
+            const int scale = std::min(width * 1000 / 370, height * 1000 / 217);
+            const int w = std::max(1, 370 * scale / 1000), h = std::max(1, 217 * scale / 1000);
+            const int left = (width - w) / 2, top = (height - h) / 2;
+            for (int y = std::max(top, rt.y); y < std::min(top + h, rt.y + rt.height); ++y)
+                for (int x = std::max(left, rt.x); x < std::min(left + w, rt.x + rt.width); ++x)
                 {
-                    image = std::make_shared<PreviewImage>();
-                    image->stamp = stamp; image->digest=identity->digest;
-                    images[imageKey] = image;
+                    const auto colour = image->pixels
+                                            [(orientation & 3) * kTrackPreviewImageSize + (y - top) * 217 / h * 370
+                                             + (x - left) * 370 / w];
+                    if (colour != static_cast<Drawing::PaletteIndex>(0))
+                        rt.bits[(y - rt.y) * rt.LineStride() + x - rt.x] = colour;
                 }
-                const auto index = GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(
-                    td->trackAndVehicle.vehicleObject);
-                PickerEntry entry{ { ObjectType::ride, index, path }, std::filesystem::path(path).stem().string(), ZoomLevel{ 3 } };
-                entry.drawPreview = [td, image, identity, width, height, orientation](Drawing::RenderTarget& rt) {
-                    if (gLegacyScene != LegacyScene::playing || !Eligible(*td) || !FileBrowsing::Current(*identity))
-                        return;
-                    if (image->pixels.empty())
-                    {
-                        // The native renderer stashes/restores the map. In playing mode it
-                        // does not load objects. Preserve the unused ride slot it borrows.
-                        const auto id = GetNextFreeRideId();
-                        if (id.IsNull())
-                            return;
-                        auto previous = std::move(getGameState().rides[id.ToUnderlying()]);
-                        auto pixels = std::make_unique<TrackDesignPreviewBuffer>();
-                        TrackDesignDrawPreview(*td, *pixels, false);
-                        image->pixels.assign(pixels->begin(), pixels->end());
-                        getGameState().rides[id.ToUnderlying()] = std::move(previous);
-                    }
-                    // Sample the real native four-orientation image into this viewport.
-                    // Respect dirty render-target clipping; never write outside the target.
-                    const int scale = std::min(width * 1000 / 370, height * 1000 / 217);
-                    const int w = std::max(1, 370 * scale / 1000), h = std::max(1, 217 * scale / 1000);
-                    const int left = (width - w) / 2, top = (height - h) / 2;
-                    for (int y = std::max(top, rt.y); y < std::min(top + h, rt.y + rt.height); ++y)
-                        for (int x = std::max(left, rt.x); x < std::min(left + w, rt.x + rt.width); ++x)
-                        {
-                            const auto colour = image->pixels[(orientation & 3) * kTrackPreviewImageSize
-                                + (y - top) * 217 / h * 370 + (x - left) * 370 / w];
-                            if (colour != static_cast<Drawing::PaletteIndex>(0))
-                                rt.bits[(y - rt.y) * rt.LineStride() + x - rt.x] = colour;
-                        }
-                };
-                return entry;
+        };
+        return entry;
     }
     std::vector<PickerEntry> Entries()
     {
@@ -148,7 +165,8 @@ namespace OpenRCT2::Ui::Handheld::Designs
             {
                 if (!paths.insert(file.path).second)
                     continue;
-                if (auto entry = FileEntry(file.path)) entries.push_back(std::move(*entry));
+                if (auto entry = FileEntry(file.path))
+                    entries.push_back(std::move(*entry));
             }
         };
         for (ride_type_t type = 0; type < RIDE_TYPE_COUNT; ++type)
@@ -173,8 +191,10 @@ namespace OpenRCT2::Ui::Handheld::Designs
     }
     void End()
     {
-        lastError.clear(); sceneryOmitted=reviewOmitted=placedOmitted=0;
-        browserReturn=false; selectedFile.reset();
+        lastError.clear();
+        sceneryOmitted = reviewOmitted = placedOmitted = 0;
+        browserReturn = false;
+        selectedFile.reset();
         ClearPreview();
         design.reset();
         heightOffset.reset();
@@ -185,52 +205,73 @@ namespace OpenRCT2::Ui::Handheld::Designs
     }
     bool Begin(const std::string& path, std::optional<ObjectEntryDescriptor> vehicle)
     {
-        const auto file=FileBrowsing::Capture(std::filesystem::u8path(path));
+        const auto file = FileBrowsing::Capture(std::filesystem::u8path(path));
         auto imported = TrackDesignImport(path.c_str());
-        if (imported && vehicle) {
-            const auto i=GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(*vehicle);
-            if (!DesignAvailability::Compatible(*imported,i)) return false;
-            imported->trackAndVehicle.vehicleObject=*vehicle;
+        if (imported && vehicle)
+        {
+            const auto i = GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(*vehicle);
+            if (!DesignAvailability::Compatible(*imported, i))
+                return false;
+            imported->trackAndVehicle.vehicleObject = *vehicle;
         }
-        if (!vehicle && design && selection==path && selectedFile==file && imported)
-            imported->trackAndVehicle.vehicleObject=design->trackAndVehicle.vehicleObject;
+        if (!vehicle && design && selection == path && selectedFile == file && imported)
+            imported->trackAndVehicle.vehicleObject = design->trackAndVehicle.vehicleObject;
         if (!file || !imported || !Eligible(*imported) || !FileBrowsing::Current(*file))
             return false;
         const bool same = selection == path && selectedFile == file;
-        const auto previousHeight=heightOffset;
+        const auto previousHeight = heightOffset;
         End();
         design = std::move(imported);
-        selectedFile=file;
-        if(same) heightOffset=previousHeight;
+        selectedFile = file;
+        if (same)
+            heightOffset = previousHeight;
         selection = path;
         if (!same)
             direction = 0;
         return true;
     }
-    const TrackDesign* Draft() { return design.get(); }
+    const TrackDesign* Draft()
+    {
+        return design.get();
+    }
     bool ChooseVehicle(const ObjectEntryDescriptor& vehicle)
     {
-        if (!design || busy || review || !selectedFile || !FileBrowsing::Current(*selectedFile)) return false;
-        const auto index=GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(vehicle);
-        if (!DesignAvailability::Compatible(*design,index)) return false;
-        ClearPreview(); design->trackAndVehicle.vehicleObject=vehicle; ++revision; return true;
+        if (!design || busy || review || !selectedFile || !FileBrowsing::Current(*selectedFile))
+            return false;
+        const auto index = GetContext()->GetObjectManager().GetLoadedObjectEntryIndex(vehicle);
+        if (!DesignAvailability::Compatible(*design, index))
+            return false;
+        ClearPreview();
+        design->trackAndVehicle.vehicleObject = vehicle;
+        ++revision;
+        return true;
     }
     std::string VehicleNotice()
     {
-        if (!design) return "Vehicle unavailable";
-        const auto* object=GetContext()->GetObjectManager().GetLoadedObject(design->trackAndVehicle.vehicleObject);
-        return "Vehicle: " + (object?object->GetName():design->trackAndVehicle.vehicleObject.ToString());
+        if (!design)
+            return "Vehicle unavailable";
+        const auto* object = GetContext()->GetObjectManager().GetLoadedObject(design->trackAndVehicle.vehicleObject);
+        return "Vehicle: " + (object ? object->GetName() : design->trackAndVehicle.vehicleObject.ToString());
     }
-    std::string LastError() { return lastError; }
-    uint32_t PlacementSceneryOmitted() { return placedOmitted; }
+    std::string LastError()
+    {
+        return lastError;
+    }
+    uint32_t PlacementSceneryOmitted()
+    {
+        return placedOmitted;
+    }
     std::vector<std::string> WarningLines()
     {
-        if (!design) return {"Design unavailable"};
-        std::vector<std::string> lines{VehicleNotice(), HeightNotice(), SceneryNotice()};
-        if (!lastError.empty()) lines.insert(lines.begin(),"Rejected: "+lastError);
-        if (scenery && sceneryOmitted) lines.push_back("Scenery omitted: "+std::to_string(sceneryOmitted));
+        if (!design)
+            return { "Design unavailable" };
+        std::vector<std::string> lines{ VehicleNotice(), HeightNotice(), SceneryNotice() };
+        if (!lastError.empty())
+            lines.insert(lines.begin(), "Rejected: " + lastError);
+        if (scenery && sceneryOmitted)
+            lines.push_back("Scenery omitted: " + std::to_string(sceneryOmitted));
         lines.push_back("Vehicle limits may change train settings");
-        if(scenery && !sceneryWarning && !design->sceneryElements.empty())
+        if (scenery && !sceneryWarning && !design->sceneryElements.empty())
             lines.push_back("Some scenery may remain if placement fails");
         return lines;
     }
@@ -282,7 +323,8 @@ namespace OpenRCT2::Ui::Handheld::Designs
     }
     std::string HeightNotice()
     {
-        return heightOffset ? "Ground offset " + std::string(*heightOffset >= 0 ? "+" : "") + std::to_string(*heightOffset / kCoordsZStep) + " levels"
+        return heightOffset ? "Ground offset " + std::string(*heightOffset >= 0 ? "+" : "")
+                + std::to_string(*heightOffset / kCoordsZStep) + " levels"
                             : "Fits to ground";
     }
     void SetScenery(bool value)
@@ -292,7 +334,10 @@ namespace OpenRCT2::Ui::Handheld::Designs
         ClearPreview();
         scenery = value;
     }
-    bool IncludesScenery() { return scenery; }
+    bool IncludesScenery()
+    {
+        return scenery;
+    }
     std::string SceneryNotice()
     {
         if (!design || design->sceneryElements.empty())
@@ -328,8 +373,8 @@ namespace OpenRCT2::Ui::Handheld::Designs
         if (preview && !preview->id().IsNull())
         {
             action.UsePreviewRideForQuery(preview->id());
-            auto result=GA::Query(&action, getGameState());
-            sceneryOmitted=_trackDesignPlaceStateSceneryOmitted;
+            auto result = GA::Query(&action, getGameState());
+            sceneryOmitted = _trackDesignPlaceStateSceneryOmitted;
             return result;
         }
         const auto id = GetNextFreeRideId();
@@ -337,13 +382,14 @@ namespace OpenRCT2::Ui::Handheld::Designs
             return GA::Query(&action, getGameState());
         auto previous = std::move(getGameState().rides[id.ToUnderlying()]);
         auto result = GA::Query(&action, getGameState());
-        sceneryOmitted=_trackDesignPlaceStateSceneryOmitted;
+        sceneryOmitted = _trackDesignPlaceStateSceneryOmitted;
         getGameState().rides[id.ToUnderlying()] = std::move(previous);
         return result;
     }
     static std::optional<Request> Resolve(std::optional<CoordsXY> tile)
     {
-        if (!design || !Eligible(*design) || !selectedFile || !FileBrowsing::Current(*selectedFile) || !tile || !MapIsLocationValid(*tile) || tile->x % 32 || tile->y % 32)
+        if (!design || !Eligible(*design) || !selectedFile || !FileBrowsing::Current(*selectedFile) || !tile
+            || !MapIsLocationValid(*tile) || tile->x % 32 || tile->y % 32)
             return {};
         // Same native terrain-fit calculation and bounded height search as desktop.
         auto* ride = preview ? GetRide(preview->id()) : nullptr;
@@ -448,8 +494,9 @@ namespace OpenRCT2::Ui::Handheld::Designs
         auto result = QueryAt(*next);
         if (result.error != GA::Status::ok)
             return false;
-        lastError.clear(); reviewOmitted=sceneryOmitted;
-        reviewContext=TrackDesignPlacementContext::Capture(*design);
+        lastError.clear();
+        reviewOmitted = sceneryOmitted;
+        reviewContext = TrackDesignPlacementContext::Capture(*design);
         review = next;
         reviewCost = result.cost;
         reviewNoMoney = getGameState().park.flags.has(ParkFlag::noMoney);
@@ -481,7 +528,7 @@ namespace OpenRCT2::Ui::Handheld::Designs
             return Invalid("No design review");
         const auto request = *review;
         review.reset();
-        if (!design || reviewContext!=TrackDesignPlacementContext::Capture(*design))
+        if (!design || reviewContext != TrackDesignPlacementContext::Capture(*design))
             return Invalid("Design objects changed; review again");
         if (reviewNoMoney != getGameState().park.flags.has(ParkFlag::noMoney))
             return Invalid("Park money rules changed; review again");
@@ -492,15 +539,19 @@ namespace OpenRCT2::Ui::Handheld::Designs
             return Invalid("Placement changed; review again");
         auto action = GA::SavedTrackDesignPlaceAction(
             request.origin, *design, Config::Get().general.defaultInspectionInterval, reviewCost, scenery);
-        action.BindReview(reviewContext,*selectedFile,reviewOmitted);
+        action.BindReview(reviewContext, *selectedFile, reviewOmitted);
         busy = true;
         const auto token = revision;
         action.SetCallback([token](const auto*, const GA::Result* finished) {
             if (token != revision)
                 return;
             busy = false;
-            if (finished->error != GA::Status::ok) { lastError=finished->getErrorMessage();return; }
-            placedOmitted=_trackDesignPlaceStateSceneryOmitted;
+            if (finished->error != GA::Status::ok)
+            {
+                lastError = finished->getErrorMessage();
+                return;
+            }
+            placedOmitted = _trackDesignPlaceStateSceneryOmitted;
             completed = RideManagement::Identify(finished->getData<RideId>());
         });
         result = GA::Execute(&action, getGameState());
@@ -510,8 +561,9 @@ namespace OpenRCT2::Ui::Handheld::Designs
     }
     GA::Result Confirm()
     {
-        auto result=ConfirmReviewed();
-        if (result.error!=GA::Status::ok) lastError=result.getErrorMessage();
+        auto result = ConfirmReviewed();
+        if (result.error != GA::Status::ok)
+            lastError = result.getErrorMessage();
         return result;
     }
     void DrawPanel(Drawing::RenderTarget& rt, ScreenSize screen)
@@ -522,7 +574,12 @@ namespace OpenRCT2::Ui::Handheld::Designs
         Section(rt, kOrigin + ScreenCoordsXY{ 10, 35 }, GetNameFromTrackPath(selection));
         Row(rt, kOrigin + ScreenCoordsXY{ 8, 54 }, "Place design", Icon::path, true);
         Rule(rt, kOrigin + ScreenCoordsXY{ 8, 99 }, 148);
-        DrawModernEllipsised(rt, kOrigin + ScreenCoordsXY{ 12, 116 }, 140, "{MUTED}" + (!lastError.empty()?"Review rejected / X":completed && placedOmitted?"Omitted "+std::to_string(placedOmitted)+" scenery":SceneryNotice()));
+        DrawModernEllipsised(
+            rt, kOrigin + ScreenCoordsXY{ 12, 116 }, 140,
+            "{MUTED}"
+                + (!lastError.empty()               ? "Review rejected / X"
+                       : completed && placedOmitted ? "Omitted " + std::to_string(placedOmitted) + " scenery"
+                                                    : SceneryNotice()));
         DrawModernEllipsised(rt, kOrigin + ScreenCoordsXY{ 12, 142 }, 140, "{MUTED}" + HeightNotice());
         DrawModernEllipsised(rt, kOrigin + ScreenCoordsXY{ 12, 158 }, 140, "{MUTED}X Design options");
         DrawFooter(

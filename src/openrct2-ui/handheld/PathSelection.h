@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
-#include <openrct2/world/Location.hpp>
 #include <algorithm>
+#include <openrct2/world/Location.hpp>
 #include <string>
 #include <vector>
 
 namespace OpenRCT2::Ui::Handheld::Paths
 {
-    enum class BuildMode { single, line, fill };
+    enum class BuildMode
+    {
+        single,
+        line,
+        fill
+    };
     constexpr size_t kSelectionLimit = 64;
     struct Selection
     {
@@ -31,4 +36,4 @@ namespace OpenRCT2::Ui::Handheld::Paths
                     result.tiles.emplace_back(x, y, start.z);
         return result;
     }
-}
+} // namespace OpenRCT2::Ui::Handheld::Paths

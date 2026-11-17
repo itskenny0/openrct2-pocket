@@ -34,10 +34,14 @@ namespace OpenRCT2::Ui::Handheld::Landscape
     {
         switch (s)
         {
-            case Shape::hill: return "Raise hill";
-            case Shape::dig: return "Dig";
-            case Shape::pond: return "Pond";
-            case Shape::flatten: return "Flatten";
+            case Shape::hill:
+                return "Raise hill";
+            case Shape::dig:
+                return "Dig";
+            case Shape::pond:
+                return "Pond";
+            case Shape::flatten:
+                return "Flatten";
         }
         return "";
     }
@@ -45,10 +49,14 @@ namespace OpenRCT2::Ui::Handheld::Landscape
     {
         switch (s)
         {
-            case Shape::hill: return "Lift the ground with gentle slopes";
-            case Shape::dig: return "Lower the ground with gentle slopes";
-            case Shape::pond: return "Dig down and fill with water";
-            case Shape::flatten: return "Level the brush to the middle tile";
+            case Shape::hill:
+                return "Lift the ground with gentle slopes";
+            case Shape::dig:
+                return "Lower the ground with gentle slopes";
+            case Shape::pond:
+                return "Dig down and fill with water";
+            case Shape::flatten:
+                return "Level the brush to the middle tile";
         }
         return "";
     }
@@ -72,7 +80,8 @@ namespace OpenRCT2::Ui::Handheld::Landscape
         {
             return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
         }
-        template<typename F> inline void ForTiles(const MapRange& range, F&& f)
+        template<typename F>
+        inline void ForTiles(const MapRange& range, F&& f)
         {
             for (int32_t y = range.getY1(); y <= range.getY2(); y += kCoordsXYStep)
                 for (int32_t x = range.getX1(); x <= range.getX2(); x += kCoordsXYStep)

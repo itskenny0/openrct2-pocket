@@ -3,7 +3,6 @@
 
 #include <openrct2-ui/interface/Dropdown.h>
 #include <openrct2/Context.h>
-#include <openrct2/drawing/Drawing.Sprite.h>
 #include <openrct2/GameState.h>
 #include <openrct2/actions/peep/StaffFireAction.h>
 #include <openrct2/actions/peep/StaffHireNewAction.h>
@@ -12,6 +11,7 @@
 #include <openrct2/actions/peep/StaffSetNameAction.h>
 #include <openrct2/actions/peep/StaffSetOrdersAction.h>
 #include <openrct2/config/Config.h>
+#include <openrct2/drawing/Drawing.Sprite.h>
 #include <openrct2/entity/EntityList.h>
 #include <openrct2/interface/Window.h>
 #include <openrct2/localisation/Formatter.h>
@@ -25,24 +25,36 @@
 
 namespace OpenRCT2::Ui::Handheld::StaffManagement
 {
-    void DrawSpritePreview(Drawing::RenderTarget& rt, ScreenCoordsXY pos, StaffType role, std::optional<ObjectEntryIndex> costume)
+    void DrawSpritePreview(
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, StaffType role, std::optional<ObjectEntryIndex> costume)
     {
         auto* object = costume ? GetContext()->GetObjectManager().GetLoadedObject<PeepAnimationsObject>(*costume)
-            : findPeepAnimationsObjectForType(static_cast<AnimationPeepType>(EnumValue(role)+1));
-        if (!object) return;
-        const auto& animation=object->GetPeepAnimation(PeepAnimationGroup::normal);
-        if(animation.frameOffsets.empty())return;
-        auto image=ImageId(animation.baseImage+1+animation.frameOffsets.front()*4);
-        if(role!=StaffType::entertainer)image=ImageId(image.GetIndex(),StaffGetColour(role),StaffGetColour(role));
-        std::array<Drawing::PaletteIndex,48*64> pixels{};
-        Drawing::RenderTarget sprite{};sprite.bits=pixels.data();sprite.width=48;sprite.height=64;sprite.DrawingEngine=rt.DrawingEngine;
-        GfxDrawSprite(sprite,image,{24,56});
-        const auto origin=pos-ScreenCoordsXY{48,112};
-        for(int y=0;y<128;++y)for(int x=0;x<96;++x) {
-            const auto colour=pixels[y/2*48+x/2];const int px=origin.x+x,py=origin.y+y;
-            if(colour!=static_cast<Drawing::PaletteIndex>(0) && px>=rt.x && px<rt.x+rt.width && py>=rt.y && py<rt.y+rt.height)
-                rt.bits[(py-rt.y)*rt.LineStride()+px-rt.x]=colour;
-        }
+                               : findPeepAnimationsObjectForType(static_cast<AnimationPeepType>(EnumValue(role) + 1));
+        if (!object)
+            return;
+        const auto& animation = object->GetPeepAnimation(PeepAnimationGroup::normal);
+        if (animation.frameOffsets.empty())
+            return;
+        auto image = ImageId(animation.baseImage + 1 + animation.frameOffsets.front() * 4);
+        if (role != StaffType::entertainer)
+            image = ImageId(image.GetIndex(), StaffGetColour(role), StaffGetColour(role));
+        std::array<Drawing::PaletteIndex, 48 * 64> pixels{};
+        Drawing::RenderTarget sprite{};
+        sprite.bits = pixels.data();
+        sprite.width = 48;
+        sprite.height = 64;
+        sprite.DrawingEngine = rt.DrawingEngine;
+        GfxDrawSprite(sprite, image, { 24, 56 });
+        const auto origin = pos - ScreenCoordsXY{ 48, 112 };
+        for (int y = 0; y < 128; ++y)
+            for (int x = 0; x < 96; ++x)
+            {
+                const auto colour = pixels[y / 2 * 48 + x / 2];
+                const int px = origin.x + x, py = origin.y + y;
+                if (colour != static_cast<Drawing::PaletteIndex>(0) && px >= rt.x && px < rt.x + rt.width && py >= rt.y
+                    && py < rt.y + rt.height)
+                    rt.bits[(py - rt.y) * rt.LineStride() + px - rt.x] = colour;
+            }
     }
     static std::unordered_map<uint16_t, uint64_t> gRemovedStaff;
     void Invalidate(EntityId id)
@@ -97,15 +109,17 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         ManagementPresentation model;
         model.breadcrumb = "Staff / Role uniform";
         model.title = RoleName(target.type) + " uniforms";
-        for(uint8_t i=0;i<72;++i) {
-            const auto colour=Windows::ColourDropDownIndexToColour(i);
+        for (uint8_t i = 0; i < 72; ++i)
+        {
+            const auto colour = Windows::ColourDropDownIndexToColour(i);
             model.colourValues.push_back(static_cast<uint16_t>(colour));
             model.rows.push_back(FmtString(FormatStringID(Windows::ColourDropDownIndexToName(i))).WithoutFormatTokens());
-            if(colour==value)model.selected=i;
+            if (colour == value)
+                model.selected = i;
         }
-        model.currentColour=static_cast<uint16_t>(StaffGetColour(target.type));
-        model.primaryAction="Apply to role";
-        model.status="Changes every "+RoleName(target.type)+" uniform";
+        model.currentColour = static_cast<uint16_t>(StaffGetColour(target.type));
+        model.primaryAction = "Apply to role";
+        model.status = "Changes every " + RoleName(target.type) + " uniform";
         return model;
     }
     GameActions::Result SetName(const Target& target, const std::string& baseline, const std::string& value, bool execute)
@@ -251,19 +265,28 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         {
             model.rows = { "Hire staff...", "Filter role...", "Wages..." };
             model.rowDetails.resize(3);
-            model.toolbarCount=3;model.denseRoster=true;model.listLabel=std::to_string(roster.size())+(roster.size()==1?" EMPLOYEE":" EMPLOYEES")+" / ROLE / CURRENT ACTIVITY";
-            const auto capacity=MeasureManagement({ContextGetWidth()-16,Layout::ContentHeight({ContextGetWidth(),ContextGetHeight()})},model).capacity;
+            model.toolbarCount = 3;
+            model.denseRoster = true;
+            model.listLabel = std::to_string(roster.size()) + (roster.size() == 1 ? " EMPLOYEE" : " EMPLOYEES")
+                + " / ROLE / CURRENT ACTIVITY";
+            const auto capacity = MeasureManagement(
+                                      { ContextGetWidth() - 16,
+                                        Layout::ContentHeight({ ContextGetWidth(), ContextGetHeight() }) },
+                                      model)
+                                      .capacity;
             for (const auto& entry : roster)
             {
                 const auto* staff = Resolve(entry);
                 model.rows.push_back(staff ? staff->getName() : "Employee unavailable");
-                const auto index=model.rows.size()-1;
-                const auto first=std::max<size_t>(selected,3)-std::min(std::max<size_t>(selected,3)-3,capacity+3);
-                const auto last=std::max<size_t>(selected,3)+capacity+3;
+                const auto index = model.rows.size() - 1;
+                const auto first = std::max<size_t>(selected, 3) - std::min(std::max<size_t>(selected, 3) - 3, capacity + 3);
+                const auto last = std::max<size_t>(selected, 3) + capacity + 3;
                 std::string detail;
-                if(staff && index>=first && index<last) {
-                    Formatter ft;formatPeepActionTo(*staff,ft);
-                    detail=RoleName(entry.type)+" / "+FormatStringIDLegacy(STR_STRINGID,ft.Data());
+                if (staff && index >= first && index < last)
+                {
+                    Formatter ft;
+                    formatPeepActionTo(*staff, ft);
+                    detail = RoleName(entry.type) + " / " + FormatStringIDLegacy(STR_STRINGID, ft.Data());
                 }
                 model.rowDetails.push_back(detail);
             }
@@ -387,7 +410,7 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
             model.rows = { "Dismiss employee", "Cancel" };
             model.confirmation = true;
             model.destructive = true;
-            model.bodyLines = {"Removes this employee and their patrol assignment."};
+            model.bodyLines = { "Removes this employee and their patrol assignment." };
             const auto result = Dismiss(*target, false);
             if (result.error != GameActions::Status::ok && model.status.empty())
                 model.status = result.getErrorMessage().empty() ? result.getErrorTitle() : result.getErrorMessage();
@@ -395,4 +418,3 @@ namespace OpenRCT2::Ui::Handheld::StaffManagement
         return model;
     }
 } // namespace OpenRCT2::Ui::Handheld::StaffManagement
-

@@ -22,4 +22,4 @@ namespace OpenRCT2::Ui::Handheld
                 return false;
         }
     }
-}
+} // namespace OpenRCT2::Ui::Handheld

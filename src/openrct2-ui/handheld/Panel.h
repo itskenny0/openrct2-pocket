@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "ConceptStyle.h"
+#include "ListScroll.h"
 #include "MenuFeel.h"
 #include "ModernText.h"
-#include "ListScroll.h"
 #include "NativeMenuArt.h"
 
 #include <array>
@@ -16,8 +16,8 @@
 #include <openrct2/drawing/PaletteIndex.h>
 #include <openrct2/drawing/Rectangle.h>
 #include <openrct2/drawing/Text.h>
-#include <string_view>
 #include <sstream>
+#include <string_view>
 
 namespace OpenRCT2::Ui::Handheld
 {
@@ -79,12 +79,14 @@ namespace OpenRCT2::Ui::Handheld
             dx += base.stride;
             --dy;
         }
-        activeMenuFeel->Selected({ pos.x - rt.x + static_cast<int>(dx) + base.x, pos.y - rt.y + static_cast<int>(dy) + base.y,
-                                   size.width, size.height });
+        activeMenuFeel->Selected(
+            { pos.x - rt.x + static_cast<int>(dx) + base.x, pos.y - rt.y + static_cast<int>(dy) + base.y, size.width,
+              size.height });
     }
 
     // Five-pixel rounded corners and quiet single-line edges, at native resolution.
-    inline void DrawCard(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, bool selected = false, bool button = false)
+    inline void DrawCard(
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, bool selected = false, bool button = false)
     {
         if (PocketPalette::Pixel())
         {
@@ -124,11 +126,11 @@ namespace OpenRCT2::Ui::Handheld
         if (selected && activeMenuFeel)
         {
             const int accentWidth = std::max(2, (size.width - 10) * activeMenuFeel->FocusPercent() / 100);
-            Fill(rt, pos + ScreenCoordsXY{ (size.width - accentWidth) / 2, size.height - 2 },
-                { accentWidth, 1 }, Theme::goldLight);
+            Fill(
+                rt, pos + ScreenCoordsXY{ (size.width - accentWidth) / 2, size.height - 2 }, { accentWidth, 1 },
+                Theme::goldLight);
             ReportSelected(rt, pos, size);
         }
-
     }
 
     // ---- Component kit -------------------------------------------------------------------------
@@ -193,7 +195,8 @@ namespace OpenRCT2::Ui::Handheld
     {
         // Around a card already filled with the section colour the ring switches to dark ink, or
         // it would vanish into the card.
-        OutlineRound(rt, pos - ScreenCoordsXY{ 2, 2 }, { size.width + 4, size.height + 4 },
+        OutlineRound(
+            rt, pos - ScreenCoordsXY{ 2, 2 }, { size.width + 4, size.height + 4 },
             onAccent ? static_cast<Drawing::PaletteIndex>(PocketPalette::primary) : Theme::gold, 2);
         if (activeMenuFeel)
             ReportSelected(rt, pos, size);
@@ -213,9 +216,11 @@ namespace OpenRCT2::Ui::Handheld
             const bool filled = kind != ButtonKind::secondary;
             FillRound(rt, pos, size, Theme::edge);
             Fill(rt, pos + ScreenCoordsXY{ 1, 1 }, { size.width - 2, size.height - 2 }, face);
-            Fill(rt, pos + ScreenCoordsXY{ 1, size.height - 4 }, { size.width - 2, 3 },
+            Fill(
+                rt, pos + ScreenCoordsXY{ 1, size.height - 4 }, { size.width - 2, 3 },
                 filled ? Theme::goldShadow : static_cast<Drawing::PaletteIndex>(PocketPalette::separator));
-            Fill(rt, pos + ScreenCoordsXY{ 2, 2 }, { size.width - 4, 1 },
+            Fill(
+                rt, pos + ScreenCoordsXY{ 2, 2 }, { size.width - 4, 1 },
                 filled ? Theme::goldLight : static_cast<Drawing::PaletteIndex>(PocketPalette::highlight));
             if (focused)
                 DrawFocusRing(rt, pos, size, kind == ButtonKind::primary);
@@ -231,8 +236,8 @@ namespace OpenRCT2::Ui::Handheld
     }
     // A segmented switch: every option visible, the current one filled. The same look as a hero's
     // state switch, for any short set of modes (Single / Line / Fill).
-    inline void DrawSegmented(Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size,
-        const std::vector<std::string>& labels, size_t current)
+    inline void DrawSegmented(
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, ScreenSize size, const std::vector<std::string>& labels, size_t current)
     {
         if (labels.empty())
             return;
@@ -305,8 +310,8 @@ namespace OpenRCT2::Ui::Handheld
             int r, g, b;
         };
         static constexpr Rgb kAccents[] = {
-            { 0, 0, 0 },      { 176, 48, 48 },  { 44, 92, 178 },  { 118, 70, 160 },
-            { 164, 118, 24 }, { 40, 128, 72 },  { 170, 50, 120 }, { 200, 120, 30 },
+            { 0, 0, 0 },      { 176, 48, 48 }, { 44, 92, 178 },  { 118, 70, 160 },
+            { 164, 118, 24 }, { 40, 128, 72 }, { 170, 50, 120 }, { 200, 120, 30 },
         };
         const auto& c = kAccents[static_cast<size_t>(accent)];
         Theme::gold = NearestPaletteIndex(c.r, c.g, c.b);
@@ -342,18 +347,9 @@ namespace OpenRCT2::Ui::Handheld
             return;
         }
         static constexpr const char* kGlove[] = {
-            "....ooo...........",
-            "...o###o..........",
-            "...o###oooooooooo.",
-            "..oo#############o",
-            ".o#o#############o",
-            "o##o##oooooooooooo",
-            "o####o###o........",
-            "o#####oooo........",
-            "o####o###o........",
-            "o#####oooo........",
-            ".o#####oo.........",
-            "..ooooo...........",
+            "....ooo...........", "...o###o..........", "...o###oooooooooo.", "..oo#############o",
+            ".o#o#############o", "o##o##oooooooooooo", "o####o###o........", "o#####oooo........",
+            "o####o###o........", "o#####oooo........", ".o#####oo.........", "..ooooo...........",
         };
         const auto outline = NearestPaletteIndex(28, 28, 36);
         const auto fill = NearestPaletteIndex(255, 255, 255);
@@ -399,33 +395,64 @@ namespace OpenRCT2::Ui::Handheld
         NativeMenuArt art;
         switch (icon)
         {
-            case PanelIcon::play: art = { SPR_TAB_RIDE_0, 16 }; break;
-            case PanelIcon::terrain: art = { SPR_G2_TAB_LAND }; break;
-            case PanelIcon::save: art = { SPR_FLOPPY }; break;
-            case PanelIcon::exit: art = { SPR_MENU_EXIT }; break;
-            case PanelIcon::folder: art = { SPR_G2_FOLDER }; break;
-            case PanelIcon::back: art = { SPR_PREVIOUS }; break;
-            case PanelIcon::raise: art = { SPR_G2_ARROW_UP }; break;
-            case PanelIcon::lower: art = { SPR_G2_ARROW_DOWN }; break;
-            case PanelIcon::path: art = { SPR_G2_BUTTON_FOOTPATH }; break;
-            case PanelIcon::remove: art = { SPR_DEMOLISH }; break;
-            case PanelIcon::tree: art = { SPR_G2_BUTTON_TREES }; break;
-            case PanelIcon::largeScenery: art = { SPR_G2_BUTTON_LARGE_SCENERY }; break;
-            case PanelIcon::walls: art = { SPR_G2_BUTTON_WALLS }; break;
-            case PanelIcon::furniture: art = { SPR_G2_BUTTON_PATH_ADDITIONS }; break;
-            default: break;
+            case PanelIcon::play:
+                art = { SPR_TAB_RIDE_0, 16 };
+                break;
+            case PanelIcon::terrain:
+                art = { SPR_G2_TAB_LAND };
+                break;
+            case PanelIcon::save:
+                art = { SPR_FLOPPY };
+                break;
+            case PanelIcon::exit:
+                art = { SPR_MENU_EXIT };
+                break;
+            case PanelIcon::folder:
+                art = { SPR_G2_FOLDER };
+                break;
+            case PanelIcon::back:
+                art = { SPR_PREVIOUS };
+                break;
+            case PanelIcon::raise:
+                art = { SPR_G2_ARROW_UP };
+                break;
+            case PanelIcon::lower:
+                art = { SPR_G2_ARROW_DOWN };
+                break;
+            case PanelIcon::path:
+                art = { SPR_G2_BUTTON_FOOTPATH };
+                break;
+            case PanelIcon::remove:
+                art = { SPR_DEMOLISH };
+                break;
+            case PanelIcon::tree:
+                art = { SPR_G2_BUTTON_TREES };
+                break;
+            case PanelIcon::largeScenery:
+                art = { SPR_G2_BUTTON_LARGE_SCENERY };
+                break;
+            case PanelIcon::walls:
+                art = { SPR_G2_BUTTON_WALLS };
+                break;
+            case PanelIcon::furniture:
+                art = { SPR_G2_BUTTON_PATH_ADDITIONS };
+                break;
+            default:
+                break;
         }
-        if (DrawNativeMenuArt(rt, pos + ScreenCoordsXY{ -4, -4 }, { 24, 24 }, art, selected)) return;
+        if (DrawNativeMenuArt(rt, pos + ScreenCoordsXY{ -4, -4 }, { 24, 24 }, art, selected))
+            return;
         if (icon == PanelIcon::largeScenery || icon == PanelIcon::walls || icon == PanelIcon::furniture)
         {
             const auto sprite = icon == PanelIcon::largeScenery ? SPR_G2_BUTTON_LARGE_SCENERY
-                : icon == PanelIcon::walls ? SPR_G2_BUTTON_WALLS : SPR_G2_BUTTON_PATH_ADDITIONS;
+                : icon == PanelIcon::walls                      ? SPR_G2_BUTTON_WALLS
+                                                                : SPR_G2_BUTTON_PATH_ADDITIONS;
             GfxDrawSprite(rt, ImageId(sprite), pos + ScreenCoordsXY{ -5, -6 });
             return;
         }
         if (icon == PanelIcon::tree)
         {
-            GfxDrawSprite(rt, ImageId(SPR_G2_BUTTON_TREES), pos + ScreenCoordsXY{-5, -6});
+            GfxDrawSprite(rt, ImageId(SPR_G2_BUTTON_TREES), pos + ScreenCoordsXY{ -5, -6 });
             return;
         }
         if (icon == PanelIcon::folder)
@@ -510,7 +537,7 @@ namespace OpenRCT2::Ui::Handheld
     {
         const auto face = onAccent ? Theme::raised
                                    : static_cast<Drawing::PaletteIndex>(
-                                         key == "A"   ? PocketPalette::positive
+                                         key == "A"       ? PocketPalette::positive
                                              : key == "B" ? PocketPalette::destructive
                                                           : PocketPalette::secondary);
         if (PocketPalette::Pixel())
@@ -590,13 +617,18 @@ namespace OpenRCT2::Ui::Handheld
         bool selected = false, const std::string& valueInk = "{WHITE}", bool hero = false)
     {
         FillRound(rt, p, size, Theme::raised);
-        DrawModernEllipsised(rt, p + ScreenCoordsXY{8, size.height < 34 ? 5 : 8}, size.width - 16, "{MUTED}" + label);
+        DrawModernEllipsised(rt, p + ScreenCoordsXY{ 8, size.height < 34 ? 5 : 8 }, size.width - 16, "{MUTED}" + label);
         if (hero && size.height >= 40)
             DrawHeadingText(rt, p + ScreenCoordsXY{ 8, 20 }, valueInk + value, size.width - 16);
         else
             DrawStrongText(
-                rt, p + ScreenCoordsXY{ 8, size.height >= 40 ? 25 : size.height < 34 ? size.height - 12 : 22 }, valueInk + value,
-                size.width - 16);
+                rt,
+                p
+                    + ScreenCoordsXY{ 8,
+                                      size.height >= 40      ? 25
+                                          : size.height < 34 ? size.height - 12
+                                                             : 22 },
+                valueInk + value, size.width - 16);
         if (selected)
             DrawFocusRing(rt, p, size);
     }
@@ -611,8 +643,8 @@ namespace OpenRCT2::Ui::Handheld
     }
     inline void DrawActionRow(
         Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& rawTitle, const std::string& subtitle,
-        bool focused, bool enabled = true, PanelIcon icon = PanelIcon::none, bool destructive = false, bool allowNativeArt = true,
-        bool primary = false, bool centred = false)
+        bool focused, bool enabled = true, PanelIcon icon = PanelIcon::none, bool destructive = false,
+        bool allowNativeArt = true, bool primary = false, bool centred = false)
     {
         const int press = ButtonPressOffset(focused);
         p.y += press;
@@ -626,15 +658,17 @@ namespace OpenRCT2::Ui::Handheld
         const bool filled = enabled && kind != ButtonKind::secondary;
         const auto colour = !enabled ? "{DISABLED}" : filled ? "{BLACK}" : "{WHITE}";
         const bool roomForArt = allowNativeArt && TextWidth(title, true) + 58 <= size.width;
-        const bool native = roomForArt && DrawNativeMenuArt(rt, p + ScreenCoordsXY{ 5, (size.height - 24) / 2 },
-            { 26, 24 }, ActionArt(rawTitle), filled);
+        const bool native = roomForArt
+            && DrawNativeMenuArt(rt, p + ScreenCoordsXY{ 5, (size.height - 24) / 2 }, { 26, 24 }, ActionArt(rawTitle), filled);
         int inset = native || (roomForArt && icon != PanelIcon::none) ? 36 : 10;
         // Short labels in a row of equal buttons (toolbars) read as a set when centred. The A glyph
         // takes the right edge when focused, so the label never slides under it.
         if (centred && !native)
-            inset = std::clamp((size.width - TextWidth(title, true)) / 2, 6,
+            inset = std::clamp(
+                (size.width - TextWidth(title, true)) / 2, 6,
                 std::max(6, size.width - (focused && enabled ? 22 : 8) - TextWidth(title, true)));
-        if (!native && roomForArt) DrawIcon(rt, p + ScreenCoordsXY{9, 8}, icon, filled);
+        if (!native && roomForArt)
+            DrawIcon(rt, p + ScreenCoordsXY{ 9, 8 }, icon, filled);
         // The focused button carries the A glyph where a desktop menu would put a chevron: it says
         // which button acts and how, without reading the footer.
         const int glyphRoom = focused && enabled ? 22 : 8;
@@ -644,7 +678,11 @@ namespace OpenRCT2::Ui::Handheld
         if (!subtitle.empty() && size.height >= 34)
             DrawModernEllipsised(
                 rt, p + ScreenCoordsXY{ inset, size.height - 13 }, size.width - inset - glyphRoom,
-                std::string(!enabled ? "{DISABLED}" : filled ? "{BLACK}" : "{MUTED}") + subtitle);
+                std::string(
+                    !enabled     ? "{DISABLED}"
+                        : filled ? "{BLACK}"
+                                 : "{MUTED}")
+                    + subtitle);
         if (focused && enabled)
             DrawButtonGlyph(rt, p + ScreenCoordsXY{ size.width - 12, (size.height - 2) / 2 }, "A", filled);
     }
@@ -662,8 +700,8 @@ namespace OpenRCT2::Ui::Handheld
     // Rosters and long lists are rows, not a stack of buttons: plain text on the panel with a hairline
     // between entries. The focused row lifts into a card with the ring and the A glyph.
     inline void DrawListRow(
-        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& rawTitle, const std::string& rawSubtitle,
-        bool focused, bool enabled = true, bool allowNativeArt = true)
+        Drawing::RenderTarget& rt, ScreenCoordsXY p, ScreenSize size, const std::string& rawTitle,
+        const std::string& rawSubtitle, bool focused, bool enabled = true, bool allowNativeArt = true)
     {
         const auto title = ButtonText(rawTitle);
         auto subtitle = rawSubtitle;
@@ -671,8 +709,8 @@ namespace OpenRCT2::Ui::Handheld
             subtitle.replace(at, 3, "  |  ");
         DrawListBackground(rt, p, size, focused);
         const bool roomForArt = allowNativeArt && TextWidth(title, true) + 58 <= size.width;
-        const bool native = roomForArt && DrawNativeMenuArt(rt, p + ScreenCoordsXY{ 5, (size.height - 24) / 2 },
-            { 26, 24 }, ActionArt(rawTitle), false);
+        const bool native = roomForArt
+            && DrawNativeMenuArt(rt, p + ScreenCoordsXY{ 5, (size.height - 24) / 2 }, { 26, 24 }, ActionArt(rawTitle), false);
         const int inset = native ? 36 : 8;
         const int glyphRoom = focused && enabled ? 22 : 8;
         const auto ink = enabled ? "{WHITE}" : "{DISABLED}";
@@ -680,7 +718,8 @@ namespace OpenRCT2::Ui::Handheld
             rt, p + ScreenCoordsXY{ inset, subtitle.empty() || size.height < 34 ? CapCentre(size.height - 1) : 6 },
             std::string(ink) + title, size.width - inset - glyphRoom);
         if (!subtitle.empty() && size.height >= 34)
-            DrawModernEllipsised(rt, p + ScreenCoordsXY{ inset, size.height - 15 }, size.width - inset - glyphRoom,
+            DrawModernEllipsised(
+                rt, p + ScreenCoordsXY{ inset, size.height - 15 }, size.width - inset - glyphRoom,
                 std::string(enabled ? "{MUTED}" : "{DISABLED}") + subtitle);
         if (focused && enabled)
             DrawButtonGlyph(rt, p + ScreenCoordsXY{ size.width - 12, size.height / 2 - 1 }, "A");
@@ -706,8 +745,9 @@ namespace OpenRCT2::Ui::Handheld
     {
         std::string park, date, cash, guests, simulation;
     };
-    inline void DrawSettingRow(Drawing::RenderTarget& rt, ScreenCoordsXY p, int width, const std::string& label,
-        const std::string& value, bool current, bool focused)
+    inline void DrawSettingRow(
+        Drawing::RenderTarget& rt, ScreenCoordsXY p, int width, const std::string& label, const std::string& value,
+        bool current, bool focused)
     {
         if (focused)
         {
@@ -727,8 +767,9 @@ namespace OpenRCT2::Ui::Handheld
     }
     // A settings row with a toggle switch on the right: the knob slides right and the track fills
     // when on. value, when given, replaces the switch with text (for multi-choice rows).
-    inline void DrawToggleRow(Drawing::RenderTarget& rt, ScreenCoordsXY p, int width, const std::string& label, bool on,
-        bool focused, const std::string& value = {})
+    inline void DrawToggleRow(
+        Drawing::RenderTarget& rt, ScreenCoordsXY p, int width, const std::string& label, bool on, bool focused,
+        const std::string& value = {})
     {
         constexpr int height = 26;
         if (focused)
@@ -748,8 +789,9 @@ namespace OpenRCT2::Ui::Handheld
         FillRound(rt, track + ScreenCoordsXY{ 1, 1 }, { 30, 12 }, on ? Theme::gold : Theme::ink);
         FillRound(rt, track + ScreenCoordsXY{ on ? 19 : 2, 2 }, { 11, 10 }, on ? Theme::raised : Theme::edge);
     }
-    inline void DrawPauseScreen(Drawing::RenderTarget& rt, ScreenSize screen, const std::vector<std::string>& rows,
-        size_t selected, const PauseSummary& summary, const std::string& status)
+    inline void DrawPauseScreen(
+        Drawing::RenderTarget& rt, ScreenSize screen, const std::vector<std::string>& rows, size_t selected,
+        const PauseSummary& summary, const std::string& status)
     {
         const int width = std::min(screen.width - 16, 496);
         const int left = (screen.width - width) / 2;
@@ -770,8 +812,9 @@ namespace OpenRCT2::Ui::Handheld
         const size_t actions = std::min<size_t>(8, rows.size());
         const int pitch = std::min(32, (bottom - columnTop - 30) / static_cast<int>(std::max<size_t>(1, actions)));
         for (size_t i = 0; i < actions; ++i)
-            DrawActionRow(rt, { left + 10, columnTop + 24 + static_cast<int>(i) * pitch }, { actionsWidth - 20, pitch - 3 },
-                rows[i], "", i == selected, true, PanelIcon::none, false, true, i == 0);
+            DrawActionRow(
+                rt, { left + 10, columnTop + 24 + static_cast<int>(i) * pitch }, { actionsWidth - 20, pitch - 3 }, rows[i], "",
+                i == selected, true, PanelIcon::none, false, true, i == 0);
         // Settings.
         const int settingsLeft = left + actionsWidth + 8;
         const int settingsWidth = width - actionsWidth - 8;
@@ -781,8 +824,9 @@ namespace OpenRCT2::Ui::Handheld
         for (size_t i = 8; i < rows.size() && i < 12; ++i, y += 24)
         {
             const bool current = rows[i].starts_with("Current: ");
-            DrawSettingRow(rt, { settingsLeft + 8, y }, settingsWidth - 16, current ? rows[i].substr(9) : rows[i], "",
-                current, i == selected);
+            DrawSettingRow(
+                rt, { settingsLeft + 8, y }, settingsWidth - 16, current ? rows[i].substr(9) : rows[i], "", current,
+                i == selected);
         }
         y += 8;
         DrawSectionLabel(rt, { settingsLeft + 12, y }, settingsWidth - 24, "DISPLAY");
@@ -810,7 +854,8 @@ namespace OpenRCT2::Ui::Handheld
     {
         if (count <= capacity || !capacity)
             return;
-        DrawModernEllipsised(rt, p, width,
+        DrawModernEllipsised(
+            rt, p, width,
             "{MUTED}Page " + std::to_string(selected / capacity + 1) + " / "
                 + std::to_string((count + capacity - 1) / capacity));
     }
@@ -820,14 +865,16 @@ namespace OpenRCT2::Ui::Handheld
         const auto pos = window.windowPos + ScreenCoordsXY{ 1, window.height - 29 };
         Fill(rt, pos, { window.width - 2, 28 }, Theme::raised);
         Fill(rt, pos, { window.width - 2, 1 }, Theme::edge);
-        DrawFooterAt(rt, window.windowPos, {window.width, window.height},
-            {{"D-pad", "Choose"}, {"A", "Select"}, {"B", backLabel}});
+        DrawFooterAt(
+            rt, window.windowPos, { window.width, window.height },
+            { { "D-pad", "Choose" }, { "A", "Select" }, { "B", backLabel } });
     }
 
     // One segmented strip with the shoulder buttons that move through it at either end, instead of
     // four separate button-shaped tabs that look like more things to press.
     inline void DrawTabs(
-        Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t width, const std::vector<std::string>& labels, size_t selected, std::string_view context = {})
+        Drawing::RenderTarget& rt, ScreenCoordsXY pos, int32_t width, const std::vector<std::string>& labels, size_t selected,
+        std::string_view context = {})
     {
         if (labels.empty())
             return;
@@ -898,15 +945,16 @@ namespace OpenRCT2::Ui::Handheld
     {
         DrawPanelHeading(rt, window, model.title);
         const auto p = window.windowPos;
-        const int listHeight=std::max(32,window.height-43-58);
-        const int offset=ListOffset(model.selected,model.rows.size(),listHeight,kPanelRowPitch);
-        const size_t first=offset/kPanelRowPitch;
+        const int listHeight = std::max(32, window.height - 43 - 58);
+        const int offset = ListOffset(model.selected, model.rows.size(), listHeight, kPanelRowPitch);
+        const size_t first = offset / kPanelRowPitch;
         Drawing::RenderTarget listRt;
-        if(ClipRenderTarget(listRt,rt,p+ScreenCoordsXY{0,43},window.width,listHeight))
-            for(size_t i=first;i<model.rows.size() && static_cast<int>(i)*kPanelRowPitch-offset<listHeight;++i)
-                DrawActionRow(listRt,{10,static_cast<int>(i)*kPanelRowPitch-offset},{window.width-20,28},
-                    model.rows[i],"",i==model.selected,true,i<model.icons.size() ? model.icons[i] : PanelIcon::none,
-                    model.destructive && i==0);
+        if (ClipRenderTarget(listRt, rt, p + ScreenCoordsXY{ 0, 43 }, window.width, listHeight))
+            for (size_t i = first; i < model.rows.size() && static_cast<int>(i) * kPanelRowPitch - offset < listHeight; ++i)
+                DrawActionRow(
+                    listRt, { 10, static_cast<int>(i) * kPanelRowPitch - offset }, { window.width - 20, 28 }, model.rows[i], "",
+                    i == model.selected, true, i < model.icons.size() ? model.icons[i] : PanelIcon::none,
+                    model.destructive && i == 0);
         DrawModernEllipsised(
             rt, p + ScreenCoordsXY{ 13, window.height - 45 }, window.width - 26, model.status, { Drawing::Colour::white });
         DrawOverlayCommands(rt, window);
@@ -963,8 +1011,9 @@ namespace OpenRCT2::Ui::Handheld
             {
                 const int r = brush / 2;
                 const bool on = std::abs(x - 2) <= r && std::abs(y - 2) <= r;
-                Fill(rt, grid + ScreenCoordsXY{ x * 8, y * 8 }, { 7, 7 },
-                     on ? Theme::gold : static_cast<Drawing::PaletteIndex>(PocketPalette::disabled));
+                Fill(
+                    rt, grid + ScreenCoordsXY{ x * 8, y * 8 }, { 7, 7 },
+                    on ? Theme::gold : static_cast<Drawing::PaletteIndex>(PocketPalette::disabled));
             }
         DrawCommand(rt, pos + ScreenCoordsXY{ 12, 210 }, 32, "Y", "Shape   L2/R2  Size");
     }
@@ -999,12 +1048,12 @@ namespace OpenRCT2::Ui::Handheld
         using namespace Concept;
         Box(rt, pos, { 184, 146 });
         Heading(rt, pos + ScreenCoordsXY{ 10, 12 }, "Place shop");
-        DrawWrappedLabel(rt,pos+ScreenCoordsXY{12,42},160,(available ? "{WHITE}" : "{DISABLED}")+name,2);
+        DrawWrappedLabel(rt, pos + ScreenCoordsXY{ 12, 42 }, 160, (available ? "{WHITE}" : "{DISABLED}") + name, 2);
         Rule(rt, pos + ScreenCoordsXY{ 12, 83 }, 160);
         DrawModernText(
             rt, pos + ScreenCoordsXY{ 12, 96 },
             "{MUTED}Faces " + std::string(std::array{ "NW", "SW", "SE", "NE" }[direction & 3]));
-        DrawCommand(rt,pos+ScreenCoordsXY{12,121},32,"SELECT","Turn");
+        DrawCommand(rt, pos + ScreenCoordsXY{ 12, 121 }, 32, "SELECT", "Turn");
     }
 
     inline void DrawTrackColourOverlay(Drawing::RenderTarget& rt, ScreenCoordsXY pos, uint8_t scheme, bool target)
@@ -1175,10 +1224,10 @@ namespace OpenRCT2::Ui::Handheld
     {
         LastControlHints = hints;
         const int height = FooterHeight(size, hints);
-        Fill(rt, origin + ScreenCoordsXY{0, size.height - height}, {size.width, height}, Theme::ink);
-        Concept::Rule(rt, origin + ScreenCoordsXY{0, size.height - height}, size.width);
+        Fill(rt, origin + ScreenCoordsXY{ 0, size.height - height }, { size.width, height }, Theme::ink);
+        Concept::Rule(rt, origin + ScreenCoordsXY{ 0, size.height - height }, size.width);
         for (const auto& p : MeasureFooter(size, hints))
-            DrawCommand(rt, origin + ScreenCoordsXY{p.x, p.y}, 0, p.hint.key.c_str(), p.hint.label.c_str());
+            DrawCommand(rt, origin + ScreenCoordsXY{ p.x, p.y }, 0, p.hint.key.c_str(), p.hint.label.c_str());
     }
     inline void DrawModeBadge(Drawing::RenderTarget& rt, ScreenCoordsXY p, const std::string& label)
     {
@@ -1240,29 +1289,40 @@ namespace OpenRCT2::Ui::Handheld
         Drawing::RenderTarget& rt, ScreenCoordsXY pos, const std::string& surface, bool queue, bool remove,
         const std::string& placement = "Ground / auto slope", bool connected = false, bool adjusting = false)
     {
-        DrawSurface(rt, pos, {164, adjusting ? connected ? 174 : 194 : 146});
-        DrawIcon(rt, pos + ScreenCoordsXY{10, 12}, PanelIcon::path);
-        DrawStrongText(rt, pos + ScreenCoordsXY{36, 14}, adjusting ? "{WHITE}Adjust path" : connected ? "{WHITE}Extend path" : "{WHITE}Single path", 116);
-        Fill(rt, pos + ScreenCoordsXY{8, 35}, {148, 22}, Theme::raised);
-        DrawStrongText(rt, pos + ScreenCoordsXY{14, 42},
-            remove ? "{WHITE}REMOVE" : queue ? "{WHITE}QUEUE" : "{WHITE}FOOTPATH", 136);
-        DrawModernEllipsised(rt, pos + ScreenCoordsXY{12, 70}, 140, "{WHITE}" + surface);
+        DrawSurface(rt, pos, { 164, adjusting ? connected ? 174 : 194 : 146 });
+        DrawIcon(rt, pos + ScreenCoordsXY{ 10, 12 }, PanelIcon::path);
+        DrawStrongText(
+            rt, pos + ScreenCoordsXY{ 36, 14 },
+            adjusting       ? "{WHITE}Adjust path"
+                : connected ? "{WHITE}Extend path"
+                            : "{WHITE}Single path",
+            116);
+        Fill(rt, pos + ScreenCoordsXY{ 8, 35 }, { 148, 22 }, Theme::raised);
+        DrawStrongText(
+            rt, pos + ScreenCoordsXY{ 14, 42 },
+            remove      ? "{WHITE}REMOVE"
+                : queue ? "{WHITE}QUEUE"
+                        : "{WHITE}FOOTPATH",
+            136);
+        DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 12, 70 }, 140, "{WHITE}" + surface);
         const auto slash = placement.find(" / ");
-        DrawModernEllipsised(rt, pos + ScreenCoordsXY{12, 91}, 140,
+        DrawModernEllipsised(
+            rt, pos + ScreenCoordsXY{ 12, 91 }, 140,
             "{MUTED}" + (remove ? std::string("Existing tile height") : placement.substr(0, slash)));
         if (!remove && slash != std::string::npos)
-            DrawModernEllipsised(rt, pos + ScreenCoordsXY{12, 109}, 140, "{MUTED}" + placement.substr(slash + 3));
+            DrawModernEllipsised(rt, pos + ScreenCoordsXY{ 12, 109 }, 140, "{MUTED}" + placement.substr(slash + 3));
         if (adjusting)
         {
-            DrawModernText(rt,pos+ScreenCoordsXY{12,128},"{WHITE}Left/Right  Turn");
-            DrawModernText(rt,pos+ScreenCoordsXY{12,148},connected ? "{WHITE}Up/Down  Slope" : "{WHITE}Up/Down  Height");
+            DrawModernText(rt, pos + ScreenCoordsXY{ 12, 128 }, "{WHITE}Left/Right  Turn");
+            DrawModernText(rt, pos + ScreenCoordsXY{ 12, 148 }, connected ? "{WHITE}Up/Down  Slope" : "{WHITE}Up/Down  Height");
         }
-        else DrawCommand(rt,pos+ScreenCoordsXY{12,128},32,"L2/R2",connected ? "Slope" : "Height");
+        else
+            DrawCommand(rt, pos + ScreenCoordsXY{ 12, 128 }, 32, "L2/R2", connected ? "Slope" : "Height");
     }
 
     inline void DrawPathFooter(
-        Drawing::RenderTarget& rt, ScreenSize screen, const std::string&, bool remove = false,
-        bool connected = false, bool adjusting = false, bool ready = false)
+        Drawing::RenderTarget& rt, ScreenSize screen, const std::string&, bool remove = false, bool connected = false,
+        bool adjusting = false, bool ready = false)
     {
         DrawActionStrip(rt, screen);
 
@@ -1345,15 +1405,18 @@ namespace OpenRCT2::Ui::Handheld
                 lines.push_back(line);
                 line = word;
             }
-            else line = candidate;
+            else
+                line = candidate;
         }
-        if (!line.empty()) lines.push_back(line);
-        const ScreenSize size{width,16+static_cast<int>(lines.size())*17};
-        const auto pos = Layout::ContextOrigin(screen,{screen.width-Layout::margin-width,screen.height},size);
-        DrawSurface(rt,pos,size);
-        for (size_t i=0;i<lines.size();++i)
-            DrawModernEllipsised(rt,pos+ScreenCoordsXY{10,8+static_cast<int>(i)*17},width-20,
-                (i==0 ? "{WHITE}" : "{MUTED}")+lines[i]);
+        if (!line.empty())
+            lines.push_back(line);
+        const ScreenSize size{ width, 16 + static_cast<int>(lines.size()) * 17 };
+        const auto pos = Layout::ContextOrigin(screen, { screen.width - Layout::margin - width, screen.height }, size);
+        DrawSurface(rt, pos, size);
+        for (size_t i = 0; i < lines.size(); ++i)
+            DrawModernEllipsised(
+                rt, pos + ScreenCoordsXY{ 10, 8 + static_cast<int>(i) * 17 }, width - 20,
+                (i == 0 ? "{WHITE}" : "{MUTED}") + lines[i]);
     }
 
     inline void DrawPathOptions(
@@ -1362,30 +1425,38 @@ namespace OpenRCT2::Ui::Handheld
     {
         const auto p = Layout::menuOrigin;
         constexpr int width = 240;
-        DrawSurface(rt, p, {width, Layout::ContentHeight(screen)});
-        DrawSectionLabel(rt, p + ScreenCoordsXY{12, 13}, width - 24, "BUILD / PATHS");
-        DrawHeadingText(rt, p + ScreenCoordsXY{12, 28}, "{WHITE}Path settings", width - 24);
-        DrawModernEllipsised(rt, p + ScreenCoordsXY{12, 54}, width - 24, "{MUTED}" + status);
+        DrawSurface(rt, p, { width, Layout::ContentHeight(screen) });
+        DrawSectionLabel(rt, p + ScreenCoordsXY{ 12, 13 }, width - 24, "BUILD / PATHS");
+        DrawHeadingText(rt, p + ScreenCoordsXY{ 12, 28 }, "{WHITE}Path settings", width - 24);
+        DrawModernEllipsised(rt, p + ScreenCoordsXY{ 12, 54 }, width - 24, "{MUTED}" + status);
         const bool connected = rows.size() > 7;
-        const int positions[] = {76, 127, 155, 183, 211, 254, 282, 310};
-        DrawSectionLabel(rt, p + ScreenCoordsXY{12, 111}, width - 24, connected ? "DIRECTION & SLOPE" : "HEIGHT & SLOPE");
-        DrawSectionLabel(rt, p + ScreenCoordsXY{12, 238}, width - 24, connected ? "SURFACE & RECOVERY" : "ORIENTATION & SURFACE");
+        const int positions[] = { 76, 127, 155, 183, 211, 254, 282, 310 };
+        DrawSectionLabel(rt, p + ScreenCoordsXY{ 12, 111 }, width - 24, connected ? "DIRECTION & SLOPE" : "HEIGHT & SLOPE");
+        DrawSectionLabel(
+            rt, p + ScreenCoordsXY{ 12, 238 }, width - 24, connected ? "SURFACE & RECOVERY" : "ORIENTATION & SURFACE");
         for (size_t i = 0; i < rows.size() && i < 8; ++i)
-            DrawActionRow(rt, p + ScreenCoordsXY{8, positions[i]}, {width - 16, i == 0 ? 30 : 27},
+            DrawActionRow(
+                rt, p + ScreenCoordsXY{ 8, positions[i] }, { width - 16, i == 0 ? 30 : 27 },
                 i == 0 ? "Return to building" : rows[i], "", selected == i);
-        const std::array<const char*,8> connectedHelp{
-            "Continue from the current path end.","Turn the next section before building.",
-            "Build uphill from the current end.","Build downhill from the current end.",
-            "Make the next section level.","Pick another path end. Existing paths stay.",
-            "Choose the path or queue surface.","Review removing the last new section."};
-        const std::array<const char*,7> groundHelp{
-            "Return to the park with this preview.","Each tile follows its own terrain. Works with Single, Line and Fill.",
-            "Use a fixed elevation above the current preview.","Lower the fixed elevation. Follow ground restores automatic height.",
-            "Change the slope for a single section. Line and Fill use level tiles.",
-            "Turn the uphill end of a single sloping section.","Choose the path or queue surface."};
-        DrawSurface(rt,{screen.width-236,screen.height-132},{228,88});
-        DrawWrappedLabel(rt,{screen.width-224,screen.height-120},204,
-            connected?connectedHelp[std::min(selected,connectedHelp.size()-1)]:groundHelp[std::min(selected,groundHelp.size()-1)],4);
+        const std::array<const char*, 8> connectedHelp{
+            "Continue from the current path end.", "Turn the next section before building.",
+            "Build uphill from the current end.",  "Build downhill from the current end.",
+            "Make the next section level.",        "Pick another path end. Existing paths stay.",
+            "Choose the path or queue surface.",   "Review removing the last new section."
+        };
+        const std::array<const char*, 7> groundHelp{ "Return to the park with this preview.",
+                                                     "Each tile follows its own terrain. Works with Single, Line and Fill.",
+                                                     "Use a fixed elevation above the current preview.",
+                                                     "Lower the fixed elevation. Follow ground restores automatic height.",
+                                                     "Change the slope for a single section. Line and Fill use level tiles.",
+                                                     "Turn the uphill end of a single sloping section.",
+                                                     "Choose the path or queue surface." };
+        DrawSurface(rt, { screen.width - 236, screen.height - 132 }, { 228, 88 });
+        DrawWrappedLabel(
+            rt, { screen.width - 224, screen.height - 120 }, 204,
+            connected ? connectedHelp[std::min(selected, connectedHelp.size() - 1)]
+                      : groundHelp[std::min(selected, groundHelp.size() - 1)],
+            4);
         DrawFooter(rt, screen, { { "D-pad", "Choose" }, { "A", "Select" }, { "B", "Build" } });
     }
 
@@ -1474,4 +1545,3 @@ namespace OpenRCT2::Ui::Handheld
         DrawPanelCommands(rt, window);
     }
 } // namespace OpenRCT2::Ui::Handheld
-

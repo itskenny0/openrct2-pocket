@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
+#include "RideTabNavigation.h"
+
 #include <openrct2-ui/handheld/RideAccess.h>
 #include <openrct2/Input.h>
-#include "RideTabNavigation.h"
 #include <openrct2/interface/Window.h>
 static void TestRideAccess(
     IContext& context, const std::string& profile, bool realUi, const Ui::Handheld::RideManagement::Target& target)

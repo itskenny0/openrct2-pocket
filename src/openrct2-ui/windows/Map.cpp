@@ -8,6 +8,7 @@
  *****************************************************************************/
 
 #include "NativeMap.h"
+
 #include <openrct2-ui/interface/ViewportQuery.h>
 #include <openrct2-ui/interface/Widget.h>
 #include <openrct2-ui/interface/Window.h>
@@ -251,7 +252,10 @@ namespace OpenRCT2::Ui::Windows
             const auto colour = rides ? GetPixelColourRide(c) : GetPixelColourPeep(c);
             return { colour.a, colour.b };
         }
-        static TileCoordsXY PocketMapCoords(CoordsXY c) { return TransformToMapCoords(c); }
+        static TileCoordsXY PocketMapCoords(CoordsXY c)
+        {
+            return TransformToMapCoords(c);
+        }
         void onOpen() override
         {
             setWidgets(window_map_widgets);
@@ -1268,20 +1272,25 @@ namespace OpenRCT2::Ui::Windows
     {
         return MapWindow::PocketTileColour(c, rides);
     }
-    TileCoordsXY NativeMiniMapCoords(CoordsXY c) { return MapWindow::PocketMapCoords(c); }
+    TileCoordsXY NativeMiniMapCoords(CoordsXY c)
+    {
+        return MapWindow::PocketMapCoords(c);
+    }
 
     std::optional<std::array<ScreenCoordsXY, 2>> NativeMiniMapViewportBounds()
     {
         const auto* main = WindowGetMain();
-        if (!main || !main->viewport) return std::nullopt;
+        if (!main || !main->viewport)
+            return std::nullopt;
         const auto* viewport = main->viewport;
         auto offset = MiniMapOffsetFactors[GetCurrentRotation()];
         offset.x *= getPracticalMapSize();
         offset.y *= getPracticalMapSize();
-        const auto start = offset + ScreenCoordsXY{ viewport->viewPos.x / kCoordsXYStep,
-            viewport->viewPos.y / kCoordsXYHalfTile };
-        return std::array<ScreenCoordsXY, 2>{ start, start + ScreenCoordsXY{
-            viewport->ViewWidth() / kCoordsXYStep, viewport->ViewHeight() / kCoordsXYHalfTile } };
+        const auto start = offset
+            + ScreenCoordsXY{ viewport->viewPos.x / kCoordsXYStep, viewport->viewPos.y / kCoordsXYHalfTile };
+        return std::array<ScreenCoordsXY, 2>{
+            start, start + ScreenCoordsXY{ viewport->ViewWidth() / kCoordsXYStep, viewport->ViewHeight() / kCoordsXYHalfTile }
+        };
     }
 
     std::vector<NativeMiniMapMarker> NativeMiniMapPeepMarkers(bool employees, bool tracked, int role)

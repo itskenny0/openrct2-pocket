@@ -2,6 +2,7 @@
 #pragma once
 #include "Currency.h"
 
+#include <algorithm>
 #include <openrct2/GameState.h>
 #include <openrct2/core/BitSet.hpp>
 #include <openrct2/core/UnitConversion.h>
@@ -10,8 +11,6 @@
 #include <openrct2/ride/Ride.h>
 #include <openrct2/ride/RideManager.hpp>
 #include <openrct2/scenario/Scenario.h>
-
-#include <algorithm>
 #include <optional>
 #include <string>
 
@@ -24,10 +23,10 @@ namespace OpenRCT2::Ui::Handheld::Goal
     // so the bar fills by the same measure the game will judge.
     struct Progress
     {
-        std::string text;   // "1,328 / 1,500 guests"
-        std::string aside;  // "8 mo left", "Rating 540"
-        int percent{};      // 0..100
-        bool asideWarns{};  // The aside is what is holding the goal back.
+        std::string text;  // "1,328 / 1,500 guests"
+        std::string aside; // "8 mo left", "Rating 540"
+        int percent{};     // 0..100
+        bool asideWarns{}; // The aside is what is holding the goal back.
         bool done{}, failed{};
     };
 

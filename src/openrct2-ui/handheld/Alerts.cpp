@@ -56,15 +56,17 @@ namespace OpenRCT2::Ui::Handheld::Alerts
                     continue;
                 const auto name = ride.getName();
                 if (ride.flags.has(RideFlag::crashed))
-                    alerts.push_back({ Kind::crash, name + " has crashed", "Close it, then reopen to repair",
-                                       RideLocation(ride), ride.id.ToUnderlying() });
+                    alerts.push_back(
+                        { Kind::crash, name + " has crashed", "Close it, then reopen to repair", RideLocation(ride),
+                          ride.id.ToUnderlying() });
                 else if (ride.flags.has(RideFlag::brokenDown))
-                    alerts.push_back({ Kind::breakdown, name + " broke down", "Hire mechanics to fix rides faster",
-                                       RideLocation(ride), ride.id.ToUnderlying() });
+                    alerts.push_back(
+                        { Kind::breakdown, name + " broke down", "Hire mechanics to fix rides faster", RideLocation(ride),
+                          ride.id.ToUnderlying() });
                 else if (ride.flags.has(RideFlag::queueFull))
-                    alerts.push_back({ Kind::queueFull, name + " has a full queue",
-                                       "Raise its price or build another ride", QueueLocation(ride),
-                                       ride.id.ToUnderlying() });
+                    alerts.push_back(
+                        { Kind::queueFull, name + " has a full queue", "Raise its price or build another ride",
+                          QueueLocation(ride), ride.id.ToUnderlying() });
             }
 
             std::array groups{
@@ -91,15 +93,28 @@ namespace OpenRCT2::Ui::Handheld::Alerts
                     ThoughtGroup* group = nullptr;
                     switch (thought.type)
                     {
-                        case PeepThoughtType::hungry: group = &groups[0]; break;
-                        case PeepThoughtType::thirsty: group = &groups[1]; break;
-                        case PeepThoughtType::toilet: group = &groups[2]; break;
+                        case PeepThoughtType::hungry:
+                            group = &groups[0];
+                            break;
+                        case PeepThoughtType::thirsty:
+                            group = &groups[1];
+                            break;
+                        case PeepThoughtType::toilet:
+                            group = &groups[2];
+                            break;
                         case PeepThoughtType::badLitter:
-                        case PeepThoughtType::pathDisgusting: group = &groups[3]; break;
-                        case PeepThoughtType::vandalism: group = &groups[4]; break;
+                        case PeepThoughtType::pathDisgusting:
+                            group = &groups[3];
+                            break;
+                        case PeepThoughtType::vandalism:
+                            group = &groups[4];
+                            break;
                         case PeepThoughtType::lost:
-                        case PeepThoughtType::cantFindExit: group = &groups[5]; break;
-                        default: break;
+                        case PeepThoughtType::cantFindExit:
+                            group = &groups[5];
+                            break;
+                        default:
+                            break;
                     }
                     if (group)
                     {
@@ -113,8 +128,8 @@ namespace OpenRCT2::Ui::Handheld::Alerts
             const int threshold = std::max(4, guests / 25);
             for (const auto& group : groups)
                 if (group.count >= threshold)
-                    alerts.push_back({ group.kind, std::to_string(group.count) + " " + group.title, group.fix,
-                                       group.where, std::nullopt });
+                    alerts.push_back(
+                        { group.kind, std::to_string(group.count) + " " + group.title, group.fix, group.where, std::nullopt });
             std::stable_sort(alerts.begin(), alerts.end(), [](const auto& a, const auto& b) { return a.kind < b.kind; });
             return alerts;
         }

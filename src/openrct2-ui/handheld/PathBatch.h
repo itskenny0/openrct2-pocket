@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "PathSelection.h"
-#include <optional>
+
 #include <openrct2/Game.h>
 #include <openrct2/GameState.h>
 #include <openrct2/actions/GameActionRunner.h>
@@ -9,6 +9,7 @@
 #include <openrct2/world/Footpath.h>
 #include <openrct2/world/Map.h>
 #include <openrct2/world/tile_element/SurfaceElement.h>
+#include <optional>
 
 namespace OpenRCT2::Ui::Handheld::Paths
 {
@@ -37,31 +38,66 @@ namespace OpenRCT2::Ui::Handheld::Paths
 
         void reset()
         {
-            if (busy) return;
+            if (busy)
+                return;
             *this = {};
         }
-        void invalidate() { cached = false; review = false; }
+        void invalidate()
+        {
+            cached = false;
+            review = false;
+        }
         bool cancel()
         {
-            if (busy) return true;
-            if (review) { review = false; return true; }
-            if (start) { start.reset(); end.reset(); invalidate(); notice.clear(); return true; }
+            if (busy)
+                return true;
+            if (review)
+            {
+                review = false;
+                return true;
+            }
+            if (start)
+            {
+                start.reset();
+                end.reset();
+                invalidate();
+                notice.clear();
+                return true;
+            }
             return false;
         }
         void update(std::optional<CoordsXY> destination, BatchMaterial settings, bool force = false)
         {
             auto& state = getGameState();
-            if (busy || !start) return;
+            if (busy || !start)
+                return;
             if (!force && cached && end == destination && material == settings && cash == state.park.cash
-                && paused == gGamePaused && state.currentTicks - tick < 8) return;
-            if (end != destination || material != settings) review = false;
-            end = destination; material = settings; cash = state.park.cash; paused = gGamePaused; tick = state.currentTicks;
-            cached = true; ++validationCount;
-            selection = {}; valid.clear(); quote = {};
+                && paused == gGamePaused && state.currentTicks - tick < 8)
+                return;
+            if (end != destination || material != settings)
+                review = false;
+            end = destination;
+            material = settings;
+            cash = state.park.cash;
+            paused = gGamePaused;
+            tick = state.currentTicks;
+            cached = true;
+            ++validationCount;
+            selection = {};
+            valid.clear();
+            quote = {};
             slopes.clear();
-            if (!end) { fail("Move destination onto the park"); return; }
+            if (!end)
+            {
+                fail("Move destination onto the park");
+                return;
+            }
             selection = SelectTiles(mode, *start, *end);
-            if (!selection.error.empty()) { fail(selection.error); return; }
+            if (!selection.error.empty())
+            {
+                fail(selection.error);
+                return;
+            }
             GameActions::Result firstError;
             for (auto& tile : selection.tiles)
             {
@@ -69,7 +105,11 @@ namespace OpenRCT2::Ui::Handheld::Paths
                 if (followsGround)
                 {
                     const auto* surface = MapGetSurfaceElementAt(CoordsXY(tile));
-                    if (!surface) { fail("Move selection onto valid land"); return; }
+                    if (!surface)
+                    {
+                        fail("Move selection onto valid land");
+                        return;
+                    }
                     const auto ground = FootpathGetOnTerrainPlacement(*surface);
                     tile.z = ground.baseZ;
                     slope = ground.slope;
@@ -78,14 +118,17 @@ namespace OpenRCT2::Ui::Handheld::Paths
                 auto action = makeAction(tile, slope);
                 const auto result = GameActions::Query(&action, state);
                 valid.push_back(result.error == GameActions::Status::ok);
-                if (result.error == GameActions::Status::ok) quote.cost += result.cost;
-                else if (firstError.error == GameActions::Status::ok) firstError = result;
+                if (result.error == GameActions::Status::ok)
+                    quote.cost += result.cost;
+                else if (firstError.error == GameActions::Status::ok)
+                    firstError = result;
             }
             quote.expenditure = ExpenditureType::landscaping;
             if (firstError.error != GameActions::Status::ok)
             {
                 const auto cost = quote.cost;
-                quote = firstError; quote.cost = cost; // Partial quote never advertised as a total.
+                quote = firstError;
+                quote.cost = cost; // Partial quote never advertised as a total.
             }
             else if (!FinanceCheckAffordability(quote.cost, {}))
             {
@@ -95,18 +138,34 @@ namespace OpenRCT2::Ui::Handheld::Paths
         }
         GameActions::Result confirm()
         {
-            if (busy) return error("Building selection; please wait");
+            if (busy)
+                return error("Building selection; please wait");
             update(end, material, true); // Fresh quote, not an atomicity guarantee.
-            if (review && reviewedCost != quote.cost) review = false;
-            if (quote.error != GameActions::Status::ok) { review = false; return quote; }
-            if (!review) { review = true; reviewedCost = quote.cost; return quote; }
-            review = false; busy = true; completed = 0; spent = 0; notice.clear();
+            if (review && reviewedCost != quote.cost)
+                review = false;
+            if (quote.error != GameActions::Status::ok)
+            {
+                review = false;
+                return quote;
+            }
+            if (!review)
+            {
+                review = true;
+                reviewedCost = quote.cost;
+                return quote;
+            }
+            review = false;
+            busy = true;
+            completed = 0;
+            spent = 0;
+            notice.clear();
             pending = selection.tiles;
             pendingSlopes = slopes;
             executingState = &getGameState();
             placeNext();
             return quote;
         }
+
     private:
         bool cached{};
         uint32_t tick{};
@@ -117,38 +176,60 @@ namespace OpenRCT2::Ui::Handheld::Paths
         const GameState_t* executingState{};
         static GameActions::Result error(const std::string& message)
         {
-            GameActions::Result r; r.error = GameActions::Status::invalidParameters; r.errorMessage = message; return r;
+            GameActions::Result r;
+            r.error = GameActions::Status::invalidParameters;
+            r.errorMessage = message;
+            return r;
         }
-        void fail(const std::string& message) { quote = error(message); }
+        void fail(const std::string& message)
+        {
+            quote = error(message);
+        }
         GameActions::FootpathPlaceAction makeAction(CoordsXYZ tile, FootpathSlope slope) const
         {
-            return GameActions::FootpathPlaceAction(tile, slope, material.surface,
-                material.railings, kInvalidDirection, material.flags);
+            return GameActions::FootpathPlaceAction(
+                tile, slope, material.surface, material.railings, kInvalidDirection, material.flags);
         }
         void stop(const GameActions::Result& result)
         {
             busy = false;
-            notice = "Stopped: " + std::to_string(completed) + "/" + std::to_string(pending.size())
-                + " built. " + result.getErrorMessage();
+            notice = "Stopped: " + std::to_string(completed) + "/" + std::to_string(pending.size()) + " built. "
+                + result.getErrorMessage();
             // Never auto-retry completed purchases. A new anchor is required.
-            start.reset(); end.reset(); invalidate();
+            start.reset();
+            end.reset();
+            invalidate();
         }
         void placeNext()
         {
-            if (executingState != &getGameState()) { stop(error("Park changed; remaining tiles cancelled")); return; }
+            if (executingState != &getGameState())
+            {
+                stop(error("Park changed; remaining tiles cancelled"));
+                return;
+            }
             auto action = makeAction(pending[completed], pendingSlopes[completed]);
             action.SetCallback([this](const auto*, const GameActions::Result* result) {
-                if (result->error != GameActions::Status::ok) { stop(*result); return; }
-                spent += result->cost; ++completed;
+                if (result->error != GameActions::Status::ok)
+                {
+                    stop(*result);
+                    return;
+                }
+                spent += result->cost;
+                ++completed;
                 if (completed == pending.size())
                 {
-                    busy = false; notice = "Built " + std::to_string(completed) + " tiles";
-                    start.reset(); end.reset(); invalidate();
+                    busy = false;
+                    notice = "Built " + std::to_string(completed) + " tiles";
+                    start.reset();
+                    end.reset();
+                    invalidate();
                 }
-                else placeNext();
+                else
+                    placeNext();
             });
             const auto result = GameActions::Execute(&action, getGameState());
-            if (busy && result.error != GameActions::Status::ok) stop(result);
+            if (busy && result.error != GameActions::Status::ok)
+                stop(result);
         }
     };
-}
+} // namespace OpenRCT2::Ui::Handheld::Paths

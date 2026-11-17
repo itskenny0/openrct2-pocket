@@ -43,8 +43,9 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
                     if (!e->isGhost() && e->getRideIndex() == target.id && e->getSequenceIndex() == 0
                         && TrackConstructionSupport::Piece(e->getTrackType()))
                     {
-                        const auto&
-                            c = TrackMetadata::GetTrackElementDescriptor(e->getTrackType()).sequenceData.sequences[0].clearance;
+                        const auto& c = TrackMetadata::GetTrackElementDescriptor(e->getTrackType())
+                                            .sequenceData.sequences[0]
+                                            .clearance;
                         const auto xy = CoordsXY{ x, y } - CoordsXY{ c.x, c.y }.rotate(e->getDirection());
                         result.push_back(
                             { target,
@@ -53,7 +54,8 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
                               e->getBrakeBoosterSpeed(),
                               e->getSeatRotation(),
                               e->hasChain(),
-                              e->isInverted(), e->getColourScheme() });
+                              e->isInverted(),
+                              e->getColourScheme() });
                     }
         return result;
     }
@@ -67,20 +69,27 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
         if (!Eligible(block.ride) || !TrackConstructionSupport::Piece(block.type) || block.origin.direction > 3)
             return false;
         const auto& sequences = TrackMetadata::GetTrackElementDescriptor(block.type).sequenceData;
-        if (!sequences.numSequences) return false;
+        if (!sequences.numSequences)
+            return false;
         for (uint8_t sequence = 0; sequence < sequences.numSequences; ++sequence)
         {
             const auto& c = sequences.sequences[sequence].clearance;
             const auto xy = CoordsXY(block.origin) + CoordsXY{ c.x, c.y }.rotate(block.origin.direction);
-            if (!MapIsLocationValid(xy)) return false;
+            if (!MapIsLocationValid(xy))
+                return false;
             bool found = false;
             for (auto* e : TileElementsView<TrackElement>(xy))
                 if (!e->isGhost() && e->getRideIndex() == block.ride.id && e->getTrackType() == block.type
                     && e->getSequenceIndex() == sequence && e->getDirection() == block.origin.direction
-                    && e->getBaseZ() == block.origin.z + c.z && e->hasChain() == block.chain && e->isInverted() == block.inverted
-                    && e->getBrakeBoosterSpeed() == block.speed && e->getSeatRotation() == block.seat
-                    && e->getColourScheme() == block.colour) { found = true; break; }
-            if (!found) return false;
+                    && e->getBaseZ() == block.origin.z + c.z && e->hasChain() == block.chain
+                    && e->isInverted() == block.inverted && e->getBrakeBoosterSpeed() == block.speed
+                    && e->getSeatRotation() == block.seat && e->getColourScheme() == block.colour)
+                {
+                    found = true;
+                    break;
+                }
+            if (!found)
+                return false;
         }
         return true;
     }
@@ -102,27 +111,37 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
                     const auto found = std::find_if(blocks.begin(), blocks.end(), [&](const auto& candidate) {
                         return candidate.origin == previous->origin && candidate.type == previous->type;
                     });
-                    if (found != blocks.end()) return *found;
+                    if (found != blocks.end())
+                        return *found;
                 }
             }
         return {};
     }
     inline std::optional<Block> Next(const Block& block)
     {
-        if (!Valid(block)) return {};
-        const auto& c=TrackMetadata::GetTrackElementDescriptor(block.type).sequenceData.sequences[0].clearance;
-        const auto xy=CoordsXY(block.origin)+CoordsXY{c.x,c.y}.rotate(block.origin.direction);
-        for(auto* e:TileElementsView<TrackElement>(xy))
-            if(!e->isGhost() && e->getRideIndex()==block.ride.id && e->getTrackType()==block.type
-                && e->getSequenceIndex()==0 && e->getDirection()==block.origin.direction && e->getBaseZ()==block.origin.z+c.z) {
-                CoordsXYE input{xy,reinterpret_cast<TileElement*>(e)}, next{};
+        if (!Valid(block))
+            return {};
+        const auto& c = TrackMetadata::GetTrackElementDescriptor(block.type).sequenceData.sequences[0].clearance;
+        const auto xy = CoordsXY(block.origin) + CoordsXY{ c.x, c.y }.rotate(block.origin.direction);
+        for (auto* e : TileElementsView<TrackElement>(xy))
+            if (!e->isGhost() && e->getRideIndex() == block.ride.id && e->getTrackType() == block.type
+                && e->getSequenceIndex() == 0 && e->getDirection() == block.origin.direction
+                && e->getBaseZ() == block.origin.z + c.z)
+            {
+                CoordsXYE input{ xy, reinterpret_cast<TileElement*>(e) }, next{};
                 int32_t z{}, direction{};
-                if(!trackBlockGetNext(&input,&next,&z,&direction) || !TrackIsConnectedByShape(input.element,next.element))return {};
-                auto* track=next.element->asTrack();
-                const auto& offset=TrackMetadata::GetTrackElementDescriptor(track->getTrackType()).sequenceData.sequences[track->getSequenceIndex()].clearance;
-                const auto origin=CoordsXYZD{CoordsXY{next.x,next.y}-CoordsXY{offset.x,offset.y}.rotate(track->getDirection()),track->getBaseZ()-offset.z,track->getDirection()};
-                for(const auto& candidate:Blocks(block.ride))
-                    if(candidate.origin==origin && candidate.type==track->getTrackType())return candidate;
+                if (!trackBlockGetNext(&input, &next, &z, &direction) || !TrackIsConnectedByShape(input.element, next.element))
+                    return {};
+                auto* track = next.element->asTrack();
+                const auto& offset = TrackMetadata::GetTrackElementDescriptor(track->getTrackType())
+                                         .sequenceData.sequences[track->getSequenceIndex()]
+                                         .clearance;
+                const auto origin = CoordsXYZD{ CoordsXY{ next.x, next.y }
+                                                    - CoordsXY{ offset.x, offset.y }.rotate(track->getDirection()),
+                                                track->getBaseZ() - offset.z, track->getDirection() };
+                for (const auto& candidate : Blocks(block.ride))
+                    if (candidate.origin == origin && candidate.type == track->getTrackType())
+                        return candidate;
             }
         return {};
     }
@@ -134,15 +153,19 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
     inline std::pair<size_t, size_t> AccessRemoval(const Block& block)
     {
         std::pair<size_t, size_t> result{};
-        if (!Valid(block) || (block.type != TrackElemType::beginStation && block.type != TrackElemType::middleStation
-            && block.type != TrackElemType::endStation)) return result;
+        if (!Valid(block)
+            || (block.type != TrackElemType::beginStation && block.type != TrackElemType::middleStation
+                && block.type != TrackElemType::endStation))
+            return result;
         for (auto delta : CoordsDirectionDelta)
             for (auto* e : TileElementsView<EntranceElement>(CoordsXY(block.origin) + delta))
                 if (!e->isGhost() && e->getRideIndex() == block.ride.id && e->getBaseZ() == block.origin.z
                     && CoordsXY(block.origin) == CoordsXY(block.origin) + delta + CoordsDirectionDelta[e->getDirection()])
                 {
-                    if (e->getEntranceType() == EntranceType::rideEntrance) ++result.first;
-                    if (e->getEntranceType() == EntranceType::rideExit) ++result.second;
+                    if (e->getEntranceType() == EntranceType::rideEntrance)
+                        ++result.first;
+                    if (e->getEntranceType() == EntranceType::rideExit)
+                        ++result.second;
                 }
         return result;
     }
@@ -153,13 +176,13 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
     }
     inline std::vector<std::string> Inspection(const Block& block, bool technical = false)
     {
-        if (!Valid(block)) return { "Selected block no longer exists", "Back to block" };
+        if (!Valid(block))
+            return { "Selected block no longer exists", "Back to block" };
         const auto& ted = TrackMetadata::GetTrackElementDescriptor(block.type);
         const auto& c = ted.sequenceData.sequences[0].clearance;
         const auto xy = CoordsXY(block.origin) + CoordsXY{ c.x, c.y }.rotate(block.origin.direction);
         auto previous = Previous(block);
-        std::vector<std::string> rows{
-            previous ? "Behind: " + Label(*previous) : "Behind: open end" };
+        std::vector<std::string> rows{ previous ? "Behind: " + Label(*previous) : "Behind: open end" };
         if (technical)
         {
             rows.push_back("Tile: " + std::to_string(block.origin.x / 32) + ", " + std::to_string(block.origin.y / 32));
@@ -176,8 +199,9 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
                 int32_t z{}, direction{};
                 const bool connected = trackBlockGetNext(&input, &next, &z, &direction)
                     && TrackIsConnectedByShape(input.element, next.element);
-                rows.push_back(connected ? "Ahead: " + CustomTracks::PieceName(next.element->asTrack()->getTrackType())
-                                         : "Ahead: open end");
+                rows.push_back(
+                    connected ? "Ahead: " + CustomTracks::PieceName(next.element->asTrack()->getTrackType())
+                              : "Ahead: open end");
                 if (block.type == TrackElemType::beginStation || block.type == TrackElemType::middleStation
                     || block.type == TrackElemType::endStation)
                 {
@@ -186,13 +210,17 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
                     if (!index.IsNull() && index.ToUnderlying() < ride->getStations().size())
                     {
                         const auto& station = ride->getStation(index);
-                        rows.push_back(block.type == TrackElemType::beginStation ? "Station piece: Begin"
-                            : block.type == TrackElemType::middleStation ? "Station piece: Middle" : "Station piece: End");
+                        rows.push_back(
+                            block.type == TrackElemType::beginStation        ? "Station piece: Begin"
+                                : block.type == TrackElemType::middleStation ? "Station piece: Middle"
+                                                                             : "Station piece: End");
                         rows.push_back("Station " + std::to_string(index.ToUnderlying() + 1));
                         auto access = [technical](const auto& loc) {
-                            if (loc.isNull()) return std::string("Needs building");
-                            return !technical ? std::string("Built") : std::to_string(loc.x) + "," + std::to_string(loc.y)
-                                + " Z" + std::to_string(loc.z) + " D" + std::to_string(loc.direction);
+                            if (loc.isNull())
+                                return std::string("Needs building");
+                            return !technical ? std::string("Built")
+                                              : std::to_string(loc.x) + "," + std::to_string(loc.y) + " Z"
+                                    + std::to_string(loc.z) + " D" + std::to_string(loc.direction);
                         };
                         rows.push_back("Entrance: " + access(station.entrance));
                         rows.push_back("Exit: " + access(station.exit));
@@ -209,7 +237,8 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
     }
     inline bool CanReplace(const Block& block)
     {
-        if (!Valid(block)) return false;
+        if (!Valid(block))
+            return false;
         const auto& c = TrackMetadata::GetTrackElementDescriptor(block.type).coordinates;
         return !(c.rotationBegin & 4) && !(c.rotationEnd & 4);
     }
@@ -252,7 +281,8 @@ namespace OpenRCT2::Ui::Handheld::TrackEditing
         return execute ? GameActions::Execute(&action, getGameState()) : GameActions::Query(&action, getGameState());
     }
     inline GameActions::Result Change(
-        const Block& block, std::optional<uint8_t> speed, money64 cost = kMoney64Undefined, bool execute = false, const std::vector<int32_t>& context = {})
+        const Block& block, std::optional<uint8_t> speed, money64 cost = kMoney64Undefined, bool execute = false,
+        const std::vector<int32_t>& context = {})
     {
         if (!Valid(block))
         {

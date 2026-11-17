@@ -15,14 +15,14 @@
 #include "../../core/Guard.hpp"
 #include "../../localisation/StringIds.h"
 #include "../../management/Finance.h"
-#include "../../ride/MazeCost.h"
 #include "../../ride/AccessPlacementContext.h"
-#include "../../world/TileElementsView.h"
+#include "../../ride/MazeCost.h"
 #include "../../ride/RideData.h"
 #include "../../world/ConstructionClearance.h"
 #include "../../world/Footpath.h"
 #include "../../world/Map.h"
 #include "../../world/QuarterTile.h"
+#include "../../world/TileElementsView.h"
 #include "../../world/Wall.h"
 #include "../../world/tile_element/Slope.h"
 #include "../../world/tile_element/SurfaceElement.h"
@@ -59,22 +59,28 @@ namespace OpenRCT2::GameActions
     };
     // clang-format on
 
-    static TileElement* MazeCell(CoordsXYZ loc,RideId id,bool ghost)
+    static TileElement* MazeCell(CoordsXYZ loc, RideId id, bool ghost)
     {
-        if(!MapIsLocationValid(loc))return nullptr;
-        for(auto* e:TileElementsView<TrackElement>(loc))
-            if(e->getRideIndex()==id && e->getTrackType()==TrackElemType::maze && e->getBaseZ()==loc.z && e->isGhost()==ghost)
+        if (!MapIsLocationValid(loc))
+            return nullptr;
+        for (auto* e : TileElementsView<TrackElement>(loc))
+            if (e->getRideIndex() == id && e->getTrackType() == TrackElemType::maze && e->getBaseZ() == loc.z
+                && e->isGhost() == ghost)
                 return e->as<TileElement>();
         return nullptr;
     }
-    static void RemoveMazePreview(CoordsXYZ loc,RideId id)
+    static void RemoveMazePreview(CoordsXYZ loc, RideId id)
     {
-        const auto origin=loc.toTileStart();
-        for(int y=-64;y<=64;y+=32)for(int x=-64;x<=64;x+=32){
-            const CoordsXYZ tile{origin.x+x,origin.y+y,loc.z};
-            while(auto* e=MazeCell(tile,id,true))TileElementRemove(e);
-            if(MapIsLocationValid(tile))MapInvalidateTileFull(tile);
-        }
+        const auto origin = loc.toTileStart();
+        for (int y = -64; y <= 64; y += 32)
+            for (int x = -64; x <= 64; x += 32)
+            {
+                const CoordsXYZ tile{ origin.x + x, origin.y + y, loc.z };
+                while (auto* e = MazeCell(tile, id, true))
+                    TileElementRemove(e);
+                if (MapIsLocationValid(tile))
+                    MapInvalidateTileFull(tile);
+            }
     }
     MazeSetTrackAction::MazeSetTrackAction(
         const CoordsXYZD& location, bool initialPlacement, RideId rideIndex, MazeBuildMode mode)
@@ -96,18 +102,25 @@ namespace OpenRCT2::GameActions
     void MazeSetTrackAction::Serialise(DataSerialiser& stream)
     {
         GameAction::Serialise(stream);
-        stream << DS_TAG(_loc) << DS_TAG(_loc.direction) << DS_TAG(_initialPlacement) << DS_TAG(_rideIndex) << DS_TAG(_mode) << DS_TAG(_pureGhost) << DS_TAG(_clearPreview) << DS_TAG(_context) << DS_TAG(_quote);
+        stream << DS_TAG(_loc) << DS_TAG(_loc.direction) << DS_TAG(_initialPlacement) << DS_TAG(_rideIndex) << DS_TAG(_mode)
+               << DS_TAG(_pureGhost) << DS_TAG(_clearPreview) << DS_TAG(_context) << DS_TAG(_quote);
     }
 
     Result MazeSetTrackAction::Query(GameState_t& gameState, Park::ParkData& park) const
     {
-        if(_pureGhost && !GetFlags().has(CommandFlag::ghost))return Result(Status::invalidParameters,kStringIdNone,kStringIdNone);
-        if(_clearPreview)return Result();
+        if (_pureGhost && !GetFlags().has(CommandFlag::ghost))
+            return Result(Status::invalidParameters, kStringIdNone, kStringIdNone);
+        if (_clearPreview)
+            return Result();
         const auto* checkedRide = GetRide(_rideIndex);
         if (!checkedRide || checkedRide->type != RIDE_TYPE_MAZE)
             return Result(Status::invalidParameters, STR_RIDE_CONSTRUCTION_CANT_CONSTRUCT_THIS_HERE, STR_ERR_RIDE_NOT_FOUND);
-        if(!_context.empty() && _context!=AccessPlacementContext::Capture(*checkedRide,_loc)) {
-            Result result;result.error=Status::disallowed;result.errorMessage="Maze context changed; review again";return result;
+        if (!_context.empty() && _context != AccessPlacementContext::Capture(*checkedRide, _loc))
+        {
+            Result result;
+            result.error = Status::disallowed;
+            result.errorMessage = "Maze context changed; review again";
+            return result;
         }
         if (checkedRide->status != RideStatus::closed)
             return Result(Status::notClosed, STR_RIDE_CONSTRUCTION_CANT_CONSTRUCT_THIS_HERE, STR_MUST_BE_CLOSED_FIRST);
@@ -118,7 +131,7 @@ namespace OpenRCT2::GameActions
         {
             const auto previous = CoordsXYZ{ _loc.x - CoordsDirectionDelta[_loc.direction].x / 2,
                                              _loc.y - CoordsDirectionDelta[_loc.direction].y / 2, _loc.z };
-            if (!LocationValid(previous) || !MazeCell(previous,_rideIndex,GetFlags().has(CommandFlag::ghost) && !_pureGhost))
+            if (!LocationValid(previous) || !MazeCell(previous, _rideIndex, GetFlags().has(CommandFlag::ghost) && !_pureGhost))
                 return Result(
                     Status::invalidParameters, STR_RIDE_CONSTRUCTION_CANT_CONSTRUCT_THIS_HERE,
                     STR_INVALID_SELECTION_OF_OBJECTS);
@@ -181,7 +194,7 @@ namespace OpenRCT2::GameActions
             }
         }
 
-        TileElement* tileElement = MazeCell(_loc,_rideIndex,GetFlags().has(CommandFlag::ghost) && !_pureGhost);
+        TileElement* tileElement = MazeCell(_loc, _rideIndex, GetFlags().has(CommandFlag::ghost) && !_pureGhost);
         if (tileElement == nullptr)
         {
             if (_mode != MazeBuildMode::build)
@@ -224,18 +237,37 @@ namespace OpenRCT2::GameActions
 
             res.cost = MazeCalculateCost(constructResult.cost, *ride, _loc);
 
-            if(_quote!=kMoney64Undefined && res.cost!=_quote){res.error=Status::disallowed;res.errorMessage="Maze cost changed; review again";}
+            if (_quote != kMoney64Undefined && res.cost != _quote)
+            {
+                res.error = Status::disallowed;
+                res.errorMessage = "Maze cost changed; review again";
+            }
             return res;
         }
-        if(_quote!=kMoney64Undefined && _quote!=0){res.error=Status::disallowed;res.errorMessage="Maze cost changed; review again";return res;}
+        if (_quote != kMoney64Undefined && _quote != 0)
+        {
+            res.error = Status::disallowed;
+            res.errorMessage = "Maze cost changed; review again";
+            return res;
+        }
         return Result();
     }
 
     Result MazeSetTrackAction::Execute(GameState_t& gameState, Park::ParkData& park) const
     {
-        if(_pureGhost && !GetFlags().has(CommandFlag::ghost))return Result(Status::invalidParameters,kStringIdNone,kStringIdNone);
-        if(_clearPreview){RemoveMazePreview(_loc,_rideIndex);return Result();}
-        if(!_context.empty() || _pureGhost){const auto q=Query(gameState,park);if(q.error!=Status::ok)return q;}
+        if (_pureGhost && !GetFlags().has(CommandFlag::ghost))
+            return Result(Status::invalidParameters, kStringIdNone, kStringIdNone);
+        if (_clearPreview)
+        {
+            RemoveMazePreview(_loc, _rideIndex);
+            return Result();
+        }
+        if (!_context.empty() || _pureGhost)
+        {
+            const auto q = Query(gameState, park);
+            if (q.error != Status::ok)
+                return q;
+        }
         auto res = Result();
 
         res.position = _loc + CoordsXYZ{ 8, 8, 0 };
@@ -251,22 +283,44 @@ namespace OpenRCT2::GameActions
             return res;
         }
 
-        if(_pureGhost){
+        if (_pureGhost)
+        {
             // Reuse the native wall algorithm on actual ghost copies, never real entries.
-            RemoveMazePreview(_loc,_rideIndex);
-            const auto origin=_loc.toTileStart();
-            std::vector<std::pair<CoordsXYZ,TrackElement>> copies;
-            for(int y=-64;y<=64;y+=32)for(int x=-64;x<=64;x+=32){
-                const CoordsXYZ tile{origin.x+x,origin.y+y,_loc.z};
-                if(const auto* real=MazeCell(tile,_rideIndex,false))copies.emplace_back(tile,*real->asTrack());
+            RemoveMazePreview(_loc, _rideIndex);
+            const auto origin = _loc.toTileStart();
+            std::vector<std::pair<CoordsXYZ, TrackElement>> copies;
+            for (int y = -64; y <= 64; y += 32)
+                for (int x = -64; x <= 64; x += 32)
+                {
+                    const CoordsXYZ tile{ origin.x + x, origin.y + y, _loc.z };
+                    if (const auto* real = MazeCell(tile, _rideIndex, false))
+                        copies.emplace_back(tile, *real->asTrack());
+                }
+            for (const auto& [tile, copy] : copies)
+            {
+                if (!MapCheckCapacityAndReorganise(tile))
+                {
+                    RemoveMazePreview(_loc, _rideIndex);
+                    return Result(Status::noFreeElements, kStringIdNone, kStringIdNone);
+                }
+                auto* e = TileElementInsert<TrackElement>(tile, 0b1111);
+                if (!e)
+                {
+                    RemoveMazePreview(_loc, _rideIndex);
+                    return Result(Status::noFreeElements, kStringIdNone, kStringIdNone);
+                }
+                const bool last = e->isLastForTile();
+                *e = copy;
+                e->setGhost(true);
+                e->setLastForTile(last);
+                MapInvalidateTileFull(tile);
             }
-            for(const auto& [tile,copy]:copies){
-                if(!MapCheckCapacityAndReorganise(tile)){RemoveMazePreview(_loc,_rideIndex);return Result(Status::noFreeElements,kStringIdNone,kStringIdNone);}
-                auto* e=TileElementInsert<TrackElement>(tile,0b1111);
-                if(!e){RemoveMazePreview(_loc,_rideIndex);return Result(Status::noFreeElements,kStringIdNone,kStringIdNone);}
-                const bool last=e->isLastForTile();*e=copy;e->setGhost(true);e->setLastForTile(last);MapInvalidateTileFull(tile);}
         }
-        if(_pureGhost && !MapCheckCapacityAndReorganise(_loc)){RemoveMazePreview(_loc,_rideIndex);return Result(Status::noFreeElements,kStringIdNone,kStringIdNone);}
+        if (_pureGhost && !MapCheckCapacityAndReorganise(_loc))
+        {
+            RemoveMazePreview(_loc, _rideIndex);
+            return Result(Status::noFreeElements, kStringIdNone, kStringIdNone);
+        }
         auto flags = GetFlags();
         if (!flags.has(CommandFlag::ghost))
         {
@@ -274,7 +328,7 @@ namespace OpenRCT2::GameActions
             WallRemoveAt({ _loc.toTileStart(), _loc.z, _loc.z + 32 });
         }
 
-        auto tileElement = MazeCell(_loc,_rideIndex,flags.has(CommandFlag::ghost));
+        auto tileElement = MazeCell(_loc, _rideIndex, flags.has(CommandFlag::ghost));
         if (tileElement == nullptr)
         {
             auto baseHeight = _loc.z;
@@ -286,7 +340,8 @@ namespace OpenRCT2::GameActions
             if (canBuild.error != Status::ok)
             {
                 canBuild.errorTitle = STR_RIDE_CONSTRUCTION_CANT_CONSTRUCT_THIS_HERE;
-                if(_pureGhost)RemoveMazePreview(_loc,_rideIndex);
+                if (_pureGhost)
+                    RemoveMazePreview(_loc, _rideIndex);
                 return canBuild;
             }
 
@@ -308,7 +363,8 @@ namespace OpenRCT2::GameActions
 
             MapInvalidateTileFull(startLoc);
 
-            if(!_pureGhost){
+            if (!_pureGhost)
+            {
                 ride->mazeTiles++;
                 ride->getStation().setBaseZ(tileElement->getBaseZ());
                 ride->getStation().start = { 0, 0 };
@@ -338,7 +394,8 @@ namespace OpenRCT2::GameActions
                     {
                         auto previousElementLoc = CoordsXY{ _loc }.toTileStart() - CoordsDirectionDelta[_loc.direction];
 
-                        TileElement* previousTileElement = MazeCell({previousElementLoc,_loc.z},_rideIndex,flags.has(CommandFlag::ghost));
+                        TileElement* previousTileElement = MazeCell(
+                            { previousElementLoc, _loc.z }, _rideIndex, flags.has(CommandFlag::ghost));
 
                         if (previousTileElement != nullptr)
                         {
@@ -363,7 +420,7 @@ namespace OpenRCT2::GameActions
                     auto previousSegment = CoordsXY{ _loc.x - CoordsDirectionDelta[_loc.direction].x / 2,
                                                      _loc.y - CoordsDirectionDelta[_loc.direction].y / 2 };
 
-                    tileElement = MazeCell({previousSegment,_loc.z},_rideIndex,flags.has(CommandFlag::ghost));
+                    tileElement = MazeCell({ previousSegment, _loc.z }, _rideIndex, flags.has(CommandFlag::ghost));
 
                     MapInvalidateTileFull(previousSegment.toTileStart());
                     if (tileElement == nullptr)
@@ -390,7 +447,8 @@ namespace OpenRCT2::GameActions
                         uint32_t direction1 = kByte993D0C[segmentBit];
                         auto nextElementLoc = previousSegment.toTileStart() + CoordsDirectionDelta[direction1];
 
-                        TileElement* tmp_tileElement = MazeCell({nextElementLoc,_loc.z},_rideIndex,flags.has(CommandFlag::ghost));
+                        TileElement* tmp_tileElement = MazeCell(
+                            { nextElementLoc, _loc.z }, _rideIndex, flags.has(CommandFlag::ghost));
 
                         if (tmp_tileElement != nullptr)
                         {
@@ -409,7 +467,11 @@ namespace OpenRCT2::GameActions
         if ((tileElement->asTrack()->getMazeEntry() & 0x8888) == 0x8888)
         {
             TileElementRemove(tileElement);
-            if(!_pureGhost){ride->validateStations();ride->mazeTiles--;}
+            if (!_pureGhost)
+            {
+                ride->validateStations();
+                ride->mazeTiles--;
+            }
         }
 
         return res;

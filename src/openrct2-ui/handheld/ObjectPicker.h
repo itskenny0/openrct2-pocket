@@ -132,7 +132,8 @@ namespace OpenRCT2::Ui::Handheld
         const auto* focused = picker.selected();
         DrawSurface(rt, p, { width, height });
         DrawHeadingText(rt, p + ScreenCoordsXY{ 12, 11 }, "{WHITE}" + title, width - 120);
-        const std::string count = std::to_string(entries.empty() ? 0 : picker.focus() + 1) + " of " + std::to_string(entries.size());
+        const std::string count = std::to_string(entries.empty() ? 0 : picker.focus() + 1) + " of "
+            + std::to_string(entries.size());
         DrawModernText(rt, p + ScreenCoordsXY{ width - 12 - TextWidth(count), 15 }, "{MUTED}" + count);
         Fill(rt, p + ScreenCoordsXY{ 12, 37 }, { width - 24, 1 }, Theme::edge);
         int top = 44;
@@ -149,11 +150,13 @@ namespace OpenRCT2::Ui::Handheld
         Drawing::RenderTarget gridRt;
         if (ClipRenderTarget(gridRt, rt, p + ScreenCoordsXY{ 0, top }, 12 + 3 * pitchX, gridHeight))
         {
-            for (size_t slot = 0; start + slot < entries.size() && static_cast<int>(slot / 3) * pitchY < gridHeight + pitchY; ++slot)
+            for (size_t slot = 0; start + slot < entries.size() && static_cast<int>(slot / 3) * pitchY < gridHeight + pitchY;
+                 ++slot)
             {
                 const auto index = start + slot;
                 const bool selected = index == picker.focus();
-                const auto cell = ScreenCoordsXY{ 12 + static_cast<int>(slot % 3) * pitchX, static_cast<int>((start + slot) / 3) * pitchY - offset + 2 };
+                const auto cell = ScreenCoordsXY{ 12 + static_cast<int>(slot % 3) * pitchX,
+                                                  static_cast<int>((start + slot) / 3) * pitchY - offset + 2 };
                 FillRound(gridRt, cell, { cellW, cellH }, Theme::raised);
                 if (entries[index].drawPreview)
                 {
@@ -161,7 +164,9 @@ namespace OpenRCT2::Ui::Handheld
                     if (ClipRenderTarget(preview, gridRt, cell + ScreenCoordsXY{ 4, 4 }, 86, 62))
                         entries[index].drawPreview(preview);
                 }
-                else if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject(entries[index].identity.type, entries[index].identity.index))
+                else if (
+                    const auto* object = GetContext()->GetObjectManager().GetLoadedObject(
+                        entries[index].identity.type, entries[index].identity.index))
                 {
                     Drawing::RenderTarget preview;
                     if (ClipRenderTarget(preview, gridRt, cell + ScreenCoordsXY{ 4, 4 }, 86, 62))
@@ -194,7 +199,9 @@ namespace OpenRCT2::Ui::Handheld
                     if (ClipRenderTarget(inner, art, { (art.width - 86) / 2, (art.height - 62) / 2 }, 86, 62))
                         focused->drawPreview(inner);
                 }
-                else if (const auto* object = GetContext()->GetObjectManager().GetLoadedObject(focused->identity.type, focused->identity.index))
+                else if (
+                    const auto* object = GetContext()->GetObjectManager().GetLoadedObject(
+                        focused->identity.type, focused->identity.index))
                 {
                     // Full-size preview where it fits (ride previews are 112 px squares).
                     Drawing::RenderTarget inner;
@@ -229,8 +236,9 @@ namespace OpenRCT2::Ui::Handheld
             hints.push_back({ "L1/R1", "Type" });
         else
             hints.push_back({ "L1/R1", "Page", HintPriority::secondary });
-        hints.push_back({ searchControl ? "X" : "START", searchControl ? "Search" : startAction,
-                          searchControl ? HintPriority::normal : HintPriority::guide });
+        hints.push_back(
+            { searchControl ? "X" : "START", searchControl ? "Search" : startAction,
+              searchControl ? HintPriority::normal : HintPriority::guide });
         if (!extraAction.empty())
             hints.push_back({ "X", extraAction });
         if (!groupAction.empty() && tabs.empty())

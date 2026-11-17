@@ -3,7 +3,6 @@
 #include <openrct2/actions/GameActionResult.h>
 #include <openrct2/core/Money.hpp>
 #include <openrct2/world/Location.hpp>
-
 #include <string>
 
 namespace OpenRCT2::Ui::Handheld::Undo

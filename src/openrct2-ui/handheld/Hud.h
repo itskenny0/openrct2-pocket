@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
-#include "MenuFeel.h"
 #include "ConceptStyle.h"
 #include "Currency.h"
 #include "Goal.h"
 #include "Layout.h"
+#include "MenuFeel.h"
 #include "MenuThemes.h"
 
 #include <SDL.h>
 #include <ctime>
-
 #include <openrct2/Game.h>
 #include <openrct2/GameState.h>
 #include <openrct2/localisation/Localisation.Date.h>
@@ -119,16 +118,22 @@ namespace OpenRCT2::Ui::Handheld
         const auto& state = getGameState();
         const auto& date = state.date;
         const bool noMoney = state.park.flags.has(ParkFlag::noMoney);
-        const auto shown = noMoney ? state.park.cash : cashTicker.Value(state.park.cash, MenuFeel::Clock(), MenuFeel::reduceMotion);
+        const auto shown = noMoney ? state.park.cash
+                                   : cashTicker.Value(state.park.cash, MenuFeel::Clock(), MenuFeel::reduceMotion);
         HudPresentation model{ noMoney ? "No money" : FormatMoney(shown),
-                 std::to_string(date.GetDay() + 1) + " " + FormatStringID(DateGameShortMonthNames[date.GetMonth()]) + " Y"
-                     + std::to_string(date.GetYear() + 1),
-                 std::to_string(state.park.numGuestsInPark),
-                 GameIsPaused(),
-                 state.park.cash < 0,
-                 noMoney,
-                 static_cast<uint16_t>(gGameSpeed >= 1 && gGameSpeed <= 8 ? 1u << (gGameSpeed - 1) : 0),
-                 noMoney ? 0 : cashTicker.Trend(), false, {}, -1, false };
+                               std::to_string(date.GetDay() + 1) + " "
+                                   + FormatStringID(DateGameShortMonthNames[date.GetMonth()]) + " Y"
+                                   + std::to_string(date.GetYear() + 1),
+                               std::to_string(state.park.numGuestsInPark),
+                               GameIsPaused(),
+                               state.park.cash < 0,
+                               noMoney,
+                               static_cast<uint16_t>(gGameSpeed >= 1 && gGameSpeed <= 8 ? 1u << (gGameSpeed - 1) : 0),
+                               noMoney ? 0 : cashTicker.Trend(),
+                               false,
+                               {},
+                               -1,
+                               false };
         if (preferences.hudClock)
         {
             model.showClock = true;
@@ -152,10 +157,10 @@ namespace OpenRCT2::Ui::Handheld
         DrawStrongText(
             rt, p + ScreenCoordsXY{ 8, 7 },
             std::string(
-                model.noMoney             ? "{MUTED}"
-                    : model.cashTrend > 0 ? "{POSITIVE}"
+                model.noMoney                                   ? "{MUTED}"
+                    : model.cashTrend > 0                       ? "{POSITIVE}"
                     : model.negativeCash || model.cashTrend < 0 ? "{GOLD}"
-                                          : "{WHITE}")
+                                                                : "{WHITE}")
                 + model.cash,
             cells.cashEnd - 16);
         DrawModernEllipsised(
@@ -177,7 +182,8 @@ namespace OpenRCT2::Ui::Handheld
         if (model.showClock)
         {
             DrawModernEllipsised(
-                rt, p + ScreenCoordsXY{ cells.guestsEnd + 7, 7 }, cells.clockEnd - cells.guestsEnd - 30, "{WHITE}" + model.clock);
+                rt, p + ScreenCoordsXY{ cells.guestsEnd + 7, 7 }, cells.clockEnd - cells.guestsEnd - 30,
+                "{WHITE}" + model.clock);
             if (model.battery >= 0)
             {
                 // A battery outline with a nub, filled to the level; red when low, green on charge.
@@ -190,7 +196,9 @@ namespace OpenRCT2::Ui::Handheld
                 GfxDrawLine(rt, { b + ScreenCoordsXY{ 14, 2 }, b + ScreenCoordsXY{ 14, 5 } }, ink);
                 const int fill = std::clamp(model.battery, 0, 100) * 11 / 100;
                 const auto level = static_cast<Drawing::PaletteIndex>(
-                    model.charging ? PocketPalette::positive : model.battery <= 15 ? PocketPalette::destructive : PocketPalette::primary);
+                    model.charging            ? PocketPalette::positive
+                        : model.battery <= 15 ? PocketPalette::destructive
+                                              : PocketPalette::primary);
                 for (int y = 2; y <= 5 && fill > 0; ++y)
                     GfxDrawLine(rt, { b + ScreenCoordsXY{ 2, y }, b + ScreenCoordsXY{ 1 + fill, y } }, level);
             }
@@ -224,13 +232,15 @@ namespace OpenRCT2::Ui::Handheld
         {
             const int track = kGoalWidth - 8;
             const auto foot = p + ScreenCoordsXY{ 4, kGoalHeight - 3 };
-            GfxDrawLine(rt, { foot, foot + ScreenCoordsXY{ track, 0 } }, static_cast<Drawing::PaletteIndex>(PocketPalette::separator));
+            GfxDrawLine(
+                rt, { foot, foot + ScreenCoordsXY{ track, 0 } }, static_cast<Drawing::PaletteIndex>(PocketPalette::separator));
             const int filled = track * goal.percent / 100;
             // Two pixels high so the fill reads at a glance on the device's small screen.
             for (int y = 0; y < 2 && filled > 0; ++y)
                 GfxDrawLine(
                     rt, { foot + ScreenCoordsXY{ 0, y - 1 }, foot + ScreenCoordsXY{ filled, y - 1 } },
-                    static_cast<Drawing::PaletteIndex>(goal.percent >= 100 ? PocketPalette::positive : PocketPalette::selection));
+                    static_cast<Drawing::PaletteIndex>(
+                        goal.percent >= 100 ? PocketPalette::positive : PocketPalette::selection));
         }
     }
 } // namespace OpenRCT2::Ui::Handheld

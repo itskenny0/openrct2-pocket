@@ -109,7 +109,7 @@ namespace OpenRCT2::Ui::Handheld
                     digits.push_back({ static_cast<size_t>(26 + (i + 1) % 10), i, 1 }); // 1..9 then 0
                 result.push_back(digits);
                 result.push_back(letters("QWERTYUIOP"));
-                result.push_back(letters("ASDFGHJKL", { { 38, 0, 1 } }));                          // '
+                result.push_back(letters("ASDFGHJKL", { { 38, 0, 1 } }));                           // '
                 result.push_back(letters("ZXCVBNM", { { 36, 0, 1 }, { 37, 0, 1 }, { 39, 0, 1 } })); // - . &
                 result.push_back({ { kCase, 0, 2 }, { 40, 2, 1 }, { 41, 3, 1 }, { kSpace, 4, 4 }, { kDelete, 8, 2 } });
                 result.push_back({ { kClear, 0, 3 }, { kDone, 3, 7 } });

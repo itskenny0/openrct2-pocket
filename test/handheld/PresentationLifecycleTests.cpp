@@ -1,8 +1,9 @@
 #include "PeopleTabNavigation.h"
 // SPDX-License-Identifier: GPL-3.0-only
 // Real SDL/window lifecycle with public engine data; graphics-disabled native park fixture.
-#include <SDL.h>
 #include "RideTabNavigation.h"
+
+#include <SDL.h>
 #include <iostream>
 #include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/handheld/AreaTools.h>
@@ -105,7 +106,9 @@ int main(int argc, char** argv)
         W::HandheldMenuBack();
         H::UpdateExplorer(input);
         // Published slate navigation returns root Build directly to the park.
-        Require(!Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu) && top(), "Root Build cancellation lost park/HUD return");
+        Require(
+            !Ui::GetWindowManager()->FindByClass(WindowClass::handheldMenu) && top(),
+            "Root Build cancellation lost park/HUD return");
         H::EndTerrain();
         // Metadata-only fixture for type-specific management; no fabricated operating track or guests.
         namespace R = H::RideManagement;
@@ -117,7 +120,9 @@ int main(int argc, char** argv)
         // This metadata-only fixture has no track or access; zero coordinates are real map positions.
         for (auto& station : ride->getStations())
         {
-            station.start.setNull(); station.entrance.setNull(); station.exit.setNull();
+            station.start.setNull();
+            station.entrance.setNull();
+            station.exit.setNull();
         }
         ride->type = RIDE_TYPE_WOODEN_ROLLER_COASTER;
         ride->subtype = context->GetObjectManager().GetLoadedObjectEntryIndex(object);
@@ -640,7 +645,7 @@ int main(int argc, char** argv)
         auto employee = S::Roster().back();
         Require(employee.type == StaffType::entertainer, "SDL entertainer hire failed");
         const auto oldCostume = S::Resolve(employee)->animationObjectIndex;
-        FocusPersonAction(true,"Costume...");
+        FocusPersonAction(true, "Costume...");
         press(H::Action::confirm);
         Require(W::HandheldStaffPresentation().breadcrumb == "Staff / Entertainer costume", "Costume picker route failed");
         const auto costumes = S::Costumes();
@@ -651,7 +656,7 @@ int main(int argc, char** argv)
         Require(
             S::Resolve(employee)->animationObjectIndex == costumes[chosen].first && state.park.cash == cash,
             "Costume action/held A accounting failed");
-        FocusPersonAction(true,"Patrol area...");
+        FocusPersonAction(true, "Patrol area...");
         press(H::Action::confirm);
         Require(H::StaffPatrol::Active() && !W::HandheldStaffIsOpen(), "Patrol inspector route failed");
         Require(
@@ -679,7 +684,7 @@ int main(int argc, char** argv)
         std::cout << "SDL patrol inspector / width-held-A / Cancel-first clear / options recovery passed" << std::endl;
         wm->CloseByClass(WindowClass::handheldMenu);
         W::HandheldStaffOpen(employee);
-        FocusPersonAction(true,"Name...");
+        FocusPersonAction(true, "Name...");
         press(H::Action::confirm);
         Require(W::HandheldStaffPresentation().columns == 8, "Staff keyboard route failed");
         const auto oldName = S::Resolve(employee)->getName();
@@ -716,7 +721,7 @@ int main(int argc, char** argv)
         GameActions::ProcessQueue(state);
         Require(handyman.has_value(), "SDL uniform target absent");
         W::HandheldStaffOpen(*handyman);
-        FocusPersonAction(true,"Uniform colour...");
+        FocusPersonAction(true, "Uniform colour...");
         press(H::Action::confirm);
         const auto oldColour = StaffGetColour(StaffType::handyman);
         press(H::Action::confirm);
@@ -730,9 +735,7 @@ int main(int argc, char** argv)
         W::HandheldStaffOpen();
         W::HandheldMenuMove(1);
         press(H::Action::confirm);
-        Require(
-            W::HandheldStaffPresentation().rows[1] == "Filter: Handyman",
-            "SDL role filtering failed");
+        Require(W::HandheldStaffPresentation().rows[1] == "Filter: Handyman", "SDL role filtering failed");
         W::HandheldMenuMove(2);
         press(H::Action::confirm);
         Require(W::HandheldStaffPresentation().stats.size() == 5, "SDL role wages/counts absent");

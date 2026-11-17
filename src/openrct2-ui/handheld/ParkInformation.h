@@ -99,13 +99,15 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
     }
     inline bool IsCurrentMessage(const NewsTarget& target)
     {
-        const auto& recent=getGameState().park.newsItems.getRecent();
-        return !target.archived && Current(target) && !recent.empty() && Same(recent.front(),target.item);
+        const auto& recent = getGameState().park.newsItems.getRecent();
+        return !target.archived && Current(target) && !recent.empty() && Same(recent.front(), target.item);
     }
     inline bool DismissCurrentMessage(const NewsTarget& target)
     {
-        if(!IsCurrentMessage(target))return false;
-        News::CloseCurrentItem(getGameState().park.newsItems);return true;
+        if (!IsCurrentMessage(target))
+            return false;
+        News::CloseCurrentItem(getGameState().park.newsItems);
+        return true;
     }
     inline bool SubjectCurrent(const NewsTarget& target)
     {
@@ -170,7 +172,8 @@ namespace OpenRCT2::Ui::Handheld::ParkInformation
             model.bodyLines.push_back(lines[i]);
         model.rows = { "Next text page", Location(target) ? "Locate subject" : "Location unavailable",
                        SubjectCurrent(target) ? "Inspect subject" : "Subject unavailable", "Back to news" };
-        if(IsCurrentMessage(target))model.rows.push_back("Dismiss current message");
+        if (IsCurrentMessage(target))
+            model.rows.push_back("Dismiss current message");
         model.selected = selected;
         model.status = status.empty() ? "Text page " + std::to_string(first / 6 + 1) + " / " + std::to_string(pages) : status;
         return model;

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Native initialized scenario fixture; construction and editing use real actions.
-#include <SDL.h>
 #include "RideTabNavigation.h"
+
+#include <SDL.h>
 #include <filesystem>
 #include <iostream>
 #include <openrct2-ui/UiContext.h>

@@ -355,6 +355,16 @@ else ()
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=objc-method-access")
     endif()
 
+    # GCC 15's flow warnings misfire on the handheld layer's brace-initialised vectors of
+    # strings once link-time optimisation inlines across files (dangling temporaries that are
+    # not dangling, strings "maybe" uninitialised after construction). Keep them as warnings.
+    # stringop-overflow and null-dereference misfire the same way at -O3 in bundled third-party
+    # code (picosha2); the Brick build always turned them off.
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=dangling-pointer -Wno-error=maybe-uninitialized -Wno-error=free-nonheap-object")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=stringop-overflow -Wno-error=null-dereference")
+    endif()
+
     if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=stringop-overflow")
     endif()

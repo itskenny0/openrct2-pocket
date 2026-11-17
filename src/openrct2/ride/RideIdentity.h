@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "../Identifiers.h"
+
 #include <cstdint>
 #include <unordered_map>
 
@@ -10,8 +11,11 @@ namespace OpenRCT2
     inline std::unordered_map<uint16_t, uint64_t> RideAllocationGenerations;
     inline uint64_t RideAllocationGeneration(RideId id)
     {
-        const auto it=RideAllocationGenerations.find(id.ToUnderlying());
-        return it==RideAllocationGenerations.end()?0:it->second;
+        const auto it = RideAllocationGenerations.find(id.ToUnderlying());
+        return it == RideAllocationGenerations.end() ? 0 : it->second;
     }
-    inline void RideAllocationChanged(RideId id) { ++RideAllocationGenerations[id.ToUnderlying()]; }
-}
+    inline void RideAllocationChanged(RideId id)
+    {
+        ++RideAllocationGenerations[id.ToUnderlying()];
+    }
+} // namespace OpenRCT2

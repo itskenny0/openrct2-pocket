@@ -50,4 +50,4 @@ namespace OpenRCT2::Ui::Handheld::GuestFollow
         if (target && target->id == id)
             Stop(); // Called before native peep removal, preventing slot reuse from moving the camera.
     }
-}
+} // namespace OpenRCT2::Ui::Handheld::GuestFollow

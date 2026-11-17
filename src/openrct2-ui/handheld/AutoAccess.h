@@ -2,10 +2,9 @@
 #pragma once
 #include "RideManagement.h"
 
+#include <functional>
 #include <openrct2/actions/GameActionResult.h>
 #include <openrct2/world/Location.hpp>
-
-#include <functional>
 #include <optional>
 #include <string>
 #include <vector>

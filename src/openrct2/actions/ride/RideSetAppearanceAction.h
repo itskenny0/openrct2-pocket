@@ -10,6 +10,7 @@
 #pragma once
 
 #include "../GameAction.hpp"
+
 #include <vector>
 
 namespace OpenRCT2::GameActions
@@ -41,7 +42,10 @@ namespace OpenRCT2::GameActions
         RideSetAppearanceAction() = default;
         RideSetAppearanceAction(RideId rideIndex, RideSetAppearanceType type, uint16_t value, uint32_t index);
 
-        void GuardShopContext(std::vector<int64_t> context) { _shopContext=std::move(context); }
+        void GuardShopContext(std::vector<int64_t> context)
+        {
+            _shopContext = std::move(context);
+        }
         void AcceptParameters(GameActionParameterVisitor&) final;
 
         uint16_t GetActionFlags() const override;

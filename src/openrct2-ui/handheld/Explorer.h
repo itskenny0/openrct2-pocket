@@ -5,20 +5,20 @@
 
 #pragma once
 #include "Alerts.h"
-#include "QuickWheel.h"
-#include <openrct2/object/Object.h>
 #include "PeepPlacement.h"
+#include "QuickWheel.h"
 #include "RideManagement.h"
 #include "RideNavigation.h"
 #include "SceneryTools.h"
 #include "StaffManagement.h"
-#include <openrct2/ride/TrackConstructionSupport.h>
 
 #include <cstddef>
-#include <string_view>
 #include <openrct2/Identifiers.h>
+#include <openrct2/object/Object.h>
 #include <openrct2/object/ObjectTypes.h>
+#include <openrct2/ride/TrackConstructionSupport.h>
 #include <openrct2/world/Location.hpp>
+#include <string_view>
 
 namespace OpenRCT2::Drawing
 {
@@ -64,8 +64,8 @@ namespace OpenRCT2::Ui::Handheld
     bool ResumeCustomTrack(RideId id);
     bool ResumeCustomTrackFrom(
         const RideManagement::Target& target, CoordsXYZD origin, TrackElemType type, bool backward = false);
-    bool ResumeCustomTrackReplacement(const RideManagement::Target& target,
-        const TrackConstructionSupport::BlockSnapshot& removed, uint8_t colour);
+    bool ResumeCustomTrackReplacement(
+        const RideManagement::Target& target, const TrackConstructionSupport::BlockSnapshot& removed, uint8_t colour);
     bool BeginFlatRide(ObjectEntryIndex index);
     bool BeginSavedDesign(const std::string& path, std::optional<ObjectEntryDescriptor> vehicle = {});
     bool ResumeFlatRide(RideId id);
@@ -87,7 +87,8 @@ namespace OpenRCT2::Ui::Windows
 {
     void HandheldRideOpen(RideId ride);
     void HandheldRideReturnNotice(std::string notice);
-    void HandheldRideReturn(const Handheld::RideManagement::Target& target, const std::optional<Handheld::RideNavigation::Context>& context = {});
+    void HandheldRideReturn(
+        const Handheld::RideManagement::Target& target, const std::optional<Handheld::RideNavigation::Context>& context = {});
     bool HandheldRideQuickAccess();
     void HandheldRideAccessOpen(const Handheld::RideManagement::Target& target);
     Handheld::ManagementPresentation HandheldDashboardPresentation(size_t selected);
@@ -113,7 +114,7 @@ namespace OpenRCT2::Ui::Windows
     Handheld::ManagementPresentation HandheldGuestsPresentation();
     void HandheldGuestOpen(const Handheld::GuestManagement::Target&);
     bool HandheldObjectPickerGroup();
-    bool HandheldTrackSelectionMove(int x,int y);
+    bool HandheldTrackSelectionMove(int x, int y);
     bool HandheldToolSettingsPage(int direction);
     std::string HandheldNewsText(const std::string& text);
     void HandheldNewsOpen();
@@ -176,4 +177,3 @@ namespace OpenRCT2::Ui::Windows
     void HandheldTreePickerPause();
     ObjectEntryIndex HandheldTreePickerFocus();
 } // namespace OpenRCT2::Ui::Windows
-

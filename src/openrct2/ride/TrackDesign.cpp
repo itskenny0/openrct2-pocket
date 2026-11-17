@@ -759,7 +759,8 @@ std::optional<TrackSceneryEntry> TrackDesignResolveScenery(const TrackDesignScen
 static std::optional<TrackSceneryEntry> TrackDesignPlaceSceneryElementGetEntry(const TrackDesignSceneryElement& scenery)
 {
     auto entry = TrackDesignResolveScenery(scenery);
-    if (!entry) _trackDesignPlaceStateSceneryUnavailable = true;
+    if (!entry)
+        _trackDesignPlaceStateSceneryUnavailable = true;
     return entry;
 }
 
@@ -1109,7 +1110,8 @@ static GameActions::Result TrackDesignPlaceSceneryElement(
             auto res = flags.has(CommandFlag::apply) ? GameActions::ExecuteNested(&smallSceneryPlace, gameState)
                                                      : GameActions::QueryNested(&smallSceneryPlace, gameState);
 
-            if (res.error != GameActions::Status::ok) ++_trackDesignPlaceStateSceneryOmitted;
+            if (res.error != GameActions::Status::ok)
+                ++_trackDesignPlaceStateSceneryOmitted;
             cost = res.error == GameActions::Status::ok ? res.cost : 0;
             break;
         }
@@ -1150,7 +1152,8 @@ static GameActions::Result TrackDesignPlaceSceneryElement(
             auto res = flags.has(CommandFlag::apply) ? GameActions::ExecuteNested(&sceneryPlaceAction, gameState)
                                                      : GameActions::QueryNested(&sceneryPlaceAction, gameState);
 
-            if (res.error != GameActions::Status::ok) ++_trackDesignPlaceStateSceneryOmitted;
+            if (res.error != GameActions::Status::ok)
+                ++_trackDesignPlaceStateSceneryOmitted;
             cost = res.cost;
             break;
         }
@@ -1189,7 +1192,8 @@ static GameActions::Result TrackDesignPlaceSceneryElement(
             auto res = flags.has(CommandFlag::apply) ? GameActions::ExecuteNested(&wallPlaceAction, gameState)
                                                      : GameActions::QueryNested(&wallPlaceAction, gameState);
 
-            if (res.error != GameActions::Status::ok) ++_trackDesignPlaceStateSceneryOmitted;
+            if (res.error != GameActions::Status::ok)
+                ++_trackDesignPlaceStateSceneryOmitted;
             cost = res.cost;
             break;
         }
@@ -1231,8 +1235,9 @@ static GameActions::Result TrackDesignPlaceSceneryElement(
                 auto res = flags.has(CommandFlag::apply) ? GameActions::ExecuteNested(&footpathPlaceAction, gameState)
                                                          : GameActions::QueryNested(&footpathPlaceAction, gameState);
                 // Ignore failures
-                if (res.error != GameActions::Status::ok) ++_trackDesignPlaceStateSceneryOmitted;
-            cost = res.error == GameActions::Status::ok ? res.cost : 0;
+                if (res.error != GameActions::Status::ok)
+                    ++_trackDesignPlaceStateSceneryOmitted;
+                cost = res.error == GameActions::Status::ok ? res.cost : 0;
             }
             else
             {

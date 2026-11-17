@@ -4,10 +4,10 @@
  *****************************************************************************/
 
 #include "ControllerInput.h"
-#include <array>
 
 #include <SDL.h>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdlib>
 #include <string_view>
@@ -26,29 +26,46 @@ namespace OpenRCT2::Ui::Handheld
 
     std::optional<Action> ButtonAction(uint8_t button)
     {
-        const bool swapped=std::getenv("OPENRCT2_HANDHELD_SWAP_AB") != nullptr
+        const bool swapped = std::getenv("OPENRCT2_HANDHELD_SWAP_AB") != nullptr
             && std::string_view(std::getenv("OPENRCT2_HANDHELD_SWAP_AB")) == "1";
-        switch(button) {
-            case SDL_CONTROLLER_BUTTON_A: return swapped?Action::back:Action::confirm;
-            case SDL_CONTROLLER_BUTTON_B: return swapped?Action::confirm:Action::back;
-            case SDL_CONTROLLER_BUTTON_X: return Action::contextPrimary;
-            case SDL_CONTROLLER_BUTTON_Y: return Action::contextSecondary;
-            case SDL_CONTROLLER_BUTTON_LEFTSHOULDER: return Action::previousOption;
-            case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER: return Action::nextOption;
-            case SDL_CONTROLLER_BUTTON_LEFTSTICK: return Action::cameraMode;
-            case SDL_CONTROLLER_BUTTON_START: return Action::openMenu;
-            case SDL_CONTROLLER_BUTTON_BACK: return Action::openBuild;
-            default: return {};
+        switch (button)
+        {
+            case SDL_CONTROLLER_BUTTON_A:
+                return swapped ? Action::back : Action::confirm;
+            case SDL_CONTROLLER_BUTTON_B:
+                return swapped ? Action::confirm : Action::back;
+            case SDL_CONTROLLER_BUTTON_X:
+                return Action::contextPrimary;
+            case SDL_CONTROLLER_BUTTON_Y:
+                return Action::contextSecondary;
+            case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
+                return Action::previousOption;
+            case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:
+                return Action::nextOption;
+            case SDL_CONTROLLER_BUTTON_LEFTSTICK:
+                return Action::cameraMode;
+            case SDL_CONTROLLER_BUTTON_START:
+                return Action::openMenu;
+            case SDL_CONTROLLER_BUTTON_BACK:
+                return Action::openBuild;
+            default:
+                return {};
         }
     }
     std::string_view ActionKey(Action action)
     {
-        for(const auto& [button,label]:std::array<std::pair<uint8_t,std::string_view>,8>{{
-            {SDL_CONTROLLER_BUTTON_A,"A"},{SDL_CONTROLLER_BUTTON_B,"B"},{SDL_CONTROLLER_BUTTON_X,"X"},
-            {SDL_CONTROLLER_BUTTON_Y,"Y"},{SDL_CONTROLLER_BUTTON_LEFTSHOULDER,"L1"},
-            {SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,"R1"},{SDL_CONTROLLER_BUTTON_START,"START"},{SDL_CONTROLLER_BUTTON_BACK,"SELECT"}}})
-            if(ButtonAction(button)==action)return label;
-        return action==Action::slopeDown?"L2":action==Action::slopeUp?"R2":"";
+        for (const auto& [button, label] :
+             std::array<std::pair<uint8_t, std::string_view>, 8>{ { { SDL_CONTROLLER_BUTTON_A, "A" },
+                                                                    { SDL_CONTROLLER_BUTTON_B, "B" },
+                                                                    { SDL_CONTROLLER_BUTTON_X, "X" },
+                                                                    { SDL_CONTROLLER_BUTTON_Y, "Y" },
+                                                                    { SDL_CONTROLLER_BUTTON_LEFTSHOULDER, "L1" },
+                                                                    { SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, "R1" },
+                                                                    { SDL_CONTROLLER_BUTTON_START, "START" },
+                                                                    { SDL_CONTROLLER_BUTTON_BACK, "SELECT" } } })
+            if (ButtonAction(button) == action)
+                return label;
+        return action == Action::slopeDown ? "L2" : action == Action::slopeUp ? "R2" : "";
     }
     ControllerInput::~ControllerInput()
     {
@@ -193,7 +210,8 @@ namespace OpenRCT2::Ui::Handheld
         const int y = held(SDL_CONTROLLER_BUTTON_DPAD_DOWN) - held(SDL_CONTROLLER_BUTTON_DPAD_UP);
         result.heldX = x;
         result.heldY = y;
-        result.backHeld = held(ButtonAction(SDL_CONTROLLER_BUTTON_B) == Action::back ? SDL_CONTROLLER_BUTTON_B : SDL_CONTROLLER_BUTTON_A);
+        result.backHeld = held(
+            ButtonAction(SDL_CONTROLLER_BUTTON_B) == Action::back ? SDL_CONTROLLER_BUTTON_B : SDL_CONTROLLER_BUTTON_A);
         for (const auto button : { SDL_CONTROLLER_BUTTON_X, SDL_CONTROLLER_BUTTON_Y })
             if (ButtonAction(button) == Action::contextSecondary && held(button))
                 result.secondaryHeld = true;

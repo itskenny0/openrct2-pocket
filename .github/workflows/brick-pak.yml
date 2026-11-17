@@ -1,0 +1,36 @@
+# Builds the TrimUI Brick (NextUI) Pak. Called by the testing and release workflows.
+name: Brick Pak
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: File name of the Pak archive
+        required: true
+        type: string
+jobs:
+  pak:
+    name: Build Brick Pak
+    runs-on: ubuntu-24.04
+    # OpenRCT2's build image has the host libraries the native graphics step needs.
+    container: ghcr.io/openrct2/openrct2-build:26-noble
+    env:
+      BRICK_SDK: ${{ github.workspace }}/../brick-sdk
+    steps:
+      - uses: actions/checkout@v4
+      - run: git config --global --add safe.directory "$PWD"
+      # ICU (built for the target in build-deps.sh) uses autotools; the image has no make.
+      - name: Install make
+        run: apt-get update -q && apt-get install -yq --no-install-recommends make curl
+      # The toolchain, vendor SDK and cross-built libraries take a long time and change rarely.
+      - name: Restore SDK
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/../brick-sdk
+          key: brick-sdk-${{ hashFiles('packaging/handheld/nextui/build-deps.sh', 'packaging/handheld/nextui/download-deps.py', 'packaging/handheld/nextui/setup.sh', 'packaging/handheld/nextui/target.cmake') }}
+      - name: Build
+        run: bash packaging/handheld/nextui/ci-build.sh "${{ inputs.name }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.name }}
+          path: ${{ inputs.name }}
+          if-no-files-found: error
