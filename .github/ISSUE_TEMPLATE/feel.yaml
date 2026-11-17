@@ -1,0 +1,23 @@
+name: Feels wrong
+description: Not a bug, but something feels awkward, slow, confusing or un-handheld.
+labels: [feel]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Pocket is meant to feel like a game made for a handheld. If you reached for a mouse that
+        isn't there, a screen confused you, or a control felt off, this is the place.
+  - type: textarea
+    id: moment
+    attributes:
+      label: What were you trying to do, and what felt wrong?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would feel right? (optional)
+  - type: input
+    id: version
+    attributes:
+      label: Pocket version and device
