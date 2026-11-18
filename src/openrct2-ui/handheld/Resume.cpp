@@ -20,6 +20,7 @@ namespace OpenRCT2::Ui::Handheld::Resume
         constexpr uint64_t kThrottleMs = 60000;
         uint64_t lastSave{};
         bool everSaved{};
+        bool discarded{};
 
         void LoadPreferences()
         {
@@ -41,7 +42,7 @@ namespace OpenRCT2::Ui::Handheld::Resume
 
     bool Save()
     {
-        if (!Wanted())
+        if (discarded || !Wanted())
             return false;
         // Same atomic write as the save slots: a write cut short by power loss leaves the
         // previous resume save in place rather than a damaged file.
@@ -84,12 +85,16 @@ namespace OpenRCT2::Ui::Handheld::Resume
 
     bool BeforeQuit()
     {
-        // Not throttled: this is the last chance.
-        return Save();
+        // Not throttled: this is the last chance. After a deliberate discard there is nothing to
+        // keep, so the game may close without asking.
+        return discarded || Save();
     }
 
     void Discard()
     {
+        // Final for this session: the system closing the game a moment later (SDL_QUIT) or the
+        // screen losing focus must not write the park straight back.
+        discarded = true;
         std::error_code error;
         std::filesystem::remove(Path(), error);
     }

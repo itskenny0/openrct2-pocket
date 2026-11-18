@@ -269,10 +269,50 @@ namespace OpenRCT2::Ui::Windows
     static std::string sRideReturnNotice; // Set by a tool just before it hands back to the ride.
     static std::string sLastBuildLabel;
     static uint32_t sLastBuildSprite{};
+    static fs::path SavesFolder()
+    {
+        return fs::u8path(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user, DirId::saves));
+    }
+    // A park's name as a folder name: characters that FAT (the SD card) refuses become spaces.
+    static std::string SlotFolderName(const std::string& park)
+    {
+        std::string name;
+        for (const char c : park)
+            name += (static_cast<unsigned char>(c) < 32 || std::string_view("<>:\"/\\|?*").find(c) != std::string_view::npos)
+                ? ' '
+                : c;
+        while (!name.empty() && (name.back() == ' ' || name.back() == '.'))
+            name.pop_back();
+        while (!name.empty() && name.front() == ' ')
+            name.erase(name.begin());
+        if (name.size() > 60)
+            name.resize(60);
+        return name.empty() ? "Park" : name;
+    }
+    // Quick slots belong to the open park: saves/Pocket/<park>/Slot N.park, three per park.
     static fs::path SlotPath(size_t slot)
     {
-        return fs::u8path(GetContext()->GetPlatformEnvironment().GetDirectoryPath(DirBase::user, DirId::saves))
-            / ("Pocket-" + std::to_string(slot + 1) + ".park");
+        return SavesFolder() / "Pocket" / fs::u8path(SlotFolderName(getGameState().park.name))
+            / ("Slot " + std::to_string(slot + 1) + ".park");
+    }
+    // Earlier builds kept three slots shared by every park (saves/Pocket-N.park). A shared slot
+    // holding this park moves into the park's own folder when its slots are first shown; slots
+    // holding other parks stay where they are until those parks are open.
+    static void AdoptSharedSlots()
+    {
+        std::error_code error;
+        for (size_t slot = 0; slot < 3; ++slot)
+        {
+            const auto shared = SavesFolder() / ("Pocket-" + std::to_string(slot + 1) + ".park");
+            const auto own = SlotPath(slot);
+            if (!fs::exists(shared, error) || fs::exists(own, error))
+                continue;
+            const auto preview = Handheld::SavedParkPresentation::Read(shared);
+            if (!preview || preview->parkName != getGameState().park.name)
+                continue;
+            fs::create_directories(own.parent_path(), error);
+            fs::rename(shared, own, error);
+        }
     }
 
     class HandheldMenuWindow;
@@ -2214,6 +2254,8 @@ namespace OpenRCT2::Ui::Windows
             ++_shopAppearanceRequest;
             _page = next;
             if (next == Page::save || next == Page::load)
+                AdoptSharedSlots();
+            if (next == Page::save || next == Page::load)
                 for (size_t slot = 0; slot < 3; ++slot)
                     _slotPreviews[slot] = Handheld::SavedParkPresentation::Read(SlotPath(slot));
             if (next == Page::designOptions)
@@ -2712,10 +2754,10 @@ namespace OpenRCT2::Ui::Windows
                         std::error_code error;
                         const bool exists = fs::exists(SlotPath(slot), error);
                         result.push_back(
-                            "Pocket " + std::to_string(slot + 1) + " / "
-                            + (_slotPreviews[slot] && !_slotPreviews[slot]->parkName.empty() ? _slotPreviews[slot]->parkName
-                                   : exists                                                  ? "Saved park"
-                                                                                             : "Empty"));
+                            "Slot " + std::to_string(slot + 1) + " / "
+                            + (_slotPreviews[slot] ? Handheld::SavedParkPresentation::Date(*_slotPreviews[slot])
+                                   : exists        ? "Saved park"
+                                                   : "Empty"));
                     }
                     result.push_back(_page == Page::load ? "Browse parks / autosaves..." : "Named Save As...");
                     return result;
