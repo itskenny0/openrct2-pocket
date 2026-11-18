@@ -3341,6 +3341,11 @@ namespace OpenRCT2::Ui::Windows
                 static_cast<int>(_page)));
             if (_menuFeel.NeedsDraw())
                 invalidate();
+            if (managementShell() && Handheld::MenuFeel::Clock() - _previewRefreshed > 500)
+            {
+                _previewRefreshed = Handheld::MenuFeel::Clock();
+                invalidate();
+            }
             if (_scrollViews[scrollKey()].moving())
                 invalidate();
             if (_page == Page::sceneryPicker)
@@ -3704,7 +3709,10 @@ namespace OpenRCT2::Ui::Windows
             if (current < controls)
             {
                 if (x)
+                {
                     adjust(current, x);
+                    ++_valueSteps;
+                }
                 else if (y < 0 && current > 0)
                     next = current - 1;
                 else if (y > 0 && current + 1 < count)
@@ -3922,7 +3930,31 @@ namespace OpenRCT2::Ui::Windows
                 page(Page::dashboard);
             }
         }
+        // Left/Right that changed a value (admission, funding, a toggle) rather than moving focus.
+        uint32_t _valueSteps{};
+        // The rail keeps showing a preview of the focused section; repaint it now and then so the
+        // numbers stay live while the game runs.
+        uint64_t _previewRefreshed{};
         void dashboardMove(int x, int y)
+        {
+            // Left that does nothing else in a section's content returns to the section rail, as
+            // the rail on the left suggests (B still works too).
+            if (x < 0 && !y && !dashboardRailFocused() && !_leaveAction && managementShell() && dashboardCanSwitch())
+            {
+                const auto page = _page;
+                const auto focused = _focus.index();
+                const auto steps = _valueSteps;
+                dashboardMoveWithin(x, y);
+                if (_page == page && _focus.index() == focused && _valueSteps == steps && dashboardCanSwitch())
+                {
+                    this->page(Page::dashboard);
+                    invalidate();
+                }
+                return;
+            }
+            dashboardMoveWithin(x, y);
+        }
+        void dashboardMoveWithin(int x, int y)
         {
             if (_leaveAction)
             {
@@ -3949,6 +3981,7 @@ namespace OpenRCT2::Ui::Windows
                         _ledger.Move(x);
                     else
                         _financeSample = std::clamp<int>(static_cast<int>(_financeSample) - x, 0, 63);
+                    ++_valueSteps;
                 }
                 if (y)
                     move(y);
@@ -9241,83 +9274,78 @@ namespace OpenRCT2::Ui::Windows
             }
             if (managementShell())
             {
+                // One builder for a section's content, used both for the page itself and for the
+                // rail's preview of it, so the preview always matches the page it leads to.
+                auto build = [&]() {
+                    Handheld::ManagementPresentation model;
+                    if (overviewManagement())
+                        model = overviewPresentation();
+                    else if (ridesManagement())
+                        model = ridesPresentationFor(_page, _focus.index());
+                    else if (guestManagement())
+                        model = guestsPresentation();
+                    else if (staffManagement())
+                        model = staffPresentation();
+                    else if (researchManagement())
+                        model = researchPresentation();
+                    else if (marketingManagement())
+                        model = marketingPresentationFor(_page, _focus.index());
+                    else
+                    {
+                        using Handheld::Finances::View;
+                        model = _page == Page::finances ? financeWorkspace()
+                                                        : Handheld::Finances::Presentation(
+                                                              _page == Page::finances            ? View::overview
+                                                                  : _page == Page::financeEditor ? View::editor
+                                                                                                 : View::confirmation,
+                                                              _focus.index(), _financeDraft, _status);
+                    }
+                    return model;
+                };
                 Handheld::ManagementPresentation model;
                 if (_page == Page::dashboard)
                 {
-                    if (_dashboard.section == Handheld::Dashboard::Section::overview)
-                        model = Handheld::ParkOverview::Presentation(0);
-                    else if (_dashboard.section == Handheld::Dashboard::Section::staff)
-                    {
-                        const auto resume = _sectionResume[_dashboard.index()];
-                        if (resume.page && *resume.page != Page::staff)
-                            model = staffPresentationFor(*resume.page, resume.row);
-                        else
-                            model = Handheld::StaffManagement::Presentation(
-                                Handheld::StaffManagement::View::roster, resume.row, Handheld::StaffManagement::Roster());
-                    }
-                    else if (_dashboard.section == Handheld::Dashboard::Section::rides)
-                    {
-                        const auto resume = _sectionResume[_dashboard.index()];
-                        model = resume.page && *resume.page != Page::ridesRoster
-                            ? ridesPresentationFor(*resume.page, resume.row)
-                            : Handheld::RideManagement::Presentation(
-                                  Handheld::RideManagement::View::roster, resume.row, Handheld::RideManagement::Roster());
-                    }
-                    else if (_dashboard.section == Handheld::Dashboard::Section::guests)
-                    {
-                        const auto resume = _sectionResume[_dashboard.index()];
-                        model = resume.page
-                            ? guestPresentationFor(*resume.page, resume.row)
-                            : Handheld::GuestManagement::Presentation(Handheld::GuestManagement::View::overview, 0);
-                    }
-                    else if (_dashboard.section == Handheld::Dashboard::Section::finances)
-                        model = Handheld::Finances::Presentation(Handheld::Finances::View::overview, 0);
-                    else if (_dashboard.section == Handheld::Dashboard::Section::marketing)
-                    {
-                        const auto resume = _sectionResume[_dashboard.index()];
-                        model = resume.page && *resume.page == Page::marketingActive
-                            ? marketingPresentationFor(Page::marketingActive, resume.row)
-                            : Handheld::MarketingManagement::Presentation(
-                                  Handheld::MarketingManagement::View::overview, 0, {}, -1,
-                                  Handheld::MarketingManagement::ActiveTypes());
-                    }
-                    else if (_dashboard.section == Handheld::Dashboard::Section::research)
-                        model = Handheld::ResearchManagement::Presentation(Handheld::ResearchManagement::View::overview, 0);
-                    else
+                    // Preview: the page entering the section would open (where you left it, or the
+                    // section's first page), built as that page, then the rail state put back.
+                    using Handheld::Dashboard::Section;
+                    const auto root = _dashboard.section == Section::staff ? std::optional<Page>{ Page::staff }
+                        : _dashboard.section == Section::finances          ? std::optional<Page>{ Page::finances }
+                        : _dashboard.section == Section::research          ? std::optional<Page>{ Page::research }
+                        : _dashboard.section == Section::marketing         ? std::optional<Page>{ Page::marketing }
+                        : _dashboard.section == Section::guests            ? std::optional<Page>{ Page::guests }
+                        : _dashboard.section == Section::rides             ? std::optional<Page>{ Page::ridesRoster }
+                        : _dashboard.section == Section::overview          ? std::optional<Page>{ Page::overview }
+                                                                           : std::nullopt;
+                    if (!root || !_dashboard.category().available)
                         model = Handheld::Dashboard::Unavailable(_dashboard.section);
+                    else
+                    {
+                        const auto resume = _sectionResume[_dashboard.index()];
+                        const auto target = resume.page.value_or(*root);
+                        // The lists a page normally fills when it is opened.
+                        if (target == Page::ridesRoster)
+                            _ridesRoster = Handheld::RideManagement::Roster();
+                        if (target == Page::staff)
+                            _staffRoster = Handheld::StaffManagement::Roster(_staffFilter);
+                        if (target == Page::guestRoster)
+                            _guestRoster = Handheld::GuestManagement::Roster(_guestFilter);
+                        if (target == Page::marketing)
+                            _marketingActiveTypes = Handheld::MarketingManagement::ActiveTypes();
+                        const auto railPage = _page;
+                        const auto railFocus = _focus;
+                        _page = target;
+                        _focus = {};
+                        if (const auto count = rows().size(); count && resume.page)
+                            _focus.move(static_cast<int32_t>(std::min(resume.row, count - 1)), count);
+                        model = build();
+                        _page = railPage;
+                        _focus = railFocus;
+                    }
                     if (!_status.empty())
                         model.status = _status;
                 }
-                else if (overviewManagement())
-                    model = overviewPresentation();
-                else if (ridesManagement())
-                    model = ridesPresentationFor(_page, _focus.index());
-                else if (guestManagement())
-                    model = guestsPresentation();
-                else if (staffManagement())
-                    model = staffPresentation();
-                else if (researchManagement())
-                    model = researchPresentation();
-                else if (marketingManagement())
-                    model = marketingPresentationFor(_page, _focus.index());
                 else
-                {
-                    using Handheld::Finances::View;
-                    model = _page == Page::finances ? financeWorkspace()
-                                                    : Handheld::Finances::Presentation(
-                                                          _page == Page::finances            ? View::overview
-                                                              : _page == Page::financeEditor ? View::editor
-                                                                                             : View::confirmation,
-                                                          _focus.index(), _financeDraft, _status);
-                }
-                if (_page == Page::dashboard)
-                {
-                    model.metricHeight = 40;
-                    // Rosters keep their detail line in the preview, so the rail already shows
-                    // status and queues before you step in.
-                    if (model.rowDetails.empty())
-                        model.rowHeight = 26;
-                }
+                    model = build();
                 Handheld::Dashboard::Draw(
                     rt, { ContextGetWidth(), ContextGetHeight() }, _dashboard, model, dashboardCanSwitch());
                 if (_page == Page::finances && _financeTabs.tab == 2)

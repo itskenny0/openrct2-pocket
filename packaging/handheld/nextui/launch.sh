@@ -2,7 +2,19 @@
 # NextUI Tools/tg5040/OpenRCT2 Pocket.pak/launch.sh
 set -eu
 PAK_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)"
-SD_ROOT="$(CDPATH= cd -- "$PAK_DIR/../../.." && pwd -P)"
+# Find the SD card root. NextUI puts Paks in Tools/<platform>/, NX Redux and others directly in
+# Tools/, so a fixed number of "../" is wrong on one or the other. Prefer the frontend's
+# SDCARD_PATH, then the nearest folder above the Pak that has .userdata, then /mnt/SDCARD.
+SD_ROOT="${SDCARD_PATH:-}"
+if [ -z "$SD_ROOT" ] || [ ! -d "$SD_ROOT" ]; then
+ SD_ROOT=""
+ dir="$PAK_DIR"
+ while [ "$dir" != "/" ]; do
+  dir="$(dirname -- "$dir")"
+  if [ -d "$dir/.userdata" ]; then SD_ROOT="$dir"; break; fi
+ done
+ [ -n "$SD_ROOT" ] || SD_ROOT="/mnt/SDCARD"
+fi
 USER_DIR="$SD_ROOT/.userdata/tg5040/openrct2-pocket"
 mkdir -p "$USER_DIR"
 exec >> "$USER_DIR/launch.log" 2>&1
@@ -19,6 +31,15 @@ for driver in /usr/trimui/lib/libEGL.so /usr/trimui/lib/libEGL.so.1 /usr/trimui/
 done
 if [ ! -x "$GAME_DIR/openrct2" ] || [ ! -x "$LOADER" ] || [ ! -f "$GAME_DIR/data/g2.dat" ]; then
  echo 'Incomplete package: executable, loader or engine data missing.';exit 1
+fi
+# A damaged copy of a bundled library is skipped silently by the loader, which then falls back to
+# the device's older one and the game refuses to start. Check the runtime against the Pak's
+# checksums so the log names the bad file.
+if command -v sha256sum >/dev/null 2>&1 && [ -f "$GAME_DIR/SHA256SUMS.txt" ]; then
+ if ! (cd "$GAME_DIR" && grep '  lib/' SHA256SUMS.txt | sha256sum -c >/dev/null 2>&1); then
+  echo 'Damaged runtime files (copy the Pak to the SD card again):'
+  (cd "$GAME_DIR" && grep '  lib/' SHA256SUMS.txt | sha256sum -c 2>&1 | grep -v ': OK$')
+ fi
 fi
 RCT2_DIR="${OPENRCT2_RCT2_PATH:-$PAK_DIR/RCT2}"
 if [ ! -f "$RCT2_DIR/Data/g1.dat" ] && [ ! -f "$RCT2_DIR/data/g1.dat" ]; then
@@ -38,7 +59,23 @@ if [ -z "${OPENRCT2_BRICK_KEEP_MAPPING:-}" ]; then
 fi
 printf 'Platform=%s Device=%s Assets=%s User=%s\n' "${PLATFORM:-unset}" "${DEVICE:-unset}" "$RCT2_DIR" "$USER_DIR"
 printf 'SDL video=%s audio=%s\n' "${SDL_VIDEODRIVER:-auto}" "${SDL_AUDIODRIVER:-auto}"
+# Some frontends (NX Redux among them) preload their own hooks. Preloads load before the Pak's
+# private libraries are searched, so a preload that depends on the system libstdc++ drags in
+# that older copy and the game refuses to start. The game gets the Pak's runtime only.
+printf 'LD_PRELOAD=%s\n' "${LD_PRELOAD:-unset}"
+[ ! -s /etc/ld.so.preload ] || { printf '/etc/ld.so.preload: '; tr '\n' ' ' < /etc/ld.so.preload; echo; }
+unset LD_PRELOAD
+# libstdc++ ships as libstdcxx.so.6 because some copy tools drop names containing '+'. Preload it
+# by path so the game and ICU get the Pak's copy instead of the device's older one.
+# (The path is relative to the game folder, set below: LD_PRELOAD splits on spaces, and the Pak's
+# own folder name has one. The bundled glibc 2.26 loader predates --preload.)
+PRELOAD=""
+for cxx in libstdcxx.so.6 libstdc++.so.6; do
+ if [ -f "$LIB_DIR/$cxx" ]; then PRELOAD="lib/$cxx"; break; fi
+done
+[ -n "$PRELOAD" ] || echo 'Warning: the Pak has no libstdc++ (libstdcxx.so.6); copy the Pak to the SD card again.'
 cd "$GAME_DIR"
+[ -z "$PRELOAD" ] || export LD_PRELOAD="$PRELOAD"
 # A private glibc runtime avoids imposing a newer libc on NextUI itself.
 # The loader affects this child only. Exiting returns normally to NextUI.
 exec "$LOADER" --library-path "$RUNTIME_LIB_PATH" "$GAME_DIR/openrct2" \

@@ -28,6 +28,10 @@ while queue:
 for name in ['ld-linux-aarch64.so.1','libnss_files.so.2','libnss_dns.so.2','libresolv.so.2']:
  found=next((r/name for r in roots if (r/name).exists()),None)
  if found:shutil.copy2(found.resolve(),lib/name);(lib/name).chmod(0o755)
+# Some copy tools (file managers, FTP and transfer apps) silently drop file names containing '+'.
+# Ship libstdc++ under a plain name; launch.sh preloads it by path, and the loader then matches
+# every later request for libstdc++.so.6 to it by its internal soname.
+if (lib/'libstdc++.so.6').exists():(lib/'libstdc++.so.6').rename(lib/'libstdcxx.so.6')
 for name in ['g2.dat','fonts.dat','palettes.dat','tracks.dat']:
  src=a.build/name
  if not src.exists():raise RuntimeError('Supply matching native-generated graphics '+name)
