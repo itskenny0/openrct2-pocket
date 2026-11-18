@@ -127,6 +127,13 @@ namespace OpenRCT2::Ui::Windows
             {
                 if (!it->is_regular_file(error) || it->path().extension() != ".park")
                     continue;
+                // OpenRCT2 also writes a park to saves/autosave every few minutes. Those are crash
+                // insurance, not the player's save: after "Quit without saving", Continue picking
+                // one up looked as if the game had saved anyway. Pocket's own resume save (also in
+                // that folder, removed by a deliberate discard) is the only one Continue offers.
+                if (it->path().parent_path().filename() == "autosave"
+                    && it->path().filename() != Handheld::Resume::Path().filename())
+                    continue;
                 const auto time = it->last_write_time(error);
                 if (!error && (!_continuePath || time > newest))
                 {

@@ -59,10 +59,33 @@ namespace OpenRCT2::Ui::Handheld
         }
 
     public:
-        static uint64_t Clock()
+        static uint64_t RealClock()
         {
             return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
                 .count();
+        }
+        // One time per frame. The game draws a frame in blocks, one after another; reading the real
+        // clock in each block let an animation (a preview easing in, a scrolling name) show
+        // different moments in neighbouring blocks, which tore moving images on the device, where a
+        // frame takes several milliseconds to draw. The time is held for the frame (the game counts
+        // frames; the UI points frameCounter at that count) and refreshed after 50 ms regardless,
+        // so code running between frames, such as hold timers, still sees time pass. Without a
+        // frame counter (the input tests), it is the real clock.
+        static inline uint32_t (*frameCounter)() = nullptr;
+        static uint64_t Clock()
+        {
+            if (frameCounter == nullptr)
+                return RealClock();
+            static uint32_t frame = 0;
+            static uint64_t held = 0;
+            const auto now = RealClock();
+            const auto current = frameCounter();
+            if (frame != current || now - held > 50 || now < held)
+            {
+                frame = current;
+                held = now;
+            }
+            return held;
         }
         Event Observe(const std::string& page, size_t selected, uint64_t now = Clock(), int pageId = -1)
         {

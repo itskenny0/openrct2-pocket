@@ -51,12 +51,15 @@ cmake -S . -B host-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOPENRCT2_USE_CCAC
     -DDISABLE_GOOGLE_BENCHMARK=ON
 cmake --build host-build --target graphics
 
-# 3. Cross build.
+# 3. Cross build. Link-time optimisation is on (IPO): the renderer's hot paths cross files, and
+#    letting the compiler inline across them is worth a few frames on the Brick. CMAKE_CXX_FLAGS
+#    given here replaces the toolchain's CMAKE_CXX_FLAGS_INIT, so the CPU tuning is repeated.
 cmake -S . -B brick-build -G Ninja -DCMAKE_TOOLCHAIN_FILE="$BRICK_SDK/target.cmake" \
     -DCMAKE_BUILD_TYPE=Release -DOPENRCT2_USE_CCACHE=OFF -DDISABLE_NETWORK=ON -DDISABLE_HTTP=ON \
-    -DDISABLE_TTF=ON -DDISABLE_OPENGL=ON -DDISABLE_DISCORD_RPC=ON -DDISABLE_IPO=ON -DDISABLE_VORBIS=ON \
+    -DDISABLE_TTF=ON -DDISABLE_OPENGL=ON -DDISABLE_DISCORD_RPC=ON -DDISABLE_VORBIS=ON \
     -DDISABLE_FLAC=ON -DDISABLE_GOOGLE_BENCHMARK=ON -DBUILD_SHARED_LIBS=OFF \
-    -DCMAKE_CXX_FLAGS='-Wno-error=stringop-overflow -Wno-error=maybe-uninitialized -Wno-error=null-dereference'
+    -DCMAKE_AR="$BIN/aarch64-linux-gnu-gcc-ar" -DCMAKE_RANLIB="$BIN/aarch64-linux-gnu-gcc-ranlib" \
+    -DCMAKE_CXX_FLAGS='-mcpu=cortex-a53 -Wno-error=stringop-overflow -Wno-error=maybe-uninitialized -Wno-error=null-dereference'
 cmake --build brick-build --target openrct2 openrct2-cli
 "$BIN/aarch64-linux-gnu-gcc" --sysroot="$ROOT" -mcpu=cortex-a53 "$NEXTUI/input-map.c" \
     -I"$ROOT/usr/include/SDL2" -L"$ROOT/usr/lib" -lSDL2 -o brick-build/input-map

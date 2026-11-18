@@ -143,6 +143,9 @@ int main(int argc, char** argv)
             ResetAllSpriteQuadrantPlacements();
             Drawing::UpdatePaletteEffects();
             ViewportRender(rt, WindowGetMain()->viewport);
+            if (std::getenv("POCKET_OVERLAY_AUDIT"))
+                if (const auto gap = H::OverlayAudit(); !gap.empty())
+                    std::cerr << "AUDIT " << name << ": " << gap << "\n";
             if (auto* window = wm->FindByClass(WindowClass::handheldMenu))
                 window->onDraw(rt);
             else
@@ -310,11 +313,11 @@ int main(int argc, char** argv)
             Check(H::QuickWheelOpen(), "L2 did not open the quick wheel");
             dpad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, true);
             capture("00d-quick-wheel.png");
-            dpad(SDL_CONTROLLER_BUTTON_DPAD_UP, true);
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_UP, true);  // A true diagonal jumps to the corner (Again).
             dpad(SDL_CONTROLLER_BUTTON_DPAD_UP, false); // Leaving a diagonal keeps it.
             dpad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, false);
-            dpad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, true);
-            dpad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, false); // Back to Rides.
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_DOWN, true); // The slots are a grid: Down from Again is Rides.
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_DOWN, false);
             std::this_thread::sleep_for(std::chrono::milliseconds(300));
             trigger(false);
             Check(!H::QuickWheelOpen() && W::HandheldRidesIsOpen(), "Releasing L2 did not open Rides");
@@ -329,8 +332,21 @@ int main(int argc, char** argv)
             Check(!H::QuickWheelOpen() && !menu(), "B did not close the wheel");
             trigger(true);
             trigger(false);
-            dpad(SDL_CONTROLLER_BUTTON_DPAD_DOWN, true);
+            // Single presses reach the corners: Up (Build), then Left (Guests, top left).
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_UP, true);
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_UP, false);
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_LEFT, true);
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_LEFT, false);
+            Check(
+                H::QuickWheelSelection() == std::optional<std::string>("Guests"),
+                "Up then Left did not reach the top-left slot");
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_DOWN, true); // Down from Guests skips nothing: Finances.
             dpad(SDL_CONTROLLER_BUTTON_DPAD_DOWN, false);
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_DOWN, true); // Pause.
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_DOWN, false);
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, true); // Park map (bottom middle).
+            dpad(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, false);
+            Check(H::QuickWheelSelection() == std::optional<std::string>("Park map"), "Grid steps did not reach Park map");
             press(H::Action::confirm);
             Check(!H::QuickWheelOpen() && menu(), "A on a pointed slot did not open it");
             wm->CloseByClass(WindowClass::handheldMenu);

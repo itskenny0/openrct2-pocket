@@ -43,6 +43,10 @@ namespace OpenRCT2::Ui::Handheld
     void JumpToAlert(const Alerts::Alert& alert);
     void UpdateExplorer(ControllerInput& input);
     bool QuickWheelOpen();
+    // Development: UI drawn outside every overlay window, which can never reach the screen.
+    std::string OverlayAudit();
+    // The label of the quick menu's selected slot, if any (for tests).
+    std::optional<std::string> QuickWheelSelection();
     void HandleExplorerInput(ControllerInput& input, const Frame& frame);
     void EndTerrain();
     std::optional<CoordsXY> CurrentTerrainTile();

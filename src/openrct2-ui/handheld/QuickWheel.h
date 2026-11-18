@@ -3,6 +3,7 @@
 #include "NativeMenuArt.h"
 #include "Panel.h"
 
+#include <algorithm>
 #include <array>
 #include <openrct2/SpriteIds.h>
 #include <optional>
@@ -63,23 +64,32 @@ namespace OpenRCT2::Ui::Handheld::QuickWheel
         {
             *this = {};
         }
-        // D-pad state to slot. Letting go of one half of a diagonal does not drop to the
-        // neighbouring cardinal: buttons are never released on exactly the same frame.
-        void Point(int x, int y)
+        // The slots form a 3x3 grid around an empty centre. Each D-pad press steps one cell (Up then
+        // Left reaches the top-left), stepping over the centre, so every slot is reachable with
+        // single presses; a true diagonal (both directions down) still jumps straight to a corner.
+        void Step(int x, int y)
         {
-            const bool wasDiagonal = lastX != 0 && lastY != 0;
-            const bool shrinking = wasDiagonal && ((x == lastX && y == 0) || (y == lastY && x == 0));
-            if ((x != 0 || y != 0) && !shrinking)
-                for (size_t i = 0; i < kSlots.size(); ++i)
-                    if (kSlots[i].dx == x && kSlots[i].dy == y)
-                        selected = i;
-            if (!shrinking)
-            {
-                lastX = x;
-                lastY = y;
-            }
             if (x == 0 && y == 0)
-                lastX = lastY = 0;
+                return;
+            int cx = 0, cy = 0;
+            if (selected)
+            {
+                cx = kSlots[*selected].dx;
+                cy = kSlots[*selected].dy;
+            }
+            int nx = std::clamp(cx + x, -1, 1), ny = std::clamp(cy + y, -1, 1);
+            if (nx == 0 && ny == 0)
+            {
+                nx = std::clamp(nx + x, -1, 1);
+                ny = std::clamp(ny + y, -1, 1);
+            }
+            Select(nx, ny);
+        }
+        void Select(int x, int y)
+        {
+            for (size_t i = 0; i < kSlots.size(); ++i)
+                if (kSlots[i].dx == x && kSlots[i].dy == y)
+                    selected = i;
         }
     };
 
@@ -131,15 +141,15 @@ namespace OpenRCT2::Ui::Handheld::QuickWheel
         const std::string top = state.selected ? name(*state.selected) : std::string("Quick menu");
         const std::string bottom = state.tapped ? (state.selected ? "A choose / B close" : "D-pad to point")
             : state.selected                    ? "Release L2"
-                                                : "Point with D-pad";
+                                                : "Move with the D-pad";
         const int tw = TextWidth(top, true), bw = TextWidth(bottom);
         DrawStrongText(rt, hubPos + ScreenCoordsXY{ (hub.width - tw) / 2, 7 }, "{WHITE}" + top);
         DrawModernText(rt, hubPos + ScreenCoordsXY{ (hub.width - bw) / 2, 23 }, "{MUTED}" + bottom);
         DrawFooter(
             rt, screen,
             state.tapped
-                ? std::vector<ControlHint>{ { "D-pad", "Point" }, { "A", "Choose" }, { "Y", "Photo" }, { "B", "Close" } }
+                ? std::vector<ControlHint>{ { "D-pad", "Move" }, { "A", "Choose" }, { "Y", "Photo" }, { "B", "Close" } }
                 : std::vector<ControlHint>{
-                      { "D-pad", "Point" }, { "L2", "Release to choose" }, { "Y", "Photo" }, { "B", "Close" } });
+                      { "D-pad", "Move" }, { "L2", "Release to choose" }, { "Y", "Photo" }, { "B", "Close" } });
     }
 } // namespace OpenRCT2::Ui::Handheld::QuickWheel

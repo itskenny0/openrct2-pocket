@@ -134,6 +134,9 @@ int main(int argc, char** argv)
             ResetAllSpriteQuadrantPlacements();
             Drawing::UpdatePaletteEffects();
             ViewportRender(rt, WindowGetMain()->viewport);
+            if (std::getenv("POCKET_OVERLAY_AUDIT"))
+                if (const auto gap = H::OverlayAudit(); !gap.empty())
+                    std::cerr << "AUDIT " << name << ": " << gap << "\n";
             if (auto* window = wm->FindByClass(WindowClass::handheldMenu))
                 window->onDraw(rt);
             else
