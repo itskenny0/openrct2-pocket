@@ -49,6 +49,7 @@
 #include <openrct2-ui/interface/Window.h>
 #include <openrct2-ui/windows/Windows.h>
 #include <openrct2/Context.h>
+#include <openrct2/Diagnostic.h>
 #include <openrct2/GameState.h>
 #include <openrct2/Input.h>
 #include <openrct2/OpenRCT2.h>
@@ -716,12 +717,155 @@ namespace OpenRCT2::Ui::Handheld
         return 0;
     }
 
+    // Pocket's UI is drawn once into an off-screen layer, and every overlay window copies its part
+    // of that layer. The game redraws the screen in 128x128 blocks and redraws every window over
+    // each changed block, so drawing the whole UI per window made it cost dozens of full UI draws
+    // per frame while the park moved. The layer is redrawn only when something on it changed.
+    static std::vector<Drawing::PaletteIndex> _layer;
+    static int32_t _layerWidth{}, _layerHeight{};
+    static bool _layerStale = true;
+    static bool _layerFresh = false; // Drawn since the update last checked its coverage.
+    static void MarkLayerStale()
+    {
+        _layerStale = true;
+    }
+    static void SyncFocusWindow();
+    // Describes UI drawn in a layer outside every overlay window ("" when all of it is covered).
+    // The catch-all overlay window: covers whatever UI the other windows miss.
+    static constexpr WindowNumber kCoverWindow = 9;
+    struct Gap
+    {
+        int32_t count{};
+        ScreenRect bounds{};
+    };
+    static Gap FindGap(const std::vector<Drawing::PaletteIndex>& layer, int32_t width, int32_t height, bool countCover)
+    {
+        std::vector<ScreenRect> covered;
+        for (const auto& window : gWindowList)
+            if (!window->flags.has(WindowFlag::dead)
+                && (window->classification == WindowClass::handheldHud || window->classification == WindowClass::handheldFocus)
+                && (countCover || window->classification != WindowClass::handheldHud || window->number != kCoverWindow))
+                covered.push_back({ window->windowPos, window->windowPos + ScreenCoordsXY{ window->width, window->height } });
+        int32_t count = 0, l = width, t = height, r = 0, b = 0;
+        for (int32_t y = 0; y < height; ++y)
+            for (int32_t x = 0; x < width; ++x)
+            {
+                if (layer[static_cast<size_t>(y) * width + x] == Drawing::PaletteIndex::transparent)
+                    continue;
+                bool inside = false;
+                for (const auto& rect : covered)
+                    if (x >= rect.getLeft() && x < rect.getRight() && y >= rect.getTop() && y < rect.getBottom())
+                    {
+                        inside = true;
+                        break;
+                    }
+                if (inside)
+                    continue;
+                ++count;
+                l = std::min(l, x);
+                t = std::min(t, y);
+                r = std::max(r, x);
+                b = std::max(b, y);
+            }
+        if (count == 0)
+            return {};
+        return { count, { { l, t }, { r + 1, b + 1 } } };
+    }
+    static std::string OverlayGap(const std::vector<Drawing::PaletteIndex>& layer, int32_t width, int32_t height)
+    {
+        const auto gap = FindGap(layer, width, height, true);
+        if (gap.count == 0)
+            return {};
+        return std::to_string(gap.count) + " uncovered pixels in " + std::to_string(gap.bounds.getLeft()) + ","
+            + std::to_string(gap.bounds.getTop()) + "-" + std::to_string(gap.bounds.getRight() - 1) + ","
+            + std::to_string(gap.bounds.getBottom() - 1);
+    }
+    std::string OverlayAudit()
+    {
+        SyncFocusWindow();
+        const int32_t width = ContextGetWidth(), height = ContextGetHeight();
+        std::vector<Drawing::PaletteIndex> layer(static_cast<size_t>(width) * height, Drawing::PaletteIndex::transparent);
+        Drawing::RenderTarget rt{};
+        rt.bits = layer.data();
+        rt.width = width;
+        rt.height = height;
+        rt.cullingWidth = width;
+        rt.cullingHeight = height;
+        DrawExplorer(rt);
+        return OverlayGap(layer, width, height);
+    }
+    static void RenderLayer(int32_t width, int32_t height)
+    {
+        if (width != _layerWidth || height != _layerHeight)
+        {
+            _layer.assign(static_cast<size_t>(width) * height, Drawing::PaletteIndex::transparent);
+            _layerWidth = width;
+            _layerHeight = height;
+            _layerStale = true;
+        }
+        if (!_layerStale)
+            return;
+        std::fill(_layer.begin(), _layer.end(), Drawing::PaletteIndex::transparent);
+        Drawing::RenderTarget layer{};
+        layer.bits = _layer.data();
+        layer.width = width;
+        layer.height = height;
+        layer.pitch = 0;
+        layer.cullingWidth = width;
+        layer.cullingHeight = height;
+        // Sprites, lines and filled shapes are drawn through the engine; without it they vanish.
+        layer.DrawingEngine = GetContext()->GetDrawingEngine();
+        DrawExplorer(layer);
+        _layerStale = false;
+        _layerFresh = true;
+        // Diagnostics (POCKET_LAYER_STATS=1): how often the UI layer is redrawn, once a second.
+        static const bool stats = std::getenv("POCKET_LAYER_STATS") != nullptr;
+        if (stats)
+        {
+            static uint64_t since = MenuFeel::Clock();
+            static int draws = 0;
+            ++draws;
+            if (MenuFeel::Clock() - since >= 1000)
+            {
+                LOG_INFO("Pocket overlay: %d layer draws in the last second", draws);
+                draws = 0;
+                since = MenuFeel::Clock();
+            }
+        }
+        // Development check (POCKET_OVERLAY_AUDIT=1): UI drawn where no overlay window covers it is
+        // never copied to the screen.
+        static const bool audit = std::getenv("POCKET_OVERLAY_AUDIT") != nullptr;
+        if (audit)
+            if (const auto gap = OverlayGap(_layer, width, height); !gap.empty())
+                LOG_WARNING("Pocket overlay audit: %s", gap.c_str());
+    }
+    static void CopyFromLayer(Drawing::RenderTarget& rt)
+    {
+        const int32_t width = ContextGetWidth(), height = ContextGetHeight();
+        static const bool direct = std::getenv("POCKET_NO_LAYER") != nullptr;
+        if (direct || width <= 0 || height <= 0 || rt.zoom_level != ZoomLevel{ 0 })
+            return DrawExplorer(rt);
+        RenderLayer(width, height);
+        // Copy the layer's drawn pixels (not its transparent ones) into the window's region.
+        const int32_t x0 = std::max(rt.x, 0), y0 = std::max(rt.y, 0);
+        const int32_t x1 = std::min(rt.x + rt.width, width), y1 = std::min(rt.y + rt.height, height);
+        const int32_t stride = rt.width + rt.pitch;
+        for (int32_t y = y0; y < y1; ++y)
+        {
+            const auto* src = &_layer[static_cast<size_t>(y) * width];
+            auto* dst = rt.bits + static_cast<size_t>(y - rt.y) * stride - rt.x;
+            for (int32_t x = x0; x < x1; ++x)
+                if (src[x] != Drawing::PaletteIndex::transparent)
+                    dst[x] = src[x];
+        }
+    }
+
     class FocusWindow final : public Window
     {
     public:
         void onDraw(Drawing::RenderTarget& rt) override
         {
-            DrawExplorer(rt);
+            CopyFromLayer(rt);
         }
     };
 
@@ -774,8 +918,32 @@ namespace OpenRCT2::Ui::Handheld
     // needs a window under it: when the park scrolls, the game shifts the screen's pixels and
     // repaints only the newly exposed strips and the areas windows cover, so an element without a
     // window is dragged along with the map and only partly redrawn.
-    static WindowBase* SyncOverlay(WindowNumber number, bool visible, ScreenCoordsXY origin, ScreenSize size, bool repaint)
+    // Any repaint of an overlay window means the layer it copies from must be redrawn first.
+    static void Repaint(WindowBase* window)
     {
+        if (window == nullptr)
+            return;
+        window->invalidate();
+        MarkLayerStale();
+    }
+    static WindowBase* CreateOverlay(
+        IWindowManager* wm, WindowClass cls, const ScreenCoordsXY& pos, ScreenSize size, WindowFlags flags)
+    {
+        MarkLayerStale();
+        return wm->Create<FocusWindow>(cls, pos, size, flags);
+    }
+
+    static WindowBase* SyncOverlay(
+        WindowNumber number, bool visible, ScreenCoordsXY origin, ScreenSize size, bool repaint, bool layerChanged = true)
+    {
+        // layerChanged: whether what this window shows changed. Moving a window over an unchanged
+        // layer only needs the window repainted, not the layer drawn again.
+        const auto touch = [layerChanged](WindowBase* w) {
+            if (layerChanged)
+                Repaint(w);
+            else if (w != nullptr)
+                w->invalidate();
+        };
         auto* wm = GetWindowManager();
         auto* window = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ number });
         if (!visible)
@@ -786,26 +954,28 @@ namespace OpenRCT2::Ui::Handheld
         }
         if (window == nullptr)
         {
-            window = wm->Create<FocusWindow>(
-                WindowClass::handheldHud, origin, size,
-                { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
+            const WindowFlags flags{ WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground,
+                                     WindowFlag::noTitleBar };
+            window = layerChanged ? CreateOverlay(wm, WindowClass::handheldHud, origin, size, flags)
+                                  : wm->Create<FocusWindow>(WindowClass::handheldHud, origin, size, flags);
             if (window != nullptr)
                 window->number = number;
             return window;
         }
         if (window->windowPos != origin || window->width != size.width || window->height != size.height)
         {
-            window->invalidate();
+            touch(window);
             window->windowPos = origin;
             window->width = size.width;
             window->height = size.height;
-            window->invalidate();
+            touch(window);
         }
         else if (repaint)
-            window->invalidate();
+            touch(window);
         return window;
     }
 
+    static uint64_t _pulseDrawn{};
     static void SyncFocusWindow()
     {
         auto* wm = GetWindowManager();
@@ -824,18 +994,25 @@ namespace OpenRCT2::Ui::Handheld
             // An empty, input-transparent widget list lets map hit testing pass through.
             // A real overlay window also keeps viewport scroll blits from smearing the reticle.
             // Sized for the pulsing target brackets, not just the cross.
-            wm->Create<FocusWindow>(
-                WindowClass::handheldFocus, position, { kCursorWindow, kCursorWindow },
+            CreateOverlay(
+                wm, WindowClass::handheldFocus, position, { kCursorWindow, kCursorWindow },
                 { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
         }
         else if (focus->windowPos != position)
         {
-            focus->invalidate();
+            Repaint(focus);
             focus->windowPos = position;
-            focus->invalidate();
+            Repaint(focus);
         }
-        else if (_inspect.kind != _drawnInspectKind || (_inspect.kind != InspectKind::none && !MenuFeel::reduceMotion))
-            focus->invalidate(); // Target colour changed, or the brackets are pulsing.
+        else if (
+            _inspect.kind != _drawnInspectKind
+            || (_inspect.kind != InspectKind::none && !MenuFeel::reduceMotion && MenuFeel::Clock() - _pulseDrawn >= 80))
+        {
+            // Target colour changed, or the brackets are pulsing (about 12 times a second is
+            // plenty for a soft pulse, and each one redraws the overlay layer).
+            _pulseDrawn = MenuFeel::Clock();
+            Repaint(focus);
+        }
         _drawnInspectKind = _inspect.kind;
         // Name chip beside the cursor, sized to the name; absent when nothing is under it.
         auto* chip = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 4 });
@@ -850,21 +1027,21 @@ namespace OpenRCT2::Ui::Handheld
             const auto size = InspectChipSize();
             if (chip == nullptr)
             {
-                chip = wm->Create<FocusWindow>(
-                    WindowClass::handheldHud, origin, size,
+                chip = CreateOverlay(
+                    wm, WindowClass::handheldHud, origin, size,
                     { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
                 if (chip != nullptr)
                     chip->number = 4;
             }
             else if (chip->windowPos != origin || chip->width != size.width)
             {
-                chip->invalidate();
+                Repaint(chip);
                 chip->windowPos = origin;
                 chip->width = size.width;
                 chip->height = size.height;
             }
             if (chip != nullptr && refresh)
-                chip->invalidate();
+                Repaint(chip);
         }
         auto* toast = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 5 });
         if (!ToastVisible())
@@ -877,42 +1054,42 @@ namespace OpenRCT2::Ui::Handheld
             const auto size = ToastSize();
             if (toast == nullptr)
             {
-                toast = wm->Create<FocusWindow>(
-                    WindowClass::handheldHud, ToastOrigin(), size,
+                toast = CreateOverlay(
+                    wm, WindowClass::handheldHud, ToastOrigin(), size,
                     { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
                 if (toast != nullptr)
                     toast->number = 5;
             }
             else
             {
-                toast->invalidate();
+                Repaint(toast);
                 toast->windowPos = ToastOrigin();
                 toast->width = size.width;
                 toast->height = size.height;
             }
             if (toast != nullptr)
-                toast->invalidate();
+                Repaint(toast);
         }
         auto* hud = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 0 });
         if (hud == nullptr)
         {
-            hud = wm->Create<FocusWindow>(
-                WindowClass::handheldHud, { 0, ContextGetHeight() - kActionStripHeight },
+            hud = CreateOverlay(
+                wm, WindowClass::handheldHud, { 0, ContextGetHeight() - kActionStripHeight },
                 { ContextGetWidth(), kActionStripHeight },
                 { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
         }
         if (hud != nullptr && refresh)
         {
-            hud->invalidate();
+            Repaint(hud);
             hud->windowPos = { 0, ContextGetHeight() - kActionStripHeight };
             hud->width = ContextGetWidth();
-            hud->invalidate();
+            Repaint(hud);
         }
         auto* top = wm->FindByNumber(WindowClass::handheldHud, WindowNumber{ 3 });
         if (top == nullptr)
         {
-            top = wm->Create<FocusWindow>(
-                WindowClass::handheldHud, { Layout::margin, Layout::hudTop },
+            top = CreateOverlay(
+                wm, WindowClass::handheldHud, { Layout::margin, Layout::hudTop },
                 { ContextGetWidth() - 2 * Layout::margin, Layout::hudHeight },
                 { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
             if (top != nullptr)
@@ -920,9 +1097,9 @@ namespace OpenRCT2::Ui::Handheld
         }
         if (top != nullptr && refresh)
         {
-            top->invalidate();
+            Repaint(top);
             top->width = ContextGetWidth() - 2 * Layout::margin;
-            top->invalidate();
+            Repaint(top);
         }
         // A separate small input-transparent window redraws only the tool panel,
         // rather than placing a full-screen overlay over the scrolling viewport.
@@ -931,14 +1108,14 @@ namespace OpenRCT2::Ui::Handheld
         {
             if (tools == nullptr)
             {
-                tools = wm->Create<FocusWindow>(
-                    WindowClass::handheldHud, Concept::kOrigin, kTerrainOverlaySize,
+                tools = CreateOverlay(
+                    wm, WindowClass::handheldHud, Concept::kOrigin, kTerrainOverlaySize,
                     { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
                 if (tools != nullptr)
                     tools->number = 1;
             }
             if (tools != nullptr && refresh)
-                tools->invalidate();
+                Repaint(tools);
         }
         else if (tools != nullptr)
             wm->Close(*tools);
@@ -947,8 +1124,8 @@ namespace OpenRCT2::Ui::Handheld
         {
             if (cost == nullptr)
             {
-                cost = wm->Create<FocusWindow>(
-                    WindowClass::handheldHud,
+                cost = CreateOverlay(
+                    wm, WindowClass::handheldHud,
                     Layout::ContextAnchor({ ContextGetWidth(), ContextGetHeight() }, kContextSize, CustomTracks::Active()),
                     kContextSize,
                     { WindowFlag::stickToFront, WindowFlag::transparent, WindowFlag::noBackground, WindowFlag::noTitleBar });
@@ -957,10 +1134,10 @@ namespace OpenRCT2::Ui::Handheld
             }
             if (cost != nullptr && refresh)
             {
-                cost->invalidate();
+                Repaint(cost);
                 cost->windowPos = Layout::ContextAnchor(
                     { ContextGetWidth(), ContextGetHeight() }, kContextSize, CustomTracks::Active());
-                cost->invalidate();
+                Repaint(cost);
             }
         }
         else if (cost != nullptr)
@@ -975,6 +1152,18 @@ namespace OpenRCT2::Ui::Handheld
         SyncOverlay(7, _wheel.open, { 0, 0 }, screen, refresh);
         SyncOverlay(
             8, _photo.active && MenuFeel::Clock() < _photo.hintUntil, { 0, Layout::hudTop }, { screen.width, 40 }, refresh);
+        // Give any UI that no window covers a window of its own, so a panel that outgrows its
+        // window (or a new one without a window) still reaches the screen and is repainted properly
+        // when the park scrolls. The layer is drawn in the draw phase (the engine allows drawing
+        // only then), so this looks at the last frame's layer: at most one frame late.
+        if (_layerFresh && _layerWidth == screen.width && _layerHeight == screen.height)
+        {
+            _layerFresh = false;
+            const auto gap = FindGap(_layer, screen.width, screen.height, false);
+            SyncOverlay(
+                kCoverWindow, gap.count > 0, gap.bounds.point1,
+                { gap.bounds.getRight() - gap.bounds.getLeft(), gap.bounds.getBottom() - gap.bounds.getTop() }, true, false);
+        }
     }
 
     bool HandleMenuInput(ControllerInput& input, const Frame& frame)
@@ -1652,7 +1841,10 @@ namespace OpenRCT2::Ui::Handheld
             _wheel.Close();
             return;
         }
-        _wheel.Point(frame.heldX, frame.heldY);
+        if (frame.heldX != 0 && frame.heldY != 0)
+            _wheel.Select(frame.heldX, frame.heldY);
+        else
+            _wheel.Step(frame.navigateX, frame.navigateY);
         for (const auto action : frame.actions)
         {
             if (action == Action::confirm && _wheel.selected)
@@ -1682,6 +1874,12 @@ namespace OpenRCT2::Ui::Handheld
             else
                 _wheel.Close();
         }
+    }
+    std::optional<std::string> QuickWheelSelection()
+    {
+        if (!_wheel.open || !_wheel.selected)
+            return std::nullopt;
+        return std::string(QuickWheel::kSlots[*_wheel.selected].label);
     }
     bool QuickWheelOpen()
     {

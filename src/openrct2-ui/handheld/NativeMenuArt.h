@@ -189,15 +189,18 @@ namespace OpenRCT2::Ui::Handheld
     {
         if (!art.sprite)
             return false;
+        // Size and place an animated icon by its first frame. Frames differ by a few pixels, so
+        // laying each out by its own size made the icon hop (and sometimes flip scale) as it played.
+        const auto* image = GfxGetG1Element(art.sprite);
+        if (!image || image->width <= 0 || image->height <= 0)
+            return false;
+        auto frame = art.sprite;
         if (selected && art.frames > 1)
         {
             if (activeMenuFeel)
                 activeMenuFeel->AnimatedSprite();
-            art.sprite += static_cast<uint32_t>((MenuFeel::Clock() / 120) % art.frames);
+            frame += static_cast<uint32_t>((MenuFeel::Clock() / 120) % art.frames);
         }
-        const auto* image = GfxGetG1Element(art.sprite);
-        if (!image || image->width <= 0 || image->height <= 0)
-            return false;
         int zoom = 0;
         // Toolbar/tab sprites have a small transparent rim. Keep their native
         // pixels rather than halving a whole icon for a one-pixel overflow.
@@ -209,7 +212,7 @@ namespace OpenRCT2::Ui::Handheld
         clipped.zoom_level = ZoomLevel{ static_cast<int8_t>(zoom) };
         const int factor = 1 << zoom;
         GfxDrawSprite(
-            clipped, ImageId(art.sprite),
+            clipped, ImageId(frame),
             { (size.width * factor - image->width) / 2 - image->xOffset,
               (size.height * factor - image->height) / 2 - image->yOffset });
         return true;
